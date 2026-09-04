@@ -1,6 +1,6 @@
 # Roadmap
 
-**Current step: A2, complete. A3 is next and has not been started.**
+**Current step: A3, complete. A4 is next and has not been started.**
 
 Three gates. Nothing after a gate begins until the gate passes. Update the line above when a
 step completes, and do not work on more than one step at a time.
@@ -9,17 +9,24 @@ step completes, and do not work on more than one step at a time.
 
 | Dependency | Needed by | Submitted | Approved |
 |---|---|---|---|
-| Etsy developer app | A6 | not yet | |
-| Etsy commercial access | A6 | not yet | |
-| Shopify Partner account | A5 | not yet | |
+| Etsy developer app | A6 | in progress | |
+| Etsy commercial access | A6 | in progress | |
+| Shopify Partner account | A5 | in progress | |
 
 Etsy commercial access has no published SLA and applicants report waiting weeks. It is the
 single most likely thing to delay the roadmap, and it costs nothing to file today.
 
-**Still outstanding as of 4 September 2026.** A0 was marked done on the strength of its
-four checks passing, but filing these was part of A0's scope and was never done. Etsy is
-needed by A6, which is three steps away, and the queue is not ours to hurry. File them
-before writing A3.
+**In progress as of 4 September 2026, none confirmed submitted.** A0 was marked done on
+the strength of its four checks passing, but filing these was part of A0's scope and was
+never done.
+
+These do not block A3, A4 or any step before A5. A3 and A4 are mock adapters and a manual
+editor: no OAuth, no credentials, no external call. The reason this table sits at the top
+of the roadmap is latency, not dependency. Start the clock early so the queue runs down
+while the code is written.
+
+Record the real submission date in the table when each is filed, and treat an unapproved
+Etsy commercial access as a live risk from A6 onward, not as a surprise discovered there.
 
 ---
 
@@ -32,7 +39,7 @@ One real product, published to two channels, by a person who is not you.
 | A0 | Repo, CI, Supabase, env validation, job abstraction. File the app registrations | `main` deploys, migrations apply clean, all four checks green | code done, **app registrations outstanding** |
 | A1 | Auth, workspaces, membership, RLS | Workspace A cannot read any Workspace B row, proven by test, for every table | done |
 | A2 | Canonical product, product types, assets, storage, checksums, image derivative service | A complete product exists with correct derivatives for two image specs, no channel connected | done |
-| A3 | Channel registry, connections, listings, adapter contract, capability matrix, requirements engine, two mock adapters | One product yields two independent mock listings, no marketplace string in the product domain | |
+| A3 | Channel registry, connections, listings, adapter contract, capability matrix, requirements engine, two mock adapters, one `api`-shaped and one `assisted`-shaped | One product yields two independent mock listings, the assisted mock implements no `publish`, and the UI offers none. No marketplace string in the product domain | done |
 | A4 | Manual listing editor, no AI. Readiness UI | A user hand-writes a listing per channel and sees deterministic readiness | |
 | A5 | Shopify: OAuth, adapter, publish, idempotency, error normalization, digital delivery decision | Real product publishes, second click creates nothing, the file is actually deliverable to a buyer | |
 | A6 | Etsy: OAuth, adapter, draft, images, digital file, activate, idempotency | Real product publishes and is purchasable | |
@@ -40,6 +47,17 @@ One real product, published to two channels, by a person who is not you.
 
 **Gate A passes when** an outside creator, unassisted, takes one of their real products from
 empty workspace to two live listings, and leaves them up.
+
+**No third channel joins Gate A.** Creative Market was considered for it, on the argument
+that the pricing model is not real until a billable channel exists, and that at Gate A exit
+the only billable channel is Etsy, whose approval is not ours to grant. It stays at B3
+anyway. The thing Creative Market would prove early is the capability matrix, not the
+revenue, and A3's assisted mock adapter proves that for free: an adapter with no `publish`
+method, a UI that consequently offers no publish button, and `status_source` that can only
+ever be `self_reported`. Building a real assisted channel to learn the same lesson adds a
+marketplace to the gate that closes the loop, which is the one thing the gate is shaped to
+avoid. The Etsy dependency is a real risk and is answered where it lives, in the external
+dependency table above, not by widening Gate A.
 
 ## Gate B: the abstraction holds and the money comes back
 

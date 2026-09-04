@@ -34,6 +34,303 @@ export type Database = {
   }
   public: {
     Tables: {
+      channel_connection_secrets: {
+        Row: {
+          channel_connection_id: string
+          created_at: string
+          encrypted_credentials: string
+          key_version: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          channel_connection_id: string
+          created_at?: string
+          encrypted_credentials: string
+          key_version?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          channel_connection_id?: string
+          created_at?: string
+          encrypted_credentials?: string
+          key_version?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_connection_secrets_channel_connection_id_fkey"
+            columns: ["channel_connection_id"]
+            isOneToOne: true
+            referencedRelation: "channel_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_connection_secrets_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channel_connections: {
+        Row: {
+          channel_id: string
+          connected_at: string
+          created_at: string
+          expires_at: string | null
+          external_account_id: string | null
+          external_account_name: string | null
+          id: string
+          last_verified_at: string | null
+          metadata: Json
+          scopes: string[]
+          status: Database["public"]["Enums"]["connection_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          channel_id: string
+          connected_at?: string
+          created_at?: string
+          expires_at?: string | null
+          external_account_id?: string | null
+          external_account_name?: string | null
+          id?: string
+          last_verified_at?: string | null
+          metadata?: Json
+          scopes?: string[]
+          status?: Database["public"]["Enums"]["connection_status"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          channel_id?: string
+          connected_at?: string
+          created_at?: string
+          expires_at?: string | null
+          external_account_id?: string | null
+          external_account_name?: string | null
+          id?: string
+          last_verified_at?: string | null
+          metadata?: Json
+          scopes?: string[]
+          status?: Database["public"]["Enums"]["connection_status"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_connections_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_connections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channel_listings: {
+        Row: {
+          approved_at: string | null
+          category: string | null
+          channel_connection_id: string
+          channel_id: string
+          created_at: string
+          currency: string
+          description: string | null
+          external_listing_id: string | null
+          external_url: string | null
+          generated_at: string | null
+          id: string
+          last_synced_at: string | null
+          metadata: Json
+          price: number | null
+          product_id: string
+          published_at: string | null
+          short_description: string | null
+          status: Database["public"]["Enums"]["listing_status"]
+          status_source: Database["public"]["Enums"]["listing_status_source"]
+          tags: string[]
+          title: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          category?: string | null
+          channel_connection_id: string
+          channel_id: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          external_listing_id?: string | null
+          external_url?: string | null
+          generated_at?: string | null
+          id?: string
+          last_synced_at?: string | null
+          metadata?: Json
+          price?: number | null
+          product_id: string
+          published_at?: string | null
+          short_description?: string | null
+          status?: Database["public"]["Enums"]["listing_status"]
+          status_source?: Database["public"]["Enums"]["listing_status_source"]
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          category?: string | null
+          channel_connection_id?: string
+          channel_id?: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          external_listing_id?: string | null
+          external_url?: string | null
+          generated_at?: string | null
+          id?: string
+          last_synced_at?: string | null
+          metadata?: Json
+          price?: number | null
+          product_id?: string
+          published_at?: string | null
+          short_description?: string | null
+          status?: Database["public"]["Enums"]["listing_status"]
+          status_source?: Database["public"]["Enums"]["listing_status_source"]
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_listings_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_listings_connection_fk"
+            columns: ["channel_connection_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "channel_connections"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "channel_listings_product_fk"
+            columns: ["product_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "channel_listings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channels: {
+        Row: {
+          billable: boolean
+          created_at: string
+          id: string
+          integration_type: Database["public"]["Enums"]["channel_integration_type"]
+          key: string
+          name: string
+          status: Database["public"]["Enums"]["channel_status"]
+        }
+        Insert: {
+          billable?: boolean
+          created_at?: string
+          id?: string
+          integration_type: Database["public"]["Enums"]["channel_integration_type"]
+          key: string
+          name: string
+          status?: Database["public"]["Enums"]["channel_status"]
+        }
+        Update: {
+          billable?: boolean
+          created_at?: string
+          id?: string
+          integration_type?: Database["public"]["Enums"]["channel_integration_type"]
+          key?: string
+          name?: string
+          status?: Database["public"]["Enums"]["channel_status"]
+        }
+        Relationships: []
+      }
+      listing_snapshots: {
+        Row: {
+          channel_id: string
+          channel_listing_id: string
+          created_at: string
+          id: string
+          payload: Json
+          product_id: string
+          snapshot_type: Database["public"]["Enums"]["snapshot_type"]
+          workspace_id: string
+        }
+        Insert: {
+          channel_id: string
+          channel_listing_id: string
+          created_at?: string
+          id?: string
+          payload: Json
+          product_id: string
+          snapshot_type: Database["public"]["Enums"]["snapshot_type"]
+          workspace_id: string
+        }
+        Update: {
+          channel_id?: string
+          channel_listing_id?: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          product_id?: string
+          snapshot_type?: Database["public"]["Enums"]["snapshot_type"]
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_snapshots_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_snapshots_listing_fk"
+            columns: ["channel_listing_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "channel_listings"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "listing_snapshots_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_assets: {
         Row: {
           asset_state: Database["public"]["Enums"]["asset_state"]
@@ -291,6 +588,17 @@ export type Database = {
         | "screenshot"
         | "promotional"
         | "other"
+      channel_integration_type: "api" | "assisted"
+      channel_status: "available" | "coming_soon" | "unavailable"
+      connection_status: "active" | "expired" | "revoked" | "error"
+      listing_status:
+        | "draft"
+        | "ready"
+        | "publishing"
+        | "published"
+        | "failed"
+        | "archived"
+      listing_status_source: "verified" | "self_reported"
       product_status:
         | "draft"
         | "incomplete"
@@ -310,6 +618,7 @@ export type Database = {
         | "three_d"
         | "theme"
         | "other"
+      snapshot_type: "build" | "publish" | "update" | "unpublish"
       workspace_role: "owner" | "admin" | "editor" | "viewer"
     }
     CompositeTypes: {
@@ -1001,6 +1310,18 @@ export const Constants = {
         "promotional",
         "other",
       ],
+      channel_integration_type: ["api", "assisted"],
+      channel_status: ["available", "coming_soon", "unavailable"],
+      connection_status: ["active", "expired", "revoked", "error"],
+      listing_status: [
+        "draft",
+        "ready",
+        "publishing",
+        "published",
+        "failed",
+        "archived",
+      ],
+      listing_status_source: ["verified", "self_reported"],
       product_status: [
         "draft",
         "incomplete",
@@ -1022,6 +1343,7 @@ export const Constants = {
         "theme",
         "other",
       ],
+      snapshot_type: ["build", "publish", "update", "unpublish"],
       workspace_role: ["owner", "admin", "editor", "viewer"],
     },
   },

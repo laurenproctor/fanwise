@@ -15,7 +15,8 @@ explicitly requested.
 
 ## Current step
 
-**Step: A2 (canonical product, assets, storage, derivatives) is complete. A3 is next.**
+**Step: A3 (channel registry, connections, listings, adapter contract) is complete. A4 is
+next.**
 See `docs/roadmap.md`. Implement the current step only. Do not build ahead.
 
 ## Architecture invariants

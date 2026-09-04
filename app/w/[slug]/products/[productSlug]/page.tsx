@@ -2,6 +2,8 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
 import { getProductBySlug, groupDerivatives, listProductAssets } from "@/lib/products/queries"
+import { listConnections, listProductListings } from "@/lib/channels/queries"
+import { ListingPanel, type ChannelListingCard } from "@/components/channels/listing-panel"
 import { ProductForm } from "./product-form"
 import { AssetManager } from "./asset-manager"
 
@@ -23,6 +25,33 @@ export default async function ProductPage({
 
   const assets = await listProductAssets(product.id)
   const { sources, derivativesBySource } = groupDerivatives(assets)
+
+  const [connections, listings] = await Promise.all([
+    listConnections(workspace.id),
+    listProductListings(product, workspace.id),
+  ])
+
+  // One card per connected channel, whether or not a listing exists yet. The
+  // capability flags come from the adapter and never from the listing row, so a
+  // channel that cannot publish cannot acquire the affordance by having data.
+  const listingByConnection = new Map(listings.map((l) => [l.listing.channel_connection_id, l]))
+
+  const cards: ChannelListingCard[] = connections
+    .filter((c) => c.adapter !== null)
+    .map(({ connection, channel, adapter }) => {
+      const view = listingByConnection.get(connection.id)
+      return {
+        connectionId: connection.id,
+        channelName: channel.name,
+        integrationType: adapter!.integrationType,
+        canPublish: adapter!.capabilities.automaticPublish,
+        listingId: view?.listing.id ?? null,
+        title: view?.listing.title ?? null,
+        statusSource: view?.listing.status_source ?? null,
+        readiness: view?.evaluation?.readiness ?? null,
+        results: view?.evaluation?.results ?? [],
+      }
+    })
 
   return (
     <div className="flex flex-col gap-12">
@@ -55,6 +84,15 @@ export default async function ProductPage({
           sources={sources}
           derivativesBySource={Object.fromEntries(derivativesBySource)}
         />
+      </section>
+
+      <section className="flex flex-col gap-5">
+        <h2 className="label-mono">Channels</h2>
+        <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
+          Each channel judges this product by its own rules. Readiness is computed from those rules,
+          never estimated.
+        </p>
+        <ListingPanel workspaceSlug={slug} productId={product.id} cards={cards} />
       </section>
     </div>
   )

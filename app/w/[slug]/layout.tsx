@@ -42,6 +42,12 @@ export default async function WorkspaceLayout({
             >
               Products
             </Link>
+            <Link
+              href={`/w/${workspace.slug}/channels`}
+              className="text-[14px] text-[var(--color-ink-2)] hover:text-[var(--color-ink)]"
+            >
+              Channels
+            </Link>
           </nav>
           <form action={signOutAction}>
             <button
