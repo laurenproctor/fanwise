@@ -6,10 +6,21 @@ import { createClient } from "@/lib/supabase/server"
 import { listProductAssets } from "@/lib/products/queries"
 import { buildDraft, draftToColumns, evaluate, snapshotPayload } from "./listings"
 import { findAdapter } from "./registry"
-import type { AdapterSubject } from "./types"
+import { updateListingSchema } from "./schemas"
+import type { AdapterSubject, ChannelListingDraft } from "./types"
 
 export interface ActionState {
   error: string | null
+}
+
+/**
+ * Save state for the listing editor. `savedAt` exists so the UI can confirm a
+ * save actually happened, matching the product form: a form that silently
+ * accepts changes leaves the creator unsure whether their edit landed.
+ */
+export interface SaveState {
+  error: string | null
+  savedAt: number | null
 }
 
 const UNIQUE_VIOLATION = "23505"
@@ -212,5 +223,164 @@ export async function buildListingAction(
   }
 
   revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`)
+  return { error: null }
+}
+
+/**
+ * Saves a hand-written listing.
+ *
+ * The creator may save something the channel would reject. That is deliberate:
+ * readiness is how they find out what is wrong, and refusing the save would put
+ * the answer behind the fix. What the channel thinks is recorded, not enforced.
+ *
+ * Readiness is recomputed here even though the browser already computed it
+ * while typing. The client copy is feedback; this one is the record. A verdict
+ * computed only in the browser is a verdict the browser can lie about, and it
+ * is the one that reaches the snapshot.
+ */
+export async function updateListingAction(
+  workspaceSlug: string,
+  listingId: string,
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const parsed = updateListingSchema.safeParse({
+    title: formData.get("title"),
+    description: formData.get("description"),
+    shortDescription: formData.get("shortDescription"),
+    category: formData.get("category"),
+    price: formData.get("price"),
+    currency: formData.get("currency"),
+    tags: formData.get("tags"),
+  })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Check the listing.", savedAt: null }
+  }
+
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data: existing, error: readError } = await supabase
+    .from("channel_listings")
+    .select("*, channel:channels(*)")
+    .eq("id", listingId)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+
+  if (readError) throw readError
+  if (!existing) return { error: "That listing could not be found.", savedAt: null }
+
+  const channel = (existing as { channel: { id: string; key: string } }).channel
+  const adapter = findAdapter(channel.key)
+  if (!adapter) return { error: "That channel is not available.", savedAt: null }
+
+  const { data: product, error: productError } = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", existing.product_id)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+
+  if (productError) throw productError
+  if (!product) return { error: "That product could not be found.", savedAt: null }
+
+  const draft: ChannelListingDraft = {
+    title: parsed.data.title,
+    description: parsed.data.description,
+    shortDescription: parsed.data.shortDescription,
+    price: parsed.data.price,
+    currency: parsed.data.currency,
+    category: parsed.data.category,
+    tags: parsed.data.tags,
+    metadata: (existing.metadata as Record<string, unknown>) ?? {},
+  }
+
+  const { error: updateError } = await supabase
+    .from("channel_listings")
+    .update(draftToColumns(draft))
+    .eq("id", listingId)
+    .eq("workspace_id", workspace.id)
+
+  if (updateError) {
+    console.error("[channels] listing update failed", updateError)
+    return { error: "Those changes could not be saved. Try again.", savedAt: null }
+  }
+
+  const assets = await listProductAssets(product.id)
+  const subject: AdapterSubject = { product, assets }
+  const evaluation = evaluate(adapter, draft, subject)
+
+  const { error: snapshotError } = await supabase.from("listing_snapshots").insert({
+    workspace_id: workspace.id,
+    channel_listing_id: listingId,
+    product_id: product.id,
+    channel_id: channel.id,
+    snapshot_type: "update",
+    payload: snapshotPayload(draft, evaluation) as never,
+  })
+
+  if (snapshotError) {
+    // A gap in the history, not a broken listing. Surfaced, not swallowed, and
+    // not rolled back: losing the edit to preserve the record of it is worse.
+    console.error("[channels] snapshot insert failed", snapshotError)
+  }
+
+  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`, "layout")
+  return { error: null, savedAt: Date.now() }
+}
+
+/**
+ * Copies one field from the canonical product onto the listing.
+ *
+ * Listings are independent rows, and pulling is something the creator does to
+ * one field on purpose. A live binding to the product would silently overwrite
+ * hand-written channel copy the moment the canonical record changed, which is
+ * the opposite of what a per-channel listing is for.
+ */
+export async function pullFromCanonicalAction(
+  workspaceSlug: string,
+  listingId: string,
+  field: "title" | "description" | "shortDescription" | "price",
+): Promise<ActionState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data: listing, error: readError } = await supabase
+    .from("channel_listings")
+    .select("id, product_id")
+    .eq("id", listingId)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+
+  if (readError) throw readError
+  if (!listing) return { error: "That listing could not be found." }
+
+  const { data: product, error: productError } = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", listing.product_id)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+
+  if (productError) throw productError
+  if (!product) return { error: "That product could not be found." }
+
+  const columns = {
+    title: { title: product.canonical_title ?? product.name },
+    description: { description: product.canonical_description },
+    shortDescription: { short_description: product.short_description },
+    price: { price: product.base_price, currency: product.currency },
+  }[field]
+
+  const { error } = await supabase
+    .from("channel_listings")
+    .update(columns)
+    .eq("id", listingId)
+    .eq("workspace_id", workspace.id)
+
+  if (error) {
+    console.error("[channels] pull from canonical failed", error)
+    return { error: "That field could not be updated. Try again." }
+  }
+
+  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`, "layout")
   return { error: null }
 }

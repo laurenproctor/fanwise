@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Button } from "@/components/ui/button"
+import { Button, ButtonLink } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { buildListingAction } from "@/lib/channels/actions"
 import { ReadinessBar } from "./readiness-bar"
@@ -35,10 +35,12 @@ export interface ChannelListingCard {
 
 export function ListingPanel({
   workspaceSlug,
+  productSlug,
   productId,
   cards,
 }: {
   workspaceSlug: string
+  productSlug: string
   productId: string
   cards: ChannelListingCard[]
 }) {
@@ -116,7 +118,12 @@ export function ListingPanel({
                 </p>
               ) : null}
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <ButtonLink
+                  href={`/w/${workspaceSlug}/products/${productSlug}/channels/${card.connectionId}`}
+                >
+                  Edit listing
+                </ButtonLink>
                 <Button
                   variant="secondary"
                   onClick={() => build(card.connectionId)}

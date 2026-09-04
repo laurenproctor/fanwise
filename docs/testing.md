@@ -14,9 +14,18 @@ the wrong one is how this suite passes while proving nothing.
 **Integration** — mocked Shopify, Etsy, Anthropic and Stripe. OAuth token handling, product
 creation, upload, publish, retry, transaction ingestion, AI failure.
 
-**E2E** — the ten journeys below, plus `tests/e2e/journey-03-channels.spec.ts`, which is
-A3's exit test against the mock channels rather than one of the ten: one product, two
-independent listings, and no publish affordance anywhere on the assisted channel.
+**E2E** — the ten journeys below, plus two step exit tests against the mock channels rather
+than against the ten:
+
+- `journey-03-channels.spec.ts` (A3): one product, two independent listings, and no publish
+  affordance anywhere on the assisted channel.
+- `journey-04-listing-editor.spec.ts` (A4): a person hand-writes a listing per channel and
+  watches deterministic readiness resolve, with no AI involved.
+
+**A note on `waitForURL`.** `/products/[^/]+$` also matches `/products/new`, so waiting on
+that pattern resolves instantly against the form just submitted and races the redirect. It
+passes most of the time, which is worse than failing. Exclude the trailing segment
+explicitly.
 
 ## The ten journeys
 
