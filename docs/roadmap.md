@@ -16,6 +16,11 @@ step completes, and do not work on more than one step at a time.
 Etsy commercial access has no published SLA and applicants report waiting weeks. It is the
 single most likely thing to delay the roadmap, and it costs nothing to file today.
 
+**Still outstanding as of 4 September 2026.** A0 was marked done on the strength of its
+four checks passing, but filing these was part of A0's scope and was never done. Etsy is
+needed by A6, which is three steps away, and the queue is not ours to hurry. File them
+before writing A3.
+
 ---
 
 ## Gate A: the loop closes
@@ -24,7 +29,7 @@ One real product, published to two channels, by a person who is not you.
 
 | Step | Content | Exit test | Status |
 |---|---|---|---|
-| A0 | Repo, CI, Supabase, env validation, job abstraction. File the app registrations | `main` deploys, migrations apply clean, all four checks green | done |
+| A0 | Repo, CI, Supabase, env validation, job abstraction. File the app registrations | `main` deploys, migrations apply clean, all four checks green | code done, **app registrations outstanding** |
 | A1 | Auth, workspaces, membership, RLS | Workspace A cannot read any Workspace B row, proven by test, for every table | done |
 | A2 | Canonical product, product types, assets, storage, checksums, image derivative service | A complete product exists with correct derivatives for two image specs, no channel connected | done |
 | A3 | Channel registry, connections, listings, adapter contract, capability matrix, requirements engine, two mock adapters | One product yields two independent mock listings, no marketplace string in the product domain | |
