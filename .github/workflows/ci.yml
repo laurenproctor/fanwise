@@ -9,12 +9,15 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# The local Supabase stack always issues these same demo keys, so they are not
-# secrets. Nothing here is a credential for a deployed project.
+# Placeholders only. They exist so lib/env.ts validation passes in the jobs that
+# never talk to Supabase; the URL has to parse as a URL and the keys have to be
+# non-empty, nothing more. The jobs that do talk to Supabase overwrite all three
+# from the running stack, so nothing here is ever a real credential and the ports
+# are never assumed.
 env:
   NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
-  SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+  SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key
   NEXT_PUBLIC_APP_URL: http://127.0.0.1:3399
 
 jobs:
@@ -46,9 +49,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # No version here on purpose. pnpm/action-setup refuses when the version
-      # is given both here and as packageManager in package.json, so
-      # package.json is the single source of truth.
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -60,6 +60,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: supabase start
       - run: supabase db reset
+      - name: Point the suite at the running stack
+        run: .github/scripts/export-supabase-env.sh
       # docs/testing.md: a failing tenancy test is fixed or reported, never
       # skipped. Do not add continue-on-error to this step.
       - run: pnpm test:db
@@ -71,9 +73,6 @@ jobs:
     needs: [verify, tenancy]
     steps:
       - uses: actions/checkout@v4
-      # No version here on purpose. pnpm/action-setup refuses when the version
-      # is given both here and as packageManager in package.json, so
-      # package.json is the single source of truth.
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -87,6 +86,8 @@ jobs:
       # Journeys 1 and 9 sign real users up, so the auth server has to be live.
       - run: supabase start
       - run: supabase db reset
+      - name: Point the suite at the running stack
+        run: .github/scripts/export-supabase-env.sh
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
