@@ -1,0 +1,24 @@
+node_modules/
+.next/
+out/
+build/
+.DS_Store
+*.pem
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.env
+.env*.local
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+supabase/.temp/
+supabase/.branches/
+# lib/supabase/database.types.ts is deliberately committed. The Supabase clients
+# import it, so `pnpm typecheck` must work on a runner with no database.
+# Regenerate with `pnpm db:types` after every migration.

@@ -1,0 +1,15 @@
+# Build output and generated files.
+.next/
+node_modules/
+playwright-report/
+test-results/
+pnpm-lock.yaml
+lib/supabase/database.types.ts
+
+# Published marketing mockups. CLAUDE.md makes these the source of truth for the
+# visual system; Prettier reflow would churn them for no benefit.
+design/
+
+# Hand-authored prose. These docs use deliberate 90-column wrapping and compact
+# tables that Prettier's markdown table alignment would expand on every edit.
+*.md

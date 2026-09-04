@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+/**
+ * Fanwise design tokens.
+ * Source: design/marketing/. Reference: docs/design-system.md.
+ * Style through these tokens, never literal colors.
+ */
+@theme {
+  /* Light surface, the application and document ground */
+  --color-paper: #fbfaf7;
+  --color-paper-2: #f3f1ec;
+  --color-card: #ffffff;
+  --color-ink: #14161c;
+  --color-ink-2: #4c525f;
+  --color-ink-3: #838996;
+  --color-rule: #e3e0d9;
+  --color-rule-2: #edebe5;
+
+  /* Dark surface, marketing hero and the app window */
+  --color-void: #04060d;
+  --color-deep: #070c1a;
+  --color-navy: #0b142a;
+  --color-panel: #0d1526;
+  --color-panel-2: #111b30;
+  --color-on-dark: #e9f0ff;
+  --color-on-dark-2: #98a6c2;
+
+  /* Accent, used sparingly */
+  --color-accent: #1e3ed4;
+  --color-accent-soft: #ebeefc;
+  --color-glow: #6c9bff;
+  --color-blue: #2e5ce6;
+
+  /* Semantic, never decorative */
+  --color-ok: #1b8a5a;
+  --color-ok-dark: #46d695;
+  --color-warn: #f5b944;
+  --color-bad: #ff8071;
+
+  /* Faces are loaded and self-hosted by next/font in app/layout.tsx, which
+     supplies these three variables. The stacks below are the fallbacks. */
+  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, Menlo, monospace;
+
+  --radius-pill: 999px;
+}
+
+html,
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+/* Mono is the voice of anything the system knows rather than says. */
+.label-mono {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+}
+
+/* Figures that line up in columns always align. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
