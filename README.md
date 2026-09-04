@@ -25,6 +25,14 @@ pnpm db:reset             # applies migrations
 pnpm dev                  # http://localhost:3000
 ```
 
+**If you copied `.env.local` before September 2026, delete any `NODE_ENV` line in it.**
+Next loads `.env.local` during `next build` as well as `next dev`, so a pinned `NODE_ENV`
+overrides the production value the build sets for itself and `pnpm build` fails while
+prerendering the framework's own `/_global-error` page, with
+`Cannot read properties of null (reading 'useContext')`. The error reproduces on a
+hello-world app and names a Next internal page, so it looks like a framework bug and is not
+one. `.env.example` no longer contains the line and a unit test keeps it out.
+
 Verify the toolchain before writing any code:
 
 ```bash
