@@ -14,7 +14,9 @@ the wrong one is how this suite passes while proving nothing.
 **Integration** — mocked Shopify, Etsy, Anthropic and Stripe. OAuth token handling, product
 creation, upload, publish, retry, transaction ingestion, AI failure.
 
-**E2E** — the ten journeys below.
+**E2E** — the ten journeys below, plus `tests/e2e/journey-03-channels.spec.ts`, which is
+A3's exit test against the mock channels rather than one of the ten: one product, two
+independent listings, and no publish affordance anywhere on the assisted channel.
 
 ## The ten journeys
 
@@ -27,7 +29,8 @@ creation, upload, publish, retry, transaction ingestion, AI failure.
 7. Generate a Creative Market submission package.
 8. Analytics shows an ingested sale.
 9. **Workspace A attempts Workspace B access, denied.** *(covered at A1, in the browser at
-   `tests/e2e/journey-09-tenancy.spec.ts` and at the database in `tests/db/tenancy.test.ts`)*
+   `tests/e2e/journey-09-tenancy.spec.ts` and at the database in `tests/db/tenancy.test.ts`;
+   extended to the A3 tables in `tests/db/channel-tenancy.test.ts`)*
 10. Trial to subscription.
 
 Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, the product

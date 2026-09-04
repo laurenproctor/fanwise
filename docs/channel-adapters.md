@@ -39,29 +39,75 @@ assisted file step.
 
 ## Requirements
 
+Defined at A3 in `lib/channels/types.ts`, evaluated by `lib/channels/requirements.ts`.
+
+**Requirements are data, not code.** An earlier sketch gave every requirement its own
+`validate()` function, which cannot satisfy rule 3 below: a spec carrying a function is code
+by construction, and adding a channel would mean writing validation rather than writing
+configuration. A single evaluator walks declarative specs instead.
+
 ```ts
-interface ChannelRequirement {
+type RequirementSpec =
+  | { kind: "text";   field: ListingTextField;   minLength?: number; maxLength?: number }
+  | { kind: "number"; field: ListingNumberField; min?: number; max?: number }
+  | { kind: "tags";   minCount?: number; maxCount?: number; maxTagLength?: number }
+  | { kind: "enum";   field: ListingTextField; allowed: readonly string[] }
+  | { kind: "asset";  assetTypes: readonly AssetType[]; minCount: number }
+  | { kind: "custom"; evaluate(draft, subject): { satisfied: boolean; message?: string } }
+```
+
+Each carries `key`, `label`, an optional `description`, and a `severity` of `error`,
+`warning` or `info`. `custom` is the escape hatch for a genuinely odd rule, not the default
+shape.
+
+There is no separate `required` boolean. `severity: "error"` is what required means, because
+two fields that must agree are two fields that can disagree.
+
+```ts
+interface RequirementResult {
   key: string
   label: string
   description?: string
-  required: boolean
-  validate(product: CanonicalProduct, listing?: ChannelListing): RequirementResult
-}
-
-interface RequirementResult {
-  satisfied: boolean
   severity: "error" | "warning" | "info"
+  satisfied: boolean
   message?: string
 }
 ```
 
-Deterministic. Readiness is errors resolved over errors total, and no model touches it.
+Deterministic and synchronous: no model, no network, no clock. The same product and draft
+always produce the same result, which is the only reason a readiness number is worth showing.
+
+**An `asset` rule counts only `ready` assets.** A pending row is a promise the finalize job
+has not kept, and publishing against one ships a listing whose file may turn out to be
+missing.
+
+## Readiness
+
+Errors resolved over errors total. Warnings are counted, displayed separately, and never
+block. Two consequences, both easy to get wrong later:
+
+- A channel with no error-severity rules is ready. The score is 1, not 0 and not `NaN`.
+- `ready` is exactly "no unsatisfied errors". It is never the score crossing a threshold,
+  because a threshold invites the idea that 90% ready is publishable, and it is not.
+
+Readiness is computed on read, from the stored listing, never persisted. Requirements change
+when an adapter changes, and a stored score would go stale silently: the listing would keep
+claiming it was publishable under rules that no longer exist.
+
+Once a creator can hand-edit a listing at A4, readiness is judged on what is **stored**, not
+on what the adapter would rebuild. Judging the rebuild would tell someone their edits were
+fine when the thing that would actually be submitted is not.
 
 ## Adding a channel
 
 1. Write `docs/channels/<key>.md` first, with the field-level spec. `creative-market.md` is
    the worked example.
-2. Declare capabilities honestly. Absent methods are how honesty is enforced.
+2. Declare capabilities honestly. Absent methods are how honesty is enforced, and unit tests
+   check it in both directions: a declared capability must have its method, and an
+   implemented method must be declared. An assisted adapter may never declare
+   `automaticPublish` or `automaticUpdate`.
+   Declare a capability false when the feature exists but the step that uses it has not
+   arrived. `metrics` and `transactions` are false on both A3 mocks for exactly this reason.
 3. Express the submission spec as data, not code, so a new assisted channel is a config file
    rather than a feature.
 4. Requirements before transformations. Knowing what would be rejected is more valuable than

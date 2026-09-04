@@ -118,22 +118,95 @@ Storage is a private bucket, `product-assets`, path
 
 ## A3: channels
 
-**channels** — id, key, name, integration_type, status, created_at
+Built. Migration `20260904173000_channels_connections_listings`.
+
+**channels** — id, key (citext, unique), name, integration_type, status, billable,
+created_at
+
+A global catalog, not tenant data: no `workspace_id`, and every signed-in user
+sees the same list. Readable by `authenticated`, writable by nobody. Rows are
+born in migrations.
+
+**Capabilities are deliberately not stored here.** They are declared in
+`lib/channels/registry.ts`, because a capability in an editable row is a
+capability that can be made to lie, and the UI reads capabilities to decide what
+to offer. A unit test asserts the registry and this table agree on key, name and
+integration type, so drift fails CI rather than production.
+
+`billable` ships now although billing is C1. It is false for an owned storefront
+included in the base price and true for every external marketplace, per
+`docs/billing.md` rule 4. Adding it later would mean backfilling live
+connections.
 
 **channel_connections** — id, workspace_id, channel_id, external_account_id,
-external_account_name, status, encrypted_credentials, scopes, metadata, connected_at,
-last_verified_at, expires_at, created_at, updated_at
+external_account_name, status, scopes, metadata, connected_at, last_verified_at,
+expires_at, created_at, updated_at
 
-**channel_listings** — id, workspace_id, product_id, channel_id, channel_connection_id,
-external_listing_id, external_url, status, status_source, title, description,
-short_description, price, currency, category, tags, metadata, generated_at, approved_at,
-published_at, last_synced_at, created_at, updated_at
+Unique on `(workspace_id, channel_id, external_account_id)`: one workspace
+connects one external account once. `(id, workspace_id)` carries the redundant
+unique constraint the composite foreign key from `channel_listings` needs.
 
-`status_source` is `verified` or `self_reported`. An assisted channel can only ever produce
-`self_reported`, and nothing that implies verification may read those rows as equal.
+### Revision: credentials are a table, not a column
 
-**listing_snapshots** — id, channel_listing_id, product_id, channel_id, snapshot_type,
-payload, created_at. Insert only.
+`encrypted_credentials` was previously listed as a column on
+`channel_connections`. It is not, and should not be.
+
+**RLS filters rows, never columns.** A credential sitting beside readable
+columns is protected only by every present and future query remembering to name
+its columns instead of `select *`. One slip returns a marketplace token to the
+browser.
+
+**channel_connection_secrets** — channel_connection_id (pk), workspace_id,
+encrypted_credentials, key_version, created_at, updated_at
+
+The table has **no grant to `anon` or `authenticated` at all**, so it is
+unreachable through PostgREST rather than merely policy-protected. RLS is
+enabled with zero policies as a second layer, so a grant added by mistake later
+still returns nothing. The only path is the service role, from server code.
+
+`key_version` records which `CREDENTIALS_ENCRYPTION_KEY` sealed the row.
+Rotation without it is a guess.
+
+A3 creates this table and never writes to it. The credentials service arrives at
+A5 with the first real connection.
+
+**channel_listings** — id, workspace_id, product_id, channel_id,
+channel_connection_id, external_listing_id, external_url, status, status_source,
+title, description, short_description, price, currency, category, tags, metadata,
+generated_at, approved_at, published_at, last_synced_at, created_at, updated_at
+
+`status_source` is `verified` or `self_reported`. An assisted channel can only
+ever produce `self_reported`, and nothing that implies verification may read
+those rows as equal. This is enforced by the trigger
+`enforce_listing_status_source()`, not by convention: `integration_type` lives on
+`channels` and the claim lives here, which is further apart than a check
+constraint can see.
+
+**Unique on `(product_id, channel_connection_id)`, not `(product_id, channel_id)`.**
+A creator with two shops on one marketplace has two connections, two listings and
+two billable channels. Keying on the channel would have made that a migration
+later.
+
+A partial unique index on `(channel_id, external_listing_id)` where the external
+id is not null makes a duplicate publication visible at the database rather than
+in a support email.
+
+Both tenant boundaries are composite foreign keys, repeating the A2 lesson: to
+`products (id, workspace_id)` and to `channel_connections (id, workspace_id)`.
+
+**listing_snapshots** — id, workspace_id, channel_listing_id, product_id,
+channel_id, snapshot_type, payload, created_at
+
+Insert only. `authenticated` holds `select` and `insert` and nothing else, and
+`enforce_snapshot_immutability()` blocks the rest for everyone including the
+service role.
+
+**The trigger permits exactly one kind of delete: a cascade whose parent is
+already gone.** Postgres removes a parent row before firing the cascade onto its
+children, so a snapshot can tell the two apart. Without this, immutability would
+block workspace deletion outright, and "never deleted" would be a promise the
+product could not keep the first time someone asked for their account to be
+removed. A direct delete is still refused.
 
 ## A5 to A7: publishing
 
