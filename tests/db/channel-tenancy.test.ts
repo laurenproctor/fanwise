@@ -177,7 +177,15 @@ describe("credentials are unreachable through the API", () => {
     })
     expect(error?.code).toBe(RLS_DENIED)
 
-    const { data } = await adminClient().from("channel_connection_secrets").select("*")
+    // Scoped to the connection the forged insert named, not the whole table.
+    // The assertion here is "alice's insert wrote nothing", and an unscoped
+    // count says "no secret exists anywhere" — which is a different claim, and
+    // false on any machine that has genuinely connected a channel. It passed
+    // only while nobody had.
+    const { data } = await adminClient()
+      .from("channel_connection_secrets")
+      .select("*")
+      .eq("channel_connection_id", aliceConnectionId)
     expect(data).toHaveLength(0)
   })
 
