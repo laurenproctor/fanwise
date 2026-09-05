@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field } from "@/components/ui/field"
+import { RequiredMark } from "@/components/ui/required-mark"
 import { FormError } from "@/components/ui/form-error"
 import { updateProductAction, type SaveState } from "@/lib/products/actions"
 import { PRODUCT_TYPES, PRODUCT_TYPE_LABELS, type Product } from "@/lib/products/types"
@@ -23,19 +24,25 @@ function Area({
   defaultValue,
   rows = 4,
   maxLength,
+  required,
 }: {
   label: string
   name: string
   defaultValue: string
   rows?: number
   maxLength?: number
+  required?: boolean
 }) {
   return (
     <label className="flex flex-col gap-2">
-      <span className="label-mono">{label}</span>
+      <span className="label-mono">
+        {label}
+        {required ? <RequiredMark /> : null}
+      </span>
       <textarea
         name={name}
         rows={rows}
+        required={required}
         maxLength={maxLength}
         defaultValue={defaultValue}
         className="w-full rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-card)] px-3 py-2.5 text-[15px] text-[var(--color-ink)] outline-none focus:border-[var(--color-accent)]"
@@ -124,9 +131,13 @@ export function ProductForm({
         <Field label="Name" name="name" defaultValue={product.name} required maxLength={200} />
 
         <label className="flex flex-col gap-2">
-          <span className="label-mono">Product type</span>
+          <span className="label-mono">
+            Product type
+            <RequiredMark />
+          </span>
           <select
             name="productType"
+            required
             defaultValue={product.product_type}
             className="w-full rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-card)] px-3 py-2.5 text-[15px] text-[var(--color-ink)] outline-none focus:border-[var(--color-accent)]"
           >

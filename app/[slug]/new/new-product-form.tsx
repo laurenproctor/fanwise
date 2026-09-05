@@ -4,6 +4,7 @@ import { useActionState } from "react"
 import { useFormStatus } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Field } from "@/components/ui/field"
+import { RequiredMark } from "@/components/ui/required-mark"
 import { FormError } from "@/components/ui/form-error"
 import { createProductAction, type ActionState } from "@/lib/products/actions"
 import { PRODUCT_TYPES, PRODUCT_TYPE_LABELS } from "@/lib/products/types"
@@ -34,7 +35,10 @@ export function NewProductForm({ workspaceSlug }: { workspaceSlug: string }) {
         placeholder="Aster Grotesk"
       />
       <label className="flex flex-col gap-2">
-        <span className="label-mono">Product type</span>
+        <span className="label-mono">
+          Product type
+          <RequiredMark />
+        </span>
         <select
           name="productType"
           required
