@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { FormError } from "@/components/ui/form-error"
 import { createUploadIntent, deleteAssetAction, finalizeUploadAction } from "@/lib/products/actions"
 import {
@@ -59,6 +60,7 @@ export function AssetManager({
   sources: ProductAsset[]
   derivativesBySource: Record<string, ProductAsset[]>
 }) {
+  const router = useRouter()
   const [assetType, setAssetType] = useState<AssetType>("deliverable")
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -92,7 +94,9 @@ export function AssetManager({
       }
 
       await finalizeUploadAction(workspaceSlug, result.intent.assetId)
-      startTransition(() => window.location.reload())
+      // Re-fetch the server components, rather than reloading the document.
+      // A full reload here raced React's transition and blanked the page.
+      router.refresh()
     } catch {
       setError("The upload did not complete. Try again.")
     } finally {
@@ -104,7 +108,7 @@ export function AssetManager({
     startTransition(async () => {
       const result = await deleteAssetAction(workspaceSlug, assetId)
       if (result.error) setError(result.error)
-      else window.location.reload()
+      else router.refresh()
     })
   }
 
