@@ -37,9 +37,12 @@ const TTL_MS = 5 * 60 * 1000
  * of those has to be an async server action. A plain string helper exported
  * from there is a build error, not a style problem.
  */
+export function appOrigin(): string {
+  return clientEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "")
+}
+
 export function callbackUrl(channelKey: string): string {
-  const base = clientEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "")
-  return `${base}/api/channels/${channelKey}/oauth/callback`
+  return `${appOrigin()}/api/channels/${channelKey}/oauth/callback`
 }
 
 export async function createAuthorizationState(params: {

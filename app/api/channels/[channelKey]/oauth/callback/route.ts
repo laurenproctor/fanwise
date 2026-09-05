@@ -3,7 +3,12 @@ import type { NextRequest } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { storeConnectionCredentials } from "@/lib/credentials"
-import { callbackUrl, consumeAuthorizationState, pruneExpiredStates } from "@/lib/channels/oauth"
+import {
+  appOrigin,
+  callbackUrl,
+  consumeAuthorizationState,
+  pruneExpiredStates,
+} from "@/lib/channels/oauth"
 import { findAdapter } from "@/lib/channels/registry"
 import { normalizeUnknown } from "@/lib/channels/errors"
 
@@ -28,12 +33,18 @@ import { normalizeUnknown } from "@/lib/channels/errors"
  * usable state row behind after a failed attempt.
  */
 
-/** Everything the creator is told. Details go to the log, not the query string. */
-function back(request: NextRequest, workspaceSlug: string | null, message?: string): NextResponse {
-  const target = new URL(
-    workspaceSlug ? `/w/${workspaceSlug}/channels` : "/",
-    request.nextUrl.origin,
-  )
+/**
+ * Everything the creator is told. Details go to the log, not the query string.
+ *
+ * The origin comes from NEXT_PUBLIC_APP_URL, not from the request, for the same
+ * reason callbackUrl() does: an origin derived from a header is an origin
+ * someone else can suggest. Behind the tunnel that development against a real
+ * provider requires, request.nextUrl.origin is also simply wrong — it pairs the
+ * forwarded protocol with the internal host and sends the creator to
+ * https://localhost:3001, which is nowhere.
+ */
+function back(workspaceSlug: string | null, message?: string): NextResponse {
+  const target = new URL(workspaceSlug ? `/w/${workspaceSlug}/channels` : "/", appOrigin())
   if (message) target.searchParams.set("error", message)
   return NextResponse.redirect(target)
 }
@@ -45,7 +56,7 @@ export async function GET(
   const { channelKey } = await params
   const adapter = findAdapter(channelKey)
 
-  if (!adapter?.oauth) return back(request, null, "That channel cannot be connected.")
+  if (!adapter?.oauth) return back(null, "That channel cannot be connected.")
 
   const query = request.nextUrl.searchParams
 
@@ -56,18 +67,18 @@ export async function GET(
     verified = adapter.oauth.verifyCallback(query)
   } catch (error) {
     console.error("[oauth] could not verify callback", { channelKey, error })
-    return back(request, null, "That connection could not be completed.")
+    return back(null, "That connection could not be completed.")
   }
   if (!verified) {
     console.warn("[oauth] callback failed signature verification", { channelKey })
-    return back(request, null, "That connection could not be verified. Start again.")
+    return back(null, "That connection could not be verified. Start again.")
   }
 
   // 2. Consume the state. One winner, decided by the database.
   const state = query.get("state")
   const consumed = state ? await consumeAuthorizationState(state) : null
   if (!consumed) {
-    return back(request, null, "That connection link has expired or was already used. Start again.")
+    return back(null, "That connection link has expired or was already used. Start again.")
   }
 
   void pruneExpiredStates().catch(() => {})
@@ -90,11 +101,7 @@ export async function GET(
   } = await supabase.auth.getUser()
 
   if (!user || user.id !== consumed.userId) {
-    return back(
-      request,
-      workspaceSlug,
-      "Sign in as the person who started that connection, then try again.",
-    )
+    return back(workspaceSlug, "Sign in as the person who started that connection, then try again.")
   }
 
   try {
@@ -143,8 +150,8 @@ export async function GET(
     // held a client secret.
     const normalized = normalizeUnknown(error, adapter.name)
     console.error("[oauth] exchange failed", { channelKey, code: normalized.code })
-    return back(request, workspaceSlug, normalized.message)
+    return back(workspaceSlug, normalized.message)
   }
 
-  return back(request, workspaceSlug)
+  return back(workspaceSlug)
 }
