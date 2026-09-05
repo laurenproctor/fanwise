@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { listProductAssets } from "@/lib/products/queries"
 import { buildDraft, draftToColumns, evaluate, snapshotPayload } from "./listings"
+import { listingImages } from "./images"
 import { findAdapter } from "./registry"
 import { updateListingSchema } from "./schemas"
 import { callbackUrl, createAuthorizationState } from "./oauth"
@@ -310,7 +311,7 @@ export async function buildListingAction(
     product_id: product.id,
     channel_id: channel.id,
     snapshot_type: "build",
-    payload: snapshotPayload(draft, evaluation) as never,
+    payload: snapshotPayload(draft, evaluation, listingImages(subject)) as never,
   })
 
   if (snapshotError) {
@@ -413,7 +414,7 @@ export async function updateListingAction(
     product_id: product.id,
     channel_id: channel.id,
     snapshot_type: "update",
-    payload: snapshotPayload(draft, evaluation) as never,
+    payload: snapshotPayload(draft, evaluation, listingImages(subject)) as never,
   })
 
   if (snapshotError) {

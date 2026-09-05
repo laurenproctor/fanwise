@@ -239,6 +239,94 @@ export async function finalizeUploadAction(
   return { error: null }
 }
 
+/**
+ * Writes the order of a product's images, and with it which one is the cover.
+ *
+ * Position is the model. The first image in the list is the cover and the rest
+ * are previews, so there is no separate cover picker to disagree with the
+ * order. That is why this writes `asset_type` as well as `sort_order`, and why
+ * the ordering migration had to narrow A2's immutability trigger to permit the
+ * cover_image <-> preview_image transition.
+ *
+ * The writes go: every asset down to preview with its new position, then the
+ * first one up to cover. Demoting before promoting means a concurrent reader
+ * can see zero covers but never two. Zero is harmless, because the channel
+ * comparator falls back to sort_order and that is already correct by then; two
+ * would make the storefront's lead image a coin toss.
+ *
+ * Not a transaction, which is a real limitation rather than an oversight: the
+ * client has no transaction API, and an interrupted run leaves an order that is
+ * partly written. It is recoverable by dragging again, nothing external has
+ * been told anything, and the alternative is an RPC this step does not need.
+ */
+export async function reorderProductImagesAction(
+  workspaceSlug: string,
+  productId: string,
+  assetIds: string[],
+): Promise<ActionState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  // Also the emptiness check: no first image means nothing to order.
+  const cover = assetIds[0]
+  if (!cover) return { error: null }
+
+  // Read through RLS before writing anything. This proves the caller may see
+  // every asset it is about to reorder, and that all of them are on this
+  // product rather than borrowed from another one.
+  const { data: assets, error: readError } = await supabase
+    .from("product_assets")
+    .select("id, asset_type")
+    .eq("product_id", productId)
+    .eq("workspace_id", workspace.id)
+    .in("id", assetIds)
+
+  if (readError) {
+    console.error("[assets] could not read images for reorder", readError)
+    return { error: "Those images could not be reordered. Try again." }
+  }
+
+  // Every id has to resolve, or the order being written is not the order the
+  // creator was looking at when they dragged.
+  if (!assets || assets.length !== assetIds.length) {
+    return { error: "Those images have changed. Reload the page and try again." }
+  }
+
+  // Images only. The database trigger permits cover_image <-> preview_image and
+  // refuses everything else, so a deliverable in this list would fail as a
+  // constraint violation; catching it here returns a sentence instead.
+  const reorderable = new Set(["cover_image", "preview_image"])
+  if (assets.some((asset) => !reorderable.has(asset.asset_type))) {
+    return { error: "Only images can be reordered." }
+  }
+
+  for (const [position, id] of assetIds.entries()) {
+    const { error } = await supabase
+      .from("product_assets")
+      .update({ sort_order: position, asset_type: "preview_image" })
+      .eq("id", id)
+      .eq("workspace_id", workspace.id)
+
+    if (error) {
+      console.error("[assets] could not write image order", error)
+      return { error: "Those images could not be reordered. Try again." }
+    }
+  }
+
+  const { error: coverError } = await supabase
+    .from("product_assets")
+    .update({ asset_type: "cover_image" })
+    .eq("id", cover)
+    .eq("workspace_id", workspace.id)
+
+  if (coverError) {
+    console.error("[assets] could not set the cover image", coverError)
+    return { error: "That order was saved, but the cover image could not be set. Try again." }
+  }
+
+  revalidatePath(`/w/${workspaceSlug}/products`, "layout")
+  return { error: null }
+}
+
 export async function deleteAssetAction(
   workspaceSlug: string,
   assetId: string,

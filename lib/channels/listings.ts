@@ -1,5 +1,6 @@
 import { computeReadiness } from "./readiness"
 import { evaluateRequirements } from "./requirements"
+import type { ProductAsset } from "@/lib/products/types"
 import type {
   AdapterSubject,
   ChannelAdapter,
@@ -84,9 +85,26 @@ export function draftToColumns(draft: ChannelListingDraft) {
 export function snapshotPayload(
   draft: ChannelListingDraft,
   evaluation: Evaluation,
+  /**
+   * The images this listing would send, in the order it would send them.
+   *
+   * Recorded because a snapshot that held only the text would under-report what
+   * was published the moment images became publishable, and a history that is
+   * silently incomplete is worse than one that is obviously partial: it answers
+   * "what changed before revenue moved" with a confident half-truth. Ids and
+   * positions rather than URLs, because a signed URL expires and would make the
+   * row unreadable a few minutes after it was written.
+   */
+  images: readonly ProductAsset[] = [],
 ): Record<string, unknown> {
   return {
     listing: draft,
+    images: images.map((asset, position) => ({
+      id: asset.id,
+      filename: asset.filename,
+      assetType: asset.asset_type,
+      position,
+    })),
     readiness: {
       score: evaluation.readiness.score,
       errorsTotal: evaluation.readiness.errorsTotal,

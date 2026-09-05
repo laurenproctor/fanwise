@@ -60,15 +60,20 @@ describe("publish keys", () => {
   })
 })
 
+/** These assertions vary the text, so the images are held constant. */
+const NO_IMAGES = ""
+
 describe("update keys", () => {
   it("changes when the content changes, so a correction is a new operation", () => {
-    const a = updateKey(WS, LISTING, draft)
-    const b = updateKey(WS, LISTING, { ...draft, title: "Aster Grotesk Variable" })
+    const a = updateKey(WS, LISTING, draft, NO_IMAGES)
+    const b = updateKey(WS, LISTING, { ...draft, title: "Aster Grotesk Variable" }, NO_IMAGES)
     expect(a).not.toBe(b)
   })
 
   it("collides when the content is identical, so sending the same edit twice is once", () => {
-    expect(updateKey(WS, LISTING, draft)).toBe(updateKey(WS, LISTING, { ...draft }))
+    expect(updateKey(WS, LISTING, draft, NO_IMAGES)).toBe(
+      updateKey(WS, LISTING, { ...draft }, NO_IMAGES),
+    )
   })
 
   it("ignores tag order, which the editor does not preserve", () => {

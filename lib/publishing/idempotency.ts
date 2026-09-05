@@ -18,10 +18,14 @@ import type { ChannelListingDraft } from "@/lib/channels/types"
  *             in between, so they must collide. This is the key that makes
  *             "a second click creates nothing" true.
  *
- *   update    (workspace, listing, content fingerprint). Two different edits are
- *             two different operations and must not collide, or a creator could
- *             only ever push one correction. Two identical edits are one
- *             operation and do collide, which is also right.
+ *   update    (workspace, listing, content fingerprint, image fingerprint). Two
+ *             different edits are two different operations and must not
+ *             collide, or a creator could only ever push one correction. Two
+ *             identical edits are one operation and do collide, which is also
+ *             right. Images are in the key because swapping a cover image while
+ *             leaving the text alone is a real change the channel must be told
+ *             about; without them that edit would collide with the one before
+ *             it and silently never be sent.
  *
  *   activate  (workspace, listing). There is one transition from draft to live.
  */
@@ -40,8 +44,21 @@ export function updateKey(
   workspaceId: string,
   listingId: string,
   draft: ChannelListingDraft,
+  /**
+   * A stable summary of the images this update would send, from
+   * imagesFingerprint(). Required rather than defaulted: a caller that omitted
+   * it would go on producing one key for every image-only edit, which is the
+   * precise collision this argument exists to prevent, and a default would let
+   * that happen silently. Rule 1 — an idempotency check is never weakened to
+   * make a caller more convenient.
+   */
+  images: string,
 ): string {
-  return `update:${workspaceId}:${listingId}:${fingerprint(draft)}`
+  // Hashed rather than interpolated. The fingerprint is a join of asset ids and
+  // grows with the gallery; the key column is unique-indexed and has no reason
+  // to carry a kilobyte of uuids.
+  const imageDigest = createHash("sha256").update(images).digest("hex").slice(0, 16)
+  return `update:${workspaceId}:${listingId}:${fingerprint(draft)}:${imageDigest}`
 }
 
 /**
@@ -67,19 +84,36 @@ export function fingerprint(draft: ChannelListingDraft): string {
   return createHash("sha256").update(canonical).digest("hex").slice(0, 16)
 }
 
-export function keyFor(params: {
-  kind: PublicationKind
-  workspaceId: string
-  listingId: string
-  draft: ChannelListingDraft
-}): string {
-  const { kind, workspaceId, listingId, draft } = params
-  switch (kind) {
+/**
+ * A union rather than one shape with an optional `images`.
+ *
+ * Publish and activate ignore content entirely, so asking them for an image
+ * fingerprint would be asking for something meaningless. Update cannot be
+ * built without one. Saying that in the type means the compiler refuses the
+ * only call that would be wrong, and no caller has to remember the rule.
+ */
+export type KeyParams =
+  | {
+      kind: "publish" | "activate"
+      workspaceId: string
+      listingId: string
+      draft: ChannelListingDraft
+    }
+  | {
+      kind: "update"
+      workspaceId: string
+      listingId: string
+      draft: ChannelListingDraft
+      images: string
+    }
+
+export function keyFor(params: KeyParams): string {
+  switch (params.kind) {
     case "publish":
-      return publishKey(workspaceId, listingId)
+      return publishKey(params.workspaceId, params.listingId)
     case "activate":
-      return activateKey(workspaceId, listingId)
+      return activateKey(params.workspaceId, params.listingId)
     case "update":
-      return updateKey(workspaceId, listingId, draft)
+      return updateKey(params.workspaceId, params.listingId, params.draft, params.images)
   }
 }

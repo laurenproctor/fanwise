@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import { jobs } from "@/lib/jobs"
-import { keyFor, type PublicationKind } from "./idempotency"
+import { keyFor } from "./idempotency"
 import type { ChannelListingDraft } from "@/lib/channels/types"
 
 /**
@@ -29,15 +29,33 @@ export type StartOutcome =
 
 const UNIQUE_VIOLATION = "23505"
 
-export async function startPublication(params: {
+/**
+ * Mirrors KeyParams: an update carries an image fingerprint and the other two
+ * kinds have no use for one. The union travels this far rather than stopping at
+ * keyFor so that the caller which knows the assets is the caller the compiler
+ * asks, instead of this function inventing an empty string on its behalf.
+ */
+export type StartParams = {
   supabase: SupabaseClient<Database>
   workspaceId: string
   listingId: string
-  kind: PublicationKind
-  draft: ChannelListingDraft
-}): Promise<StartOutcome> {
-  const { supabase, workspaceId, listingId, kind, draft } = params
-  const idempotencyKey = keyFor({ kind, workspaceId, listingId, draft })
+} & (
+  | { kind: "publish" | "activate"; draft: ChannelListingDraft }
+  | { kind: "update"; draft: ChannelListingDraft; images: string }
+)
+
+export async function startPublication(params: StartParams): Promise<StartOutcome> {
+  const { supabase, workspaceId, listingId, kind } = params
+  const idempotencyKey =
+    params.kind === "update"
+      ? keyFor({
+          kind: "update",
+          workspaceId,
+          listingId,
+          draft: params.draft,
+          images: params.images,
+        })
+      : keyFor({ kind: params.kind, workspaceId, listingId, draft: params.draft })
 
   const { data: inserted, error } = await supabase
     .from("publication_jobs")
