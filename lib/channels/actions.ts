@@ -7,6 +7,7 @@ import { listProductAssets } from "@/lib/products/queries"
 import { buildDraft, draftToColumns, evaluate, snapshotPayload } from "./listings"
 import { findAdapter } from "./registry"
 import { updateListingSchema } from "./schemas"
+import { callbackUrl, createAuthorizationState } from "./oauth"
 import type { AdapterSubject, ChannelListingDraft } from "./types"
 
 export interface ActionState {
@@ -52,10 +53,10 @@ async function requireWorkspace(workspaceSlug: string) {
 /**
  * Connects a channel.
  *
- * A3 has no OAuth and no credentials: a connection is created directly, and
- * channel_connection_secrets is never written. A5 replaces the body of this
- * function with a real authorization round trip, and the shape of what it
- * writes here does not change.
+ * This is the path for a channel with no authorization to perform, which since
+ * A5 means the mocks only. A real channel goes through
+ * beginAuthorizationAction and the callback route, which write the same
+ * connection row plus a sealed credential.
  *
  * At C1 this becomes a billing event in the same transaction as the row, per
  * docs/billing.md rule 1. It is not one yet, and pretending otherwise by
@@ -67,6 +68,13 @@ export async function connectChannelAction(
 ): Promise<ActionState> {
   const adapter = findAdapter(channelKey)
   if (!adapter) return { error: "That channel is not available." }
+
+  // A channel Fanwise can authorize against is never connected by writing a
+  // row. Doing so would create a connection with no credential behind it, which
+  // looks connected everywhere in the UI and fails at the first publish.
+  if (adapter.oauth) {
+    return { error: `${adapter.name} is connected by authorizing it, not by adding a row.` }
+  }
 
   const { supabase, workspace } = await requireWorkspace(workspaceSlug)
 
@@ -104,14 +112,86 @@ export async function connectChannelAction(
   return { error: null }
 }
 
+export type BeginAuthorizationState =
+  { error: string; authorizeUrl?: undefined } | { error: null; authorizeUrl: string }
+
+/**
+ * Begins an OAuth authorization against a real channel.
+ *
+ * Returns the provider URL rather than redirecting to it. A server action that
+ * redirects off-site is a server action whose failures are invisible: the
+ * creator either lands on a marketplace or does not, and "did not" looks
+ * identical to a broken button. Returning the URL lets the caller show the
+ * error it got instead.
+ *
+ * The state is written before the URL is built, so there is no window in which
+ * a creator holds an authorize link Fanwise cannot later recognise.
+ */
+export async function beginAuthorizationAction(
+  workspaceSlug: string,
+  channelKey: string,
+  accountHint: string,
+): Promise<BeginAuthorizationState> {
+  const adapter = findAdapter(channelKey)
+  if (!adapter?.oauth) return { error: "That channel cannot be connected yet." }
+
+  const parsed = adapter.oauth.parseAccountHint(accountHint)
+  if (!parsed.ok) return { error: parsed.message }
+
+  const { supabase, user, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data: channel, error: channelError } = await supabase
+    .from("channels")
+    .select("id, name, status")
+    .eq("key", channelKey)
+    .maybeSingle()
+
+  if (channelError) throw channelError
+  if (!channel) return { error: "That channel is not available." }
+  if (channel.status !== "available") {
+    return { error: `${channel.name} is not open for connections yet.` }
+  }
+
+  try {
+    const state = await createAuthorizationState({
+      workspaceId: workspace.id,
+      channelId: channel.id,
+      userId: user.id,
+      accountHint: parsed.value,
+    })
+
+    return {
+      error: null,
+      authorizeUrl: adapter.oauth.authorizeUrl({
+        state,
+        accountHint: parsed.value,
+        redirectUri: callbackUrl(channelKey),
+      }),
+    }
+  } catch (error) {
+    // Reaches here when the deployment has no client id or secret configured,
+    // which is a Fanwise problem and not something the creator can fix by
+    // retrying. Said plainly rather than dressed up as a transient failure.
+    console.error("[channels] could not begin authorization", error)
+    return {
+      error: `${channel.name} is not configured on this deployment yet. Nothing was changed.`,
+    }
+  }
+}
+
 /**
  * Disconnects a channel.
  *
- * Listings cascade with the connection. That is correct for A3, where a listing
- * carries no external object: nothing is left behind on a marketplace. Once A5
- * and A6 create real listings, disconnecting must stop deleting rows that
- * describe something still live on a provider, and this is the function that
- * has to change.
+ * Listings cascade with the connection, and since A5 that is only safe while
+ * none of them describes something a provider still holds. A3 left this as the
+ * function that would have to change once real listings existed, and this is
+ * that change.
+ *
+ * The refusal below is deliberately not a warning the creator can click past.
+ * Cascading away a listing that carries an external id does not remove the
+ * product from the marketplace; it removes Fanwise's only record of it, leaving
+ * a live product nothing points at and no way to publish to it again without
+ * creating a duplicate. Fanwise forgetting is worse than Fanwise refusing.
  *
  * Snapshots also cascade, and should not. That is recorded as a known
  * limitation rather than fixed here, because the right fix is to retain them
@@ -122,6 +202,24 @@ export async function disconnectChannelAction(
   connectionId: string,
 ): Promise<ActionState> {
   const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data: published, error: publishedError } = await supabase
+    .from("channel_listings")
+    .select("id")
+    .eq("channel_connection_id", connectionId)
+    .eq("workspace_id", workspace.id)
+    .not("external_listing_id", "is", null)
+
+  if (publishedError) throw publishedError
+
+  if (published && published.length > 0) {
+    return {
+      error:
+        published.length === 1
+          ? "One product is published to this channel. Remove it from the channel first, or it will stay for sale with nothing in Fanwise pointing at it."
+          : `${published.length} products are published to this channel. Remove them from the channel first, or they will stay for sale with nothing in Fanwise pointing at them.`,
+    }
+  }
 
   const { error } = await supabase
     .from("channel_connections")

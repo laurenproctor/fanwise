@@ -12,7 +12,7 @@ import type { ImageSpec } from "@/lib/products/derivatives"
  * external call happens.
  */
 
-export type JobName = "noop" | "finalize_asset" | "build_derivative"
+export type JobName = "noop" | "finalize_asset" | "build_derivative" | "publish_listing"
 
 export interface JobPayloads {
   noop: { message: string }
@@ -24,6 +24,15 @@ export interface JobPayloads {
     sourceAssetId: string
     spec: ImageSpec
   }
+  /**
+   * Perform one external write against a channel. Step A5.
+   *
+   * The payload carries ids only. Everything the write needs is loaded from the
+   * database by the runner, so a job that sits in a queue while a creator keeps
+   * editing performs the write against the listing as it stands when it runs,
+   * not against a copy taken when they clicked.
+   */
+  publish_listing: { workspaceId: string; publicationJobId: string }
 }
 
 export interface EnqueueOptions {

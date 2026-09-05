@@ -135,7 +135,16 @@ test("disconnecting a channel takes its listings with it", async ({ page }) => {
   await expect(page.getByText("removes its listings from Fanwise")).toBeVisible()
   await page.getByRole("button", { name: "Yes, disconnect" }).click()
 
-  await expect(page.getByRole("button", { name: "Connect", exact: true })).toBeVisible()
+  // Scoped to the card, not the page. Every unconnected channel offers a
+  // Connect button, so an unscoped locator counts the other channels too and
+  // starts failing the moment a channel is added, which is what happened when
+  // Shopify arrived at A5.
+  await expect(
+    page
+      .locator("section")
+      .filter({ hasText: "Mock Storefront" })
+      .getByRole("button", { name: "Connect", exact: true }),
+  ).toBeVisible()
 
   await page.goto(`/w/${slug}/products`)
   await page.getByRole("link", { name: "Doomed Listing" }).click()

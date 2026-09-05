@@ -21,6 +21,26 @@ than against the ten:
   affordance anywhere on the assisted channel.
 - `journey-04-listing-editor.spec.ts` (A4): a person hand-writes a listing per channel and
   watches deterministic readiness resolve, with no AI involved.
+- `journey-05-publish.spec.ts` (A5): a product publishes, and clicking Publish again creates
+  nothing. Run against the mock API channel, because A5's exit test needs a live Shopify
+  connection that does not exist yet.
+
+**A5's idempotency is proved at the database, not in the browser**, in
+`tests/db/publication-idempotency.test.ts`. That suite drives the real job row, the real
+unique constraint and the real runner, and checks the three guards from
+`docs/architecture.md` one at a time: an existing external id, an existing successful job,
+and the key itself. The browser can only show that the button is gone; the database can show
+that the operation cannot happen twice even when it is attempted directly.
+
+**A note on uploading a file in a test.** The browser PUTs the bytes straight to storage and
+then calls finalize, and the component reloads itself when both return. A test that starts
+polling with `page.reload()` before that lands aborts the in-flight PUT: the asset row exists,
+because the intent was created, and the bytes never arrive. It sits `pending` with no error
+anywhere and looks exactly like a broken finalize job. Wait for the row to appear, then poll.
+
+**A note on locators that count channels.** Every unconnected channel offers a Connect
+button, so an unscoped `getByRole("button", { name: "Connect" })` starts failing the moment a
+channel is added — which it did when Shopify arrived at A5. Scope to the card.
 
 **A note on `waitForURL`.** `/products/[^/]+$` also matches `/products/new`, so waiting on
 that pattern resolves instantly against the form just submitted and races the redirect. It
@@ -31,7 +51,7 @@ explicitly.
 
 1. Signup, workspace, product. *(complete at A2)*
 2. Product to AI Shopify listing, approved.
-3. Connect Shopify, publish.
+3. Connect Shopify, publish. *(code complete at A5, unverified: needs a live shop)*
 4. Connect Etsy, publish.
 5. Publish to Shopify and Etsy in one action.
 6. Publication failure, correction, retry, no duplicate.

@@ -104,6 +104,10 @@ export const mockAssistedAdapter: ChannelAdapter = {
     drafts: false,
   },
   requirements,
+  // Everything about this channel is manual, which is what "assisted" means.
+  // There is still no manual *step* row: a step tracks work outstanding after a
+  // successful publication, and nothing here ever publishes.
+  manualSteps: [],
 
   buildListing({ product }: AdapterSubject): ChannelListingDraft {
     return {

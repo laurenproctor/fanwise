@@ -246,6 +246,54 @@ export type Database = {
           },
         ]
       }
+      channel_oauth_states: {
+        Row: {
+          channel_id: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          external_account_hint: string | null
+          state: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          channel_id: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          external_account_hint?: string | null
+          state: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          channel_id?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          external_account_hint?: string | null
+          state?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_oauth_states_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_oauth_states_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channels: {
         Row: {
           billable: boolean
@@ -275,6 +323,54 @@ export type Database = {
           status?: Database["public"]["Enums"]["channel_status"]
         }
         Relationships: []
+      }
+      listing_manual_steps: {
+        Row: {
+          channel_listing_id: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          step_key: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          channel_listing_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          step_key: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          channel_listing_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          step_key?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_manual_steps_listing_fk"
+            columns: ["channel_listing_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "channel_listings"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "listing_manual_steps_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       listing_snapshots: {
         Row: {
@@ -487,6 +583,72 @@ export type Database = {
           },
         ]
       }
+      publication_jobs: {
+        Row: {
+          attempt_count: number
+          channel_listing_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          idempotency_key: string
+          kind: Database["public"]["Enums"]["publication_job_kind"]
+          normalized_error_code: string | null
+          normalized_error_message: string | null
+          provider_response: Json | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["publication_job_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          channel_listing_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          kind: Database["public"]["Enums"]["publication_job_kind"]
+          normalized_error_code?: string | null
+          normalized_error_message?: string | null
+          provider_response?: Json | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["publication_job_status"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          attempt_count?: number
+          channel_listing_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          kind?: Database["public"]["Enums"]["publication_job_kind"]
+          normalized_error_code?: string | null
+          normalized_error_message?: string | null
+          provider_response?: Json | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["publication_job_status"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publication_jobs_listing_fk"
+            columns: ["channel_listing_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "channel_listings"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "publication_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_members: {
         Row: {
           created_at: string
@@ -618,6 +780,8 @@ export type Database = {
         | "three_d"
         | "theme"
         | "other"
+      publication_job_kind: "publish" | "update" | "activate"
+      publication_job_status: "pending" | "running" | "succeeded" | "failed"
       snapshot_type: "build" | "publish" | "update" | "unpublish"
       workspace_role: "owner" | "admin" | "editor" | "viewer"
     }
@@ -1343,6 +1507,8 @@ export const Constants = {
         "theme",
         "other",
       ],
+      publication_job_kind: ["publish", "update", "activate"],
+      publication_job_status: ["pending", "running", "succeeded", "failed"],
       snapshot_type: ["build", "publish", "update", "unpublish"],
       workspace_role: ["owner", "admin", "editor", "viewer"],
     },

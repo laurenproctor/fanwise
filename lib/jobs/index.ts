@@ -1,5 +1,6 @@
 import { InMemoryQueue } from "./in-memory-queue"
 import { buildDerivative, finalizeAsset } from "@/lib/products/assets"
+import { runPublication } from "@/lib/publishing/runner"
 import type { JobHandlers, JobQueue } from "./types"
 
 const handlers: JobHandlers = {
@@ -11,6 +12,9 @@ const handlers: JobHandlers = {
   },
   build_derivative: async (payload) => {
     await buildDerivative(payload)
+  },
+  publish_listing: async (payload) => {
+    await runPublication(payload)
   },
 }
 

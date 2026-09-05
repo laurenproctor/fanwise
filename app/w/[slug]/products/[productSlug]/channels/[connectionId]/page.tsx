@@ -62,7 +62,20 @@ export default async function ListingPage({
         workspaceSlug={slug}
         listingId={view.listing.id}
         channelKey={view.channel.key}
-        subject={{ product, assets }}
+        /*
+          connectionMetadata travels to the browser so the readiness the
+          creator watches while typing is the same verdict the server records
+          on save. A rule that depends on the connected account — the currency a
+          storefront actually sells in is the first — would otherwise report one
+          answer here and another there, and the one they could see would be the
+          wrong one. These are the non-secret facts from channel_connections;
+          credentials live in a different table the browser has no path to.
+        */
+        subject={{
+          product,
+          assets,
+          connectionMetadata: (view.connection?.metadata as Record<string, unknown>) ?? {},
+        }}
         initial={listingToDraft(view.listing)}
         canonical={{
           title: product.canonical_title ?? product.name,

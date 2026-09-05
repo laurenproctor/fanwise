@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
 import { getProductBySlug, groupDerivatives, listProductAssets } from "@/lib/products/queries"
 import { listConnections, listProductListings } from "@/lib/channels/queries"
+import { loadPublicationViews } from "@/lib/publishing/queries"
+import { liveness, mergeManualSteps } from "@/lib/publishing/manual-steps"
 import { ListingPanel, type ChannelListingCard } from "@/components/channels/listing-panel"
 import { ProductForm } from "./product-form"
 import { AssetManager } from "./asset-manager"
@@ -31,6 +33,23 @@ export default async function ProductPage({
     listProductListings(product, workspace.id),
   ])
 
+  const publications = await loadPublicationViews(
+    workspace.id,
+    listings.map((l) => l.listing.id),
+  )
+
+  /**
+   * The file a creator hands to a channel that cannot receive one through its
+   * API. Sorted the same way the asset manager sorts, so "the deliverable"
+   * means the same file in both places.
+   */
+  const deliverable =
+    assets.find(
+      (asset) =>
+        asset.asset_state === "ready" &&
+        (asset.asset_type === "deliverable" || asset.asset_type === "archive"),
+    ) ?? null
+
   // One card per connected channel, whether or not a listing exists yet. The
   // capability flags come from the adapter and never from the listing row, so a
   // channel that cannot publish cannot acquire the affordance by having data.
@@ -40,16 +59,46 @@ export default async function ProductPage({
     .filter((c) => c.adapter !== null)
     .map(({ connection, channel, adapter }) => {
       const view = listingByConnection.get(connection.id)
+      const listingId = view?.listing.id ?? null
+
+      const steps = view
+        ? mergeManualSteps(
+            adapter!.manualSteps,
+            publications.manualSteps.get(view.listing.id) ?? [],
+          )
+        : []
+
+      const lastJob = listingId ? publications.latestJob.get(listingId) : undefined
+
       return {
         connectionId: connection.id,
         channelName: channel.name,
         integrationType: adapter!.integrationType,
         canPublish: adapter!.capabilities.automaticPublish,
-        listingId: view?.listing.id ?? null,
+        listingId,
         title: view?.listing.title ?? null,
         statusSource: view?.listing.status_source ?? null,
         readiness: view?.evaluation?.readiness ?? null,
         results: view?.evaluation?.results ?? [],
+        // Derived, never stored. ADR 0001: published and live are not the same
+        // claim, and only one of them may be made about a product a buyer
+        // cannot yet receive anything from.
+        liveness: view ? liveness(view.listing, steps) : "unpublished",
+        externalUrl: view?.listing.external_url ?? null,
+        manualSteps: steps.map((state) => ({
+          key: state.spec.key,
+          label: state.spec.label,
+          description: state.spec.description,
+          instructions: [...state.spec.instructions],
+          completed: state.completedAt !== null,
+          needsDeliverable: state.spec.needsDeliverable,
+        })),
+        // Only a failure that is still the latest word. A message from an
+        // attempt that has since been superseded is a message about the past.
+        lastError: lastJob?.status === "failed" ? (lastJob.normalized_error_message ?? null) : null,
+        deliverable: deliverable
+          ? { assetId: deliverable.id, filename: deliverable.filename }
+          : null,
       }
     })
 

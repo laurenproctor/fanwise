@@ -15,7 +15,13 @@ export const metadata = { title: "Channels · Fanwise" }
  * cannot publish cannot be made to look as though it can, whatever the database
  * says.
  */
-export default async function ChannelsPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ChannelsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ error?: string }>
+}) {
   if (!(await getCurrentUser())) redirect("/sign-in")
 
   const { slug } = await params
@@ -25,6 +31,11 @@ export default async function ChannelsPage({ params }: { params: Promise<{ slug:
   const [channels, connections] = await Promise.all([listChannels(), listConnections(workspace.id)])
 
   const connectionByChannelId = new Map(connections.map((c) => [c.channel.id, c.connection]))
+
+  // Surfaced by the OAuth callback, which redirects here rather than rendering
+  // its own page: a failed authorization should leave the creator looking at
+  // the thing they were trying to connect.
+  const { error: connectError } = await searchParams
 
   return (
     <div className="flex flex-col gap-8">
@@ -36,6 +47,15 @@ export default async function ChannelsPage({ params }: { params: Promise<{ slug:
           channel its own translation of it.
         </p>
       </div>
+
+      {connectError ? (
+        <p
+          role="alert"
+          className="border-l-2 border-[var(--color-bad)] bg-[var(--color-paper-2)] py-2 pl-3 text-[14px] text-[var(--color-ink)]"
+        >
+          {connectError}
+        </p>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         {channels.map((channel) => {
@@ -82,7 +102,22 @@ export default async function ChannelsPage({ params }: { params: Promise<{ slug:
                   channelKey={channel.key}
                   channelName={channel.name}
                   connectionId={connection?.id ?? null}
+                  accountName={connection?.external_account_name ?? null}
                   disabled={channel.status !== "available"}
+                  /*
+                    Only the two strings the form needs. `adapter.oauth` holds
+                    functions and a client secret's worth of behaviour; passing
+                    the object itself would neither serialize nor belong in a
+                    browser bundle.
+                  */
+                  oauth={
+                    adapter.oauth
+                      ? {
+                          accountHintLabel: adapter.oauth.accountHintLabel,
+                          accountHintPlaceholder: adapter.oauth.accountHintPlaceholder,
+                        }
+                      : null
+                  }
                 />
               </div>
             </section>

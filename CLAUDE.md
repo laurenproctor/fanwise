@@ -15,7 +15,8 @@ explicitly requested.
 
 ## Current step
 
-**Step: A4 (manual listing editor, readiness UI) is complete. A5 is next.**
+**Step: A5 (Shopify adapter, OAuth, credentials, publishing) is code complete. Its exit
+test needs a live Shopify connection and has not been run. A6 does not begin until it has.**
 See `docs/roadmap.md`. Implement the current step only. Do not build ahead.
 
 ## Architecture invariants

@@ -1,6 +1,6 @@
 # Roadmap
 
-**Current step: A4, complete. A5 is next and has not been started.**
+**Current step: A5, code complete. Its exit test is unverified: see the note below.**
 
 Three gates. Nothing after a gate begins until the gate passes. Update the line above when a
 step completes, and do not work on more than one step at a time.
@@ -41,12 +41,26 @@ One real product, published to two channels, by a person who is not you.
 | A2 | Canonical product, product types, assets, storage, checksums, image derivative service | A complete product exists with correct derivatives for two image specs, no channel connected | done |
 | A3 | Channel registry, connections, listings, adapter contract, capability matrix, requirements engine, two mock adapters, one `api`-shaped and one `assisted`-shaped | One product yields two independent mock listings, the assisted mock implements no `publish`, and the UI offers none. No marketplace string in the product domain | done |
 | A4 | Manual listing editor, no AI. Readiness UI | A user hand-writes a listing per channel and sees deterministic readiness | done |
-| A5 | Shopify: OAuth, adapter, publish, idempotency, error normalization, digital delivery decision | Real product publishes, second click creates nothing, the file is actually deliverable to a buyer | |
+| A5 | Shopify: OAuth, adapter, publish, idempotency, error normalization, digital delivery decision | Real product publishes, second click creates nothing, the file is actually deliverable to a buyer | code done, **exit test unverified** |
 | A6 | Etsy: OAuth, adapter, draft, images, digital file, activate, idempotency | Real product publishes and is purchasable | |
 | A7 | Publish Everywhere orchestration, jobs, progress, retry, activity log | One action, two live URLs, one failure recovered without duplicates | |
 
 **Gate A passes when** an outside creator, unassisted, takes one of their real products from
 empty workspace to two live listings, and leaves them up.
+
+**A5 is code complete and its exit test has not been run.** The exit test is "a real
+product publishes, a second click creates nothing, and the file is actually deliverable to
+a buyer", and every clause of that needs a live Shopify connection. The Partner account is
+still outstanding, so the adapter, OAuth, credential sealing, idempotency and error
+normalization are all exercised against mocks and none of them has yet met Shopify.
+
+This is deliberately **not** recorded as done. A0 was marked complete on the strength of its
+checks passing while the app registrations it also owned were never filed, and that error
+went unnoticed for four steps. A step whose exit test cannot run is a step that says so.
+
+What remains for A5: register the Partner app, set the Shopify client id and secret, connect
+a development store, publish a real product, click Publish twice, and confirm a buyer can
+download the file after the manual attach step.
 
 **No third channel joins Gate A.** Creative Market was considered for it, on the argument
 that the pricing model is not real until a billable channel exists, and that at Gate A exit

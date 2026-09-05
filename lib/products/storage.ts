@@ -26,6 +26,18 @@ const UPLOAD_URL_TTL_SECONDS = 60 * 60 * 4
 const DOWNLOAD_URL_TTL_SECONDS = 60 * 5
 
 /**
+ * How long a link handed to a marketplace stays valid.
+ *
+ * Much longer than a creator's download link, and for a reason that is not
+ * generosity: a provider given a media URL fetches it on its own schedule, in
+ * its own queue, after the API call that supplied it has already returned. A
+ * five minute link is a product whose image silently fails to appear whenever
+ * the provider is busy, which looks like a Fanwise bug and is not debuggable
+ * from either end.
+ */
+const INGEST_URL_TTL_SECONDS = 60 * 60
+
+/**
  * The only extension characters that may reach a storage path. Everything else
  * is dropped rather than escaped, because a path is not the place to be clever.
  */
@@ -82,6 +94,25 @@ export async function createDownloadUrl(storagePath: string, filename: string) {
   return data.signedUrl
 }
 
+/**
+ * A link for a marketplace to fetch an asset from.
+ *
+ * Deliberately not `createDownloadUrl`. That one sets Content-Disposition so a
+ * creator's browser saves the file under its real name; a provider ingesting
+ * media wants the bytes inline, and some reject an attachment response outright.
+ * Same bucket, same signing, different purpose, so a different function rather
+ * than a boolean argument nobody reads at the call site.
+ */
+export async function createIngestUrl(storagePath: string): Promise<string> {
+  const admin = createAdminClient()
+  const { data, error } = await admin.storage
+    .from(PRODUCT_ASSET_BUCKET)
+    .createSignedUrl(storagePath, INGEST_URL_TTL_SECONDS)
+
+  if (error || !data) throw error ?? new Error("could not create an ingest URL")
+  return data.signedUrl
+}
+
 export async function downloadObject(storagePath: string): Promise<Buffer> {
   const admin = createAdminClient()
   const { data, error } = await admin.storage.from(PRODUCT_ASSET_BUCKET).download(storagePath)
@@ -117,4 +148,5 @@ export async function removeObjects(storagePaths: string[]): Promise<void> {
 export const STORAGE_TTL = {
   upload: UPLOAD_URL_TTL_SECONDS,
   download: DOWNLOAD_URL_TTL_SECONDS,
+  ingest: INGEST_URL_TTL_SECONDS,
 } as const

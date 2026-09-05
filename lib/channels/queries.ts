@@ -65,6 +65,7 @@ export async function listConnections(workspaceId: string): Promise<ConnectionWi
 export interface ListingView {
   listing: ChannelListing
   channel: Channel
+  connection: ChannelConnection | null
   adapter: ChannelAdapter | null
   evaluation: Evaluation | null
 }
@@ -84,7 +85,7 @@ export async function listProductListings(
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("channel_listings")
-    .select("*, channel:channels(*)")
+    .select("*, channel:channels(*), connection:channel_connections(*)")
     .eq("product_id", product.id)
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: true })
@@ -93,14 +94,28 @@ export async function listProductListings(
   if (!data || data.length === 0) return []
 
   const assets = await listProductAssets(product.id)
-  const subject: AdapterSubject = { product, assets }
 
   return data.map((row) => {
-    const { channel, ...listing } = row as ChannelListing & { channel: Channel }
+    const { channel, connection, ...listing } = row as ChannelListing & {
+      channel: Channel
+      connection: ChannelConnection | null
+    }
     const adapter = findAdapter(channel.key)
+
+    // The subject is built per listing rather than once, because a rule may
+    // legitimately depend on the account a listing is bound to. Currency is the
+    // first such rule: the same product on two storefronts selling in two
+    // currencies is ready for one and not the other.
+    const subject: AdapterSubject = {
+      product,
+      assets,
+      connectionMetadata: (connection?.metadata as Record<string, unknown>) ?? {},
+    }
+
     return {
       listing,
       channel,
+      connection,
       adapter,
       evaluation: adapter ? evaluate(adapter, listingToDraft(listing), subject) : null,
     }

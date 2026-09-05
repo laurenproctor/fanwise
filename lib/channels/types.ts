@@ -14,14 +14,14 @@ export type ListingStatusSource = Database["public"]["Enums"]["listing_status_so
 export type SnapshotType = Database["public"]["Enums"]["snapshot_type"]
 
 /**
- * Every channel Fanwise knows about. A3 ships two mocks and nothing else; real
- * providers are added here as their adapters land.
+ * Every channel Fanwise knows about. A3 shipped two mocks; A5 adds the first
+ * real provider, and the rest arrive here as their adapters land.
  *
  * This union is what keeps provider names out of the rest of the codebase: a
  * component that wants to special-case a marketplace has to name a key, and a
  * unit test fails the moment a key appears outside lib/channels/adapters.
  */
-export const CHANNEL_KEYS = ["mock_api", "mock_assisted"] as const
+export const CHANNEL_KEYS = ["mock_api", "mock_assisted", "shopify"] as const
 export type ChannelKey = (typeof CHANNEL_KEYS)[number]
 export const channelKeySchema = z.enum(CHANNEL_KEYS)
 
@@ -75,6 +75,18 @@ export const CAPABILITY_LABELS: Record<CapabilityKey, string> = {
 export interface AdapterSubject {
   product: Product
   assets: ProductAsset[]
+  /**
+   * Non-secret facts the connection learned about the account at authorization
+   * time, such as the currency a storefront actually sells in.
+   *
+   * Deliberately an opaque bag rather than typed fields: the adapter wrote
+   * these keys and is the only thing that reads them, so naming them here would
+   * put provider-shaped fields on a shared type. It is `metadata` from
+   * channel_connections and never `channel_connection_secrets`, so nothing in
+   * it is a credential and it is safe to send to the browser, which the editor
+   * does so client-side readiness matches the server's.
+   */
+  connectionMetadata?: Record<string, unknown>
 }
 
 export type RequirementSeverity = "error" | "warning" | "info"
@@ -123,9 +135,116 @@ export interface ChannelListingDraft {
   metadata: Record<string, unknown>
 }
 
+/**
+ * What the provider now holds after a write.
+ *
+ * `externalState` is the field that keeps ADR 0001 honest. A channel that
+ * cannot receive the deliverable through its API creates the object in a state
+ * a buyer cannot reach, and only a human confirming the file is attached moves
+ * it to `live`. Without this field "published" would be one word covering both
+ * "for sale" and "for sale with nothing behind it".
+ */
 export interface PublishResult {
   externalListingId: string
   externalUrl: string | null
+  externalState: ExternalListingState
+  /**
+   * The provider's own response, persisted to publication_jobs. Never rendered,
+   * and never a credential: adapters return what came back from a write.
+   */
+  providerResponse?: unknown
+}
+
+export type ExternalListingState = "draft" | "live"
+
+/**
+ * Everything an adapter needs to perform an external write.
+ *
+ * `assetUrl` is injected rather than imported so the adapter never reaches into
+ * lib/products/storage. Providers that ingest media by URL get a time-limited
+ * signed link; the adapter asks for one and does not know or care where the
+ * bytes live.
+ */
+export interface PublishContext {
+  listing: ChannelListing
+  connection: ChannelConnection
+  subject: AdapterSubject
+  assetUrl(asset: ProductAsset): Promise<string>
+}
+
+/**
+ * Work the provider's API cannot do and a person must.
+ *
+ * Declared in the adapter, in code, for the same reason capabilities are: the
+ * database row records only which step and whether it is done. A row that also
+ * carried "required" would be a requirement somebody could edit away.
+ *
+ * ADR 0001 is the worked example. Shopify has no API for attaching a
+ * buyer-downloadable file, so the creator does it once per product, and until
+ * they have, the product is not purchasable.
+ */
+export interface ManualStepSpec {
+  key: string
+  label: string
+  description: string
+  /** Rendered as a numbered list, in order. */
+  instructions: readonly string[]
+  /** An incomplete required step means published, but not live. */
+  required: boolean
+  /**
+   * True when the provider object stays in a draft state until this is done and
+   * the adapter flips it live afterwards. An adapter declaring this must
+   * implement `activate`, which a unit test checks.
+   */
+  gatesActivation: boolean
+  /** True when the creator needs the deliverable in hand to perform the step. */
+  needsDeliverable: boolean
+}
+
+/** What the creator types before an authorization begins. */
+export interface OAuthAuthorizeRequest {
+  state: string
+  accountHint: string
+  redirectUri: string
+}
+
+/**
+ * The result of a completed authorization.
+ *
+ * `credentials` is the only secret-bearing field, is sealed by
+ * lib/credentials before it reaches a row, and never leaves the server.
+ * Everything else is non-secret and lands on channel_connections.
+ */
+export interface OAuthGrant {
+  externalAccountId: string
+  externalAccountName: string | null
+  scopes: string[]
+  expiresAt: string | null
+  credentials: Record<string, unknown>
+  metadata: Record<string, unknown>
+}
+
+export interface ChannelOAuth {
+  /** Label and placeholder for the account field, e.g. a shop domain. */
+  accountHintLabel: string
+  accountHintPlaceholder: string
+  /**
+   * Validates and normalizes what the creator typed, before it reaches a URL.
+   * An account hint becomes a hostname Fanwise redirects a person to and then
+   * sends a client secret to, so it is checked rather than trusted.
+   */
+  parseAccountHint(raw: string): { ok: true; value: string } | { ok: false; message: string }
+  authorizeUrl(request: OAuthAuthorizeRequest): string
+  /**
+   * Integrity of the callback itself, verified before any parameter is used,
+   * per docs/security.md rule 5.
+   */
+  verifyCallback(query: URLSearchParams): boolean
+  exchange(params: {
+    accountHint: string
+    query: URLSearchParams
+    redirectUri: string
+  }): Promise<OAuthGrant>
 }
 
 /**
@@ -136,9 +255,9 @@ export interface PublishResult {
  * offers it. Absent methods are how the honesty is enforced: a capability
  * claimed without its method fails a unit test.
  *
- * Methods beyond publish arrive with the steps that need them. A5 and A6 bring
- * real publish implementations, B5 brings fetchTransactions, and neither is
- * declared here as a capability until it exists.
+ * Methods beyond publish arrive with the steps that need them. A5 brings the
+ * first real publish implementation, B5 brings fetchTransactions, and neither
+ * is declared here as a capability until it exists.
  */
 export interface ChannelAdapter {
   key: ChannelKey
@@ -147,10 +266,16 @@ export interface ChannelAdapter {
   capabilities: ChannelCapabilities
   /** The rules this channel enforces, as data. See lib/channels/requirements.ts. */
   requirements: readonly RequirementSpec[]
+  /** Work this channel's API cannot do. Empty for a channel that needs none. */
+  manualSteps: readonly ManualStepSpec[]
   buildListing(subject: AdapterSubject): ChannelListingDraft
-  publish?(listing: ChannelListing): Promise<PublishResult>
-  update?(listing: ChannelListing): Promise<PublishResult>
-  unpublish?(listing: ChannelListing): Promise<void>
+  /** Present only on a channel Fanwise can authorize against. */
+  oauth?: ChannelOAuth
+  publish?(context: PublishContext): Promise<PublishResult>
+  update?(context: PublishContext): Promise<PublishResult>
+  /** Moves a provider draft to live. Required when a step gates activation. */
+  activate?(context: PublishContext): Promise<PublishResult>
+  unpublish?(context: PublishContext): Promise<void>
 }
 
 /**

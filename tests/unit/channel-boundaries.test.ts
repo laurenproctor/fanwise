@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs"
 import { join, relative, sep } from "node:path"
 import { describe, expect, it } from "vitest"
 import { CHANNEL_KEYS, CAPABILITY_KEYS } from "@/lib/channels/types"
-import { listAdapters } from "@/lib/channels/registry"
+import { CAPABILITY_METHODS, listAdapters } from "@/lib/channels/registry"
 
 /**
  * The architectural invariants of A3, enforced rather than reviewed.
@@ -52,9 +52,14 @@ describe("provider names stay inside the adapter layer", () => {
 
     for (const file of sourceFiles(ROOT)) {
       if (isSanctioned(file)) continue
-      const contents = readFileSync(file, "utf8")
+      const contents = readFileSync(file, "utf8").toLowerCase()
       for (const key of CHANNEL_KEYS) {
-        if (contents.includes(key)) {
+        // Case-insensitive, and the key is also checked without its underscores.
+        // A provider name does not stop being one because it was written
+        // SHOPIFY_CLIENT_ID in an env schema or "Shopify" in a sentence, and
+        // both are exactly the leaks invariant 2 is about.
+        const needles = [key, key.replace(/_/g, "")].map((n) => n.toLowerCase())
+        if (needles.some((needle) => contents.includes(needle))) {
           offenders.push(`${relative(ROOT, file)} mentions ${key}`)
         }
       }
@@ -79,18 +84,27 @@ describe("provider names stay inside the adapter layer", () => {
 })
 
 describe("the registry and the channels table agree", () => {
-  const migration = readFileSync(
-    join(ROOT, "supabase", "migrations", "20260904173000_channels_connections_listings.sql"),
-    "utf8",
-  )
-
-  const seeded = [...migration.matchAll(/\('([a-z_]+)', '([^']+)', '(api|assisted)'/g)].map(
-    (m) => ({
-      key: m[1],
-      name: m[2],
-      integrationType: m[3],
-    }),
-  )
+  /**
+   * Every migration, not one named file.
+   *
+   * A3 seeded its two mocks in its own migration and A5 seeds Shopify in
+   * another, so a test pinned to a single filename stops checking the thing it
+   * was written to check the moment a second channel lands. It fails loudly
+   * rather than passing quietly, which is how this was caught, but the fix is
+   * to read the directory.
+   */
+  const migrationsDir = join(ROOT, "supabase", "migrations")
+  const seeded = readdirSync(migrationsDir)
+    .filter((file) => file.endsWith(".sql"))
+    .sort()
+    .flatMap((file) => {
+      const sql = readFileSync(join(migrationsDir, file), "utf8")
+      return [...sql.matchAll(/\('([a-z_]+)', '([^']+)', '(api|assisted)'/g)].map((m) => ({
+        key: m[1],
+        name: m[2],
+        integrationType: m[3],
+      }))
+    })
 
   it("seeds exactly the channels the registry knows about", () => {
     expect(seeded.map((s) => s.key).sort()).toEqual([...CHANNEL_KEYS].sort())
@@ -119,6 +133,67 @@ describe("the registry and the channels table agree", () => {
           `${adapter.key} does not declare ${capability}`,
         ).toBe("boolean")
       }
+    }
+  })
+})
+
+describe("the adapter contract stays honest", () => {
+  it("implements every method it declares a capability for", () => {
+    for (const adapter of listAdapters()) {
+      for (const { capability, method } of CAPABILITY_METHODS) {
+        const declared = adapter.capabilities[capability]
+        const implemented =
+          typeof (adapter as unknown as Record<string, unknown>)[method] === "function"
+        expect(implemented, `${adapter.key} declares ${capability} but has no ${method}()`).toBe(
+          declared,
+        )
+      }
+    }
+  })
+
+  it("never lets an assisted channel claim it can publish or update", () => {
+    for (const adapter of listAdapters()) {
+      if (adapter.integrationType !== "assisted") continue
+      expect(adapter.capabilities.automaticPublish, `${adapter.key}`).toBe(false)
+      expect(adapter.capabilities.automaticUpdate, `${adapter.key}`).toBe(false)
+      expect(adapter.publish, `${adapter.key} implements publish`).toBeUndefined()
+      expect(adapter.update, `${adapter.key} implements update`).toBeUndefined()
+    }
+  })
+
+  it("implements activate wherever a manual step gates activation", () => {
+    for (const adapter of listAdapters()) {
+      const gates = adapter.manualSteps.some((step) => step.gatesActivation)
+      if (!gates) continue
+      expect(
+        typeof adapter.activate,
+        `${adapter.key} has a step that gates activation but no activate()`,
+      ).toBe("function")
+      // A step that gates activation is a step that holds the product back, so
+      // the channel has to be able to hold it back in the first place.
+      expect(adapter.capabilities.drafts, `${adapter.key} gates activation without drafts`).toBe(
+        true,
+      )
+    }
+  })
+
+  it("declares a manual step wherever it cannot upload the deliverable itself", () => {
+    for (const adapter of listAdapters()) {
+      // Only meaningful for a channel that publishes. An assisted channel does
+      // everything by hand and tracks none of it as a step.
+      if (!adapter.capabilities.automaticPublish) continue
+      if (adapter.capabilities.digitalFileUpload) continue
+      expect(
+        adapter.manualSteps.some((step) => step.needsDeliverable && step.required),
+        `${adapter.key} publishes, cannot upload the deliverable, and asks nobody to`,
+      ).toBe(true)
+    }
+  })
+
+  it("only offers an authorization on a channel that can act through an API", () => {
+    for (const adapter of listAdapters()) {
+      if (!adapter.oauth) continue
+      expect(adapter.integrationType, `${adapter.key}`).toBe("api")
     }
   })
 })

@@ -220,11 +220,60 @@ block workspace deletion outright, and "never deleted" would be a promise the
 product could not keep the first time someone asked for their account to be
 removed. A direct delete is still refused.
 
-## A5 to A7: publishing
+## A5: publishing
 
-**publication_jobs** — id, workspace_id, channel_listing_id, idempotency_key, status,
-attempt_count, started_at, completed_at, provider_response, normalized_error_code,
-normalized_error_message, created_at
+Built. Migration `20260904190000_shopify_publishing`.
+
+**channel_oauth_states** — state (pk), workspace_id, channel_id, user_id,
+external_account_hint, expires_at, consumed_at, created_at
+
+OAuth state is a **single-use row, not a cookie**. `docs/security.md` rule 6
+requires state validated on every callback, and a cookie satisfies the letter of
+that but not the point: the same callback URL opened twice validates twice. A row
+can be *consumed*, so the replay fails because there is nothing left to consume.
+The state itself is the primary key, because uniqueness is the anti-replay
+property.
+
+The row also carries what the callback must not choose for itself — which
+workspace, which user, which account — so a valid callback cannot be steered at a
+different workspace or a different shop. Like `channel_connection_secrets` it has
+**no grant to `anon` or `authenticated`**, with RLS on and zero policies behind
+that.
+
+**publication_jobs** — id, workspace_id, channel_listing_id, kind,
+idempotency_key, status, attempt_count, started_at, completed_at,
+provider_response, normalized_error_code, normalized_error_message, created_at,
+updated_at
+
+Architecture invariant 3 lives here. `idempotency_key` is `not null` with a
+**global unique constraint**, so "persisted before the call, in the same
+transaction as the job row" is not a discipline anyone has to remember: the
+insert that creates the job is the insert that claims the key, and a second click
+loses at the database rather than in application code.
+
+The two kinds differ on purpose. A **publish** key is derived from the workspace
+and listing alone and deliberately excludes the content, because two clicks of
+Publish are the same operation whatever was typed in between and must collide.
+An **update** key includes a content fingerprint, because two different edits are
+two operations and must not collide, while two identical edits are one and do.
+
+Members hold `select` and `insert` only. The outcome of an external write is the
+system's account of what happened, not a field a person edits.
+
+**listing_manual_steps** — id, workspace_id, channel_listing_id, step_key,
+completed_at, completed_by, created_at, updated_at
+
+ADR 0001's assisted file step, and the reason **"fully published" is a derived
+condition rather than a status value**: published, and no required manual step
+incomplete. A live product with no deliverable attached can take money and give
+nothing back, which is the one outcome worth engineering against.
+
+The step's label, description and whether it is required live in the adapter, not
+in this table, for the same reason capabilities do. There is no delete grant: a
+step that was required does not stop having been required because someone would
+rather it went away.
+
+## A7: orchestration
 
 **workspace_events** — append-only activity log. Never updated, never deleted.
 
