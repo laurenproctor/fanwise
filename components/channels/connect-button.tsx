@@ -36,6 +36,7 @@ export function ConnectButton({
   connectionId,
   accountName,
   disabled,
+  publishedCount,
   oauth,
 }: {
   workspaceSlug: string
@@ -43,6 +44,17 @@ export function ConnectButton({
   channelName: string
   connectionId: string | null
   accountName: string | null
+  /**
+   * How many listings on this connection carry an external id.
+   *
+   * The disconnect action refuses while this is above zero, and that refusal is
+   * deliberate rather than a warning to click past: forgetting a live product
+   * is worse than declining to forget it. So the count comes down here, and the
+   * button is not offered at all. Offering one whose only outcome is the
+   * refusal is offering a lie, the same way a second Publish on a published
+   * listing would be.
+   */
+  publishedCount: number
   disabled?: boolean
   /** Present when this channel is connected by authorizing it. */
   oauth: OAuthPrompt | null
@@ -145,7 +157,20 @@ export function ConnectButton({
   return (
     <div className="grid gap-2">
       {accountName ? <p className="text-[13px] text-[var(--color-ink-2)]">{accountName}</p> : null}
-      {confirming ? (
+      {publishedCount > 0 ? (
+        /*
+          Not a disabled button. A disabled control says "not now"; this is
+          "not until something changes", and the something is nowhere near
+          this button, so the sentence has to carry it.
+        */
+        <p className="text-[13px] text-[var(--color-ink-2)]">
+          {publishedCount === 1
+            ? `A product is published to ${channelName}, so this connection cannot be disconnected.`
+            : `${publishedCount} products are published to ${channelName}, so this connection cannot be disconnected.`}{" "}
+          Disconnecting would leave {publishedCount === 1 ? "it" : "them"} for sale with nothing
+          in Fanwise pointing at {publishedCount === 1 ? "it" : "them"}.
+        </p>
+      ) : confirming ? (
         <div className="grid gap-2">
           <p className="text-[13px] text-[var(--color-ink-2)]">
             Disconnecting {channelName} removes its listings from Fanwise. Anything already
