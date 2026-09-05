@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { FormError } from "@/components/ui/form-error"
 import { createUploadIntent, deleteAssetAction, finalizeUploadAction } from "@/lib/products/actions"
@@ -67,42 +67,86 @@ export function AssetManager({
   const [uploading, setUploading] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  async function upload(file: File) {
+  /*
+   * Dropping files here is the same operation as choosing them, with one
+   * difference that has to stay visible: a drop carries no answer to "what kind
+   * of file is this", so it uses whatever File type is selected. That is why
+   * the hint below names the current type rather than saying "drop files here"
+   * and letting someone file a deliverable as a cover image.
+   */
+  const [fileOver, setFileOver] = useState(false)
+  const dragDepth = useRef(0)
+
+  /** One file. False once it has failed and the error is already on screen. */
+  async function uploadOne(file: File) {
+    const result = await createUploadIntent(workspaceSlug, {
+      productId,
+      assetType,
+      filename: file.name,
+      byteSize: file.size,
+    })
+
+    if ("error" in result) {
+      setError(result.error)
+      return false
+    }
+
+    const response = await fetch(result.intent.signedUrl, {
+      method: "PUT",
+      body: file,
+      headers: { "content-type": file.type || "application/octet-stream" },
+    })
+
+    if (!response.ok) {
+      setError("The upload did not complete. Try again.")
+      return false
+    }
+
+    await finalizeUploadAction(workspaceSlug, result.intent.assetId)
+    return true
+  }
+
+  /**
+   * The one path the picker and a drop share.
+   *
+   * Sequential, and it stops at the first failure. A deliverable here can be
+   * gigabytes, so several at once is not a faster upload, it is several slow
+   * uploads competing for the same connection and failing together.
+   */
+  async function upload(files: readonly File[]) {
+    if (files.length === 0) return
     setError(null)
     setUploading(true)
     try {
-      const result = await createUploadIntent(workspaceSlug, {
-        productId,
-        assetType,
-        filename: file.name,
-        byteSize: file.size,
-      })
-
-      if ("error" in result) {
-        setError(result.error)
-        return
+      for (const file of files) {
+        if (!(await uploadOne(file))) return
       }
-
-      const response = await fetch(result.intent.signedUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "content-type": file.type || "application/octet-stream" },
-      })
-
-      if (!response.ok) {
-        setError("The upload did not complete. Try again.")
-        return
-      }
-
-      await finalizeUploadAction(workspaceSlug, result.intent.assetId)
-      // Re-fetch the server components, rather than reloading the document.
-      // A full reload here raced React's transition and blanked the page.
-      router.refresh()
     } catch {
       setError("The upload did not complete. Try again.")
     } finally {
       setUploading(false)
+      // Re-fetch the server components, rather than reloading the document.
+      // A full reload here raced React's transition and blanked the page.
+      router.refresh()
     }
+  }
+
+  function isFileDrag(transfer: DataTransfer) {
+    return transfer.types.includes("Files")
+  }
+
+  /*
+   * A drop straight onto the file input is the browser's own business: it
+   * fills the input, which fires change, which uploads. Handling it here as
+   * well would upload the same file twice. The root guard steps aside for file
+   * inputs for the same reason, and the two exemptions have to agree.
+   */
+  function boundForTheInput(target: EventTarget | null) {
+    return target instanceof Element && target.closest('input[type="file"]') !== null
+  }
+
+  function acceptsDrop(event: { dataTransfer: DataTransfer; target: EventTarget | null }) {
+    return isFileDrag(event.dataTransfer) && !boundForTheInput(event.target)
   }
 
   function remove(assetId: string) {
@@ -114,10 +158,51 @@ export function AssetManager({
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div
+      /*
+        The whole section takes a drop, not just the bar. Same reason the images
+        panel does: a file dropped wide of a small target otherwise reaches the
+        page, and a browser handed a file it was not offered navigates away to
+        it, taking any unsaved edit on the screen with it.
+      */
+      onDragEnter={(event) => {
+        if (!acceptsDrop(event)) return
+        dragDepth.current += 1
+        setFileOver(true)
+      }}
+      onDragOver={(event) => {
+        if (!acceptsDrop(event)) return
+        // Without preventDefault here the drop never fires at all.
+        event.preventDefault()
+        event.dataTransfer.dropEffect = "copy"
+      }}
+      onDragLeave={(event) => {
+        if (!acceptsDrop(event)) return
+        dragDepth.current -= 1
+        if (dragDepth.current <= 0) {
+          dragDepth.current = 0
+          setFileOver(false)
+        }
+      }}
+      onDrop={(event) => {
+        if (!acceptsDrop(event)) return
+        event.preventDefault()
+        dragDepth.current = 0
+        setFileOver(false)
+        if (uploading || isPending) return
+        void upload(Array.from(event.dataTransfer.files))
+      }}
+      className="flex flex-col gap-6"
+    >
       <FormError message={error} />
 
-      <div className="flex flex-wrap items-end gap-4 rounded-[14px] border border-[var(--color-rule)] p-5">
+      <div
+        className={`flex flex-wrap items-end gap-4 rounded-[14px] border p-5 transition-colors ${
+          fileOver
+            ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
+            : "border-[var(--color-rule)]"
+        }`}
+      >
         <label className="flex flex-col gap-2">
           <span className="label-mono">File type</span>
           <select
@@ -137,10 +222,10 @@ export function AssetManager({
           <span className="label-mono">Add a file</span>
           <input
             type="file"
+            multiple
             disabled={uploading || isPending}
             onChange={(event) => {
-              const file = event.target.files?.[0]
-              if (file) void upload(file)
+              void upload(Array.from(event.target.files ?? []))
               event.target.value = ""
             }}
             className="text-[14px] text-[var(--color-ink-2)] file:mr-3 file:rounded-[var(--radius-pill)] file:border file:border-[var(--color-rule)] file:bg-transparent file:px-4 file:py-2 file:text-[13px]"
@@ -152,6 +237,17 @@ export function AssetManager({
             Uploading…
           </span>
         ) : null}
+
+        {/*
+          Names the type a drop would use. "Drop files here" on its own invites
+          someone to drop a deliverable while Cover image is selected and only
+          find out from the table afterwards.
+        */}
+        <p className="basis-full text-[13px] text-[var(--color-ink-3)]">
+          {fileOver
+            ? `Drop to add as ${ASSET_TYPE_LABELS[assetType]}.`
+            : `Or drop files anywhere in this section. They are added as ${ASSET_TYPE_LABELS[assetType]}.`}
+        </p>
       </div>
 
       {sources.length === 0 ? (

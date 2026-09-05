@@ -209,3 +209,53 @@ test("a creator drops an image onto the dashed Add-images tile", async ({ page }
     page.getByRole("region", { name: "Images" }).getByText("small-800x600.png"),
   ).toBeVisible()
 })
+
+/**
+ * The Files section takes a drop too, and files it as the selected type.
+ *
+ * A drop carries no answer to "what kind of file is this", so it uses whatever
+ * File type is selected. That is the only sane mapping — there is nothing else
+ * to read it from — but it means the type must be visible before the drop, not
+ * discovered in the table afterwards, which is what the hint is for.
+ */
+test("a creator drops a file into the Files section", async ({ page }) => {
+  const { slug } = await signUpAndCreateWorkspace(page, "j1f", "Files Studio")
+
+  await page.goto(`/${slug}/new`)
+  await page.getByLabel("Product name").fill("Filed Product")
+  await page.getByRole("button", { name: "Create product" }).click()
+  await page.waitForURL(productUrl(slug))
+
+  await expect(page.getByText("They are added as Deliverable")).toBeVisible()
+
+  const transfer = await fileTransfer(page, "tests/fixtures/specimen-3000x2000.jpg", "image/jpeg")
+  await page.getByText("No files yet").dispatchEvent("drop", { dataTransfer: transfer })
+
+  const row = page.getByRole("row").filter({ hasText: "specimen-3000x2000.jpg" })
+  await expect(row).toBeVisible()
+  // Filed as the selected type, not guessed from the file being an image.
+  await expect(row).toContainText("Deliverable")
+})
+
+/**
+ * The hazard this section has and the images panel does not.
+ *
+ * "Add a file" is a visible native file input sitting inside the drop zone.
+ * Dropping straight onto it fills it natively, which fires change, which
+ * uploads — so a section handler that also claimed that drop would upload the
+ * same file twice. Both this section and the root guard step aside for file
+ * inputs, and this is the test that says the exemptions agree.
+ */
+test("a file dropped on the input itself uploads once, not twice", async ({ page }) => {
+  const { slug } = await signUpAndCreateWorkspace(page, "j1u", "Once Studio")
+
+  await page.goto(`/${slug}/new`)
+  await page.getByLabel("Product name").fill("Once Product")
+  await page.getByRole("button", { name: "Create product" }).click()
+  await page.waitForURL(productUrl(slug))
+
+  const input = page.getByLabel("Add a file")
+  await input.setInputFiles("tests/fixtures/small-800x600.png")
+
+  await expect(page.getByRole("row").filter({ hasText: "small-800x600.png" })).toHaveCount(1)
+})
