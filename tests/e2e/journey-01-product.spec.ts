@@ -45,7 +45,7 @@ test("the canonical record saves and survives a reload", async ({ page }) => {
 
   // Wait for the save to be confirmed. Reloading straight after the click races
   // the server action and tells you nothing about whether it persisted.
-  await expect(page.getByRole("status")).toHaveText("Saved")
+  await expect(page.getByRole("status")).toHaveText(/^Saved/)
 
   await page.reload()
   await expect(page.getByLabel("Canonical title")).toHaveValue("Editable Product Family")

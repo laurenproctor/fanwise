@@ -156,7 +156,10 @@ test("a field can be pulled from the canonical product on purpose", async ({ pag
 
   await page.getByLabel("Canonical title").fill("The Canonical Title")
   await page.getByRole("button", { name: "Save changes" }).click()
-  await expect(page.getByRole("status")).toHaveText("Saved")
+  // The product form reports how long ago it saved, so this reads "Saved just
+  // now" and later "Saved 2 minutes ago". The listing editor's own indicator,
+  // asserted elsewhere in this file, still says exactly "Saved".
+  await expect(page.getByRole("status")).toHaveText(/^Saved/)
 
   await page.getByRole("button", { name: "Build listing" }).click()
   await page.getByRole("link", { name: "Edit listing" }).click()

@@ -11,7 +11,7 @@ import { RequirementList } from "./requirement-list"
 import { StatusPill } from "./status-pill"
 import { ManualStepCard, type ManualStepCardData } from "./manual-step-card"
 import type { Readiness, RequirementResult } from "@/lib/channels/types"
-import type { ListingLiveness } from "@/lib/publishing/manual-steps"
+import { LIVENESS_MEANINGS, type ListingLiveness } from "@/lib/publishing/manual-steps"
 
 /**
  * One product, its channels, and what each of them would reject or has done.
@@ -160,6 +160,17 @@ export function ListingPanel({
                   </span>
                   {card.listingId ? <StatusPill liveness={card.liveness} /> : null}
                 </div>
+                {/*
+                  The pill is two words and the distinction that matters does
+                  not fit in two words. Spelling it out beside the pill costs a
+                  line and stops "Published, not live" being read as a slower
+                  kind of live.
+                */}
+                {card.listingId ? (
+                  <p className="max-w-prose text-[13px] text-[var(--color-ink-2)]">
+                    {LIVENESS_MEANINGS[card.liveness]}
+                  </p>
+                ) : null}
               </div>
 
               {card.readiness ? (

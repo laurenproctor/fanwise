@@ -78,6 +78,25 @@ export function liveness(
   return outstandingRequired(states).length === 0 ? "live" : "published_not_live"
 }
 
+/**
+ * What each state means for the person reading it, in a sentence.
+ *
+ * The labels are two words each, and two words cannot carry the distinction
+ * the whole model turns on: "Published, not live" is not a worse "Live", it is
+ * a product on a channel that nobody can buy yet. A creator who reads it as a
+ * synonym stops here and waits for sales that cannot arrive.
+ *
+ * Says what is true and what happens next, never how to feel about it.
+ */
+export const LIVENESS_MEANINGS: Record<ListingLiveness, string> = {
+  unpublished: "Written here, and not sent anywhere yet.",
+  publishing: "Sent, and waiting for the channel to confirm. You can leave this page.",
+  published_not_live:
+    "The channel has the product, but nobody can buy it until the steps below are done.",
+  live: "On the channel, and available to buy.",
+  failed: "The last attempt did not finish. Trying again is safe: it will not create a duplicate.",
+}
+
 export const LIVENESS_LABELS: Record<ListingLiveness, string> = {
   unpublished: "Not published",
   publishing: "Publishing",

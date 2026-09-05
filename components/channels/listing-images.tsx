@@ -51,10 +51,18 @@ export function ListingImages({
 }: {
   workspaceSlug: string
   productId: string
-  channelName: string
+  /**
+   * The channel this panel is speaking for, or null on the product page, where
+   * the same images are being managed for every channel at once.
+   *
+   * Optional rather than a second component: the images are product assets
+   * either way, the ordering is the same ordering, and two grids that drift
+   * apart would be a worse outcome than one sentence that changes.
+   */
+  channelName: string | null
   images: ListingImage[]
   /** True once the channel holds a product, which changes what a change means. */
-  published: boolean
+  published?: boolean
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -166,11 +174,13 @@ export function ListingImages({
       <div className="grid gap-1.5">
         <h2 className="label-mono">Images</h2>
         <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
-          The first image is the cover, and it is the one {channelName} shows in its grid. Drag to
-          reorder.
-          {published
-            ? ` Sending changes replaces the images on ${channelName} with this list, including any added there directly.`
-            : ` These go to ${channelName} when you publish.`}
+          The first image is the cover, and it is the one {channelName ?? "a storefront"} shows in
+          its grid. Drag to reorder.
+          {channelName === null
+            ? " Every channel receives this list, in this order."
+            : published
+              ? ` Sending changes replaces the images on ${channelName} with this list, including any added there directly.`
+              : ` These go to ${channelName} when you publish.`}
         </p>
       </div>
 

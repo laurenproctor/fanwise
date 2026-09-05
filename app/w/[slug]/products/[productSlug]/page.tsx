@@ -6,6 +6,9 @@ import { listConnections, listProductListings } from "@/lib/channels/queries"
 import { loadPublicationViews } from "@/lib/publishing/queries"
 import { liveness, mergeManualSteps } from "@/lib/publishing/manual-steps"
 import { ListingPanel, type ChannelListingCard } from "@/components/channels/listing-panel"
+import { ListingImages, type ListingImage } from "@/components/channels/listing-images"
+import { listingImageSlots } from "@/lib/channels/images"
+import { isReorderable } from "@/lib/products/image-order"
 import { ProductForm } from "./product-form"
 import { AssetManager } from "./asset-manager"
 
@@ -26,6 +29,21 @@ export default async function ProductPage({
   if (!product) notFound()
 
   const assets = await listProductAssets(product.id)
+
+  // The same ordering the adapter uses, so the grid on this page and the images
+  // a channel receives cannot disagree.
+  const productImages: ListingImage[] = listingImageSlots(assets).flatMap((asset) =>
+    isReorderable(asset.asset_type)
+      ? [
+          {
+            id: asset.id,
+            filename: asset.filename,
+            assetType: asset.asset_type,
+            state: asset.asset_state,
+          },
+        ]
+      : [],
+  )
   const { sources, derivativesBySource } = groupDerivatives(assets)
 
   const [connections, listings] = await Promise.all([
@@ -116,13 +134,27 @@ export default async function ProductPage({
         </p>
       </div>
 
+      {/* Heading and description live in the form, so the save status can sit
+          on the heading line rather than at the bottom of a long column. */}
       <section className="flex max-w-[640px] flex-col gap-5">
-        <h2 className="label-mono">The canonical record</h2>
-        <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
-          This is the source of truth. Channels receive a translation of it; nothing here is shaped
-          by any one marketplace.
-        </p>
         <ProductForm workspaceSlug={slug} product={product} />
+      </section>
+
+      {/*
+        Images before Files, and separate from it. Images were uploadable all
+        along — through the asset manager's type select — and nobody found
+        them, because "cover image" was the fourth of twelve enum values in a
+        dropdown labelled File type. A thing every product needs should not be
+        reachable only by knowing which enum to pick.
+      */}
+      <section className="flex flex-col gap-5">
+        <h2 className="label-mono">Images</h2>
+        <ListingImages
+          workspaceSlug={slug}
+          productId={product.id}
+          channelName={null}
+          images={productImages}
+        />
       </section>
 
       <section className="flex flex-col gap-5">
