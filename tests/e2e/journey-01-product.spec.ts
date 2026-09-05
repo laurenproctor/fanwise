@@ -101,3 +101,66 @@ test("a creator drops an image onto the product's images panel", async ({ page }
   // having been asked. Position is the model.
   await expect(panel.getByText("Cover", { exact: true })).toBeVisible()
 })
+
+/**
+ * The guard that stops a missed drop from replacing the page.
+ *
+ * A browser handed a file it was not offered opens it, discarding whatever was
+ * on screen and any unsaved edit with it. Playwright cannot assert on "the
+ * document was not replaced" — the navigation is the browser's default action,
+ * and if it happens the test has already lost the page it wanted to check. So
+ * this asserts the thing that prevents it: whether the drop event came back
+ * cancelled. `dispatchEvent` returns false when preventDefault was called.
+ */
+test("a file dropped off-target is refused rather than opened", async ({ page }) => {
+  const { slug } = await signUpAndCreateWorkspace(page, "j1g", "Guard Studio")
+
+  await page.goto(`/${slug}/new`)
+  await page.getByLabel("Product name").fill("Guarded Product")
+  await page.getByRole("button", { name: "Create product" }).click()
+  await page.waitForURL(productUrl(slug))
+
+  const cancelled = await page.evaluate(() => {
+    const data = new DataTransfer()
+    data.items.add(new File(["not really a png"], "stray.png", { type: "image/png" }))
+    const event = new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data })
+    return !document.body.dispatchEvent(event)
+  })
+
+  expect(cancelled).toBe(true)
+
+  // And the page is still the page, rather than a rendering of the file.
+  await expect(page.getByRole("heading", { name: "Guarded Product" })).toBeVisible()
+})
+
+/**
+ * The exemption that keeps the Files section working.
+ *
+ * Dropping onto `<input type="file">` fills it natively, with no JavaScript
+ * anywhere, and that happens as the default action — exactly what the guard
+ * cancels everywhere else. Fixing one silent failure by causing another is not
+ * a trade worth making, so the guard steps aside here, and this is the test
+ * that says so before someone simplifies the exemption away.
+ */
+test("the guard leaves a native file input alone", async ({ page }) => {
+  const { slug } = await signUpAndCreateWorkspace(page, "j1i", "Input Studio")
+
+  await page.goto(`/${slug}/new`)
+  await page.getByLabel("Product name").fill("Input Product")
+  await page.getByRole("button", { name: "Create product" }).click()
+  await page.waitForURL(productUrl(slug))
+
+  // Through the label rather than a raw selector, so this waits for the Files
+  // section to render instead of racing it.
+  const input = page.getByLabel("Add a file")
+  await expect(input).toBeVisible()
+
+  const cancelled = await input.evaluate((element) => {
+    const data = new DataTransfer()
+    data.items.add(new File(["not really a png"], "chosen.png", { type: "image/png" }))
+    const event = new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data })
+    return !element.dispatchEvent(event)
+  })
+
+  expect(cancelled).toBe(false)
+})
