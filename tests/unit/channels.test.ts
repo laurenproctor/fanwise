@@ -116,10 +116,13 @@ describe("requirement evaluation", () => {
     expect(evaluateOne(textSpec, draft({ title: "Aster Gro" }), subject()).satisfied).toBe(true)
   })
 
-  it("fails an empty value and says so plainly", () => {
+  it("fails an empty value, and names the button it blocks", () => {
+    // A blocking requirement says what it blocks rather than describing the
+    // field: the creator is looking at a Publish button that will not move.
+    // The warning wording lives in requirement-messages.test.ts.
     const result = evaluateOne(textSpec, draft({ title: "" }), subject())
     expect(result.satisfied).toBe(false)
-    expect(result.message).toContain("empty")
+    expect(result.message).toBe("Title is required before you can publish your listing.")
   })
 
   it("treats whitespace as empty", () => {
@@ -143,8 +146,10 @@ describe("requirement evaluation", () => {
       min: 0,
     }
     const result = evaluateOne(spec, draft({ price: null }), subject())
+    // The point of this one is that null is not 0. A price of zero satisfies
+    // `min: 0`, so coercion would silently pass an unpriced listing.
     expect(result.satisfied).toBe(false)
-    expect(result.message).toContain("not set")
+    expect(result.message).toBe("Price is required before you can publish your listing.")
   })
 
   it("checks tag count and per-tag length separately", () => {

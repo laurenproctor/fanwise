@@ -41,6 +41,7 @@ export default async function ProductPage({
             filename: asset.filename,
             assetType: asset.asset_type,
             state: asset.asset_state,
+            checksum: asset.checksum,
           },
         ]
       : [],
@@ -157,15 +158,22 @@ export default async function ProductPage({
         dropdown labelled File type. A thing every product needs should not be
         reachable only by knowing which enum to pick.
       */}
-      <section className="flex flex-col gap-5">
-        <h2 className="label-mono">Images</h2>
-        <ListingImages
-          workspaceSlug={slug}
-          productId={product.id}
-          channelName={null}
-          images={productImages}
-        />
-      </section>
+      {/*
+        Rendered bare, with no wrapping section and no heading of its own. The
+        panel carries both, and the wrapper this used to have put a second
+        "Images" heading above it in a band that was not part of the drop
+        target. A file aimed at that heading — the obvious place to aim — fell
+        through to the page, and the browser navigated away to the file. The
+        panel's whole point is that a near miss is impossible, and the wrapper
+        quietly reintroduced the miss it was built to prevent. The channel
+        listing page always called it this way; this is the page that differed.
+      */}
+      <ListingImages
+        workspaceSlug={slug}
+        productId={product.id}
+        channelName={null}
+        images={productImages}
+      />
 
       <section className="flex flex-col gap-5">
         <h2 className="label-mono">Files</h2>
