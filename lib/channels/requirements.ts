@@ -22,6 +22,26 @@ function textValue(draft: ChannelListingDraft, field: string): string {
   return typeof raw === "string" ? raw.trim() : ""
 }
 
+/**
+ * What an absent required value says.
+ *
+ * Named after the button it blocks, because "Title is empty" describes the
+ * field and leaves the consequence to be inferred. The creator is looking at a
+ * Publish button that will not move; the sentence should say why.
+ *
+ * Only an error blocks publishing, so only an error may claim to. A warning
+ * saying "required" would be lying about a button it does not disable, and the
+ * readiness bar renders both kinds in one list, where the two sentences sit
+ * next to each other and the difference has to survive being read quickly.
+ *
+ * The label carries its own article — "A deliverable", "Title" — because the
+ * adapters already write them that way and threading an article through would
+ * mean every future requirement getting it right a second time.
+ */
+function requiredToPublish(label: string): string {
+  return `${label} is required before you can publish your listing.`
+}
+
 function evaluateOne(
   spec: RequirementSpec,
   draft: ChannelListingDraft,
@@ -38,7 +58,12 @@ function evaluateOne(
     case "text": {
       const value = textValue(draft, spec.field)
       if (value.length === 0) {
-        return { ...base, satisfied: false, message: `${spec.label} is empty.` }
+        return {
+          ...base,
+          satisfied: false,
+          message:
+            spec.severity === "error" ? requiredToPublish(spec.label) : `${spec.label} is empty.`,
+        }
       }
       if (spec.minLength !== undefined && value.length < spec.minLength) {
         return {
@@ -60,7 +85,12 @@ function evaluateOne(
     case "number": {
       const value = draft[spec.field]
       if (value === null || value === undefined || Number.isNaN(value)) {
-        return { ...base, satisfied: false, message: `${spec.label} is not set.` }
+        return {
+          ...base,
+          satisfied: false,
+          message:
+            spec.severity === "error" ? requiredToPublish(spec.label) : `${spec.label} is not set.`,
+        }
       }
       if (spec.min !== undefined && value < spec.min) {
         return {
@@ -135,9 +165,11 @@ function evaluateOne(
           ...base,
           satisfied: false,
           message:
-            spec.minCount === 1
-              ? `Add ${spec.label.toLowerCase()}.`
-              : `Add ${spec.minCount - matching.length} more.`,
+            spec.severity === "error" && matching.length === 0
+              ? requiredToPublish(spec.label)
+              : spec.minCount === 1
+                ? `Add ${spec.label.toLowerCase()}.`
+                : `Add ${spec.minCount - matching.length} more.`,
         }
       }
       return { ...base, satisfied: true }
