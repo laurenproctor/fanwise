@@ -309,3 +309,45 @@ test("the Files section draws a single outline around controls and list", async 
   await expect(box.getByLabel("Add a file")).toBeVisible()
   await expect(box.getByText("No files yet")).toBeVisible()
 })
+
+/**
+ * The same picture twice, which reaches a storefront as two identical tiles.
+ *
+ * The panel says every channel receives this list in this order, so a duplicate
+ * here is a duplicate in front of a buyer. Detected by checksum, so this drops
+ * the same bytes under two different names — the case a filename comparison
+ * would miss, and the reason the comparison is on bytes.
+ */
+test("a repeated image says which one it repeats", async ({ page }) => {
+  const { slug } = await signUpAndCreateWorkspace(page, "j1s", "Same Studio")
+
+  await page.goto(`/${slug}/new`)
+  await page.getByLabel("Product name").fill("Repeated Product")
+  await page.getByRole("button", { name: "Create product" }).click()
+  await page.waitForURL(productUrl(slug))
+
+  const panel = page.getByRole("region", { name: "Images" })
+
+  const first = await fileTransfer(page, "tests/fixtures/small-800x600.png", "image/png")
+  await panel.dispatchEvent("drop", { dataTransfer: first })
+  await expect(panel.getByText("small-800x600.png")).toBeVisible()
+
+  // The same bytes, under a name nothing would match on.
+  const again = await page.evaluateHandle(
+    (bytes) => {
+      const data = new DataTransfer()
+      data.items.add(
+        new File([new Uint8Array(bytes as number[])], "a-completely-different-name.png", {
+          type: "image/png",
+        }),
+      )
+      return data
+    },
+    Array.from(readFileSync("tests/fixtures/small-800x600.png")),
+  )
+  await panel.dispatchEvent("drop", { dataTransfer: again })
+
+  // The copy is named, and it points at the cover rather than at itself.
+  await expect(panel.getByText("Same image as the cover")).toBeVisible({ timeout: 20000 })
+  await expect(panel.getByText("Same image as the cover")).toHaveCount(1)
+})

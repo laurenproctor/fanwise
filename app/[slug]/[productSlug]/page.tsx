@@ -41,6 +41,7 @@ export default async function ProductPage({
             filename: asset.filename,
             assetType: asset.asset_type,
             state: asset.asset_state,
+            checksum: asset.checksum,
           },
         ]
       : [],

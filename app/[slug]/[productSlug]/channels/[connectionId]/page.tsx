@@ -60,6 +60,7 @@ export default async function ListingPage({
             filename: asset.filename,
             assetType: asset.asset_type,
             state: asset.asset_state,
+            checksum: asset.checksum,
           },
         ]
       : [],

@@ -12,6 +12,7 @@ import {
 import { routes } from "@/lib/routes"
 import { useBackgroundRefresh } from "@/lib/use-background-refresh"
 import { planImageDrop } from "@/lib/products/image-drop"
+import { duplicateOrigins } from "@/lib/products/duplicate-images"
 
 /**
  * The images this channel will receive, in the order it will receive them.
@@ -47,6 +48,11 @@ export interface ListingImage {
   filename: string
   assetType: "cover_image" | "preview_image"
   state: "pending" | "ready" | "failed"
+  /**
+   * Of the stored bytes, written by the finalize job. Null until it has run,
+   * which is why a pending tile is never called a duplicate of anything.
+   */
+  checksum: string | null
 }
 
 export function ListingImages({
@@ -128,6 +134,13 @@ export function ListingImages({
    * Without this the tile stays wrong until someone reloads.
    */
   useBackgroundRefresh(order.some((image) => image.state === "pending"))
+
+  /*
+   * Computed from the rendered order rather than stored, because both halves of
+   * the sentence move when a tile is dragged: which image is the original, and
+   * what position it now occupies.
+   */
+  const origins = duplicateOrigins(order.map((image) => image.checksum))
 
   function isFileDrag(transfer: DataTransfer) {
     return transfer.types.includes("Files")
@@ -398,6 +411,21 @@ export function ListingImages({
               <span className="truncate text-[12px] text-[var(--color-ink-2)]">
                 {image.filename}
               </span>
+
+              {/*
+                Said on the copy, not on the original, and it names where the
+                original is so the choice of which to remove is the creator's.
+                A warning rather than a block: this is almost never deliberate,
+                and "almost never" is the reason to mention it rather than the
+                reason to refuse it.
+              */}
+              {origins[index] !== null && origins[index] !== undefined ? (
+                <span className="text-[12px] text-[var(--color-bad)]">
+                  {origins[index] === 0
+                    ? "Same image as the cover"
+                    : `Same image as #${origins[index]! + 1}`}
+                </span>
+              ) : null}
 
               {/*
                 Dragging is not reachable from a keyboard, so the same two moves
