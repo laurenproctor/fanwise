@@ -65,6 +65,15 @@ explicitly.
 Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, the product
 is broken in the way that matters most.
 
+**Password recovery is not one of the ten**, because it is not a step on the path from empty
+workspace to live listing. It is covered anyway, in two halves that meet at the token:
+`tests/db/password-recovery.test.ts` makes the same calls the confirm route makes, against the
+real auth server, and proves the link is single use; `tests/e2e/password-recovery.spec.ts`
+covers what a person sees, including that the answer is identical for a registered and an
+unregistered address. Neither needs a mail catcher: the db test asks the admin API for the same
+token the email would have carried. What that leaves unproven is the email itself, and it is
+the only part of the flow no automated test touches.
+
 ## Rules
 
 A failing test is fixed or reported, never disabled. A test that is hard to write usually
