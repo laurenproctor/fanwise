@@ -46,6 +46,15 @@ export default async function ProductPage({
   )
   const { sources, derivativesBySource } = groupDerivatives(assets)
 
+  /*
+   * Files lists what a buyer receives and the working files behind it. The
+   * cover and preview images are neither: they are shop-window pictures, they
+   * are managed in the Images section above, and listing them here a second
+   * time reads as though they ship inside the download. Every other asset type
+   * stays, including image types that are not part of the gallery.
+   */
+  const fileSources = sources.filter((asset) => !isReorderable(asset.asset_type))
+
   const [connections, listings] = await Promise.all([
     listConnections(workspace.id),
     listProductListings(product, workspace.id),
@@ -162,7 +171,7 @@ export default async function ProductPage({
         <AssetManager
           workspaceSlug={slug}
           productId={product.id}
-          sources={sources}
+          sources={fileSources}
           derivativesBySource={Object.fromEntries(derivativesBySource)}
         />
       </section>

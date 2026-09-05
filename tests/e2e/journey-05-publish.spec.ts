@@ -49,8 +49,20 @@ async function connect(page: Page, slug: string, channelName: string) {
  * snapshot from the first version of this test showed nothing but "Loading" —
  * and reports zero rows for a table that was about to appear.
  */
-async function upload(page: Page, type: string, fixture: string, expected: number) {
+async function upload(page: Page, type: string, fixture: string, expectedFileRows: number) {
   const filename = fixture.split("/").pop()!
+
+  /*
+   * Gallery images are uploaded here and land in the Images section, not in
+   * the Files table: they are shop-window pictures rather than part of the
+   * download. So the assertion follows the file to wherever it went. The tile
+   * renders its <img> only once the asset is ready, which makes one locator
+   * stand for both "it arrived" and "it finished".
+   */
+  const gallery = type === "cover_image" || type === "preview_image"
+  const landed = gallery
+    ? page.getByRole("img", { name: filename })
+    : page.getByRole("cell", { name: filename, exact: true })
 
   await page.getByLabel("File type").selectOption(type)
   await page.getByLabel("Add a file").setInputFiles(fixture)
@@ -62,9 +74,7 @@ async function upload(page: Page, type: string, fixture: string, expected: numbe
   // that aborts the in-flight PUT, and the asset then sits pending forever with
   // no error anywhere: the row exists because the intent was created, and the
   // bytes never arrived. That looked exactly like a broken finalize job.
-  await expect(page.getByRole("cell", { name: filename, exact: true })).toBeVisible({
-    timeout: 60_000,
-  })
+  await expect(landed).toBeVisible({ timeout: 60_000 })
 
   // Now poll. The row stays pending until a background job has measured the
   // stored bytes, because nothing the browser claimed about the file is
@@ -72,9 +82,14 @@ async function upload(page: Page, type: string, fixture: string, expected: numbe
   // waits for.
   await expect(async () => {
     await page.reload()
-    await expect(page.getByRole("cell", { name: "Ready", exact: true })).toHaveCount(expected, {
-      timeout: 5_000,
-    })
+    if (gallery) {
+      await expect(landed).toBeVisible({ timeout: 5_000 })
+    } else {
+      await expect(page.getByRole("cell", { name: "Ready", exact: true })).toHaveCount(
+        expectedFileRows,
+        { timeout: 5_000 },
+      )
+    }
   }).toPass({ timeout: 60_000 })
 }
 
@@ -102,8 +117,8 @@ test("a product publishes, and clicking publish again creates nothing", async ({
   await waitForProductPage(page, slug)
   const productUrl = page.url()
 
-  await upload(page, "cover_image", "tests/fixtures/small-800x600.png", 1)
-  await upload(page, "deliverable", "tests/fixtures/specimen-3000x2000.jpg", 2)
+  await upload(page, "cover_image", "tests/fixtures/small-800x600.png", 0)
+  await upload(page, "deliverable", "tests/fixtures/specimen-3000x2000.jpg", 1)
 
   await page.getByRole("button", { name: "Build listing" }).click()
   await expect(page.getByRole("link", { name: "Edit listing" })).toHaveCount(1)

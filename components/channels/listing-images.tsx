@@ -193,12 +193,25 @@ export function ListingImages({
             <li
               key={image.id}
               draggable={!pending}
-              onDragStart={() => setDragging(image.id)}
+              onDragStart={(event) => {
+                setDragging(image.id)
+                /*
+                  Firefox refuses to begin a drag whose dataTransfer carries
+                  nothing, and the failure is silent: the element simply does
+                  not lift. The id is the honest payload, and setting an
+                  explicit move effect stops the cursor promising a copy.
+                */
+                event.dataTransfer.setData("text/plain", image.id)
+                event.dataTransfer.effectAllowed = "move"
+              }}
               onDragEnd={() => setDragging(null)}
               // Without preventDefault a drop never fires. This is the single
               // most common way a native drag-and-drop list silently does
               // nothing at all.
-              onDragOver={(event) => event.preventDefault()}
+              onDragOver={(event) => {
+                event.preventDefault()
+                event.dataTransfer.dropEffect = "move"
+              }}
               onDrop={(event) => {
                 event.preventDefault()
                 const from = order.findIndex((candidate) => candidate.id === dragging)
