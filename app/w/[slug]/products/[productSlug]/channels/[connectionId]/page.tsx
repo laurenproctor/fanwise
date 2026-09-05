@@ -6,6 +6,9 @@ import { listProductListings } from "@/lib/channels/queries"
 import { listingToDraft } from "@/lib/channels/listings"
 import { isChannelKey } from "@/lib/channels/registry"
 import { ListingEditor } from "@/components/channels/listing-editor"
+import { ListingImages, type ListingImage } from "@/components/channels/listing-images"
+import { listingImageSlots } from "@/lib/channels/images"
+import { isReorderable } from "@/lib/products/image-order"
 
 export const metadata = { title: "Listing · Fanwise" }
 
@@ -38,6 +41,28 @@ export default async function ListingPage({
   if (!view || !view.adapter || !isChannelKey(view.channel.key)) notFound()
 
   const assets = await listProductAssets(product.id)
+
+  /*
+   * The images in the order the channel would receive them, which is the order
+   * the panel lets the creator change. listingImageSlots is the same function
+   * the adapter uses, so what is shown here and what would be sent cannot drift.
+   *
+   * flatMap with the type predicate rather than a cast: the slots are already
+   * only cover and preview images, but saying so in a way the compiler checks
+   * costs one line and survives someone widening CHANNEL_IMAGE_TYPES later.
+   */
+  const images: ListingImage[] = listingImageSlots(assets).flatMap((asset) =>
+    isReorderable(asset.asset_type)
+      ? [
+          {
+            id: asset.id,
+            filename: asset.filename,
+            assetType: asset.asset_type,
+            state: asset.asset_state,
+          },
+        ]
+      : [],
+  )
 
   return (
     <div className="flex flex-col gap-8">
@@ -83,6 +108,20 @@ export default async function ListingPage({
           shortDescription: product.short_description ?? "",
           price: product.base_price === null ? "" : String(product.base_price),
         }}
+      />
+
+      <ListingImages
+        workspaceSlug={slug}
+        productId={product.id}
+        channelName={view.channel.name}
+        images={images}
+        /*
+          Publishing replaces the channel's media wholesale, so what a change
+          means depends on whether the channel already holds the product. The
+          panel says which of the two it is rather than leaving the creator to
+          discover it.
+        */
+        published={Boolean(view.listing.external_listing_id)}
       />
     </div>
   )
