@@ -10,6 +10,7 @@ import {
   reorderProductImagesAction,
 } from "@/lib/products/actions"
 import { routes } from "@/lib/routes"
+import { useBackgroundRefresh } from "@/lib/use-background-refresh"
 import { planImageDrop } from "@/lib/products/image-drop"
 
 /**
@@ -120,6 +121,13 @@ export function ListingImages({
     setLastSeen(images)
     setOrder(images)
   }
+
+  /*
+   * A tile says "Uploading" until the finalize job has measured the stored
+   * bytes, and that job finishes after the refresh which followed the upload.
+   * Without this the tile stays wrong until someone reloads.
+   */
+  useBackgroundRefresh(order.some((image) => image.state === "pending"))
 
   function isFileDrag(transfer: DataTransfer) {
     return transfer.types.includes("Files")

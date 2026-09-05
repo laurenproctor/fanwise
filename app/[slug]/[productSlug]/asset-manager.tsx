@@ -13,6 +13,7 @@ import {
   type ProductAsset,
 } from "@/lib/products/types"
 import { routes } from "@/lib/routes"
+import { useBackgroundRefresh } from "@/lib/use-background-refresh"
 
 /**
  * Upload goes straight from the browser to storage using a signed URL the
@@ -76,6 +77,10 @@ export function AssetManager({
    */
   const [fileOver, setFileOver] = useState(false)
   const dragDepth = useRef(0)
+
+  // A row stays "Uploading" until finalize_asset has measured the bytes, which
+  // happens after the refresh that followed the upload.
+  useBackgroundRefresh(sources.some((asset) => asset.asset_state === "pending"))
 
   /** One file. False once it has failed and the error is already on screen. */
   async function uploadOne(file: File) {
