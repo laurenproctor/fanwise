@@ -441,10 +441,25 @@ export function ListingImages({
           "add another" sits where the images are instead of somewhere the eye
           has to go looking for it.
         */}
-        <li className="grid">
+        {/*
+          The column span belongs on the <li>, which is the grid item the <ul>
+          lays out. On the <label> it did nothing: the label is a child of the
+          li's own single-column grid, so it was spanning one column of one.
+          The empty-state tile has been full width in intent and one column in
+          fact since it was written.
+        */}
+        <li className={`grid ${order.length === 0 ? "col-span-2" : ""}`}>
           <label
-            className={`grid cursor-pointer place-items-center gap-1 rounded-[10px] border border-dashed border-[var(--color-rule)] p-4 text-center hover:border-[var(--color-accent)] ${
-              order.length === 0 ? "col-span-2 aspect-[16/10]" : "aspect-[4/3]"
+            /*
+              w-full pins the width to the column. Without it the aspect ratio
+              was free to derive width from height, and height is whatever the
+              row happens to be — which, next to a cover spanning two rows, is
+              tall. The tile then computed itself wider than its column and hung
+              out past the panel. An aspect ratio needs one side nailed down or
+              it will pick the wrong one.
+            */
+            className={`grid w-full cursor-pointer place-items-center gap-1 rounded-[10px] border border-dashed border-[var(--color-rule)] p-4 text-center hover:border-[var(--color-accent)] ${
+              order.length === 0 ? "aspect-[16/10]" : "aspect-[4/3]"
             }`}
           >
             <span className="label-mono">
