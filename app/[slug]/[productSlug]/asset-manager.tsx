@@ -12,6 +12,7 @@ import {
   type AssetType,
   type ProductAsset,
 } from "@/lib/products/types"
+import { routes } from "@/lib/routes"
 
 /**
  * Upload goes straight from the browser to storage using a signed URL the
@@ -206,7 +207,7 @@ export function AssetManager({
                           {derivatives.map((derivative) => (
                             <li key={derivative.id}>
                               <a
-                                href={`/w/${workspaceSlug}/assets/${derivative.id}/download`}
+                                href={routes.assetDownload(workspaceSlug, derivative.id)}
                                 className="underline underline-offset-4 hover:text-[var(--color-accent)]"
                               >
                                 {derivative.filename}
@@ -220,7 +221,7 @@ export function AssetManager({
                       <div className="flex items-center gap-3">
                         {asset.asset_state === "ready" ? (
                           <a
-                            href={`/w/${workspaceSlug}/assets/${asset.id}/download`}
+                            href={routes.assetDownload(workspaceSlug, asset.id)}
                             className="text-[14px] underline underline-offset-4 hover:text-[var(--color-accent)]"
                           >
                             Download

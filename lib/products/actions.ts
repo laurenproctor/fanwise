@@ -3,7 +3,15 @@
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
-import { ensureMinimumLength, randomSuffix, slugify, withSuffix } from "@/lib/slug"
+import {
+  RESERVED_PRODUCT_SLUGS,
+  avoidReserved,
+  ensureMinimumLength,
+  randomSuffix,
+  slugify,
+  withSuffix,
+} from "@/lib/slug"
+import { routes } from "@/lib/routes"
 import { jobs } from "@/lib/jobs"
 import { deleteAssetCascade } from "./assets"
 import { createUploadUrl, buildStoragePath } from "./storage"
@@ -67,7 +75,13 @@ export async function createProductAction(
   }
 
   const { supabase, workspace } = await requireWorkspace(workspaceSlug)
-  const base = ensureMinimumLength(slugify(parsed.data.name), randomSuffix())
+  // A product slug shares its segment with the workspace's own pages, so the
+  // same rule applies one level down.
+  const base = avoidReserved(
+    ensureMinimumLength(slugify(parsed.data.name), randomSuffix()),
+    RESERVED_PRODUCT_SLUGS,
+    randomSuffix(),
+  )
   let slug = base
 
   for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt += 1) {
@@ -84,8 +98,8 @@ export async function createProductAction(
       .single()
 
     if (!error && data) {
-      revalidatePath(`/w/${workspaceSlug}/products`)
-      redirect(`/w/${workspaceSlug}/products/${data.slug}`)
+      revalidatePath(routes.workspace(workspaceSlug))
+      redirect(routes.product(workspaceSlug, data.slug))
     }
 
     if (error?.code !== UNIQUE_VIOLATION) {
@@ -151,7 +165,7 @@ export async function updateProductAction(
     return { error: "Those changes could not be saved. Try again.", savedAt: null }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products`, "layout")
+  revalidatePath(routes.workspace(workspaceSlug), "layout")
   return { error: null, savedAt: Date.now() }
 }
 
@@ -236,7 +250,7 @@ export async function finalizeUploadAction(
 
   await jobs.enqueue("finalize_asset", { workspaceId: workspace.id, assetId })
 
-  revalidatePath(`/w/${workspaceSlug}/products`)
+  revalidatePath(routes.workspace(workspaceSlug))
   return { error: null }
 }
 
@@ -332,7 +346,7 @@ export async function reorderProductImagesAction(
     }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products`, "layout")
+  revalidatePath(routes.workspace(workspaceSlug), "layout")
   return { error: null }
 }
 
@@ -359,6 +373,6 @@ export async function deleteAssetAction(
     return { error: "That file could not be deleted. Try again." }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products`)
+  revalidatePath(routes.workspace(workspaceSlug))
   return { error: null }
 }

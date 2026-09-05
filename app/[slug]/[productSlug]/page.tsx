@@ -11,6 +11,7 @@ import { listingImageSlots } from "@/lib/channels/images"
 import { isReorderable } from "@/lib/products/image-order"
 import { ProductForm } from "./product-form"
 import { AssetManager } from "./asset-manager"
+import { routes } from "@/lib/routes"
 
 export const metadata = { title: "Product · Fanwise" }
 
@@ -132,14 +133,14 @@ export default async function ProductPage({
   return (
     <div className="flex flex-col gap-12">
       <div className="flex flex-col gap-2">
-        <Link href={`/w/${slug}/products`} className="label-mono hover:text-[var(--color-ink-2)]">
+        <Link href={routes.workspace(slug)} className="label-mono hover:text-[var(--color-ink-2)]">
           ← Products
         </Link>
         <h1 className="font-display text-4xl font-extralight tracking-[-0.03em] text-balance">
           {product.name}
         </h1>
         <p className="font-mono text-[13px] text-[var(--color-ink-3)]">
-          /w/{slug}/products/{product.slug}
+          {routes.product(slug, product.slug)}
         </p>
       </div>
 

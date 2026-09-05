@@ -12,6 +12,7 @@ import { StatusPill } from "./status-pill"
 import { ManualStepCard, type ManualStepCardData } from "./manual-step-card"
 import type { Readiness, RequirementResult } from "@/lib/channels/types"
 import { LIVENESS_MEANINGS, type ListingLiveness } from "@/lib/publishing/manual-steps"
+import { routes } from "@/lib/routes"
 
 /**
  * One product, its channels, and what each of them would reject or has done.
@@ -242,7 +243,7 @@ export function ListingPanel({
                 <div className="flex flex-wrap items-center gap-2">
                   <ButtonLink
                     variant="secondary"
-                    href={`/w/${workspaceSlug}/products/${productSlug}/channels/${card.connectionId}`}
+                    href={routes.productChannel(workspaceSlug, productSlug, card.connectionId)}
                   >
                     Edit listing
                   </ButtonLink>

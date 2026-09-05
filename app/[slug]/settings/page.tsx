@@ -1,9 +1,10 @@
 import { notFound, redirect } from "next/navigation"
 import { getCurrentUser, getWorkspaceBySlug, listWorkspaceMembers } from "@/lib/workspaces/queries"
+import { routes } from "@/lib/routes"
 
-export const metadata = { title: "Workspace · Fanwise" }
+export const metadata = { title: "Settings · Fanwise" }
 
-export default async function WorkspacePage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function SettingsPage({ params }: { params: Promise<{ slug: string }> }) {
   const user = await getCurrentUser()
   if (!user) redirect("/sign-in")
 
@@ -16,13 +17,13 @@ export default async function WorkspacePage({ params }: { params: Promise<{ slug
   return (
     <div className="flex flex-col gap-10">
       <section className="flex flex-col gap-3">
-        <span className="label-mono">Step A1 · tenancy</span>
+        <span className="label-mono">Settings</span>
         <h1 className="font-display text-5xl font-extralight tracking-[-0.04em] text-balance">
           {workspace.name}
         </h1>
         <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
-          Your workspace exists and is isolated. Products arrive in the next step; until then there
-          is nothing here to publish.
+          Who can reach this workspace, and where it lives. Every workspace is isolated from every
+          other one.
         </p>
       </section>
 
@@ -30,7 +31,7 @@ export default async function WorkspacePage({ params }: { params: Promise<{ slug
         <h2 className="label-mono">Details</h2>
         <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-rule-2)] sm:grid-cols-3">
           {[
-            { term: "Address", value: `/w/${workspace.slug}` },
+            { term: "Address", value: routes.workspace(workspace.slug) },
             { term: "Your role", value: members.find((m) => m.user_id === user.id)?.role ?? "—" },
             { term: "Created", value: new Date(workspace.created_at).toLocaleDateString() },
           ].map(({ term, value }) => (

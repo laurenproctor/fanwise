@@ -9,6 +9,7 @@ import {
   finalizeUploadAction,
   reorderProductImagesAction,
 } from "@/lib/products/actions"
+import { routes } from "@/lib/routes"
 
 /**
  * The images this channel will receive, in the order it will receive them.
@@ -238,7 +239,7 @@ export function ListingImages({
                   */
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={`/w/${workspaceSlug}/assets/${image.id}/preview`}
+                    src={routes.assetPreview(workspaceSlug, image.id)}
                     alt={image.filename}
                     draggable={false}
                     className="h-full w-full object-cover"

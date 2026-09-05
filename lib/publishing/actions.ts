@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { routes } from "@/lib/routes"
 import { evaluate, listingToDraft } from "@/lib/channels/listings"
 import { findAdapter } from "@/lib/channels/registry"
 import type { AdapterSubject, Channel, ChannelListing } from "@/lib/channels/types"
@@ -165,7 +166,7 @@ export async function publishListingAction(
       .eq("workspace_id", workspace.id)
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`, "layout")
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
 
   switch (outcome.kind) {
     case "already_done":
@@ -236,7 +237,7 @@ export async function completeManualStepAction(
     .eq("workspace_id", workspace.id)
 
   const states = mergeManualSteps(adapter.manualSteps, rows ?? [])
-  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`, "layout")
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
 
   if (!readyToActivate(states) || !adapter.activate) {
     return { error: null, notice: "Step marked done." }

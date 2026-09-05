@@ -11,6 +11,14 @@ Built. Migration `20260904042945_workspaces_and_membership`.
 updated_at. Check constraints on name length, slug format and slug length, so a
 malformed slug cannot reach a row even if the app forgets to validate.
 
+A workspace slug is the first path segment (`/best-night`), and a product slug the
+second (`/best-night/facette-typeface`). Both therefore share a namespace with the
+application's own routes, and `workspaces_slug_not_reserved` and
+`products_slug_not_reserved` (migration `20260905173722_reserved_slugs`) keep a slug
+off a word a route would shadow. A shadowed slug is not a broken link; it is a row
+that inserts happily and a page nobody can open. The lists live in `lib/slug.ts` and
+a unit test asserts they still cover every route that exists.
+
 **workspace_members** — workspace_id, user_id, role, created_at.
 Primary key (workspace_id, user_id), plus an index on `user_id` alone: the
 composite key is workspace-id-leading and cannot serve "which workspaces does

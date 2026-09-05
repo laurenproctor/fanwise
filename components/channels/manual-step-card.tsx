@@ -4,6 +4,7 @@ import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { completeManualStepAction } from "@/lib/publishing/actions"
+import { routes } from "@/lib/routes"
 
 /**
  * One thing a channel's API cannot do, and the creator can.
@@ -90,7 +91,7 @@ export function ManualStepCard({
                   {" "}
                   <a
                     className="underline underline-offset-2 hover:text-[var(--color-accent)]"
-                    href={`/w/${workspaceSlug}/assets/${deliverable.assetId}/download`}
+                    href={routes.assetDownload(workspaceSlug, deliverable.assetId)}
                   >
                     {deliverable.filename}
                   </a>

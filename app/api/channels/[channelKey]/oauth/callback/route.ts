@@ -11,6 +11,7 @@ import {
 } from "@/lib/channels/oauth"
 import { findAdapter } from "@/lib/channels/registry"
 import { normalizeUnknown } from "@/lib/channels/errors"
+import { routes } from "@/lib/routes"
 
 /**
  * The OAuth callback, for every channel that has one.
@@ -44,7 +45,7 @@ import { normalizeUnknown } from "@/lib/channels/errors"
  * https://localhost:3001, which is nowhere.
  */
 function back(workspaceSlug: string | null, message?: string): NextResponse {
-  const target = new URL(workspaceSlug ? `/w/${workspaceSlug}/channels` : "/", appOrigin())
+  const target = new URL(workspaceSlug ? routes.channels(workspaceSlug) : "/", appOrigin())
   if (message) target.searchParams.set("error", message)
   return NextResponse.redirect(target)
 }

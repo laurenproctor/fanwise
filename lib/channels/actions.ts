@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { routes } from "@/lib/routes"
 import { listProductAssets } from "@/lib/products/queries"
 import { buildDraft, draftToColumns, evaluate, snapshotPayload } from "./listings"
 import { listingImages } from "./images"
@@ -109,7 +110,7 @@ export async function connectChannelAction(
     return { error: "That channel could not be connected. Try again." }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/channels`)
+  revalidatePath(routes.channels(workspaceSlug))
   return { error: null }
 }
 
@@ -233,7 +234,7 @@ export async function disconnectChannelAction(
     return { error: "That channel could not be disconnected. Try again." }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/channels`)
+  revalidatePath(routes.channels(workspaceSlug))
   return { error: null }
 }
 
@@ -321,7 +322,7 @@ export async function buildListingAction(
     console.error("[channels] snapshot insert failed", snapshotError)
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`)
+  revalidatePath(routes.product(workspaceSlug, product.slug))
   return { error: null }
 }
 
@@ -423,7 +424,7 @@ export async function updateListingAction(
     console.error("[channels] snapshot insert failed", snapshotError)
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`, "layout")
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
   return { error: null, savedAt: Date.now() }
 }
 
@@ -480,6 +481,6 @@ export async function pullFromCanonicalAction(
     return { error: "That field could not be updated. Try again." }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`, "layout")
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
   return { error: null }
 }

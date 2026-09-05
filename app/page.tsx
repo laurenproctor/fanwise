@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { getCurrentUser, listWorkspaces } from "@/lib/workspaces/queries"
+import { routes } from "@/lib/routes"
 
 /**
  * The root is a resolver, not a page. Every real surface lives under a workspace
@@ -12,5 +13,5 @@ export default async function RootPage() {
   const first = workspaces[0]
   if (!first) redirect("/onboarding")
 
-  redirect(`/w/${first.slug}`)
+  redirect(routes.workspace(first.slug))
 }

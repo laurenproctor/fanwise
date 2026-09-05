@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
-import { signUpAndCreateWorkspace } from "./support"
+import { listingUrl, productUrl, signUpAndCreateWorkspace } from "./support"
 
 /**
  * A5's exit test, the two thirds of it a mock channel can prove:
@@ -17,16 +17,22 @@ import { signUpAndCreateWorkspace } from "./support"
  * everything above the adapter is identical.
  */
 
-async function waitForProductPage(page: Page, slug: string) {
-  await page.waitForURL(
-    (url) =>
-      new RegExp(`^/w/${slug}/products/[^/]+$`).test(url.pathname) &&
-      !url.pathname.endsWith("/new"),
-  )
+/**
+ * Waits for the product page, URL and content both.
+ *
+ * `productUrl` already excludes `/new` and the other reserved segments, so the
+ * URL cannot match the form just submitted. The second wait is the one that
+ * matters after that: an App Router transition changes the URL before the page
+ * renders, so without it the next locator counts elements on a loading
+ * boundary and finds none.
+ */
+async function waitForProductPage(page: Page, slug: string, name: string) {
+  await page.waitForURL((url) => productUrl(slug).test(url.pathname))
+  await expect(page.getByRole("heading", { name })).toBeVisible()
 }
 
 async function connect(page: Page, slug: string, channelName: string) {
-  await page.goto(`/w/${slug}/channels`)
+  await page.goto(`/${slug}/channels`)
   await page
     .locator("section")
     .filter({ hasText: channelName })
@@ -95,7 +101,7 @@ async function upload(page: Page, type: string, fixture: string, expectedFileRow
 
 async function writeListing(page: Page, slug: string) {
   await page.getByRole("link", { name: "Edit listing" }).first().click()
-  await page.waitForURL(new RegExp(`/w/${slug}/products/[^/]+/channels/[^/]+$`))
+  await page.waitForURL(listingUrl(slug))
 
   await page.getByLabel("Title", { exact: true }).fill("Aster Grotesk Display")
   await page
@@ -110,12 +116,12 @@ test("a product publishes, and clicking publish again creates nothing", async ({
   const { slug } = await signUpAndCreateWorkspace(page, "j5p", "Publishing Studio")
   await connect(page, slug, "Mock Storefront")
 
-  await page.goto(`/w/${slug}/products/new`)
+  await page.goto(`/${slug}/new`)
   await page.getByLabel("Product name").fill("Aster Grotesk")
   await page.getByLabel("Product type").selectOption("font")
   await page.getByRole("button", { name: "Create product" }).click()
-  await waitForProductPage(page, slug)
-  const productUrl = page.url()
+  await waitForProductPage(page, slug, "Aster Grotesk")
+  const productPage = page.url()
 
   await upload(page, "cover_image", "tests/fixtures/small-800x600.png", 0)
   await upload(page, "deliverable", "tests/fixtures/specimen-3000x2000.jpg", 1)
@@ -124,7 +130,7 @@ test("a product publishes, and clicking publish again creates nothing", async ({
   await expect(page.getByRole("link", { name: "Edit listing" })).toHaveCount(1)
 
   await writeListing(page, slug)
-  await page.goto(productUrl)
+  await page.goto(productPage)
 
   // Nothing has been sent yet, and the card says so rather than staying blank.
   await expect(page.getByText("Not published")).toBeVisible()
@@ -152,10 +158,10 @@ test("a listing that is not ready cannot be published", async ({ page }) => {
   const { slug } = await signUpAndCreateWorkspace(page, "j5g", "Unready Studio")
   await connect(page, slug, "Mock Storefront")
 
-  await page.goto(`/w/${slug}/products/new`)
+  await page.goto(`/${slug}/new`)
   await page.getByLabel("Product name").fill("Unfinished Font")
   await page.getByRole("button", { name: "Create product" }).click()
-  await waitForProductPage(page, slug)
+  await waitForProductPage(page, slug, "Unfinished Font")
 
   await page.getByRole("button", { name: "Build listing" }).click()
   await expect(page.getByRole("link", { name: "Edit listing" })).toHaveCount(1)
@@ -171,10 +177,10 @@ test("an assisted channel never offers to publish", async ({ page }) => {
   const { slug } = await signUpAndCreateWorkspace(page, "j5a", "Assisted Studio")
   await connect(page, slug, "Mock Marketplace")
 
-  await page.goto(`/w/${slug}/products/new`)
+  await page.goto(`/${slug}/new`)
   await page.getByLabel("Product name").fill("Assisted Font")
   await page.getByRole("button", { name: "Create product" }).click()
-  await waitForProductPage(page, slug)
+  await waitForProductPage(page, slug, "Assisted Font")
 
   await page.getByRole("button", { name: "Build listing" }).click()
   await expect(page.getByRole("link", { name: "Edit listing" })).toHaveCount(1)

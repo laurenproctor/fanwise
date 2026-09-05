@@ -41,7 +41,7 @@ function isSanctioned(path: string): boolean {
   return (
     rel.startsWith("lib/channels/") ||
     rel.startsWith("components/channels/") ||
-    rel.startsWith("app/w/[slug]/channels/") ||
+    rel.startsWith("app/[slug]/channels/") ||
     rel.startsWith("tests/")
   )
 }

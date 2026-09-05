@@ -42,10 +42,18 @@ anywhere and looks exactly like a broken finalize job. Wait for the row to appea
 button, so an unscoped `getByRole("button", { name: "Connect" })` starts failing the moment a
 channel is added — which it did when Shopify arrived at A5. Scope to the card.
 
-**A note on `waitForURL`.** `/products/[^/]+$` also matches `/products/new`, so waiting on
-that pattern resolves instantly against the form just submitted and races the redirect. It
-passes most of the time, which is worse than failing. Exclude the trailing segment
-explicitly.
+**A note on `waitForURL`.** A product now lives at `/<workspace>/<product>`, which is the
+same shape as `/<workspace>/new`, `/channels` and `/settings`. Waiting on a pattern loose
+enough to match a product matches the form just submitted, resolves instantly, and races the
+redirect. It passes most of the time, which is worse than failing. Use `productUrl()` from
+`tests/e2e/support.ts`, which builds the exclusions from `RESERVED_PRODUCT_SLUGS` so a new
+route cannot leave the pattern quietly wrong. The same applies one level up: `/onboarding` is
+a single path segment and so is a workspace.
+
+A matching URL is not a rendered page. An App Router transition changes the URL before the
+content arrives, so `waitForURL` can return while the loading boundary is still on screen,
+and a locator that counts elements then finds none. Follow it with a wait on real content —
+the product heading, usually.
 
 ## The ten journeys
 

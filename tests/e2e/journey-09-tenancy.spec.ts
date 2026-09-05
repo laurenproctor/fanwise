@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { signUpAndCreateWorkspace, signOut } from "./support"
+import { productUrl, signOut, signUpAndCreateWorkspace } from "./support"
 
 /**
  * Journey 9. Never skipped, never quarantined, never marked flaky.
@@ -11,13 +11,13 @@ import { signUpAndCreateWorkspace, signOut } from "./support"
  */
 test("workspace A cannot reach workspace B by URL", async ({ page }) => {
   const b = await signUpAndCreateWorkspace(page, "j9b", "Bravo Studio")
-  await expect(page.getByRole("heading", { name: "Bravo Studio" })).toBeVisible()
+  await expect(page.getByRole("link", { name: /Bravo Studio/ })).toBeVisible()
   await signOut(page)
 
   await signUpAndCreateWorkspace(page, "j9a", "Alpha Studio")
 
   // Alice, signed in, walks straight up to Bob's address.
-  const response = await page.goto(`/w/${b.slug}`)
+  const response = await page.goto(`/${b.slug}`)
 
   expect(response?.status()).toBe(404)
   await expect(page.getByText("This page does not exist")).toBeVisible()
@@ -34,7 +34,7 @@ test("a workspace that never existed is indistinguishable from one that is not y
 }) => {
   await signUpAndCreateWorkspace(page, "j9probe", "Delta Studio")
 
-  const response = await page.goto("/w/definitely-not-a-real-workspace")
+  const response = await page.goto("/definitely-not-a-real-workspace")
 
   // Same status and same words as the case above. A different answer here would
   // confirm to a prober which slugs are real.
@@ -44,10 +44,10 @@ test("a workspace that never existed is indistinguishable from one that is not y
 
 test("workspace A cannot reach workspace B's product by URL", async ({ page }) => {
   const b = await signUpAndCreateWorkspace(page, "j9pb", "Bravo Products")
-  await page.goto(`/w/${b.slug}/products/new`)
+  await page.goto(`/${b.slug}/new`)
   await page.getByLabel("Product name").fill("Bravo Secret Font")
   await page.getByRole("button", { name: "Create product" }).click()
-  await page.waitForURL(new RegExp(`/w/${b.slug}/products/[^/]+$`))
+  await page.waitForURL(productUrl(b.slug))
   const productPath = new URL(page.url()).pathname
   await signOut(page)
 
@@ -63,7 +63,7 @@ test("an anonymous visitor cannot reach a workspace by URL", async ({ page }) =>
   const b = await signUpAndCreateWorkspace(page, "j9anon", "Charlie Studio")
   await signOut(page)
 
-  await page.goto(`/w/${b.slug}`)
+  await page.goto(`/${b.slug}`)
 
   await expect(page).toHaveURL(/\/sign-in$/)
   await expect(page.getByText("Charlie Studio")).toHaveCount(0)

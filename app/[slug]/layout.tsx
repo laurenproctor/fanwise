@@ -2,6 +2,7 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { signOutAction } from "@/lib/workspaces/actions"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
+import { routes } from "@/lib/routes"
 
 /**
  * The tenancy boundary for every workspace-scoped surface.
@@ -29,24 +30,26 @@ export default async function WorkspaceLayout({
     <div className="min-h-dvh">
       <header className="border-b border-[var(--color-rule)]">
         <div className="mx-auto flex w-full max-w-[1160px] items-center justify-between gap-6 px-6 py-4">
-          <Link href={`/w/${workspace.slug}`} className="flex flex-col gap-1">
+          <Link href={routes.workspace(workspace.slug)} className="flex flex-col gap-1">
             <span className="label-mono">Workspace</span>
             <span className="font-display text-[17px] font-normal tracking-[-0.01em]">
               {workspace.name}
             </span>
           </Link>
+          {/* No "Products" link: the workspace name to the left is the catalog
+              now, and two links to one page reads as two destinations. */}
           <nav className="ml-auto mr-2 flex items-center gap-5">
             <Link
-              href={`/w/${workspace.slug}/products`}
-              className="text-[14px] text-[var(--color-ink-2)] hover:text-[var(--color-ink)]"
-            >
-              Products
-            </Link>
-            <Link
-              href={`/w/${workspace.slug}/channels`}
+              href={routes.channels(workspace.slug)}
               className="text-[14px] text-[var(--color-ink-2)] hover:text-[var(--color-ink)]"
             >
               Channels
+            </Link>
+            <Link
+              href={routes.settings(workspace.slug)}
+              className="text-[14px] text-[var(--color-ink-2)] hover:text-[var(--color-ink)]"
+            >
+              Settings
             </Link>
           </nav>
           <form action={signOutAction}>

@@ -16,7 +16,7 @@ const NUL = String.fromCharCode(0)
 describe("safeRedirectTarget", () => {
   it("keeps an ordinary same-origin path", () => {
     expect(safeRedirectTarget("/reset-password", FALLBACK)).toBe("/reset-password")
-    expect(safeRedirectTarget("/w/northbound/products", FALLBACK)).toBe("/w/northbound/products")
+    expect(safeRedirectTarget("/best-night/facette", FALLBACK)).toBe("/best-night/facette")
   })
 
   it("falls back when nothing was supplied", () => {

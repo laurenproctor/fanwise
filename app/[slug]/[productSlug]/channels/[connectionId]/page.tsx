@@ -9,6 +9,7 @@ import { ListingEditor } from "@/components/channels/listing-editor"
 import { ListingImages, type ListingImage } from "@/components/channels/listing-images"
 import { listingImageSlots } from "@/lib/channels/images"
 import { isReorderable } from "@/lib/products/image-order"
+import { routes } from "@/lib/routes"
 
 export const metadata = { title: "Listing · Fanwise" }
 
@@ -68,7 +69,7 @@ export default async function ListingPage({
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
         <Link
-          href={`/w/${slug}/products/${productSlug}`}
+          href={routes.product(slug, productSlug)}
           className="label-mono hover:text-[var(--color-ink-2)]"
         >
           ← {product.name}
