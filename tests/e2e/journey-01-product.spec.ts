@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { expect, test } from "@playwright/test"
 import { productUrl, signUpAndCreateWorkspace } from "./support"
 
@@ -50,4 +51,53 @@ test("the canonical record saves and survives a reload", async ({ page }) => {
   await page.reload()
   await expect(page.getByLabel("Canonical title")).toHaveValue("Editable Product Family")
   await expect(page.getByLabel("Brand name")).toHaveValue("Northbound")
+})
+
+/**
+ * Dropping a file onto the images panel.
+ *
+ * This is here because it broke, and it broke in the way drag-and-drop always
+ * breaks: nothing at all happened, with no error anywhere. The panel had drag
+ * handlers for reordering, so the gesture looked supported, and a file dropped
+ * on a tile hit a handler that had no index to move and returned silently.
+ *
+ * The drop is dispatched with a real DataTransfer built in the page rather than
+ * through `setInputFiles`, because the file input is exactly the path that was
+ * already working. A test that goes through the input would have passed
+ * throughout the bug.
+ */
+test("a creator drops an image onto the product's images panel", async ({ page }) => {
+  const { slug } = await signUpAndCreateWorkspace(page, "j1d", "Drop Studio")
+
+  await page.goto(`/${slug}/new`)
+  await page.getByLabel("Product name").fill("Dropped Product")
+  await page.getByRole("button", { name: "Create product" }).click()
+  await page.waitForURL(productUrl(slug))
+
+  // A repo-relative path, as journey 5 uses. This file is compiled to CJS by
+  // the Playwright runner, where import.meta does not exist.
+  const png = readFileSync("tests/fixtures/small-800x600.png")
+  const transfer = await page.evaluateHandle(
+    ([bytes, name]) => {
+      const data = new DataTransfer()
+      data.items.add(new File([new Uint8Array(bytes as number[])], name as string, {
+        type: "image/png",
+      }))
+      return data
+    },
+    [Array.from(png), "small-800x600.png"] as const,
+  )
+
+  // Onto an existing area of the panel, not the dashed tile: aiming a file
+  // precisely at one small square is the gesture nobody actually performs.
+  const panel = page.getByRole("region", { name: "Images" })
+  await panel.dispatchEvent("drop", { dataTransfer: transfer })
+
+  // The tile exists whatever state the asset is in; the finalize job decides
+  // ready versus pending on its own schedule and that is not what this asserts.
+  await expect(panel.getByText("small-800x600.png")).toBeVisible()
+
+  // And the first image of an empty product is its cover, without anyone
+  // having been asked. Position is the model.
+  await expect(panel.getByText("Cover", { exact: true })).toBeVisible()
 })
