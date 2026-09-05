@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Button, ButtonLink } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { buildListingAction } from "@/lib/channels/actions"
 import { publishListingAction } from "@/lib/publishing/actions"
+import { useBackgroundRefresh } from "@/lib/use-background-refresh"
 import { ReadinessBar } from "./readiness-bar"
 import { RequirementList } from "./requirement-list"
 import { StatusPill } from "./status-pill"
@@ -46,9 +47,6 @@ export interface ChannelListingCard {
 }
 
 /** How long to keep asking whether a publication finished, and how often. */
-const POLL_MS = 2000
-const POLL_LIMIT = 20
-
 export function ListingPanel({
   workspaceSlug,
   productSlug,
@@ -68,28 +66,12 @@ export function ListingPanel({
 
   const publishing = cards.some((card) => card.liveness === "publishing")
 
-  /**
+  /*
    * Publishing happens in a background job, so the page that queued it does not
-   * know when it finished. It asks, briefly.
-   *
-   * Bounded rather than indefinite: a job that has not landed in forty seconds
-   * has failed in a way polling will not discover, and a tab that refreshes
-   * itself forever is worse than one that stops. A7 replaces this with real
+   * know when it finished. It asks, briefly. A7 replaces this with real
    * progress, which is where it belongs.
    */
-  useEffect(() => {
-    if (!publishing) return
-    let ticks = 0
-    const timer = setInterval(() => {
-      ticks += 1
-      if (ticks > POLL_LIMIT) {
-        clearInterval(timer)
-        return
-      }
-      router.refresh()
-    }, POLL_MS)
-    return () => clearInterval(timer)
-  }, [publishing, router])
+  useBackgroundRefresh(publishing)
 
   function build(connectionId: string) {
     setError(null)
