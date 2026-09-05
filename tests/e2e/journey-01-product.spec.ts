@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs"
-import { expect, test } from "@playwright/test"
+import { expect, test, type Page } from "@playwright/test"
 import { productUrl, signUpAndCreateWorkspace } from "./support"
 
 /**
@@ -54,6 +54,32 @@ test("the canonical record saves and survives a reload", async ({ page }) => {
 })
 
 /**
+ * A DataTransfer carrying one file, built inside the page.
+ *
+ * Playwright cannot perform an operating-system drag, so a dispatched event
+ * with a real DataTransfer is the closest available thing. It exercises the
+ * handlers and the whole upload path behind them; it does not prove the
+ * browser's own drag machinery hands the panel what it expects. Worth knowing
+ * when one of these passes and a person still reports the gesture failing.
+ */
+async function fileTransfer(page: Page, path: string, type: string) {
+  const bytes = readFileSync(path)
+  const name = path.split("/").pop()!
+  return page.evaluateHandle(
+    ([data, filename, mime]) => {
+      const transfer = new DataTransfer()
+      transfer.items.add(
+        new File([new Uint8Array(data as number[])], filename as string, {
+          type: mime as string,
+        }),
+      )
+      return transfer
+    },
+    [Array.from(bytes), name, type] as const,
+  )
+}
+
+/**
  * Dropping a file onto the images panel.
  *
  * This is here because it broke, and it broke in the way drag-and-drop always
@@ -76,22 +102,10 @@ test("a creator drops an image onto the product's images panel", async ({ page }
 
   // A repo-relative path, as journey 5 uses. This file is compiled to CJS by
   // the Playwright runner, where import.meta does not exist.
-  const png = readFileSync("tests/fixtures/small-800x600.png")
-  const transfer = await page.evaluateHandle(
-    ([bytes, name]) => {
-      const data = new DataTransfer()
-      data.items.add(
-        new File([new Uint8Array(bytes as number[])], name as string, {
-          type: "image/png",
-        }),
-      )
-      return data
-    },
-    [Array.from(png), "small-800x600.png"] as const,
-  )
+  const transfer = await fileTransfer(page, "tests/fixtures/small-800x600.png", "image/png")
 
-  // Onto an existing area of the panel, not the dashed tile: aiming a file
-  // precisely at one small square is the gesture nobody actually performs.
+  // Onto the body of the panel, away from the dashed tile: a file dropped an
+  // inch wide of the target is the ordinary case, not the exotic one.
   const panel = page.getByRole("region", { name: "Images" })
   await panel.dispatchEvent("drop", { dataTransfer: transfer })
 
@@ -165,4 +179,33 @@ test("the guard leaves a native file input alone", async ({ page }) => {
   })
 
   expect(cancelled).toBe(false)
+})
+
+/**
+ * The same drop, aimed at the dashed tile itself.
+ *
+ * Added after the fix, because the fix's own test dropped on the body of the
+ * panel and this is the square a person actually aims at — it is the one thing
+ * on screen that says "put a file here". The tile is a `<label>` wrapping a
+ * hidden `<input type="file">`, so the drop lands on markup with its own ideas
+ * about files and has to bubble out to the section to be handled at all.
+ * Nothing in the panel-body test covers that path.
+ */
+test("a creator drops an image onto the dashed Add-images tile", async ({ page }) => {
+  const { slug } = await signUpAndCreateWorkspace(page, "j1t", "Tile Studio")
+
+  await page.goto(`/${slug}/new`)
+  await page.getByLabel("Product name").fill("Tiled Product")
+  await page.getByRole("button", { name: "Create product" }).click()
+  await page.waitForURL(productUrl(slug))
+
+  const transfer = await fileTransfer(page, "tests/fixtures/small-800x600.png", "image/png")
+
+  const tile = page.getByText("Drop them here, or click")
+  await expect(tile).toBeVisible()
+  await tile.dispatchEvent("drop", { dataTransfer: transfer })
+
+  await expect(
+    page.getByRole("region", { name: "Images" }).getByText("small-800x600.png"),
+  ).toBeVisible()
 })
