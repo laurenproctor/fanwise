@@ -253,6 +253,44 @@ indistinguishable from a zero that means "no sales".
 
 ## Gate C, and the pricing page
 
+### 21. How a product leaves a channel
+
+Found on 5 September 2026, trying to disconnect a Shopify connection with one published
+product.
+
+`disconnectChannelAction` refuses while any listing on the connection carries an external id,
+and that refusal is right: cascading the listing away does not remove the product from the
+marketplace, it removes Fanwise's only record of it, leaving a live product nothing points at
+and no way to publish again without creating a duplicate. Fanwise forgetting is worse than
+Fanwise refusing.
+
+The refusal says "remove it from the channel first." There is no way to do that. The actions
+are `buildListing`, `updateListing` and `publishListing`; nothing removes one. So publishing a
+single product to a channel makes that connection permanent.
+
+That is a dead end today and a billing problem at C1, where disconnecting is the event that
+decrements quantity. A creator who publishes once can never stop being charged for the
+channel, and the entitlement service is coupled to `channel_connections` precisely so that
+connecting and disconnecting are the billing signals.
+
+The real question is what "remove from the channel" should mean, and it is not obvious:
+
+- **Delist on the marketplace, then forget.** Honest, and the only version where the refusal's
+  advice is literally true. Needs a `delist` capability that not every adapter can implement —
+  an assisted channel cannot, so this becomes another capability with a UI that has to respect
+  it.
+- **Forget without delisting, behind an explicit acknowledgement.** Cheap, and re-creates the
+  orphan the refusal exists to prevent, except now the creator chose it. Defensible only if
+  the acknowledgement names the product and the marketplace.
+- **Archive rather than delete.** Keeps the external id and the snapshots, drops the
+  connection, and leaves a record that could be re-attached if the store is reconnected.
+  Interacts directly with entry 10, which is the same tension seen from the snapshot side.
+
+**Recommendation:** answer it with entry 10 rather than separately, since both are the same
+question about what survives a disconnection, and decide before C1 rather than at it. Until
+then the UI says the connection cannot be disconnected and why, rather than offering a button
+whose only outcome is the refusal.
+
 ### 16. Assisted versus automatic pricing
 
 **The largest open commercial decision.** Charging $6 for a channel Fanwise cannot publish to

@@ -4,6 +4,7 @@ import { listChannels, listConnections } from "@/lib/channels/queries"
 import { findAdapter } from "@/lib/channels/registry"
 import { CapabilityList } from "@/components/channels/capability-list"
 import { ConnectButton } from "@/components/channels/connect-button"
+import { countPublishedByConnection } from "@/lib/channels/queries"
 
 export const metadata = { title: "Channels · Fanwise" }
 
@@ -28,7 +29,16 @@ export default async function ChannelsPage({
   const workspace = await getWorkspaceBySlug(slug)
   if (!workspace) notFound()
 
-  const [channels, connections] = await Promise.all([listChannels(), listConnections(workspace.id)])
+  const [channels, connections, publishedByConnection] = await Promise.all([
+    listChannels(),
+    listConnections(workspace.id),
+    /*
+      Which connections hold something live. Disconnect refuses while a listing
+      carries an external id, so the page has to know before it renders a button
+      that would only ever be refused.
+    */
+    countPublishedByConnection(workspace.id),
+  ])
 
   const connectionByChannelId = new Map(connections.map((c) => [c.channel.id, c.connection]))
 
@@ -103,6 +113,7 @@ export default async function ChannelsPage({
                   channelName={channel.name}
                   connectionId={connection?.id ?? null}
                   accountName={connection?.external_account_name ?? null}
+                  publishedCount={connection ? (publishedByConnection.get(connection.id) ?? 0) : 0}
                   disabled={channel.status !== "available"}
                   /*
                     Only the two strings the form needs. `adapter.oauth` holds
