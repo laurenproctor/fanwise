@@ -10,6 +10,7 @@ import { createUploadUrl, buildStoragePath } from "./storage"
 import { sanitizeFilename } from "./storage"
 import { createProductSchema, updateProductSchema, uploadIntentSchema } from "./schemas"
 import { emptyMetadataFor } from "./metadata"
+import { planImageOrder } from "./image-order"
 
 export interface ActionState {
   error: string | null
@@ -266,13 +267,12 @@ export async function reorderProductImagesAction(
 ): Promise<ActionState> {
   const { supabase, workspace } = await requireWorkspace(workspaceSlug)
 
-  // Also the emptiness check: no first image means nothing to order.
-  const cover = assetIds[0]
-  if (!cover) return { error: null }
+  if (assetIds.length === 0) return { error: null }
 
-  // Read through RLS before writing anything. This proves the caller may see
-  // every asset it is about to reorder, and that all of them are on this
-  // product rather than borrowed from another one.
+  // Read through RLS before deciding anything. Scoping the select to this
+  // workspace and product is the authorization step: an id belonging to someone
+  // else simply does not come back, and the planner then refuses the whole
+  // order rather than applying the part that happened to resolve.
   const { data: assets, error: readError } = await supabase
     .from("product_assets")
     .select("id, asset_type")
@@ -285,25 +285,31 @@ export async function reorderProductImagesAction(
     return { error: "Those images could not be reordered. Try again." }
   }
 
-  // Every id has to resolve, or the order being written is not the order the
-  // creator was looking at when they dragged.
-  if (!assets || assets.length !== assetIds.length) {
-    return { error: "Those images have changed. Reload the page and try again." }
+  const plan = planImageOrder(assetIds, assets ?? [])
+  if (!plan.ok) {
+    return {
+      error:
+        plan.reason === "not_reorderable"
+          ? "Only cover and preview images can be reordered."
+          : "Those images have changed. Reload the page and try again.",
+    }
   }
 
-  // Images only. The database trigger permits cover_image <-> preview_image and
-  // refuses everything else, so a deliverable in this list would fail as a
-  // constraint violation; catching it here returns a sentence instead.
-  const reorderable = new Set(["cover_image", "preview_image"])
-  if (assets.some((asset) => !reorderable.has(asset.asset_type))) {
-    return { error: "Only images can be reordered." }
-  }
-
-  for (const [position, id] of assetIds.entries()) {
+  // Demote everything to preview with its new position, then promote the first.
+  // Demoting before promoting means a concurrent reader can see zero covers but
+  // never two: zero is harmless, because the channel comparator falls back to
+  // sort_order and that is already correct by this point, while two would make
+  // a storefront's lead image a coin toss.
+  //
+  // Not a transaction, which is a real limitation rather than an oversight. The
+  // client has no transaction API, and an interrupted run leaves an order that
+  // is partly written: recoverable by dragging again, with nothing external
+  // told anything in the meantime.
+  for (const write of plan.writes) {
     const { error } = await supabase
       .from("product_assets")
-      .update({ sort_order: position, asset_type: "preview_image" })
-      .eq("id", id)
+      .update({ sort_order: write.sortOrder, asset_type: "preview_image" })
+      .eq("id", write.id)
       .eq("workspace_id", workspace.id)
 
     if (error) {
@@ -312,15 +318,18 @@ export async function reorderProductImagesAction(
     }
   }
 
-  const { error: coverError } = await supabase
-    .from("product_assets")
-    .update({ asset_type: "cover_image" })
-    .eq("id", cover)
-    .eq("workspace_id", workspace.id)
+  const cover = plan.writes.find((write) => write.assetType === "cover_image")
+  if (cover) {
+    const { error: coverError } = await supabase
+      .from("product_assets")
+      .update({ asset_type: "cover_image" })
+      .eq("id", cover.id)
+      .eq("workspace_id", workspace.id)
 
-  if (coverError) {
-    console.error("[assets] could not set the cover image", coverError)
-    return { error: "That order was saved, but the cover image could not be set. Try again." }
+    if (coverError) {
+      console.error("[assets] could not set the cover image", coverError)
+      return { error: "That order was saved, but the cover image could not be set. Try again." }
+    }
   }
 
   revalidatePath(`/w/${workspaceSlug}/products`, "layout")
