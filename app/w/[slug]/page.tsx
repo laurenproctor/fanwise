@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import { getCurrentUser, getWorkspaceBySlug, listWorkspaceMembers } from "@/lib/workspaces/queries"
+import { InfoTip } from "@/components/ui/info-tip"
+import type { GlossaryTerm } from "@/lib/ui/glossary"
 
 export const metadata = { title: "Workspace · Fanwise" }
 
@@ -29,13 +31,24 @@ export default async function WorkspacePage({ params }: { params: Promise<{ slug
       <section className="flex flex-col gap-4">
         <h2 className="label-mono">Details</h2>
         <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-rule-2)] sm:grid-cols-3">
-          {[
-            { term: "Address", value: `/w/${workspace.slug}` },
-            { term: "Your role", value: members.find((m) => m.user_id === user.id)?.role ?? "—" },
-            { term: "Created", value: new Date(workspace.created_at).toLocaleDateString() },
-          ].map(({ term, value }) => (
+          {(
+            [
+              { term: "Address", value: `/w/${workspace.slug}`, tip: "workspaceAddress" },
+              {
+                term: "Your role",
+                value: members.find((m) => m.user_id === user.id)?.role ?? "—",
+                tip: "workspaceRole",
+              },
+              // A date needs no gloss. An icon on every row would only teach
+              // people that the icons are not worth opening.
+              { term: "Created", value: new Date(workspace.created_at).toLocaleDateString() },
+            ] as { term: string; value: string; tip?: GlossaryTerm }[]
+          ).map(({ term, value, tip }) => (
             <div key={term} className="flex flex-col gap-1.5 bg-[var(--color-card)] p-4">
-              <dt className="label-mono">{term}</dt>
+              <dt className="flex items-baseline gap-1.5">
+                <span className="label-mono">{term}</span>
+                {tip ? <InfoTip term={tip} /> : null}
+              </dt>
               <dd className="font-mono text-[13px] text-[var(--color-ink)]">{value}</dd>
             </div>
           ))}

@@ -4,6 +4,7 @@ import { listChannels, listConnections } from "@/lib/channels/queries"
 import { findAdapter } from "@/lib/channels/registry"
 import { CapabilityList } from "@/components/channels/capability-list"
 import { ConnectButton } from "@/components/channels/connect-button"
+import { InfoTip } from "@/components/ui/info-tip"
 
 export const metadata = { title: "Channels · Fanwise" }
 
@@ -41,7 +42,10 @@ export default async function ChannelsPage({
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
         <span className="label-mono">Distribution</span>
-        <h1 className="font-display text-4xl font-extralight tracking-[-0.03em]">Channels</h1>
+        <h1 className="flex items-center gap-2 font-display text-4xl font-extralight tracking-[-0.03em]">
+          Channels
+          <InfoTip term="channel" />
+        </h1>
         <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
           A channel is somewhere you sell. Fanwise keeps one canonical product and gives each
           channel its own translation of it.
@@ -76,14 +80,29 @@ export default async function ChannelsPage({
                   <h2 className="font-display text-[22px] font-normal tracking-[-0.02em]">
                     {channel.name}
                   </h2>
-                  <span className="label-mono">
-                    {adapter.integrationType === "api" ? "Automatic" : "Assisted"}
+                  <span className="flex items-baseline gap-1.5">
+                    <span className="label-mono">
+                      {adapter.integrationType === "api" ? "Automatic" : "Assisted"}
+                    </span>
+                    {/*
+                      The single most consequential word on the card. Someone
+                      who reads "Assisted" as "Automatic, eventually" will wait
+                      for a publish that is never coming.
+                    */}
+                    <InfoTip
+                      term={
+                        adapter.integrationType === "api" ? "automaticChannel" : "assistedChannel"
+                      }
+                    />
                   </span>
                 </div>
                 {connection ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--color-ok)] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-ok)]">
-                    <span className="h-[5px] w-[5px] rounded-full bg-current" aria-hidden />
-                    Connected
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--color-ok)] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-ok)]">
+                      <span className="h-[5px] w-[5px] rounded-full bg-current" aria-hidden />
+                      Connected
+                    </span>
+                    <InfoTip term="connection" />
                   </span>
                 ) : null}
               </div>

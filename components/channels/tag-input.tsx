@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { InfoTip } from "@/components/ui/info-tip"
 
 /**
  * Tags as a comma-separated field, with a live count against the channel's
@@ -37,9 +38,13 @@ export function TagInput({
 
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor="listing-tags" className="label-mono">
-        Tags
-      </label>
+      <span className="flex items-baseline gap-1.5">
+        <label htmlFor="listing-tags" className="label-mono">
+          Tags
+        </label>
+        {/* Sibling, not child: a button inside a label steals the label's name. */}
+        <InfoTip term="listingTags" />
+      </span>
       <input
         id="listing-tags"
         name={name}

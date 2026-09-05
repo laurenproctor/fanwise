@@ -1,3 +1,4 @@
+import { InfoTip } from "@/components/ui/info-tip"
 import type { RequirementResult } from "@/lib/channels/types"
 
 /**
@@ -27,8 +28,16 @@ export function RequirementList({ results }: { results: RequirementResult[] }) {
             <span className="text-[13.5px] text-[var(--color-ink)]">
               {result.label}
               {!result.satisfied && result.severity === "warning" ? (
-                <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
-                  optional
+                <span className="ml-2 inline-flex items-center gap-1.5">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-ink-3)]">
+                    optional
+                  </span>
+                  {/*
+                    An unsatisfied rule sitting next to satisfied ones reads as
+                    a problem. This is the one that is not, and readiness
+                    already ignores it.
+                  */}
+                  <InfoTip term="optionalRequirement" />
                 </span>
               ) : null}
             </span>

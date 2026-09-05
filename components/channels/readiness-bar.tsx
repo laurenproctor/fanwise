@@ -1,3 +1,4 @@
+import { InfoTip } from "@/components/ui/info-tip"
 import { readinessPercent } from "@/lib/channels/readiness"
 import type { Readiness } from "@/lib/channels/types"
 
@@ -13,10 +14,14 @@ export function ReadinessBar({ readiness }: { readiness: Readiness }) {
   return (
     <div className="grid gap-2">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="label-mono">
-          {readiness.ready
-            ? "Ready"
-            : `${readiness.errorsResolved} of ${readiness.errorsTotal} resolved`}
+        <span className="flex items-baseline gap-1.5">
+          <span className="label-mono">
+            {readiness.ready
+              ? "Ready"
+              : `${readiness.errorsResolved} of ${readiness.errorsTotal} resolved`}
+          </span>
+          {/* "78%" invites being read as a grade. It is a count of rules. */}
+          <InfoTip term="readiness" />
         </span>
         <span className="tabular font-mono text-[12px] text-[var(--color-ink-3)]">{percent}%</span>
       </div>
