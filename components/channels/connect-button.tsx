@@ -167,8 +167,8 @@ export function ConnectButton({
           {publishedCount === 1
             ? `A product is published to ${channelName}, so this connection cannot be disconnected.`
             : `${publishedCount} products are published to ${channelName}, so this connection cannot be disconnected.`}{" "}
-          Disconnecting would leave {publishedCount === 1 ? "it" : "them"} for sale with nothing
-          in Fanwise pointing at {publishedCount === 1 ? "it" : "them"}.
+          Disconnecting would leave {publishedCount === 1 ? "it" : "them"} for sale with nothing in
+          Fanwise pointing at {publishedCount === 1 ? "it" : "them"}.
         </p>
       ) : confirming ? (
         <div className="grid gap-2">
