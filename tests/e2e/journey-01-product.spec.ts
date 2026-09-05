@@ -259,3 +259,53 @@ test("a file dropped on the input itself uploads once, not twice", async ({ page
 
   await expect(page.getByRole("row").filter({ hasText: "small-800x600.png" })).toHaveCount(1)
 })
+
+/**
+ * Required fields say so before the form is submitted.
+ *
+ * Marked from the input's own `required`, so a field cannot be required and
+ * unmarked. The mark is aria-hidden: the attribute is what a screen reader
+ * announces, and it announces it on the control rather than inside the label.
+ */
+test("required fields carry a mark, and optional ones do not", async ({ page }) => {
+  await page.goto("/sign-up")
+  for (const label of ["Email", "Password"]) {
+    const text = await page.getByText(label, { exact: false }).first().textContent()
+    expect(text).toContain("*")
+  }
+
+  const { slug } = await signUpAndCreateWorkspace(page, "j1r", "Marks Studio")
+  await page.goto(`/${slug}/new`)
+
+  // Both of the new-product form's fields are required.
+  expect(await page.locator("label", { hasText: "Product name" }).textContent()).toContain("*")
+  expect(await page.locator("label", { hasText: "Product type" }).textContent()).toContain("*")
+
+  await page.getByLabel("Product name").fill("Marked Product")
+  await page.getByRole("button", { name: "Create product" }).click()
+  await page.waitForURL(productUrl(slug))
+
+  // And a field that is genuinely optional is not marked, or the mark stops
+  // carrying information.
+  expect(await page.locator("label", { hasText: "Brand name" }).textContent()).not.toContain("*")
+})
+
+/**
+ * The Files section is one outline, not two.
+ *
+ * The controls and the files they produce are one thing, and a second frame
+ * around the list said they were two — with the drop target ambiguous between
+ * them, which matters now that the section takes a drop.
+ */
+test("the Files section draws a single outline around controls and list", async ({ page }) => {
+  const { slug } = await signUpAndCreateWorkspace(page, "j1o", "Outline Studio")
+  await page.goto(`/${slug}/new`)
+  await page.getByLabel("Product name").fill("Outlined Product")
+  await page.getByRole("button", { name: "Create product" }).click()
+  await page.waitForURL(productUrl(slug))
+
+  // The empty state and the file input live inside the same bordered box.
+  const box = page.locator("div.rounded-\\[14px\\].border", { hasText: "No files yet" }).last()
+  await expect(box.getByLabel("Add a file")).toBeVisible()
+  await expect(box.getByText("No files yet")).toBeVisible()
+})

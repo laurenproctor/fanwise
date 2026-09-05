@@ -196,150 +196,159 @@ export function AssetManager({
     >
       <FormError message={error} />
 
+      {/*
+        One outline, not two. The controls and the files they produce are one
+        thing — "the files on this product" — and drawing a box around each
+        said they were two, with the drop target ambiguous between them. A
+        single border with a rule inside it keeps the grouping and drops the
+        second frame.
+      */}
       <div
-        className={`flex flex-wrap items-end gap-4 rounded-[14px] border p-5 transition-colors ${
+        className={`overflow-hidden rounded-[14px] border transition-colors ${
           fileOver
             ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
             : "border-[var(--color-rule)]"
         }`}
       >
-        <label className="flex flex-col gap-2">
-          <span className="label-mono">File type</span>
-          <select
-            value={assetType}
-            onChange={(event) => setAssetType(event.target.value as AssetType)}
-            className="rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-card)] px-3 py-2.5 text-[15px] outline-none focus:border-[var(--color-accent)]"
-          >
-            {ASSET_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {ASSET_TYPE_LABELS[type]}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex flex-wrap items-end gap-4 p-5">
+          <label className="flex flex-col gap-2">
+            <span className="label-mono">File type</span>
+            <select
+              value={assetType}
+              onChange={(event) => setAssetType(event.target.value as AssetType)}
+              className="rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-card)] px-3 py-2.5 text-[15px] outline-none focus:border-[var(--color-accent)]"
+            >
+              {ASSET_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {ASSET_TYPE_LABELS[type]}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label className="flex flex-col gap-2">
-          <span className="label-mono">Add a file</span>
-          <input
-            type="file"
-            multiple
-            disabled={uploading || isPending}
-            onChange={(event) => {
-              void upload(Array.from(event.target.files ?? []))
-              event.target.value = ""
-            }}
-            className="text-[14px] text-[var(--color-ink-2)] file:mr-3 file:rounded-[var(--radius-pill)] file:border file:border-[var(--color-rule)] file:bg-transparent file:px-4 file:py-2 file:text-[13px]"
-          />
-        </label>
+          <label className="flex flex-col gap-2">
+            <span className="label-mono">Add a file</span>
+            <input
+              type="file"
+              multiple
+              disabled={uploading || isPending}
+              onChange={(event) => {
+                void upload(Array.from(event.target.files ?? []))
+                event.target.value = ""
+              }}
+              className="text-[14px] text-[var(--color-ink-2)] file:mr-3 file:rounded-[var(--radius-pill)] file:border file:border-[var(--color-rule)] file:bg-transparent file:px-4 file:py-2 file:text-[13px]"
+            />
+          </label>
 
-        {uploading ? (
-          <span className="label-mono" aria-live="polite">
-            Uploading…
-          </span>
-        ) : null}
+          {uploading ? (
+            <span className="label-mono" aria-live="polite">
+              Uploading…
+            </span>
+          ) : null}
 
-        {/*
+          {/*
           Names the type a drop would use. "Drop files here" on its own invites
           someone to drop a deliverable while Cover image is selected and only
           find out from the table afterwards.
         */}
-        <p className="basis-full text-[13px] text-[var(--color-ink-3)]">
-          {fileOver
-            ? `Drop to add as ${ASSET_TYPE_LABELS[assetType]}.`
-            : `Or drop files anywhere in this section. They are added as ${ASSET_TYPE_LABELS[assetType]}.`}
-        </p>
-      </div>
-
-      {sources.length === 0 ? (
-        <div className="flex flex-col items-start gap-2 rounded-[14px] border border-dashed border-[var(--color-rule)] p-8">
-          <span className="label-mono">No files yet</span>
-          <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
-            Add the deliverable your buyer receives, and the images you want channels to show.
+          <p className="basis-full text-[13px] text-[var(--color-ink-3)]">
+            {fileOver
+              ? `Drop to add as ${ASSET_TYPE_LABELS[assetType]}.`
+              : `Or drop files anywhere in this section. They are added as ${ASSET_TYPE_LABELS[assetType]}.`}
           </p>
         </div>
-      ) : (
-        <div className="overflow-x-auto rounded-[14px] border border-[var(--color-rule)]">
-          <table className="w-full border-collapse bg-[var(--color-card)] text-left">
-            <thead>
-              <tr className="border-b border-[var(--color-rule)]">
-                <th className="label-mono p-4 font-normal">File</th>
-                <th className="label-mono p-4 font-normal">Type</th>
-                <th className="label-mono p-4 font-normal">State</th>
-                <th className="label-mono p-4 font-normal">Size</th>
-                <th className="label-mono p-4 font-normal">Derivatives</th>
-                <th className="label-mono p-4 font-normal" />
-              </tr>
-            </thead>
-            <tbody>
-              {sources.map((asset) => {
-                const derivatives = derivativesBySource[asset.id] ?? []
-                return (
-                  <tr
-                    key={asset.id}
-                    className="border-b border-[var(--color-rule-2)] last:border-b-0 align-top"
-                  >
-                    <td className="p-4">
-                      <div className="font-display text-[17px] font-normal">{asset.filename}</div>
-                      {asset.failure_reason ? (
-                        <div className="mt-1 text-[13px] text-[var(--color-ink-2)]">
-                          {asset.failure_reason}
-                        </div>
-                      ) : null}
-                    </td>
-                    <td className="p-4 font-mono text-[13px] text-[var(--color-ink-2)]">
-                      {ASSET_TYPE_LABELS[asset.asset_type]}
-                    </td>
-                    <td className="p-4">
-                      <StatePill state={asset.asset_state} />
-                    </td>
-                    <td className="tabular p-4 font-mono text-[13px] text-[var(--color-ink-2)]">
-                      {formatBytes(asset.byte_size)}
-                    </td>
-                    <td className="p-4 font-mono text-[13px] text-[var(--color-ink-2)]">
-                      {derivatives.length === 0 ? (
-                        "—"
-                      ) : (
-                        <ul className="flex flex-col gap-1">
-                          {derivatives.map((derivative) => (
-                            <li key={derivative.id}>
-                              <a
-                                href={routes.assetDownload(workspaceSlug, derivative.id)}
-                                className="underline underline-offset-4 hover:text-[var(--color-accent)]"
-                              >
-                                {derivative.filename}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        {asset.asset_state === "ready" ? (
-                          <a
-                            href={routes.assetDownload(workspaceSlug, asset.id)}
-                            className="text-[14px] underline underline-offset-4 hover:text-[var(--color-accent)]"
-                          >
-                            Download
-                          </a>
+
+        {sources.length === 0 ? (
+          <div className="flex flex-col items-start gap-2 border-t border-[var(--color-rule)] p-8">
+            <span className="label-mono">No files yet</span>
+            <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
+              Add the deliverable your buyer receives, and the images you want channels to show.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto border-t border-[var(--color-rule)]">
+            <table className="w-full border-collapse bg-[var(--color-card)] text-left">
+              <thead>
+                <tr className="border-b border-[var(--color-rule)]">
+                  <th className="label-mono p-4 font-normal">File</th>
+                  <th className="label-mono p-4 font-normal">Type</th>
+                  <th className="label-mono p-4 font-normal">State</th>
+                  <th className="label-mono p-4 font-normal">Size</th>
+                  <th className="label-mono p-4 font-normal">Derivatives</th>
+                  <th className="label-mono p-4 font-normal" />
+                </tr>
+              </thead>
+              <tbody>
+                {sources.map((asset) => {
+                  const derivatives = derivativesBySource[asset.id] ?? []
+                  return (
+                    <tr
+                      key={asset.id}
+                      className="border-b border-[var(--color-rule-2)] last:border-b-0 align-top"
+                    >
+                      <td className="p-4">
+                        <div className="font-display text-[17px] font-normal">{asset.filename}</div>
+                        {asset.failure_reason ? (
+                          <div className="mt-1 text-[13px] text-[var(--color-ink-2)]">
+                            {asset.failure_reason}
+                          </div>
                         ) : null}
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={() => remove(asset.id)}
-                          className="text-[14px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)]"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                      </td>
+                      <td className="p-4 font-mono text-[13px] text-[var(--color-ink-2)]">
+                        {ASSET_TYPE_LABELS[asset.asset_type]}
+                      </td>
+                      <td className="p-4">
+                        <StatePill state={asset.asset_state} />
+                      </td>
+                      <td className="tabular p-4 font-mono text-[13px] text-[var(--color-ink-2)]">
+                        {formatBytes(asset.byte_size)}
+                      </td>
+                      <td className="p-4 font-mono text-[13px] text-[var(--color-ink-2)]">
+                        {derivatives.length === 0 ? (
+                          "—"
+                        ) : (
+                          <ul className="flex flex-col gap-1">
+                            {derivatives.map((derivative) => (
+                              <li key={derivative.id}>
+                                <a
+                                  href={routes.assetDownload(workspaceSlug, derivative.id)}
+                                  className="underline underline-offset-4 hover:text-[var(--color-accent)]"
+                                >
+                                  {derivative.filename}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          {asset.asset_state === "ready" ? (
+                            <a
+                              href={routes.assetDownload(workspaceSlug, asset.id)}
+                              className="text-[14px] underline underline-offset-4 hover:text-[var(--color-accent)]"
+                            >
+                              Download
+                            </a>
+                          ) : null}
+                          <button
+                            type="button"
+                            disabled={isPending}
+                            onClick={() => remove(asset.id)}
+                            className="text-[14px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)]"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
