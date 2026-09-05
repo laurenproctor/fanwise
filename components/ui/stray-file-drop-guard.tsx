@@ -45,9 +45,7 @@ export function StrayFileDropGuard() {
     }
 
     function unclaimed(event: DragEvent) {
-      return (
-        carriesFiles(event) && !event.defaultPrevented && !boundForAFileInput(event.target)
-      )
+      return carriesFiles(event) && !event.defaultPrevented && !boundForAFileInput(event.target)
     }
 
     function onDragOver(event: DragEvent) {
