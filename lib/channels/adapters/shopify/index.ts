@@ -196,6 +196,70 @@ const productSetSchema = z.object({
   }),
 })
 
+/**
+ * What the product currently holds, so a missing image can be sent again.
+ *
+ * `files` goes out only when there is nothing to overwrite (see productSet), so
+ * this read is what makes that condition answerable. FAILED is asked for by
+ * name: Shopify keeps a media row whose fetch did not succeed, and counting it
+ * as media present would make a permanently broken image permanently
+ * unrepairable, which is the exact failure this exists to end.
+ */
+const PRODUCT_MEDIA = `
+  query FanwiseProductMedia($id: ID!) {
+    product(id: $id) {
+      media(first: 10) {
+        nodes {
+          id
+          status
+          ... on MediaImage {
+            mediaErrors { code details message }
+          }
+        }
+      }
+    }
+  }
+`
+
+const productMediaSchema = z.object({
+  product: z
+    .object({
+      media: z.object({
+        nodes: z.array(
+          z.object({
+            id: z.string(),
+            status: z.string().nullish(),
+            mediaErrors: z
+              .array(
+                z.object({
+                  code: z.string().nullish(),
+                  details: z.string().nullish(),
+                  message: z.string().nullish(),
+                }),
+              )
+              .nullish(),
+          }),
+        ),
+      }),
+    })
+    .nullish(),
+})
+
+type ProductMedia = z.infer<typeof productMediaSchema>
+
+/**
+ * True when the product has no image a buyer would actually see.
+ *
+ * A FAILED node is not one. Shopify's fetch of `originalSource` happens on its
+ * own schedule after the mutation returns, so a URL that was unreachable —
+ * expired signature, storage not publicly resolvable — leaves a product that
+ * reported a clean publish and shows nothing.
+ */
+function needsMedia(media: ProductMedia): boolean {
+  const nodes = media.product?.media.nodes ?? []
+  return nodes.filter((node) => node.status !== "FAILED").length === 0
+}
+
 /** Shopify's single-variant convention. */
 const OPTION_NAME = "Title"
 const OPTION_VALUE = "Default Title"
@@ -275,19 +339,41 @@ async function productSet(
     ],
   }
 
-  if (!externalId) {
-    const cover = subject.assets.find(
-      (asset) => asset.asset_state === "ready" && asset.asset_type === "cover_image",
-    )
-    if (cover) {
-      input.files = [
-        {
-          originalSource: await context.assetUrl(cover),
-          contentType: "IMAGE",
-          alt: listing.title ?? subject.product.name,
-        },
-      ]
-    }
+  /*
+   * Media goes out on the create, and again later only if the product has none.
+   *
+   * The second half is the repair path, and it is why this reads before it
+   * writes. Shopify fetches `originalSource` asynchronously, after the mutation
+   * has already returned success, so a URL it could not reach produces a
+   * published product with no image and no error anywhere. Sending `files`
+   * only on the create — which is what this did — made that state permanent:
+   * every later write omitted the field, so nothing ever put the image back.
+   *
+   * The condition is "Shopify holds no usable image", not "we have not sent one
+   * before". That is what keeps §13's rule intact: a creator who curated media
+   * in the Shopify admin has media, so nothing here overwrites it.
+   */
+  const cover = subject.assets.find(
+    (asset) => asset.asset_state === "ready" && asset.asset_type === "cover_image",
+  )
+
+  let media: ProductMedia | null = null
+  if (cover && externalId) {
+    media = await client.request({
+      query: PRODUCT_MEDIA,
+      variables: { id: externalId },
+      schema: productMediaSchema,
+    })
+  }
+
+  if (cover && (!externalId || (media && needsMedia(media)))) {
+    input.files = [
+      {
+        originalSource: await context.assetUrl(cover),
+        contentType: "IMAGE",
+        alt: listing.title ?? subject.product.name,
+      },
+    ]
   }
 
   const result = await client.request({
@@ -320,7 +406,13 @@ async function productSet(
     // product is a draft, which is every product this adapter has just created.
     externalUrl: adminProductUrl(shopDomain, product.legacyResourceId),
     externalState: product.status === "ACTIVE" ? "live" : "draft",
-    providerResponse: result,
+    /*
+      The media read travels with the write. A publish that reported success
+      while the image never arrived is the failure that started this, and the
+      job row is where someone looks afterwards; `mediaBefore` is what Shopify
+      held at the moment we decided whether to send one.
+    */
+    providerResponse: media === null ? result : { ...result, mediaBefore: media },
   }
 }
 
