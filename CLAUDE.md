@@ -159,6 +159,8 @@ Do not continue into the next step automatically.
 
 ## Reference docs
 
+- `docs/decisions/`: architecture decision records, and `0002` is the open decisions
+  register: everything still owed an answer, grouped by when the answer is needed
 - `docs/architecture.md`: canonical product and adapter contract
 - `docs/roadmap.md`: the three gates and current step
 - `docs/data-model.md`: tables and relationships
