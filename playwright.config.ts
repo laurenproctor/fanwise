@@ -38,7 +38,14 @@ function localSupabaseEnv(): Record<string, string> {
   const values = new Map<string, string>()
   for (const line of raw.split("\n")) {
     const at = line.indexOf("=")
-    if (at > 0) values.set(line.slice(0, at).trim(), line.slice(at + 1).trim().replace(/^"|"$/g, ""))
+    if (at > 0)
+      values.set(
+        line.slice(0, at).trim(),
+        line
+          .slice(at + 1)
+          .trim()
+          .replace(/^"|"$/g, ""),
+      )
   }
 
   const apiUrl = values.get("API_URL")
