@@ -80,9 +80,11 @@ test("a creator drops an image onto the product's images panel", async ({ page }
   const transfer = await page.evaluateHandle(
     ([bytes, name]) => {
       const data = new DataTransfer()
-      data.items.add(new File([new Uint8Array(bytes as number[])], name as string, {
-        type: "image/png",
-      }))
+      data.items.add(
+        new File([new Uint8Array(bytes as number[])], name as string, {
+          type: "image/png",
+        }),
+      )
       return data
     },
     [Array.from(png), "small-800x600.png"] as const,
