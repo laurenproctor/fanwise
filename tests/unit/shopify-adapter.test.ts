@@ -349,6 +349,61 @@ describe("publish", () => {
     expect(variables.identifier).toEqual({ id: "gid://shopify/Product/900" })
   })
 
+  it("sends every image the channel should receive, cover first", async () => {
+    /*
+      The panel promises "every channel receives this list, in this order". It
+      sent one file, so a creator who arranged four pictures got one on the
+      storefront and nothing saying where the rest went.
+    */
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body)),
+    )
+
+    const cover = asset({ asset_type: "cover_image", filename: "cover.png" })
+    const one = asset({ asset_type: "preview_image", filename: "one.png", sort_order: 1 })
+    const two = asset({ asset_type: "preview_image", filename: "two.png", sort_order: 2 })
+
+    await shopifyAdapter.publish!(
+      context({
+        subject: { ...subject(), assets: [two, one, cover] },
+        // Names the asset in the URL, so the assertion can be about order
+        // rather than only about how many went.
+        assetUrl: async (a) => `https://signed.example/${a.filename}`,
+      }),
+    )
+
+    const input = productSetVariables(bodies).input as {
+      files: { originalSource: string }[]
+    }
+    expect(input.files.map((f) => f.originalSource.split("/").pop())).toEqual([
+      // Cover first whatever order the assets arrived in, then the creator's
+      // sort order. This is the order the storefront grid reads.
+      "cover.png",
+      "one.png",
+      "two.png",
+    ])
+  })
+
+  it("does not send an image that is still being measured", async () => {
+    // A pending row is a promise finalize_asset has not kept, and a provider
+    // handed a URL for bytes that have not landed shows a broken image.
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body)),
+    )
+
+    const cover = asset({ asset_type: "cover_image" })
+    const pending = asset({ asset_type: "preview_image", asset_state: "pending" })
+
+    await shopifyAdapter.publish!(context({ subject: { ...subject(), assets: [cover, pending] } }))
+
+    const input = productSetVariables(bodies).input as { files: unknown[] }
+    expect(input.files).toHaveLength(1)
+  })
+
   it("leaves media alone when the product already has some", async () => {
     // The rule productSet depends on: an omitted field is left as it is, so
     // re-sending would replace a media list the creator may have curated in

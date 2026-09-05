@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { ChannelError, normalized } from "@/lib/channels/errors"
+import { listingImages } from "@/lib/channels/images"
 import { readConnectionCredentials } from "@/lib/credentials"
 import type {
   AdapterSubject,
@@ -353,12 +354,19 @@ async function productSet(
    * before". That is what keeps §13's rule intact: a creator who curated media
    * in the Shopify admin has media, so nothing here overwrites it.
    */
-  const cover = subject.assets.find(
-    (asset) => asset.asset_state === "ready" && asset.asset_type === "cover_image",
-  )
+  /*
+   * Every image the channel is meant to receive, not just the cover.
+   *
+   * This sent one file, and the images panel says "every channel receives this
+   * list, in this order" — so a creator who arranged four pictures got one on
+   * the storefront and no indication of where the others went. listingImages is
+   * the list, already filtered to ready assets and already ordered with the
+   * cover first, which is the order Shopify keeps.
+   */
+  const images = listingImages(subject)
 
   let media: ProductMedia | null = null
-  if (cover && externalId) {
+  if (images.length > 0 && externalId) {
     media = await client.request({
       query: PRODUCT_MEDIA,
       variables: { id: externalId },
@@ -366,14 +374,16 @@ async function productSet(
     })
   }
 
-  if (cover && (!externalId || (media && needsMedia(media)))) {
-    input.files = [
-      {
-        originalSource: await context.assetUrl(cover),
+  if (images.length > 0 && (!externalId || (media && needsMedia(media)))) {
+    input.files = await Promise.all(
+      images.map(async (asset) => ({
+        originalSource: await context.assetUrl(asset),
         contentType: "IMAGE",
+        // The product's name, not the filename. Alt text is read aloud to a
+        // buyer; "Screenshot 2026-09-05 at 6.51.39 PM.jpg" tells them nothing.
         alt: listing.title ?? subject.product.name,
-      },
-    ]
+      })),
+    )
   }
 
   const result = await client.request({

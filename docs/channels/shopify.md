@@ -250,9 +250,13 @@ Nothing below is a guess about intent; each is a shape that only a 2xx can confi
    default-variant convention is accepted and no second mutation is needed for price.
 2. `InventoryItemInput.requiresShipping: false` on a `productSet` variant: confirm it is
    honored at creation rather than only on update.
-3. `files: [FileSetInput]` with a Supabase signed URL: confirm Shopify's async fetch
-   completes inside the signed URL's TTL, and what the media state is when `productSet`
-   returns synchronously. **Partly answered, 5 September 2026.** A real publish produced a
+3. `files: [FileSetInput]` with a Supabase signed URL: **answered, 5 September 2026.** A
+   publish against a publicly reachable Supabase project put the image on the product, so the
+   async fetch does complete inside the signed URL's TTL. The earlier failure was
+   environmental: the URL pointed at a local Supabase that Shopify cannot resolve. Media state
+   at the moment `productSet` returns is still not asserted on, because nothing needs it — §5
+   reads media before the next write instead. Earlier note, kept because the failure mode it
+   describes is real: **partly answered, 5 September 2026.** A real publish produced a
    product with no image. The cause on that run was environmental rather than the TTL — the
    signed URL pointed at a local Supabase, which Shopify cannot resolve — so the TTL
    question is still open and needs a publicly reachable storage host to answer. What the
