@@ -62,9 +62,7 @@ function evaluateOne(
           ...base,
           satisfied: false,
           message:
-            spec.severity === "error"
-              ? requiredToPublish(spec.label)
-              : `${spec.label} is empty.`,
+            spec.severity === "error" ? requiredToPublish(spec.label) : `${spec.label} is empty.`,
         }
       }
       if (spec.minLength !== undefined && value.length < spec.minLength) {
@@ -91,9 +89,7 @@ function evaluateOne(
           ...base,
           satisfied: false,
           message:
-            spec.severity === "error"
-              ? requiredToPublish(spec.label)
-              : `${spec.label} is not set.`,
+            spec.severity === "error" ? requiredToPublish(spec.label) : `${spec.label} is not set.`,
         }
       }
       if (spec.min !== undefined && value < spec.min) {

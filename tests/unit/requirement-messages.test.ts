@@ -51,7 +51,13 @@ describe("a blocking requirement names the button it blocks", () => {
 
   it("says so for a number that was never set", () => {
     expect(
-      messageFor({ kind: "number", key: "price", label: "Price", severity: "error", field: "price" }),
+      messageFor({
+        kind: "number",
+        key: "price",
+        label: "Price",
+        severity: "error",
+        field: "price",
+      }),
     ).toBe("Price is required before you can publish your listing.")
   })
 
