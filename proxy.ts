@@ -15,7 +15,18 @@ import type { Database } from "@/lib/supabase/database.types"
  * boundary, per docs/security.md rule 7.
  */
 
-const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth", "/api/health"]
+// `/reset-password` is public because the recovery session may already be gone
+// by the time someone opens it, and the page's own expired-link message is more
+// use to them than a silent bounce to /sign-in. The page and the action both
+// re-check; this list is convenience, not authorization.
+const PUBLIC_PATHS = [
+  "/sign-in",
+  "/sign-up",
+  "/forgot-password",
+  "/reset-password",
+  "/auth",
+  "/api/health",
+]
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
