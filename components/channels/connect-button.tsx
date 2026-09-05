@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Field } from "@/components/ui/field"
 import { FormError } from "@/components/ui/form-error"
@@ -46,6 +47,7 @@ export function ConnectButton({
   /** Present when this channel is connected by authorizing it. */
   oauth: OAuthPrompt | null
 }) {
+  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [authorizing, setAuthorizing] = useState(false)
@@ -57,6 +59,7 @@ export function ConnectButton({
     startTransition(async () => {
       const result = await connectChannelAction(workspaceSlug, channelKey)
       setError(result.error)
+      if (!result.error) router.refresh()
     })
   }
 
@@ -82,7 +85,10 @@ export function ConnectButton({
     startTransition(async () => {
       const result = await disconnectChannelAction(workspaceSlug, connectionId!)
       setError(result.error)
-      if (!result.error) setConfirming(false)
+      if (!result.error) {
+        setConfirming(false)
+        router.refresh()
+      }
     })
   }
 

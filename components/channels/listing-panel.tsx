@@ -98,6 +98,11 @@ export function ListingPanel({
       const result = await buildListingAction(workspaceSlug, productId, connectionId)
       setError(result.error)
       setActingOn(null)
+      // As publish() does. These routes are dynamically rendered, so there is
+      // no cached entry for revalidatePath to invalidate and the client is
+      // never told to refetch: the listing is built, the card goes on saying
+      // "Build listing", and the creator reasonably reads that as a hang.
+      router.refresh()
     })
   }
 
