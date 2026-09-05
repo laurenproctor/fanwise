@@ -92,7 +92,12 @@ export default async function ProductPage({
           Each channel judges this product by its own rules. Readiness is computed from those rules,
           never estimated.
         </p>
-        <ListingPanel workspaceSlug={slug} productId={product.id} cards={cards} />
+        <ListingPanel
+          workspaceSlug={slug}
+          productSlug={product.slug}
+          productId={product.id}
+          cards={cards}
+        />
       </section>
     </div>
   )

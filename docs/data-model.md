@@ -201,6 +201,18 @@ Insert only. `authenticated` holds `select` and `insert` and nothing else, and
 `enforce_snapshot_immutability()` blocks the rest for everyone including the
 service role.
 
+### A4: what a save records
+
+Every save from the listing editor writes one `update` snapshot alongside the
+row it changed, carrying the field values *and* the readiness verdict at that
+moment. A snapshot holding only the text would leave the more useful half of
+"what changed before revenue moved" unanswerable.
+
+The verdict written is the server's, recomputed at save. The browser computes
+one too, so the creator sees readiness move while typing, but a verdict computed
+only in the browser is a verdict the browser can lie about, and it is the
+server's that reaches the snapshot.
+
 **The trigger permits exactly one kind of delete: a cascade whose parent is
 already gone.** Postgres removes a parent row before firing the cascade onto its
 children, so a snapshot can tell the two apart. Without this, immutability would

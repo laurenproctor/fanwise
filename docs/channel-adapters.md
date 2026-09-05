@@ -94,9 +94,30 @@ Readiness is computed on read, from the stored listing, never persisted. Require
 when an adapter changes, and a stored score would go stale silently: the listing would keep
 claiming it was publishable under rules that no longer exist.
 
-Once a creator can hand-edit a listing at A4, readiness is judged on what is **stored**, not
+Since A4 a creator can hand-edit a listing, so readiness is judged on what is **stored**, not
 on what the adapter would rebuild. Judging the rebuild would tell someone their edits were
 fine when the thing that would actually be submitted is not.
+
+## Constraints, for the editor
+
+`lib/channels/constraints.ts` derives field limits from the same specs the evaluator walks,
+so the editor's character counters and the rules that block publication cannot disagree. A
+counter that contradicts the blocking rule is worse than no counter: it teaches a limit that
+is not the real one.
+
+Where a channel declares more than one rule for a field, the **strictest** bound wins. A
+title passing a 120 character rule and failing an 80 character rule is a rejected title, and
+the counter should show the first wall the creator will hit. Asset and custom rules yield no
+constraint, because neither describes a limit the editor could render; both still block
+through the evaluator.
+
+## Saving versus publishing
+
+The editor saves whatever the creator typed, including copy the channel would reject. This
+is deliberate. Readiness is how they find out what is wrong, so refusing the save would put
+the answer behind the fix. `lib/channels/schemas.ts` therefore bounds what is *storable*,
+not what is *publishable*, and the requirement engine remains the only thing that decides
+the second.
 
 ## Adding a channel
 

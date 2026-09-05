@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
 import { listProducts } from "@/lib/products/queries"
 import { PRODUCT_TYPE_LABELS } from "@/lib/products/types"
-import { Button } from "@/components/ui/button"
+import { ButtonLink } from "@/components/ui/button"
 
 export const metadata = { title: "Products · Fanwise" }
 
@@ -23,9 +23,7 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
           <span className="label-mono">Catalog</span>
           <h1 className="font-display text-4xl font-extralight tracking-[-0.03em]">Products</h1>
         </div>
-        <Link href={`/w/${slug}/products/new`}>
-          <Button>New product</Button>
-        </Link>
+        <ButtonLink href={`/w/${slug}/products/new`}>New product</ButtonLink>
       </div>
 
       {products.length === 0 ? (
@@ -35,9 +33,7 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
             A product is the canonical record of one thing you sell. You write it once here, and
             every channel gets its own translation of it later.
           </p>
-          <Link href={`/w/${slug}/products/new`}>
-            <Button>Create your first product</Button>
-          </Link>
+          <ButtonLink href={`/w/${slug}/products/new`}>Create your first product</ButtonLink>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-[14px] border border-[var(--color-rule)]">

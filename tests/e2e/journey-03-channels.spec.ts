@@ -18,7 +18,13 @@ async function createProduct(page: import("@playwright/test").Page, slug: string
   await page.getByLabel("Product name").fill(name)
   await page.getByLabel("Product type").selectOption("font")
   await page.getByRole("button", { name: "Create product" }).click()
-  await page.waitForURL(new RegExp(`/w/${slug}/products/[^/]+$`))
+  // `/products/[^/]+$` also matches `/products/new`, so waiting on that pattern
+  // resolves instantly against the form just submitted and races the redirect.
+  await page.waitForURL(
+    (url) =>
+      new RegExp(`^/w/${slug}/products/[^/]+$`).test(url.pathname) &&
+      !url.pathname.endsWith("/new"),
+  )
 }
 
 test("a channel states what it cannot do before it is connected", async ({ page }) => {

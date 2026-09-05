@@ -1,3 +1,4 @@
+import Link from "next/link"
 import type { ComponentProps } from "react"
 
 /**
@@ -23,4 +24,20 @@ export function Button({
   ...props
 }: ComponentProps<"button"> & { variant?: Variant }) {
   return <button className={`${base} ${variants[variant]} ${className}`} {...props} />
+}
+
+/**
+ * A link that looks like a button.
+ *
+ * Exists because `<Link><Button/></Link>` renders a <button> inside an <a>,
+ * which is invalid HTML: browsers disagree about which element receives the
+ * click, and the navigation intermittently does not happen at all. Sharing the
+ * styles keeps the two in step without nesting the elements.
+ */
+export function ButtonLink({
+  variant = "primary",
+  className = "",
+  ...props
+}: ComponentProps<typeof Link> & { variant?: Variant }) {
+  return <Link className={`${base} ${variants[variant]} ${className}`} {...props} />
 }
