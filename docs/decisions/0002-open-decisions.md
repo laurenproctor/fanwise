@@ -181,6 +181,39 @@ product.
 **Recommendation:** start the conversation during A5. A creator who has agreed in principle
 two steps early is a very different prospect from one approached the week the gate is ready.
 
+### 20. Who sends Fanwise's email
+
+Discovered on 5 September 2026, pushing `config.toml` to a hosted Supabase project:
+
+> Email template modification is not available for free tier projects using the default email
+> provider. Please upgrade your plan or configure a custom SMTP provider.
+
+Two consequences, and the second is the one that matters.
+
+Signup on a hosted project defaults to requiring email confirmation, and the built-in sender
+is rate limited to a handful of messages an hour. The first few signups on a fresh project
+fail with "Too many attempts", which is our own normalization of a rate limit nobody has hit
+locally, because local runs with `enable_confirmations = false`.
+
+The real problem is the recovery template. `supabase/templates/recovery.html` exists because
+the stock template returns a PKCE code that only works in the browser that asked for the
+reset — someone who requests a reset on a laptop and opens the mail on their phone gets an
+invalid link, and recovery is exactly the flow where that happens. That template cannot be
+installed on the default provider. So a deployment on the built-in sender silently reverts to
+the stock template and reacquires the bug the custom one was written to fix. Nothing errors.
+Password recovery simply half-works, on the flow least likely to be exercised before a real
+person needs it.
+
+This is grouped at Gate A exit rather than later because that gate puts an outside creator on
+a deployed instance. That is the first moment the built-in sender stops being adequate.
+
+**Recommendation:** configure custom SMTP before anyone outside the team touches a deployed
+project, and treat the provider as part of the environment rather than a detail of the auth
+config. Resend or Postmark, chosen for deliverability on transactional mail rather than
+price; the volume through Gate A is trivial either way. Until then, a dev project runs with
+`enable_confirmations` off and no custom template, and `pnpm test:e2e` continues to prove the
+recovery flow against local Supabase, where the template does load.
+
 ---
 
 ## Gate B
