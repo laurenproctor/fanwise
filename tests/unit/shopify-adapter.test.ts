@@ -130,6 +130,36 @@ function productSetOk(status: "DRAFT" | "ACTIVE" = "DRAFT") {
   }
 }
 
+/** A productMedia response. `nodes: []` is a product Shopify holds no image for. */
+function productMediaOk(nodes: { id: string; status: string }[] = []) {
+  return { data: { product: { media: { nodes } } } }
+}
+
+/**
+ * Answers whichever operation the adapter actually sent.
+ *
+ * The adapter reads media before it writes, so a stub that returns a
+ * productSet payload to every request feeds a product-shaped body to the media
+ * schema and fails for a reason that has nothing to do with the test.
+ */
+function respondTo(
+  body: unknown,
+  options: { status?: "DRAFT" | "ACTIVE"; media?: { id: string; status: string }[] } = {},
+): Response {
+  const query = String((body as { query?: string }).query ?? "")
+  if (query.includes("FanwiseProductMedia")) return jsonResponse(productMediaOk(options.media))
+  return jsonResponse(productSetOk(options.status))
+}
+
+/** The productSet call, wherever it landed among the reads. */
+function productSetVariables(bodies: unknown[]): Record<string, unknown> {
+  const body = bodies.find((candidate) =>
+    String((candidate as { query?: string }).query ?? "").includes("FanwiseProductSet"),
+  )
+  if (!body) throw new Error("the adapter never sent productSet")
+  return (body as { variables: Record<string, unknown> }).variables
+}
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -138,10 +168,11 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 /** Captures the GraphQL variables the adapter sent. */
-function captureFetch(bodies: unknown[], respond: () => Response) {
+function captureFetch(bodies: unknown[], respond: (body: unknown) => Response) {
   return vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-    bodies.push(JSON.parse(String(init?.body)))
-    return respond()
+    const body = JSON.parse(String(init?.body))
+    bodies.push(body)
+    return respond(body)
   })
 }
 
@@ -255,12 +286,12 @@ describe("publish", () => {
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
-      captureFetch(bodies, () => jsonResponse(productSetOk("DRAFT"))),
+      captureFetch(bodies, (body) => respondTo(body, { status: "DRAFT" })),
     )
 
     const result = await shopifyAdapter.publish!(context())
 
-    const variables = (bodies[0] as { variables: Record<string, unknown> }).variables
+    const variables = productSetVariables(bodies)
     // No identifier means create. This is the only call in the adapter that
     // may bring a new product into existence.
     expect(variables.identifier).toBeNull()
@@ -275,11 +306,11 @@ describe("publish", () => {
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
-      captureFetch(bodies, () => jsonResponse(productSetOk())),
+      captureFetch(bodies, (body) => respondTo(body)),
     )
     await shopifyAdapter.publish!(context())
 
-    const input = (bodies[0] as { variables: { input: Record<string, unknown> } }).variables.input
+    const input = productSetVariables(bodies).input as Record<string, unknown>
     const variant = (input.variants as Array<Record<string, unknown>>)[0]!
     expect(variant.inventoryItem).toEqual({ requiresShipping: false, tracked: false })
     expect(variant.price).toBe("48.00")
@@ -289,11 +320,11 @@ describe("publish", () => {
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
-      captureFetch(bodies, () => jsonResponse(productSetOk())),
+      captureFetch(bodies, (body) => respondTo(body)),
     )
     await shopifyAdapter.publish!(context())
 
-    const input = (bodies[0] as { variables: { input: Record<string, unknown> } }).variables.input
+    const input = productSetVariables(bodies).input as Record<string, unknown>
     expect(input.files).toEqual([
       {
         originalSource: "https://signed.example/cover.png",
@@ -307,32 +338,105 @@ describe("publish", () => {
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
-      captureFetch(bodies, () => jsonResponse(productSetOk())),
+      captureFetch(bodies, (body) => respondTo(body)),
     )
 
     await shopifyAdapter.publish!(
       context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
     )
 
-    const variables = (bodies[0] as { variables: Record<string, unknown> }).variables
+    const variables = productSetVariables(bodies)
     expect(variables.identifier).toEqual({ id: "gid://shopify/Product/900" })
-    // Media is not re-sent on an update: productSet leaves an omitted field
-    // alone, and re-sending would risk replacing a list the creator curated.
-    expect((variables.input as Record<string, unknown>).files).toBeUndefined()
+  })
+
+  it("leaves media alone when the product already has some", async () => {
+    // The rule productSet depends on: an omitted field is left as it is, so
+    // re-sending would replace a media list the creator may have curated in
+    // the Shopify admin. Having any usable image is what makes it theirs.
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) =>
+        respondTo(body, { media: [{ id: "gid://shopify/MediaImage/1", status: "READY" }] }),
+      ),
+    )
+
+    await shopifyAdapter.publish!(
+      context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
+    )
+
+    expect(productSetVariables(bodies).input).not.toHaveProperty("files")
+  })
+
+  it("sends the image again when Shopify holds none, so a lost image is repairable", async () => {
+    /*
+      The failure this exists for: Shopify fetches originalSource on its own
+      schedule, after the mutation has already returned success. A URL it could
+      not reach leaves a published product with no image and no error anywhere,
+      and sending files only on the create made that permanent.
+    */
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body, { media: [] })),
+    )
+
+    await shopifyAdapter.publish!(
+      context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
+    )
+
+    expect(productSetVariables(bodies).input).toHaveProperty("files")
+  })
+
+  it("treats a failed media node as no image, or a broken one is never repaired", async () => {
+    // Shopify keeps the row when its fetch fails. Counting it as media present
+    // would make exactly the state we are trying to fix permanent.
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) =>
+        respondTo(body, { media: [{ id: "gid://shopify/MediaImage/1", status: "FAILED" }] }),
+      ),
+    )
+
+    await shopifyAdapter.publish!(
+      context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
+    )
+
+    expect(productSetVariables(bodies).input).toHaveProperty("files")
+  })
+
+  it("does not read media at all when there is no cover to send", async () => {
+    // Nothing to repair with, so the extra round trip buys nothing.
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body)),
+    )
+
+    await shopifyAdapter.publish!(
+      context({
+        listing: listing({ external_listing_id: "gid://shopify/Product/900" }),
+        subject: { ...subject(), assets: [] },
+      }),
+    )
+
+    expect(bodies).toHaveLength(1)
+    expect(productSetVariables(bodies).input).not.toHaveProperty("files")
   })
 
   it("activates by setting ACTIVE on the existing product", async () => {
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
-      captureFetch(bodies, () => jsonResponse(productSetOk("ACTIVE"))),
+      captureFetch(bodies, (body) => respondTo(body, { status: "ACTIVE" })),
     )
 
     const result = await shopifyAdapter.activate!(
       context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
     )
 
-    const variables = (bodies[0] as { variables: Record<string, unknown> }).variables
+    const variables = productSetVariables(bodies)
     expect((variables.input as { status: string }).status).toBe("ACTIVE")
     expect(result.externalState).toBe("live")
   })
@@ -341,7 +445,7 @@ describe("publish", () => {
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
-      captureFetch(bodies, () => jsonResponse(productSetOk("ACTIVE"))),
+      captureFetch(bodies, (body) => respondTo(body, { status: "ACTIVE" })),
     )
 
     await shopifyAdapter.update!(
@@ -353,7 +457,7 @@ describe("publish", () => {
       }),
     )
 
-    const input = (bodies[0] as { variables: { input: { status: string } } }).variables.input
+    const input = productSetVariables(bodies).input as { status: string }
     // An edit must not quietly take a live product off sale.
     expect(input.status).toBe("ACTIVE")
   })
@@ -362,7 +466,7 @@ describe("publish", () => {
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
-      captureFetch(bodies, () => jsonResponse(productSetOk("DRAFT"))),
+      captureFetch(bodies, (body) => respondTo(body, { status: "DRAFT" })),
     )
 
     await shopifyAdapter.update!(
@@ -374,7 +478,7 @@ describe("publish", () => {
       }),
     )
 
-    const input = (bodies[0] as { variables: { input: { status: string } } }).variables.input
+    const input = productSetVariables(bodies).input as { status: string }
     expect(input.status).toBe("DRAFT")
   })
 })
