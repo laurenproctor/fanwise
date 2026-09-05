@@ -42,10 +42,7 @@ export default async function ChannelsPage({
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
         <span className="label-mono">Distribution</span>
-        <h1 className="flex items-center gap-2 font-display text-4xl font-extralight tracking-[-0.03em]">
-          Channels
-          <InfoTip term="channel" />
-        </h1>
+        <h1 className="font-display text-4xl font-extralight tracking-[-0.03em]">Channels</h1>
         <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
           A channel is somewhere you sell. Fanwise keeps one canonical product and gives each
           channel its own translation of it.

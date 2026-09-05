@@ -32,10 +32,6 @@ export const GLOSSARY = {
     label: "Product",
     body: "The one record in Fanwise that is the truth about a thing you sell. Every channel listing starts as a copy of it, and editing a listing never edits the product back. Change something everywhere by changing it here and rebuilding the listings.",
   },
-  productType: {
-    label: "Type",
-    body: "What kind of digital product this is. Channels use it to decide which of their rules apply to the listing and where in their catalog it belongs.",
-  },
   productStatus: {
     label: "Status",
     body: "Where the product stands inside Fanwise. It says nothing about whether the product is on sale anywhere — a product can be complete here and published nowhere. Per-channel state is on the product's channel cards.",
@@ -43,10 +39,6 @@ export const GLOSSARY = {
 
   // ---------------------------------------------------------------- channels
 
-  channel: {
-    label: "Channel",
-    body: "Somewhere you sell: a marketplace, or a storefront you own. Fanwise keeps one product and gives each channel its own listing derived from it, because no two channels want the same title, length or category.",
-  },
   connection: {
     label: "Connected",
     body: "You have authorized Fanwise to act on your account on this channel. The credentials are encrypted and only ever read on the server; they are never sent to your browser.",
@@ -58,37 +50,6 @@ export const GLOSSARY = {
   assistedChannel: {
     label: "Assisted",
     body: "This channel has no API to publish through. Fanwise writes the listing and checks it against the channel's rules, then you submit it on the channel yourself and mark it done here. Nothing about it is automatic, and Fanwise will not pretend otherwise.",
-  },
-
-  // ------------------------------------------------------------ capabilities
-
-  automaticPublish: {
-    label: "Publish automatically",
-    body: "Fanwise can create the listing on this channel for you. Without it, you create the listing yourself and Fanwise only prepares and checks the content.",
-  },
-  automaticUpdate: {
-    label: "Update automatically",
-    body: "Once the listing exists, Fanwise can send later edits to it. Without it, edits you make here stay in Fanwise until you copy them across by hand.",
-  },
-  metrics: {
-    label: "Read metrics",
-    body: "Fanwise can read performance figures — views and similar — back from this channel. Without it, Fanwise has no idea how the listing is doing there.",
-  },
-  transactions: {
-    label: "Read sales",
-    body: "Fanwise can read completed orders back from this channel, so sales appear here without you exporting anything.",
-  },
-  digitalFileUpload: {
-    label: "Upload the deliverable",
-    body: "Fanwise can send the actual file your buyer downloads. Where a channel will not accept that file over its API, Fanwise gives you a step to attach it by hand instead, and holds the listing back until you have.",
-  },
-  imageUpload: {
-    label: "Upload images",
-    body: "Fanwise can send cover and preview images along with the listing. Without it, you add the images on the channel yourself.",
-  },
-  drafts: {
-    label: "Save a draft first",
-    body: "The listing can exist on the channel without being on sale, so you can look at it there before anyone can buy it. Without it, creating the listing puts it on sale straight away.",
   },
 
   // ------------------------------------------------------------- readiness
@@ -157,15 +118,6 @@ export const GLOSSARY = {
   },
 
   // --------------------------------------------------------------- workspace
-
-  workspaceAddress: {
-    label: "Address",
-    body: "The path this workspace lives at. Everything underneath it belongs to this workspace, and no other workspace can read any of it.",
-  },
-  workspaceRole: {
-    label: "Your role",
-    body: "What you are allowed to do in this workspace. Every workspace has exactly one owner, who can do everything; inviting other people is not part of the first version.",
-  },
 } as const satisfies Record<string, GlossaryEntry>
 
 export type GlossaryTerm = keyof typeof GLOSSARY

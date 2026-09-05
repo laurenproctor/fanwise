@@ -67,6 +67,27 @@ export const CAPABILITY_LABELS: Record<CapabilityKey, string> = {
 }
 
 /**
+ * What the creator does instead, wherever a channel cannot do one of these.
+ *
+ * Shown on the channel card rather than hidden behind a hover. This list is
+ * read once, while deciding whether to connect a channel, and the half of it
+ * that changes that decision is the half a channel cannot do. An explanation
+ * someone has to go looking for is one they find after they needed it.
+ *
+ * Typed against CapabilityKey, so a new capability does not compile until the
+ * consequence of not having it is written down.
+ */
+export const CAPABILITY_ABSENCES: Record<CapabilityKey, string> = {
+  automaticPublish: "You create the listing on the channel yourself.",
+  automaticUpdate: "Later edits stay in Fanwise until you copy them across.",
+  metrics: "Fanwise cannot tell you how the listing is performing.",
+  transactions: "Sales here will not appear in Fanwise.",
+  digitalFileUpload: "Fanwise gives you a step to attach the file by hand.",
+  imageUpload: "You add the images on the channel yourself.",
+  drafts: "Creating the listing puts it on sale straight away.",
+}
+
+/**
  * Everything an adapter is allowed to see about a product.
  *
  * Deliberately a copy rather than a live handle: an adapter reads the canonical

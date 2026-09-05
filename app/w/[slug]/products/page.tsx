@@ -42,10 +42,10 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
             <thead>
               <tr className="border-b border-[var(--color-rule)]">
                 {/*
-                  The header is where a column gets explained. "Status" in
-                  particular is worth a sentence: it is the product's state
-                  here, and a reader who takes it for "on sale" has been
-                  misled by one word.
+                  Two of the four headers carry a tip. "Status" earns one: it is
+                  the product's state in Fanwise, and a reader who takes it for
+                  "on sale" has been misled by one word. Type does not, because
+                  the column underneath it reads "font" and explains itself.
                 */}
                 <th className="label-mono p-4 font-normal">
                   <span className="inline-flex items-center gap-1.5">
@@ -53,12 +53,7 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
                     <InfoTip term="canonicalProduct" />
                   </span>
                 </th>
-                <th className="label-mono p-4 font-normal">
-                  <span className="inline-flex items-center gap-1.5">
-                    Type
-                    <InfoTip term="productType" />
-                  </span>
-                </th>
+                <th className="label-mono p-4 font-normal">Type</th>
                 <th className="label-mono p-4 font-normal">
                   <span className="inline-flex items-center gap-1.5">
                     Status

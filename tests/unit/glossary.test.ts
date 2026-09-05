@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs"
 import { join, relative, sep } from "node:path"
 import { describe, expect, it } from "vitest"
 import { GLOSSARY, type GlossaryTerm } from "@/lib/ui/glossary"
-import { CAPABILITY_KEYS, CAPABILITY_LABELS } from "@/lib/channels/types"
+import { CAPABILITY_ABSENCES, CAPABILITY_KEYS, CAPABILITY_LABELS } from "@/lib/channels/types"
 import { LIVENESS_LABELS } from "@/lib/publishing/manual-steps"
 
 /**
@@ -38,19 +38,6 @@ function sourceFiles(dir: string): string[] {
 const terms = Object.keys(GLOSSARY) as GlossaryTerm[]
 
 describe("every term the interface can render is defined", () => {
-  /**
-   * Both of these are keyed by something the rest of the system already
-   * enumerates, so a term cannot be added there and forgotten here. TypeScript
-   * catches it at the call site; this catches it at the source, which is where
-   * someone adding a capability is actually looking.
-   */
-  it("explains every capability an adapter can declare", () => {
-    for (const key of CAPABILITY_KEYS) {
-      expect(GLOSSARY[key], `no explanation for the ${key} capability`).toBeDefined()
-      expect(GLOSSARY[key].label).toBe(CAPABILITY_LABELS[key])
-    }
-  })
-
   it("explains every state a listing can be in", () => {
     for (const [liveness, label] of Object.entries(LIVENESS_LABELS)) {
       const entry = GLOSSARY[liveness as GlossaryTerm]
@@ -92,7 +79,7 @@ describe("nothing is defined and left unrendered", () => {
      * a test is the cheap half — copy that is written down and then named
      * nowhere at all, which is the way this file will actually rot.
      */
-    const dynamic = new Set<string>([...CAPABILITY_KEYS, ...Object.keys(LIVENESS_LABELS)])
+    const dynamic = new Set<string>(Object.keys(LIVENESS_LABELS))
 
     const named = new Set<string>()
     for (const file of sourceFiles(ROOT)) {
@@ -119,5 +106,31 @@ describe("nothing is defined and left unrendered", () => {
       }
     }
     expect(unknown).toEqual([])
+  })
+})
+
+describe("the channel card says what each limit costs", () => {
+  /**
+   * These sentences used to be glossary entries behind an info icon on all
+   * seven capability lines. They are on the card now, which is a change of
+   * medium rather than of duty: they are still the only place a creator is
+   * told what a missing capability will mean for them.
+   *
+   * Completeness is the compiler's, via Record<CapabilityKey, string>. What is
+   * left is whether the sentence says anything.
+   */
+  it.each(CAPABILITY_KEYS)("%s says what the creator does instead", (key) => {
+    const absence = CAPABILITY_ABSENCES[key]
+
+    expect(absence.trim()).not.toBe("")
+    expect(absence.endsWith(".")).toBe(true)
+    // It follows "— not supported" on the line, so repeating the label there
+    // would read as a stutter rather than as an explanation.
+    expect(absence.toLowerCase()).not.toContain(CAPABILITY_LABELS[key].toLowerCase())
+  })
+
+  it("gives no two capabilities the same consequence", () => {
+    const all = CAPABILITY_KEYS.map((key) => CAPABILITY_ABSENCES[key])
+    expect(new Set(all).size).toBe(all.length)
   })
 })
