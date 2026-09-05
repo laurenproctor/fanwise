@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useId, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { FormError } from "@/components/ui/form-error"
 import {
@@ -10,6 +10,7 @@ import {
   reorderProductImagesAction,
 } from "@/lib/products/actions"
 import { routes } from "@/lib/routes"
+import { planImageDrop } from "@/lib/products/image-drop"
 
 /**
  * The images this channel will receive, in the order it will receive them.
@@ -28,6 +29,10 @@ import { routes } from "@/lib/routes"
  * channel-specific field, so it lands in product_assets like every other file.
  * This panel is a convenient doorway to the same place the product page writes
  * to, not a second store.
+ *
+ * Files can be dropped anywhere on the panel, not only on the dashed tile.
+ * A miss would otherwise hit the page, and a browser handed a file it was not
+ * offered navigates away to it, taking any unsaved edit on the screen with it.
  *
  * It says what publishing will do to the channel. `productSet` is a set
  * operation, so the next update replaces the channel's media with this list.
@@ -66,6 +71,12 @@ export function ListingImages({
   published?: boolean
 }) {
   const router = useRouter()
+  /*
+   * Naming the section off its own heading makes it a landmark rather than an
+   * anonymous <section>, which is what a screen reader needs to announce a drop
+   * target that is now the whole panel rather than one visible tile.
+   */
+  const headingId = useId()
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [pending, startTransition] = useTransition()
@@ -80,6 +91,25 @@ export function ListingImages({
   const [dragging, setDragging] = useState<string | null>(null)
 
   /*
+   * Two different drags land in this section and they must not be confused. A
+   * tile being dragged to a new position carries text/plain; a file coming from
+   * the desktop carries Files. `types` is the only part of a dataTransfer
+   * readable during dragover — `files` is empty until the drop itself, by
+   * design, so that a page cannot read what is being dragged over it — so it is
+   * what both handlers key on.
+   */
+  const [fileOver, setFileOver] = useState(false)
+
+  /*
+   * dragenter and dragleave fire for every child the cursor crosses, so a
+   * boolean flipped by dragleave goes dark the moment the pointer passes over a
+   * tile inside the drop zone. Counting depth is the standard fix; a ref rather
+   * than state because it changes several times per second and nothing renders
+   * from it directly.
+   */
+  const dragDepth = useRef(0)
+
+  /*
    * Re-sync during render rather than in an effect. React's own guidance for
    * adjusting state when a prop changes: an effect would paint the stale order
    * first and then correct it, which is a visible flicker on exactly the
@@ -89,6 +119,10 @@ export function ListingImages({
   if (lastSeen !== images) {
     setLastSeen(images)
     setOrder(images)
+  }
+
+  function isFileDrag(transfer: DataTransfer) {
+    return transfer.types.includes("Files")
   }
 
   function persist(next: ListingImage[]) {
@@ -117,47 +151,89 @@ export function ListingImages({
     persist(next)
   }
 
-  async function upload(file: File) {
+  /**
+   * One file, all the way to storage. Returns false once something has gone
+   * wrong and the error is already on screen, so a batch stops rather than
+   * pushing the rest of a drop at a failing storage endpoint.
+   *
+   * The caller decides `assetType` rather than this function reading `order`,
+   * because a batch has to number its own files: four images dropped onto an
+   * empty product are one cover and three previews, and `order` does not move
+   * until the refresh at the end.
+   */
+  async function uploadOne(file: File, assetType: "cover_image" | "preview_image") {
+    const result = await createUploadIntent(workspaceSlug, {
+      productId,
+      assetType,
+      filename: file.name,
+      byteSize: file.size,
+    })
+
+    if ("error" in result) {
+      setError(result.error)
+      return false
+    }
+
+    // Straight to storage, never through a server function. The signed URL is
+    // a bearer capability and the server chose the path it points at, so the
+    // browser cannot aim it anywhere else. See docs/security.md.
+    const response = await fetch(result.intent.signedUrl, {
+      method: "PUT",
+      body: file,
+      headers: { "content-type": file.type || "application/octet-stream" },
+    })
+
+    if (!response.ok) {
+      setError("The upload did not complete. Try again.")
+      return false
+    }
+
+    // The row stays pending until a background job has measured the stored
+    // bytes; nothing the browser said about the file is trusted.
+    await finalizeUploadAction(workspaceSlug, result.intent.assetId)
+    return true
+  }
+
+  /**
+   * The one path both the file picker and a drop take.
+   *
+   * Sequential rather than parallel: each file needs its own intent row minted
+   * before its bytes go anywhere, and ten photographs dropped at once opening
+   * ten concurrent uploads is how a creator on a domestic connection gets ten
+   * timeouts instead of one working batch. One refresh at the end, so the grid
+   * does not reshuffle under the cursor between files.
+   */
+  async function upload(files: readonly File[]) {
+    const plan = planImageDrop(files, order.length)
+    if (!plan.ok) {
+      setError(
+        plan.reason === "no_files"
+          ? "That did not carry a file. Drop an image, or click to choose one."
+          : "Only images can go here. Try a JPG, PNG, GIF or WebP.",
+      )
+      return
+    }
+
     setError(null)
     setUploading(true)
     try {
-      const result = await createUploadIntent(workspaceSlug, {
-        productId,
-        // The first image a product gets is its cover; everything after it is a
-        // preview until someone drags it to the front. Uploading is not a place
-        // to make a creator answer a question the order already answers.
-        assetType: order.length === 0 ? "cover_image" : "preview_image",
-        filename: file.name,
-        byteSize: file.size,
-      })
-
-      if ("error" in result) {
-        setError(result.error)
-        return
+      for (const item of plan.uploads) {
+        if (!(await uploadOne(item.file, item.assetType))) return
       }
-
-      // Straight to storage, never through a server function. The signed URL is
-      // a bearer capability and the server chose the path it points at, so the
-      // browser cannot aim it anywhere else. See docs/security.md.
-      const response = await fetch(result.intent.signedUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "content-type": file.type || "application/octet-stream" },
-      })
-
-      if (!response.ok) {
-        setError("The upload did not complete. Try again.")
-        return
+      if (plan.skipped > 0) {
+        // Not an error: the images that were images did land. Saying nothing
+        // would leave a creator counting tiles to work out what happened.
+        setError(
+          plan.skipped === 1
+            ? "One file was not an image and was skipped."
+            : `${plan.skipped} files were not images and were skipped.`,
+        )
       }
-
-      // The row stays pending until a background job has measured the stored
-      // bytes; nothing the browser said about the file is trusted.
-      await finalizeUploadAction(workspaceSlug, result.intent.assetId)
-      router.refresh()
     } catch {
       setError("The upload did not complete. Try again.")
     } finally {
       setUploading(false)
+      router.refresh()
     }
   }
 
@@ -171,12 +247,57 @@ export function ListingImages({
   }
 
   return (
-    <section className="grid gap-5 rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-card)] p-6">
+    <section
+      aria-labelledby={headingId}
+      /*
+        The whole panel is the drop target, not just the dashed tile. Aiming a
+        file at one small square is a fiddly gesture, and a file dropped an inch
+        wide of it would otherwise hit the page and navigate the browser away to
+        the file — losing unsaved edits elsewhere on the screen. Accepting the
+        whole section makes the miss impossible rather than merely unlikely.
+      */
+      onDragEnter={(event) => {
+        if (!isFileDrag(event.dataTransfer)) return
+        dragDepth.current += 1
+        setFileOver(true)
+      }}
+      onDragOver={(event) => {
+        if (!isFileDrag(event.dataTransfer)) return
+        // Without preventDefault on dragover the drop never fires and the
+        // browser navigates to the file instead. This is the single most
+        // common way a drop zone silently does nothing at all.
+        event.preventDefault()
+        event.dataTransfer.dropEffect = "copy"
+      }}
+      onDragLeave={(event) => {
+        if (!isFileDrag(event.dataTransfer)) return
+        dragDepth.current -= 1
+        if (dragDepth.current <= 0) {
+          dragDepth.current = 0
+          setFileOver(false)
+        }
+      }}
+      onDrop={(event) => {
+        if (!isFileDrag(event.dataTransfer)) return
+        event.preventDefault()
+        dragDepth.current = 0
+        setFileOver(false)
+        if (uploading || pending) return
+        void upload(Array.from(event.dataTransfer.files))
+      }}
+      className={`grid gap-5 rounded-[14px] border p-6 transition-colors ${
+        fileOver
+          ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
+          : "border-[var(--color-rule)] bg-[var(--color-card)]"
+      }`}
+    >
       <div className="grid gap-1.5">
-        <h2 className="label-mono">Images</h2>
+        <h2 id={headingId} className="label-mono">
+          Images
+        </h2>
         <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
           The first image is the cover, and it is the one {channelName ?? "a storefront"} shows in
-          its grid. Drag to reorder.
+          its grid. Drop files anywhere here to add them, and drag to reorder.
           {channelName === null
             ? " Every channel receives this list, in this order."
             : published
@@ -206,14 +327,23 @@ export function ListingImages({
                 event.dataTransfer.effectAllowed = "move"
               }}
               onDragEnd={() => setDragging(null)}
-              // Without preventDefault a drop never fires. This is the single
-              // most common way a native drag-and-drop list silently does
-              // nothing at all.
+              /*
+                A file dragged from the desktop passes straight through to the
+                section, which uploads it. Claiming it here would mean a photo
+                dropped on an existing tile — the most natural place to aim
+                one — landing on a handler that has no index to reorder to and
+                therefore does nothing, silently.
+              */
               onDragOver={(event) => {
+                if (isFileDrag(event.dataTransfer)) return
+                // Without preventDefault a drop never fires. This is the single
+                // most common way a native drag-and-drop list silently does
+                // nothing at all.
                 event.preventDefault()
                 event.dataTransfer.dropEffect = "move"
               }}
               onDrop={(event) => {
+                if (isFileDrag(event.dataTransfer)) return
                 event.preventDefault()
                 const from = order.findIndex((candidate) => candidate.id === dragging)
                 setDragging(null)
@@ -309,17 +439,24 @@ export function ListingImages({
               order.length === 0 ? "col-span-2 aspect-[16/10]" : "aspect-[4/3]"
             }`}
           >
-            <span className="label-mono">{uploading ? "Uploading…" : "Add image"}</span>
+            <span className="label-mono">
+              {uploading ? "Uploading…" : fileOver ? "Drop to add" : "Add images"}
+            </span>
             <span className="text-[12px] text-[var(--color-ink-3)]">
-              {order.length === 0 ? "The first one becomes the cover" : "JPG or PNG"}
+              {order.length === 0
+                ? "Drop them here, or click. The first becomes the cover"
+                : "Drop them here, or click"}
             </span>
             <input
               type="file"
               accept="image/*"
+              multiple
               disabled={uploading || pending}
               onChange={(event) => {
-                const file = event.target.files?.[0]
-                if (file) void upload(file)
+                // A cancelled picker should say nothing at all, so an empty
+                // selection never reaches upload's "that carried no file".
+                const picked = Array.from(event.target.files ?? [])
+                if (picked.length > 0) void upload(picked)
                 // Cleared so choosing the same file twice fires change again.
                 event.target.value = ""
               }}
