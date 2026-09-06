@@ -79,6 +79,8 @@ const draft = (overrides: Partial<ChannelListingDraft> = {}): ChannelListingDraf
   title: "Aster Grotesk",
   description: "x".repeat(200),
   shortDescription: "A neo-grotesque for interfaces.",
+  seoTitle: null,
+  seoDescription: null,
   price: 48,
   currency: "USD",
   category: "font",
@@ -363,6 +365,8 @@ describe("listings round trip", () => {
       title: "Stored title",
       description: "stored description",
       short_description: null,
+      seo_title: null,
+      seo_description: null,
       price: "48.00",
       currency: "USD",
       category: "font",
@@ -374,6 +378,8 @@ describe("listings round trip", () => {
       title: "Stored title",
       description: "stored description",
       shortDescription: null,
+      seoTitle: null,
+      seoDescription: null,
       // numeric arrives from Postgres as a string; a requirement comparing it
       // against a minimum would otherwise compare a string to a number.
       price: 48,

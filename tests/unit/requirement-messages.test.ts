@@ -20,6 +20,8 @@ const draft: ChannelListingDraft = {
   title: "",
   description: "",
   shortDescription: null,
+  seoTitle: null,
+  seoDescription: null,
   price: null,
   currency: "USD",
   category: null,

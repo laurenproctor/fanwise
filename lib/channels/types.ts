@@ -128,6 +128,19 @@ export interface ChannelListingDraft {
   title: string | null
   description: string | null
   shortDescription: string | null
+  /**
+   * The search-result title and description, when the creator wants them to
+   * differ from the listing's own.
+   *
+   * Both are overrides and null is the ordinary state: a channel that has these
+   * fields falls back to the listing title and the short description, which is
+   * usually the right answer. They are separate from `shortDescription` because
+   * a blurb written for a product page and a line written for a search result
+   * are two pieces of writing, and a channel that offers both fields is a
+   * channel that expects two.
+   */
+  seoTitle: string | null
+  seoDescription: string | null
   price: number | null
   currency: string
   category: string | null
@@ -303,7 +316,8 @@ interface RequirementSpecBase {
 }
 
 /** Fields a rule may address on a draft listing. */
-export type ListingTextField = "title" | "description" | "shortDescription" | "category"
+export type ListingTextField =
+  "title" | "description" | "shortDescription" | "seoTitle" | "seoDescription" | "category"
 export type ListingNumberField = "price"
 
 export interface TextRequirement extends RequirementSpecBase {
@@ -311,6 +325,23 @@ export interface TextRequirement extends RequirementSpecBase {
   field: ListingTextField
   minLength?: number
   maxLength?: number
+  /**
+   * True when an empty value is fine and the bounds apply only to a value that
+   * is set.
+   *
+   * The field this was added for is a meta title. Leaving it blank is not a
+   * mistake — the channel falls back to the listing title, which is usually
+   * what the creator wants — but a 200 character one is a mistake, and it is
+   * the kind the creator cannot see without a counter. Without this flag the
+   * only way to get the counter was to declare a rule that complains about
+   * every listing that has quite reasonably left the field alone, and a
+   * readiness list that is mostly noise is a readiness list nobody reads.
+   *
+   * `custom` could express the same rule, but a custom rule is opaque to
+   * `constraintsFor`, so the editor would show no limit at all and the creator
+   * would learn about the wall by hitting it.
+   */
+  optional?: boolean
 }
 
 export interface NumberRequirement extends RequirementSpecBase {

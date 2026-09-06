@@ -23,6 +23,19 @@ export const NORMALIZED_ERROR_CODES = [
   "validation_rejected",
   /** The external object named by an id is gone. */
   "not_found",
+  /**
+   * The provider was reached, was asked about the object Fanwise created, and
+   * answered that there is no such object. Distinct from `not_found`, which
+   * covers everything a 404 can mean — a store that has closed, an app that
+   * has been uninstalled, a URL that was never right.
+   *
+   * The distinction is load-bearing rather than descriptive: this is the only
+   * code the runner acts on by changing the listing, so it has to mean exactly
+   * "the provider confirmed the product is gone" and never "we could not
+   * reach it". Clearing a listing's external id on a transient failure would
+   * publish a second product the next time the creator clicked.
+   */
+  "external_object_missing",
   /** The provider is down or erroring. Retryable. */
   "provider_unavailable",
   /** The request never reached the provider. Retryable. */

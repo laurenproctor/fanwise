@@ -188,7 +188,19 @@ async function execute(
     return
   }
 
-  /** Guard 2. An earlier job already did this exact operation. */
+  /**
+   * Guard 2. An earlier job already did this exact operation.
+   *
+   * Scoped to the listing's current generation, which is the only honest
+   * reading of "already". A generation moves when the provider confirms the
+   * product Fanwise created no longer exists, so a succeeded publish from an
+   * earlier one describes a product that is gone; treating it as proof that
+   * there is nothing to create is what left a deleted product unrecoverable,
+   * with the key claimed and this guard reporting "already published" forever.
+   *
+   * Within a generation nothing changes: the same two clicks still collide,
+   * here and at the unique key.
+   */
   const { data: earlier } = await admin
     .from("publication_jobs")
     .select("id")
@@ -196,6 +208,7 @@ async function execute(
     .eq("channel_listing_id", job.channel_listing_id)
     .eq("kind", job.kind)
     .eq("status", "succeeded")
+    .eq("publish_generation", listing.publish_generation)
     .neq("id", job.id)
     .limit(1)
 
@@ -268,11 +281,27 @@ async function execute(
   } catch (error) {
     const normalized = normalizeUnknown(error, adapter.name)
 
-    // A failed publish leaves nothing on the provider, so the listing goes back
-    // to failed. A failed update or activate does not: the product is still
-    // there and still published, and marking the listing failed would tell the
-    // creator their live product had gone away.
-    if (job.kind === "publish") {
+    /*
+     * The product Fanwise created is gone from the channel.
+     *
+     * Only an adapter that asked the provider and was told so raises this, so
+     * the listing's claim to be published is now known to be false and is
+     * withdrawn rather than left standing behind a URL that 404s. The
+     * generation moves at the same time, which is what makes the next Publish
+     * a new operation instead of a repeat the idempotency key refuses.
+     *
+     * Deliberately not a re-create. A product is usually gone because somebody
+     * deleted it on purpose, and quietly putting it back would overrule that
+     * decision with a background job. The creator is told what happened and
+     * the button is theirs to press.
+     */
+    if (normalized.code === "external_object_missing") {
+      await forgetExternalObject(admin, workspaceId, listing)
+    } else if (job.kind === "publish") {
+      // A failed publish leaves nothing on the provider, so the listing goes
+      // back to failed. A failed update or activate does not: the product is
+      // still there and still published, and marking the listing failed would
+      // tell the creator their live product had gone away.
       await admin
         .from("channel_listings")
         .update({ status: "failed" })
@@ -295,6 +324,55 @@ async function execute(
     status: "succeeded",
     provider_response: (result.providerResponse ?? null) as never,
   })
+}
+
+/**
+ * Withdraws a listing's claim to be published, because the channel no longer
+ * holds the product.
+ *
+ * Everything that pointed at the external object goes: the id, the URL, the
+ * `verified` status source that was true when it was written, and the
+ * `externalState` an adapter reads to decide whether an update should put the
+ * object back on sale or leave it as a draft. That last one is the one that would
+ * bite later: left behind, it answers "live" about an object that is gone.
+ *
+ * `published_at` stays. It is history, and this listing was published; the
+ * product it was published as was then deleted somewhere else. Blanking it
+ * would rewrite the record rather than correct it, and the snapshots that
+ * describe that publication are immutable anyway.
+ */
+async function forgetExternalObject(
+  admin: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  listing: ChannelListing,
+): Promise<void> {
+  const metadata = { ...((listing.metadata as Record<string, unknown>) ?? {}) }
+  delete metadata.externalState
+
+  const { error } = await admin
+    .from("channel_listings")
+    .update({
+      external_listing_id: null,
+      external_url: null,
+      status: "draft",
+      status_source: "self_reported",
+      last_sent_fingerprint: null,
+      last_synced_at: new Date().toISOString(),
+      publish_generation: listing.publish_generation + 1,
+      metadata: metadata as never,
+    })
+    .eq("id", listing.id)
+    .eq("workspace_id", workspaceId)
+
+  if (error) {
+    // The job still reports the failure and its message, so the creator is not
+    // misled about what happened. What they lose is the ability to publish
+    // again without this running once more, which the next attempt does.
+    console.error("[publishing] could not clear a missing external object", {
+      listingId: listing.id,
+      error,
+    })
+  }
 }
 
 async function recordSuccess(params: {

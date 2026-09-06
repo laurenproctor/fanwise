@@ -162,6 +162,20 @@ the same failure inverted — work genuinely done, and the roadmap still saying 
 account was outstanding. Both directions cost the same, so the rule does not change: a clause
 nobody has run is a clause that says so.
 
+**A fourth product went missing between runs, on 6 September 2026**, and the way it went
+missing was worth fixing rather than noting. `Facette`
+(`gid://shopify/Product/9407450906860`) was deleted in the Shopify admin. Fanwise went on
+holding the id and the admin URL, which returned Not Found, and had no route back: the
+publish key was claimed, so Publish reported "already published" forever. That is now
+`docs/channels/shopify.md` §15 — the adapter reads the product before every write and
+raises `external_object_missing` when Shopify says there is none, the runner withdraws the
+listing's claim to be published, and a generation on the listing makes the next Publish a
+new operation rather than a blocked repeat.
+
+The same change filled the two product fields Fanwise was leaving empty in Shopify: the
+Category field, which is the Standard Product Taxonomy and not the free-text product type
+the adapter had been confusing it with, and the meta title. See §14.
+
 What remains for A5, in order:
 
 1. **Decide how a product reaches a sales channel.** Either Fanwise publishes it, which means

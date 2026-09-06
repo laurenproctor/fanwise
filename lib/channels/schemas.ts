@@ -13,13 +13,20 @@ import { z } from "zod"
  * The hard bounds here are the database's, not the channel's.
  */
 
+/**
+ * Nullish rather than merely optional, because the payload is a FormData read.
+ * `formData.get` returns null for a field the form did not carry, and an
+ * absent field means the same thing as an empty one here: no value. Rejecting
+ * null would turn a form that legitimately omits a control into a validation
+ * error the creator cannot act on.
+ */
 const optionalText = (max: number) =>
   z
     .string()
     .trim()
     .max(max, `Keep this under ${max} characters.`)
-    .optional()
-    .transform((v) => (v === "" || v === undefined ? null : v))
+    .nullish()
+    .transform((v) => (v === "" || v === undefined || v === null ? null : v))
 
 /**
  * Tags arrive as one comma-separated string from the form. Splitting here keeps
@@ -55,6 +62,12 @@ export const updateListingSchema = z.object({
   title: optionalText(500),
   description: optionalText(20000),
   shortDescription: optionalText(2000),
+  // The database's bound, not the channel's. Shopify wants a meta title well
+  // under 70 characters and the editor's counter says so, but a creator must
+  // be able to save an overlong one, see the requirement fail, and come back
+  // to it — the same reason every other field here is permissive.
+  seoTitle: optionalText(500),
+  seoDescription: optionalText(2000),
   category: optionalText(200),
   price: z
     .string()

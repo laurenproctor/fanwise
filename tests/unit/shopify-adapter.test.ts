@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
+import { readFileSync } from "node:fs"
 
 vi.mock("@/lib/credentials", () => ({
   readConnectionCredentials: vi.fn(async () => ({ accessToken: "shpat-test-token" })),
@@ -16,7 +17,14 @@ import {
   toMoney,
   toProductType,
   toSeoDescription,
+  toSeoTitle,
 } from "@/lib/channels/adapters/shopify/transform"
+import {
+  CATEGORY_LABELS,
+  defaultCategoryLabel,
+  taxonomyCategoryId,
+} from "@/lib/channels/adapters/shopify/categories"
+import type { Database } from "@/lib/supabase/database.types"
 import type {
   AdapterSubject,
   ChannelConnection,
@@ -24,6 +32,30 @@ import type {
   PublishContext,
 } from "@/lib/channels/types"
 import type { Product, ProductAsset } from "@/lib/products/types"
+
+/**
+ * Every member of the product_type enum, listed rather than derived.
+ *
+ * The enum is a database type with no runtime value to iterate, so the only way
+ * to assert "every product type has a category" is to write them out. A member
+ * added to the migration and not to this line makes the assertion pass while
+ * proving less than it claims, which is why the same list is a compile error in
+ * categories.ts: the map there is exhaustive by type, and this checks that what
+ * the map produces is something the picker will offer.
+ */
+const PRODUCT_TYPES: readonly Database["public"]["Enums"]["product_type"][] = [
+  "font",
+  "template",
+  "graphic",
+  "photo",
+  "illustration",
+  "icon",
+  "mockup",
+  "brush",
+  "three_d",
+  "theme",
+  "other",
+]
 
 /**
  * The Shopify adapter.
@@ -55,7 +87,9 @@ function listing(overrides: Partial<ChannelListing> = {}): ChannelListing {
     short_description: "Nine weights.",
     price: 48,
     currency: "USD",
-    category: "font",
+    category: "Fonts",
+    seo_title: null,
+    seo_description: null,
     tags: ["font"],
     metadata: {},
     ...overrides,
@@ -235,6 +269,15 @@ describe("transforms", () => {
     expect(toProductType("three_d")).toBe("Three D")
   })
 
+  it("truncates the SEO title at the limit Shopify's own admin uses", () => {
+    expect(toSeoTitle("x".repeat(200))).toHaveLength(70)
+    expect(toSeoTitle("Aster Grotesk")).toBe("Aster Grotesk")
+    // An empty override is not an override. Sending "" would store a blank in
+    // Shopify and stop it deriving the field from the product.
+    expect(toSeoTitle("   ")).toBeNull()
+    expect(toSeoTitle(null)).toBeNull()
+  })
+
   it("truncates the SEO description at Shopify's limit", () => {
     expect(toSeoDescription("x".repeat(400))).toHaveLength(320)
     expect(toSeoDescription("short")).toBe("short")
@@ -293,6 +336,210 @@ describe("requirements", () => {
   it("exposes Shopify's real title limit to the editor's counter", () => {
     expect(constraintsFor(shopifyAdapter).text.title?.maxLength).toBe(255)
     expect(constraintsFor(shopifyAdapter).tags?.maxCount).toBe(250)
+  })
+})
+
+describe("the product category", () => {
+  /*
+    Shopify has two fields that look like a category and only one of them is.
+    `productType` is free text; `category` is an id from the Standard Product
+    Taxonomy, and it is the one the admin labels Category. The adapter sent only
+    the first, so every product Fanwise created arrived with Category empty.
+  */
+
+  it("resolves every label it offers, so the picker cannot offer a dead option", () => {
+    // The whole risk of holding taxonomy ids in this repo is that a label and
+    // its id drift apart. This is the assertion that makes that a test failure
+    // rather than a product that silently publishes with no category.
+    for (const label of CATEGORY_LABELS) {
+      expect(taxonomyCategoryId(label)).toMatch(/^gid:\/\/shopify\/TaxonomyCategory\/[a-z0-9-]+$/)
+    }
+  })
+
+  it("has a default for every Fanwise product type, and every default is offerable", () => {
+    for (const productType of PRODUCT_TYPES) {
+      const label = defaultCategoryLabel(productType)
+      expect(CATEGORY_LABELS).toContain(label)
+    }
+  })
+
+  it("agrees with the migration that repaired the listings written before it", () => {
+    /*
+      The migration rewrites `category` on existing Shopify listings from the
+      Fanwise product-type slug they were seeded with to the taxonomy label the
+      adapter now expects. Two copies of one mapping is two things to keep in
+      step, and the copy in SQL is the one nobody will remember to update: a
+      product type added later would leave old rows repaired to a label this
+      build no longer produces, and the drift would show up as a listing that
+      quietly publishes with no category.
+    */
+    const sql = readFileSync(
+      new URL(
+        "../../supabase/migrations/20260907120000_listing_seo_category_and_generation.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    )
+
+    for (const productType of PRODUCT_TYPES) {
+      const match = new RegExp(`when '${productType}' then '([^']+)'`).exec(sql)
+      expect(match?.[1]).toBe(defaultCategoryLabel(productType))
+    }
+  })
+
+  it("resolves nothing for a label it does not know", () => {
+    expect(taxonomyCategoryId(null)).toBeNull()
+    expect(taxonomyCategoryId("font")).toBeNull()
+  })
+
+  it("sends the taxonomy id, and keeps productType as the canonical type", () => {
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body)),
+    )
+
+    return shopifyAdapter.publish!(context()).then(() => {
+      const input = productSetVariables(bodies).input as Record<string, unknown>
+      expect(input.category).toBe("gid://shopify/TaxonomyCategory/so-2-5")
+      // Two fields, two values. The category is the creator's choice; the
+      // product type stays the coarse Fanwise one.
+      expect(input.productType).toBe("Font")
+    })
+  })
+
+  it("omits the category rather than clearing it when the label is unrecognised", async () => {
+    /*
+      productSet leaves an omitted field alone and overwrites a supplied one.
+      Sending null for a label this build does not know would wipe a category
+      the creator set in the Shopify admin, turning a naming drift into data
+      loss.
+    */
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body)),
+    )
+
+    await shopifyAdapter.publish!(context({ listing: listing({ category: "Yarn" }) }))
+
+    expect(productSetVariables(bodies).input).not.toHaveProperty("category")
+  })
+
+  it("seeds a new listing with the category its product type belongs in", () => {
+    const draft = shopifyAdapter.buildListing(subject())
+    expect(draft.category).toBe("Fonts")
+  })
+
+  it("warns rather than blocks on a category Shopify does not have", () => {
+    const { readiness, results } = evaluate(
+      shopifyAdapter,
+      { ...shopifyAdapter.buildListing(subject()), category: "Yarn" },
+      subject(),
+    )
+    const category = results.find((r) => r.key === "category")
+    expect(category?.satisfied).toBe(false)
+    // Shopify creates a product with no category, so this cannot be an error.
+    expect(readiness.blocking.map((r) => r.key)).not.toContain("category")
+  })
+})
+
+describe("the search-result fields", () => {
+  it("sends both halves of the SEO input", async () => {
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body)),
+    )
+
+    await shopifyAdapter.publish!(
+      context({
+        listing: listing({
+          seo_title: "Aster Grotesk, a nine-weight typeface",
+          seo_description: "Nine weights, drawn for long text and interfaces.",
+        }),
+      }),
+    )
+
+    const seo = (productSetVariables(bodies).input as { seo: Record<string, string> }).seo
+    expect(seo.title).toBe("Aster Grotesk, a nine-weight typeface")
+    expect(seo.description).toBe("Nine weights, drawn for long text and interfaces.")
+  })
+
+  it("falls back to the listing's own writing rather than sending blanks", async () => {
+    /*
+      A blank is not the same as nothing. Shopify stores an empty string and
+      stops deriving the field from the product, so a creator who never touched
+      these would end up with a search result that has no title at all.
+    */
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body)),
+    )
+
+    await shopifyAdapter.publish!(context())
+
+    const seo = (productSetVariables(bodies).input as { seo: Record<string, string> }).seo
+    expect(seo.title).toBe("Aster Grotesk")
+    expect(seo.description).toBe("Nine weights.")
+  })
+
+  it("omits a half it has nothing for, rather than clearing it", async () => {
+    /*
+      In GraphQL an explicit null is an instruction to clear. A listing with no
+      short description and no override has no meta description, and sending
+      null for it would wipe one the creator wrote in the Shopify admin on
+      every update — in the field they are least likely to check.
+    */
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body)),
+    )
+
+    await shopifyAdapter.publish!(
+      context({ listing: listing({ short_description: null, seo_description: null }) }),
+    )
+
+    const seo = (productSetVariables(bodies).input as { seo: Record<string, string> }).seo
+    expect(seo).not.toHaveProperty("description")
+    expect(seo.title).toBe("Aster Grotesk")
+  })
+
+  it("truncates an override rather than letting Shopify cut it invisibly", async () => {
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body)),
+    )
+
+    await shopifyAdapter.publish!(context({ listing: listing({ seo_title: "x".repeat(120) }) }))
+
+    const seo = (productSetVariables(bodies).input as { seo: Record<string, string> }).seo
+    expect(seo.title).toHaveLength(70)
+  })
+
+  it("is silent about an empty meta field, and loud about an overlong one", () => {
+    // The reason `optional` exists. Leaving these blank is the ordinary case
+    // and has a documented fallback, so a rule that complained about it would
+    // put a permanent warning on almost every listing in the product.
+    const base = shopifyAdapter.buildListing(subject())
+
+    const empty = evaluate(shopifyAdapter, base, subject()).results
+    expect(empty.find((r) => r.key === "seo_title")?.satisfied).toBe(true)
+    expect(empty.find((r) => r.key === "seo_description")?.satisfied).toBe(true)
+
+    const long = evaluate(shopifyAdapter, { ...base, seoTitle: "x".repeat(120) }, subject()).results
+    expect(long.find((r) => r.key === "seo_title")?.satisfied).toBe(false)
+  })
+
+  it("gives the editor a counter without making the field required", () => {
+    const c = constraintsFor(shopifyAdapter).text
+    expect(c.seoTitle?.maxLength).toBe(70)
+    expect(c.seoTitle?.required).toBe(false)
+    expect(c.seoDescription?.maxLength).toBe(320)
+    expect(c.seoDescription?.required).toBe(false)
   })
 })
 
@@ -527,8 +774,15 @@ describe("publish", () => {
     expect(productSetVariables(bodies).input).toHaveProperty("files")
   })
 
-  it("does not read media at all when there is no cover to send", async () => {
-    // Nothing to repair with, so the extra round trip buys nothing.
+  it("sends no files when there is no cover, but still reads the product first", async () => {
+    /*
+      The read used to be skipped when there was nothing to repair with, which
+      is how a product deleted in the Shopify admin stayed invisible: no read,
+      no way to notice the id points at nothing. It is unconditional now
+      whenever the product is supposed to exist. What has not changed is the
+      write — with no images there is still no `files`, so nothing overwrites
+      media a creator curated in the admin.
+    */
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
@@ -542,8 +796,28 @@ describe("publish", () => {
       }),
     )
 
-    expect(bodies).toHaveLength(1)
+    const queries = bodies.map((b) => String((b as { query?: string }).query ?? ""))
+    expect(queries.filter((q) => q.includes("FanwiseProductState"))).toHaveLength(1)
     expect(productSetVariables(bodies).input).not.toHaveProperty("files")
+  })
+
+  it("does not read anything when it is creating the product", async () => {
+    // Nothing exists yet, so there is nothing to ask about. A create is still
+    // one round trip.
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body)),
+    )
+
+    await shopifyAdapter.publish!(
+      context({
+        listing: listing({ external_listing_id: null }),
+        subject: { ...subject(), assets: [] },
+      }),
+    )
+
+    expect(bodies).toHaveLength(1)
   })
 
   it("activates by setting ACTIVE on the existing product", async () => {
@@ -652,10 +926,11 @@ describe("publish", () => {
   it("refuses the update rather than guessing when the status cannot be read", async () => {
     // Defaulting to DRAFT here is the deactivation this whole change exists to
     // prevent. A creator would rather retry than find their product off sale.
+    // The product is there; it is its status that is unintelligible.
     vi.stubGlobal(
       "fetch",
       vi.fn(async (_url: string, init: RequestInit) =>
-        respondTo(JSON.parse(String(init.body)), { missing: true }),
+        respondTo(JSON.parse(String(init.body)), { holds: "SOMETHING_NEW" }),
       ),
     )
 
@@ -668,13 +943,14 @@ describe("publish", () => {
     ).rejects.toThrow(/could not read whether this product is currently on sale/)
   })
 
-  it("still trusts a recorded state without reading the product", async () => {
-    // The read costs a round trip. A listing that already knows should not pay
-    // for one, and the recorded value is what publication itself wrote.
+  it("still lets a recorded state decide the status it sends", async () => {
+    // The recorded value is what publication itself wrote, and it is trusted
+    // when it says something. The read that now happens either way is about
+    // whether the product exists, not about what to send.
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
-      captureFetch(bodies, (body) => respondTo(body, { status: "ACTIVE" })),
+      captureFetch(bodies, (body) => respondTo(body, { status: "ACTIVE", holds: "DRAFT" })),
     )
 
     await shopifyAdapter.update!(
@@ -683,13 +959,81 @@ describe("publish", () => {
           external_listing_id: "gid://shopify/Product/900",
           metadata: { externalState: "live" },
         }),
-        // No images, so nothing else would trigger a read either.
         subject: { ...subject(), assets: [] },
       }),
     )
 
+    // Shopify says DRAFT, the listing's own record says live, and the record
+    // wins. `preserve` is for a listing that has no record at all.
+    expect((productSetVariables(bodies).input as { status: string }).status).toBe("ACTIVE")
+  })
+})
+
+describe("a product that is gone from the channel", () => {
+  /*
+    The failure a creator actually hit: a product deleted in the Shopify admin,
+    and a Fanwise listing still pointing at it with an admin URL that returns
+    Not Found. Every write against that identifier failed, and each failed
+    differently, so nothing in the product ever said the plain thing — the
+    product is not there any more.
+  */
+
+  it("names the deletion instead of failing obscurely, and writes nothing", async () => {
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body, { missing: true })),
+    )
+
+    await expect(
+      shopifyAdapter.update!(
+        context({
+          listing: listing({ external_listing_id: "gid://shopify/Product/900", metadata: {} }),
+        }),
+      ),
+    ).rejects.toThrow(/no longer exists in Shopify/)
+
+    // The read happened and the write did not. Sending productSet with a dead
+    // identifier is what produced the unintelligible failures.
     const queries = bodies.map((b) => String((b as { query?: string }).query ?? ""))
-    expect(queries.some((q) => q.includes("FanwiseProductState"))).toBe(false)
+    expect(queries.some((q) => q.includes("FanwiseProductSet"))).toBe(false)
+  })
+
+  it("raises the code the runner acts on, and only for a confirmed absence", async () => {
+    vi.stubGlobal(
+      "fetch",
+      captureFetch([], (body) => respondTo(body, { missing: true })),
+    )
+
+    const error = await shopifyAdapter.activate!(
+      context({
+        listing: listing({ external_listing_id: "gid://shopify/Product/900", metadata: {} }),
+      }),
+    ).catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ChannelError)
+    expect((error as ChannelError).normalized.code).toBe("external_object_missing")
+    // Not retryable: asking again will get the same answer, and a retry that
+    // eventually gave up would leave the listing claiming to be published.
+    expect((error as ChannelError).normalized.retryable).toBe(false)
+  })
+
+  it("does not raise it when the store itself could not be reached", async () => {
+    // The distinction the runner depends on. A 404 from the store is not the
+    // provider confirming this product is gone, and clearing the listing's
+    // external id on one would publish a second product next time.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ errors: [{ message: "Not Found" }] }, 404)),
+    )
+
+    const error = await shopifyAdapter.update!(
+      context({
+        listing: listing({ external_listing_id: "gid://shopify/Product/900", metadata: {} }),
+      }),
+    ).catch((e: unknown) => e)
+
+    expect((error as ChannelError).normalized.code).toBe("not_found")
   })
 })
 

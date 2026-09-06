@@ -257,6 +257,48 @@ export function ListingEditor({
           />
         </FieldShell>
 
+        {/*
+          The search-result pair, together and after the writing they fall back
+          to. Both are overrides: left empty, the channel uses the title and the
+          short description above, which the placeholders say rather than
+          leaving the creator to find out by publishing.
+        */}
+        <FieldShell
+          id="listing-seo-title"
+          label="Meta title"
+          aside={<Counter value={draft.seoTitle ?? ""} constraint={constraints.text.seoTitle} />}
+        >
+          <input
+            id="listing-seo-title"
+            name="seoTitle"
+            value={draft.seoTitle ?? ""}
+            onChange={(e) => set("seoTitle", e.target.value)}
+            placeholder="Defaults to the title above"
+            className={inputClass}
+          />
+        </FieldShell>
+
+        <FieldShell
+          id="listing-seo-description"
+          label="Meta description"
+          aside={
+            <Counter
+              value={draft.seoDescription ?? ""}
+              constraint={constraints.text.seoDescription}
+            />
+          }
+        >
+          <textarea
+            id="listing-seo-description"
+            name="seoDescription"
+            rows={2}
+            value={draft.seoDescription ?? ""}
+            onChange={(e) => set("seoDescription", e.target.value)}
+            placeholder="Defaults to the short description above"
+            className={inputClass}
+          />
+        </FieldShell>
+
         <div className="grid grid-cols-2 gap-4">
           <FieldShell
             id="listing-price"

@@ -107,6 +107,9 @@ export const mockApiAdapter: ChannelAdapter = {
       title: product.canonical_title ?? product.name,
       description: product.canonical_description,
       shortDescription: product.short_description,
+      // A mock channel has no search surface, so it has nothing to override.
+      seoTitle: null,
+      seoDescription: null,
       price: product.base_price === null ? null : Number(product.base_price),
       currency: product.currency,
       category: product.product_type,
