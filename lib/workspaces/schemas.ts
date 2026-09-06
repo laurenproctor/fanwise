@@ -33,3 +33,20 @@ export const credentialsSchema = z.object({
 
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>
 export type CredentialsInput = z.infer<typeof credentialsSchema>
+
+export const passwordResetRequestSchema = z.object({ email: emailSchema })
+
+/**
+ * Setting a password with no old password to check against, so the confirmation
+ * field is the only guard against a typo locking someone out of the account
+ * they just recovered.
+ */
+export const newPasswordSchema = z
+  .object({ password: passwordSchema, confirm: z.string() })
+  .refine((v) => v.password === v.confirm, {
+    message: "Those passwords do not match.",
+    path: ["confirm"],
+  })
+
+export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>
+export type NewPasswordInput = z.infer<typeof newPasswordSchema>

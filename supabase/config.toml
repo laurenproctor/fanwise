@@ -27,7 +27,14 @@ file_size_limit = "4GiB"
 [auth]
 enabled = true
 site_url = "http://localhost:3001"
-additional_redirect_urls = ["http://localhost:3001/auth/callback"]
+# Recovery links land on /auth/confirm. The ports vary by how the app is being
+# run (3000 by default, 3001 for this stack, a dedicated port for Playwright),
+# so the local allowlist is a glob. A deployed project lists exact URLs.
+additional_redirect_urls = [
+  "http://localhost:3001/auth/callback",
+  "http://localhost:*/auth/confirm",
+  "http://127.0.0.1:*/auth/confirm",
+]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
@@ -37,6 +44,10 @@ enable_signup = true
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
+
+[auth.email.template.recovery]
+subject = "Reset your Fanwise password"
+content_path = "./supabase/templates/recovery.html"
 
 [analytics]
 enabled = true

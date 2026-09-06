@@ -1,0 +1,23 @@
+<!--
+  The recovery email.
+
+  The link points at Fanwise, not at Supabase's verify endpoint, and carries the
+  token hash for /auth/confirm to verify server-side. The stock template instead
+  returns a PKCE code, which only works in the browser that asked for the reset:
+  a person who requests a reset on a laptop and opens the mail on their phone
+  would get an invalid link. Recovery is exactly the flow where that happens.
+
+  {{ .RedirectTo }} is the URL the action passed to resetPasswordForEmail, which
+  already carries ?next=/reset-password, so the token is appended to it.
+-->
+<h2>Reset your Fanwise password</h2>
+
+<p>Someone asked to reset the password for this address. If that was you, set a new one:</p>
+
+<p>
+  <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery">Set a new password</a>
+</p>
+
+<p>The link can be used once, and expires in an hour.</p>
+
+<p>If it was not you, nothing has changed and you can ignore this message.</p>

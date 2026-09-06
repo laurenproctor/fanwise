@@ -18,6 +18,14 @@ export default async function SignInPage() {
         passwordAutoComplete="current-password"
       />
       <p className="text-[14px] text-[var(--color-ink-2)]">
+        <Link
+          href="/forgot-password"
+          className="text-[var(--color-accent)] underline underline-offset-4"
+        >
+          Forgot your password?
+        </Link>
+      </p>
+      <p className="text-[14px] text-[var(--color-ink-2)]">
         No account?{" "}
         <Link href="/sign-up" className="text-[var(--color-accent)] underline underline-offset-4">
           Create one
