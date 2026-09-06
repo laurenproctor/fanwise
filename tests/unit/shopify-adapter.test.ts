@@ -404,10 +404,61 @@ describe("publish", () => {
     expect(input.files).toHaveLength(1)
   })
 
+  it("sends the images a published product is missing, not only when it has none", async () => {
+    /*
+      The bug this closes. A product created before Fanwise sent more than the
+      cover holds exactly one image, and the old rule — "does Shopify have any
+      image at all" — read that as media present and omitted `files` on every
+      later write. The previews a creator had already uploaded could never
+      reach the storefront, and nothing anywhere said why.
+    */
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) =>
+        respondTo(body, { media: [{ id: "gid://shopify/MediaImage/1", status: "READY" }] }),
+      ),
+    )
+
+    const cover = asset({ id: "a-cover", asset_type: "cover_image", filename: "cover.png" })
+    const one = asset({
+      id: "a-one",
+      asset_type: "preview_image",
+      filename: "one.png",
+      sort_order: 1,
+    })
+    const two = asset({
+      id: "a-two",
+      asset_type: "preview_image",
+      filename: "two.png",
+      sort_order: 2,
+    })
+
+    await shopifyAdapter.publish!(
+      context({
+        listing: listing({ external_listing_id: "gid://shopify/Product/900" }),
+        subject: { ...subject(), assets: [cover, one, two] },
+        assetUrl: async (a) => `https://signed.example/${a.filename}`,
+      }),
+    )
+
+    const input = productSetVariables(bodies).input as {
+      files: { originalSource: string }[]
+    }
+    // All three, in channel order. productSet replaces the media list, so a
+    // partial resend of "just the missing two" would drop the cover.
+    expect(input.files.map((f) => f.originalSource.split("/").pop())).toEqual([
+      "cover.png",
+      "one.png",
+      "two.png",
+    ])
+  })
+
   it("leaves media alone when the product already has some", async () => {
     // The rule productSet depends on: an omitted field is left as it is, so
     // re-sending would replace a media list the creator may have curated in
-    // the Shopify admin. Having any usable image is what makes it theirs.
+    // the Shopify admin. Holding at least as many images as Fanwise would send
+    // is what makes it theirs.
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
