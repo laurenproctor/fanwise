@@ -100,6 +100,34 @@ and a much shorter path to a working publish.
 queue Fanwise does not control, and the OAuth code is nearly identical either way. Revisit
 before any public launch, because a custom app does not scale to self-serve signup.
 
+### 4a. How a Shopify product reaches a sales channel
+
+**Found by running A5's exit test on 6 September 2026, and it blocks the last clause.**
+
+`status: ACTIVE` does not make a product purchasable. Both live products read
+`publishedAt: null` and `onlineStoreUrl: null`: they are active and on no sales channel, so
+no storefront page exists and no buyer can reach them. `activate()` sets status and nothing
+else, which is all `productSet` can do.
+
+Two ways to answer it, and they are not close in cost.
+
+**Fanwise publishes to the channel.** Needs `publishablePublish` and a publications scope
+this app does not request. Adding a scope re-authorises every existing connection, so it is
+not a silent change even at three connections. It is the answer that makes **Publish
+Everywhere** mean what it says.
+
+**The creator publishes it.** Becomes a manual step beside `attach_digital_file`, with the
+same standing: Fanwise says what to do, the creator asserts it is done, and `status_source`
+stays honest about who confirmed it. Cheap, and consistent with ADR 0001's shape for things
+Shopify will not let an app do — except that Shopify *will* let an app do this one, so the
+manual step would be a choice rather than a limit.
+
+**Recommendation:** the manual step for Gate A, the scope afterwards. Gate A is about closing
+the loop with a handful of creators, and a re-authorisation of every connection is a poor
+thing to spend that on; the step is reversible into the scope later, and the reverse is not
+true. Whichever is chosen, `liveness` must stop reporting `live` as "available to buy" for a
+product on no sales channel — that half is not optional and does not wait for this decision.
+
 ### 5. The credentials encryption key rotation plan
 
 `docs/security.md` says the rotation plan is written **before** the first real credential is
