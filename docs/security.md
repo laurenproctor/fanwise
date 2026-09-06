@@ -112,6 +112,43 @@ deployment whose template has not been updated degrades rather than breaks. **A 
 does not inherit `config.toml`, so the template has to be set on the project itself, and the
 `/auth/confirm` URL added to its redirect allowlist.**
 
+## Password recovery
+
+The flow is `/forgot-password` to `/auth/confirm` to `/reset-password`, and the three
+properties that make it safe are each held in one place.
+
+**It never says whether an address has an account.** `requestPasswordResetAction` answers with
+the same sentence for a registered address, an unregistered one, and a send the provider
+refused. Reporting the provider's error would be an oracle: "too many attempts" comes back
+only for an address that exists, and that is enough to enumerate a customer list one address
+at a time. The only thing reported is a malformed address, which the browser knows already and
+which depends on no account. An E2E test compares the two responses character for character,
+because this property is lost by a well-meaning improvement to an error message.
+
+**The link is spent server-side, once.** `/auth/confirm` exchanges the emailed token for a
+session and redirects. The token never reaches a client component, and it is single use at the
+auth server, which `tests/db/password-recovery.test.ts` proves by replaying one. Everything
+after the redirect authorizes on the session cookie, so `updatePasswordAction` takes no token
+parameter and re-checks the session itself, per rule 7.
+
+**The redirect target is checked.** `safeRedirectTarget` narrows the `next` parameter to a
+plain same-origin path. Unchecked, it is an open redirect on a URL that arrives by email and
+has just established a session, which is the most valuable moment to steer someone somewhere
+else. The base URL is `NEXT_PUBLIC_APP_URL`, never a request header, for the same reason the
+OAuth redirect URI is.
+
+Changing the password calls `signOut({ scope: "others" })`. Recovery exists because the old
+password may be in someone else's hands, so sessions opened with it do not survive.
+
+The recovery email is a project template, `supabase/templates/recovery.html`, and it points at
+Fanwise carrying `token_hash`. The stock template routes through Supabase's verify endpoint and
+returns a PKCE code, which only works in the browser that asked for the reset: a person who
+requests a reset on a laptop and opens the mail on their phone gets an invalid link, and
+recovery is exactly the flow where that happens. `/auth/confirm` still accepts a code, so a
+deployment whose template has not been updated degrades rather than breaks. **A hosted project
+does not inherit `config.toml`, so the template has to be set on the project itself, and the
+`/auth/confirm` URL added to its redirect allowlist.**
+
 ## The three things that never bend
 
 RLS, idempotency checks, and the factuality validator. If a feature appears to require

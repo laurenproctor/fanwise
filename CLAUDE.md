@@ -55,7 +55,12 @@ These do not bend. If a task appears to require breaking one, stop and say so.
    original.
 9. Implement the simplest correct version. Do not build V2 because the architecture allows
    it.
-10. Keep `main` deployable. One step per branch, one PR per step.
+10. Keep `main` deployable. One step per branch, one PR per step, one session per step.
+    Two agents in one working directory will fight over the index and the checked-out
+    branch, and the loser's edit disappears without an error. If parallel work is wanted,
+    each agent gets its own git worktree. Before resuming a paused session, check whether
+    another is still live: files modified more recently than your own last edit are the
+    tell.
 
 ## Stack
 
