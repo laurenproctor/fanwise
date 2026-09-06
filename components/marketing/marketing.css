@@ -1920,6 +1920,11 @@
   color: var(--fw-slab-ink-3);
 }
 
+/* The same note on the interior pages, whose tertiary ink is warmer. */
+.fw-footnote--page {
+  color: var(--fw-ink-3);
+}
+
 /* ------------------------------------------------------- workspace mock -- */
 
 .fw-mock {
