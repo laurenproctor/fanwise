@@ -1,8 +1,8 @@
 import type {
   AdapterSubject,
   ChannelAdapter,
-  ChannelListing,
   ChannelListingDraft,
+  PublishContext,
   PublishResult,
   RequirementSpec,
 } from "@/lib/channels/types"
@@ -15,9 +15,15 @@ import type {
  * can run without a network. Its twin, mock-assisted, structurally cannot
  * publish; this one can.
  *
- * Nothing here talks to anything. publish() returns a deterministic fake id.
- * Real publication, with idempotency keys and background jobs, is A5 and A7,
- * and this method is deliberately not wired to either.
+ * Nothing here talks to anything. publish() returns a deterministic fake id
+ * derived from the listing, which is what lets A5's idempotency tests prove
+ * "a second click creates nothing" without a network: two publishes of the same
+ * listing would produce the same external id, so a duplicate would collide on
+ * channel_listings' partial unique index if the guards above it ever failed.
+ *
+ * It uploads its own deliverable, so it declares no manual steps and its
+ * products go straight to `live`. Its twin, mock-assisted, cannot publish at
+ * all. Between them the two ends of the capability matrix are covered.
  */
 
 const requirements: readonly RequirementSpec[] = [
@@ -93,6 +99,8 @@ export const mockApiAdapter: ChannelAdapter = {
     drafts: true,
   },
   requirements,
+  // Nothing is left for a human to do here: this channel takes the file itself.
+  manualSteps: [],
 
   buildListing({ product }: AdapterSubject): ChannelListingDraft {
     return {
@@ -107,17 +115,22 @@ export const mockApiAdapter: ChannelAdapter = {
     }
   },
 
-  async publish(listing: ChannelListing): Promise<PublishResult> {
+  async publish({ listing }: PublishContext): Promise<PublishResult> {
     return {
       externalListingId: `mock-api-${listing.id}`,
       externalUrl: `https://mock-storefront.test/listings/${listing.id}`,
+      // Live immediately, because this channel received the deliverable.
+      externalState: "live",
+      providerResponse: { ok: true, id: `mock-api-${listing.id}` },
     }
   },
 
-  async update(listing: ChannelListing): Promise<PublishResult> {
+  async update({ listing }: PublishContext): Promise<PublishResult> {
     return {
       externalListingId: listing.external_listing_id ?? `mock-api-${listing.id}`,
       externalUrl: listing.external_url,
+      externalState: "live",
+      providerResponse: { ok: true, updated: true },
     }
   },
 }

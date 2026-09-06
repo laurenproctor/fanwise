@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { signUpAndCreateWorkspace } from "./support"
+import { productUrl, signUpAndCreateWorkspace } from "./support"
 
 /**
  * A3's exit test, driven through the browser.
@@ -14,16 +14,14 @@ import { signUpAndCreateWorkspace } from "./support"
  */
 
 async function createProduct(page: import("@playwright/test").Page, slug: string, name: string) {
-  await page.goto(`/w/${slug}/products/new`)
+  await page.goto(`/${slug}/new`)
   await page.getByLabel("Product name").fill(name)
   await page.getByLabel("Product type").selectOption("font")
   await page.getByRole("button", { name: "Create product" }).click()
   // `/products/[^/]+$` also matches `/products/new`, so waiting on that pattern
   // resolves instantly against the form just submitted and races the redirect.
   await page.waitForURL(
-    (url) =>
-      new RegExp(`^/w/${slug}/products/[^/]+$`).test(url.pathname) &&
-      !url.pathname.endsWith("/new"),
+    (url) => productUrl(slug).test(url.pathname) && !url.pathname.endsWith("/new"),
   )
 }
 
@@ -31,7 +29,7 @@ test("a channel states what it cannot do before it is connected", async ({ page 
   const { slug } = await signUpAndCreateWorkspace(page, "j3cap", "Capability Studio")
 
   await page.getByRole("link", { name: "Channels" }).click()
-  await page.waitForURL(new RegExp(`/w/${slug}/channels$`))
+  await page.waitForURL(new RegExp(`/${slug}/channels$`))
 
   const assisted = page.locator("section").filter({ hasText: "Mock Marketplace" })
 
@@ -48,7 +46,7 @@ test("a channel states what it cannot do before it is connected", async ({ page 
 test("one product yields two independent listings, judged by different rules", async ({ page }) => {
   const { slug } = await signUpAndCreateWorkspace(page, "j3two", "Two Channel Studio")
 
-  await page.goto(`/w/${slug}/channels`)
+  await page.goto(`/${slug}/channels`)
   const cards = page.locator("section")
   await cards
     .filter({ hasText: "Mock Storefront" })
@@ -96,7 +94,7 @@ test("one product yields two independent listings, judged by different rules", a
 test("the assisted channel never offers publishing, anywhere", async ({ page }) => {
   const { slug } = await signUpAndCreateWorkspace(page, "j3pub", "No Publish Studio")
 
-  await page.goto(`/w/${slug}/channels`)
+  await page.goto(`/${slug}/channels`)
   await page
     .locator("section")
     .filter({ hasText: "Mock Marketplace" })
@@ -117,7 +115,7 @@ test("the assisted channel never offers publishing, anywhere", async ({ page }) 
 test("disconnecting a channel takes its listings with it", async ({ page }) => {
   const { slug } = await signUpAndCreateWorkspace(page, "j3dis", "Disconnect Studio")
 
-  await page.goto(`/w/${slug}/channels`)
+  await page.goto(`/${slug}/channels`)
   await page
     .locator("section")
     .filter({ hasText: "Mock Storefront" })
@@ -129,15 +127,24 @@ test("disconnecting a channel takes its listings with it", async ({ page }) => {
   await page.getByRole("button", { name: "Build listing" }).click()
   await expect(page.getByRole("button", { name: "Rebuild" })).toBeVisible()
 
-  await page.goto(`/w/${slug}/channels`)
+  await page.goto(`/${slug}/channels`)
   await page.getByRole("button", { name: "Disconnect", exact: true }).click()
   // Destructive and irreversible, so it says what it will do before it does it.
   await expect(page.getByText("removes its listings from Fanwise")).toBeVisible()
   await page.getByRole("button", { name: "Yes, disconnect" }).click()
 
-  await expect(page.getByRole("button", { name: "Connect", exact: true })).toBeVisible()
+  // Scoped to the card, not the page. Every unconnected channel offers a
+  // Connect button, so an unscoped locator counts the other channels too and
+  // starts failing the moment a channel is added, which is what happened when
+  // Shopify arrived at A5.
+  await expect(
+    page
+      .locator("section")
+      .filter({ hasText: "Mock Storefront" })
+      .getByRole("button", { name: "Connect", exact: true }),
+  ).toBeVisible()
 
-  await page.goto(`/w/${slug}/products`)
+  await page.goto(`/${slug}`)
   await page.getByRole("link", { name: "Doomed Listing" }).click()
   await expect(page.getByText("No channels connected")).toBeVisible()
 })

@@ -100,6 +100,34 @@ and a much shorter path to a working publish.
 queue Fanwise does not control, and the OAuth code is nearly identical either way. Revisit
 before any public launch, because a custom app does not scale to self-serve signup.
 
+### 4a. How a Shopify product reaches a sales channel
+
+**Found by running A5's exit test on 6 September 2026, and it blocks the last clause.**
+
+`status: ACTIVE` does not make a product purchasable. Both live products read
+`publishedAt: null` and `onlineStoreUrl: null`: they are active and on no sales channel, so
+no storefront page exists and no buyer can reach them. `activate()` sets status and nothing
+else, which is all `productSet` can do.
+
+Two ways to answer it, and they are not close in cost.
+
+**Fanwise publishes to the channel.** Needs `publishablePublish` and a publications scope
+this app does not request. Adding a scope re-authorises every existing connection, so it is
+not a silent change even at three connections. It is the answer that makes **Publish
+Everywhere** mean what it says.
+
+**The creator publishes it.** Becomes a manual step beside `attach_digital_file`, with the
+same standing: Fanwise says what to do, the creator asserts it is done, and `status_source`
+stays honest about who confirmed it. Cheap, and consistent with ADR 0001's shape for things
+Shopify will not let an app do — except that Shopify *will* let an app do this one, so the
+manual step would be a choice rather than a limit.
+
+**Recommendation:** the manual step for Gate A, the scope afterwards. Gate A is about closing
+the loop with a handful of creators, and a re-authorisation of every connection is a poor
+thing to spend that on; the step is reversible into the scope later, and the reverse is not
+true. Whichever is chosen, `liveness` must stop reporting `live` as "available to buy" for a
+product on no sales channel — that half is not optional and does not wait for this decision.
+
 ### 5. The credentials encryption key rotation plan
 
 `docs/security.md` says the rotation plan is written **before** the first real credential is
@@ -181,6 +209,39 @@ product.
 **Recommendation:** start the conversation during A5. A creator who has agreed in principle
 two steps early is a very different prospect from one approached the week the gate is ready.
 
+### 20. Who sends Fanwise's email
+
+Discovered on 5 September 2026, pushing `config.toml` to a hosted Supabase project:
+
+> Email template modification is not available for free tier projects using the default email
+> provider. Please upgrade your plan or configure a custom SMTP provider.
+
+Two consequences, and the second is the one that matters.
+
+Signup on a hosted project defaults to requiring email confirmation, and the built-in sender
+is rate limited to a handful of messages an hour. The first few signups on a fresh project
+fail with "Too many attempts", which is our own normalization of a rate limit nobody has hit
+locally, because local runs with `enable_confirmations = false`.
+
+The real problem is the recovery template. `supabase/templates/recovery.html` exists because
+the stock template returns a PKCE code that only works in the browser that asked for the
+reset — someone who requests a reset on a laptop and opens the mail on their phone gets an
+invalid link, and recovery is exactly the flow where that happens. That template cannot be
+installed on the default provider. So a deployment on the built-in sender silently reverts to
+the stock template and reacquires the bug the custom one was written to fix. Nothing errors.
+Password recovery simply half-works, on the flow least likely to be exercised before a real
+person needs it.
+
+This is grouped at Gate A exit rather than later because that gate puts an outside creator on
+a deployed instance. That is the first moment the built-in sender stops being adequate.
+
+**Recommendation:** configure custom SMTP before anyone outside the team touches a deployed
+project, and treat the provider as part of the environment rather than a detail of the auth
+config. Resend or Postmark, chosen for deliverability on transactional mail rather than
+price; the volume through Gate A is trivial either way. Until then, a dev project runs with
+`enable_confirmations` off and no custom template, and `pnpm test:e2e` continues to prove the
+recovery flow against local Supabase, where the template does load.
+
 ---
 
 ## Gate B
@@ -219,6 +280,44 @@ indistinguishable from a zero that means "no sales".
 ---
 
 ## Gate C, and the pricing page
+
+### 21. How a product leaves a channel
+
+Found on 5 September 2026, trying to disconnect a Shopify connection with one published
+product.
+
+`disconnectChannelAction` refuses while any listing on the connection carries an external id,
+and that refusal is right: cascading the listing away does not remove the product from the
+marketplace, it removes Fanwise's only record of it, leaving a live product nothing points at
+and no way to publish again without creating a duplicate. Fanwise forgetting is worse than
+Fanwise refusing.
+
+The refusal says "remove it from the channel first." There is no way to do that. The actions
+are `buildListing`, `updateListing` and `publishListing`; nothing removes one. So publishing a
+single product to a channel makes that connection permanent.
+
+That is a dead end today and a billing problem at C1, where disconnecting is the event that
+decrements quantity. A creator who publishes once can never stop being charged for the
+channel, and the entitlement service is coupled to `channel_connections` precisely so that
+connecting and disconnecting are the billing signals.
+
+The real question is what "remove from the channel" should mean, and it is not obvious:
+
+- **Delist on the marketplace, then forget.** Honest, and the only version where the refusal's
+  advice is literally true. Needs a `delist` capability that not every adapter can implement —
+  an assisted channel cannot, so this becomes another capability with a UI that has to respect
+  it.
+- **Forget without delisting, behind an explicit acknowledgement.** Cheap, and re-creates the
+  orphan the refusal exists to prevent, except now the creator chose it. Defensible only if
+  the acknowledgement names the product and the marketplace.
+- **Archive rather than delete.** Keeps the external id and the snapshots, drops the
+  connection, and leaves a record that could be re-attached if the store is reconnected.
+  Interacts directly with entry 10, which is the same tension seen from the snapshot side.
+
+**Recommendation:** answer it with entry 10 rather than separately, since both are the same
+question about what survives a disconnection, and decide before C1 rather than at it. Until
+then the UI says the connection cannot be disconnected and why, rather than offering a button
+whose only outcome is the refusal.
 
 ### 16. Assisted versus automatic pricing
 

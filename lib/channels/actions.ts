@@ -3,10 +3,13 @@
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { routes } from "@/lib/routes"
 import { listProductAssets } from "@/lib/products/queries"
-import { buildDraft, draftToColumns, evaluate, snapshotPayload } from "./listings"
+import { buildDraft, draftToColumns, evaluate, rebuildColumns, snapshotPayload } from "./listings"
+import { listingImages } from "./images"
 import { findAdapter } from "./registry"
 import { updateListingSchema } from "./schemas"
+import { callbackUrl, createAuthorizationState } from "./oauth"
 import type { AdapterSubject, ChannelListingDraft } from "./types"
 
 export interface ActionState {
@@ -52,10 +55,10 @@ async function requireWorkspace(workspaceSlug: string) {
 /**
  * Connects a channel.
  *
- * A3 has no OAuth and no credentials: a connection is created directly, and
- * channel_connection_secrets is never written. A5 replaces the body of this
- * function with a real authorization round trip, and the shape of what it
- * writes here does not change.
+ * This is the path for a channel with no authorization to perform, which since
+ * A5 means the mocks only. A real channel goes through
+ * beginAuthorizationAction and the callback route, which write the same
+ * connection row plus a sealed credential.
  *
  * At C1 this becomes a billing event in the same transaction as the row, per
  * docs/billing.md rule 1. It is not one yet, and pretending otherwise by
@@ -67,6 +70,13 @@ export async function connectChannelAction(
 ): Promise<ActionState> {
   const adapter = findAdapter(channelKey)
   if (!adapter) return { error: "That channel is not available." }
+
+  // A channel Fanwise can authorize against is never connected by writing a
+  // row. Doing so would create a connection with no credential behind it, which
+  // looks connected everywhere in the UI and fails at the first publish.
+  if (adapter.oauth) {
+    return { error: `${adapter.name} is connected by authorizing it, not by adding a row.` }
+  }
 
   const { supabase, workspace } = await requireWorkspace(workspaceSlug)
 
@@ -100,18 +110,90 @@ export async function connectChannelAction(
     return { error: "That channel could not be connected. Try again." }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/channels`)
+  revalidatePath(routes.channels(workspaceSlug))
   return { error: null }
+}
+
+export type BeginAuthorizationState =
+  { error: string; authorizeUrl?: undefined } | { error: null; authorizeUrl: string }
+
+/**
+ * Begins an OAuth authorization against a real channel.
+ *
+ * Returns the provider URL rather than redirecting to it. A server action that
+ * redirects off-site is a server action whose failures are invisible: the
+ * creator either lands on a marketplace or does not, and "did not" looks
+ * identical to a broken button. Returning the URL lets the caller show the
+ * error it got instead.
+ *
+ * The state is written before the URL is built, so there is no window in which
+ * a creator holds an authorize link Fanwise cannot later recognise.
+ */
+export async function beginAuthorizationAction(
+  workspaceSlug: string,
+  channelKey: string,
+  accountHint: string,
+): Promise<BeginAuthorizationState> {
+  const adapter = findAdapter(channelKey)
+  if (!adapter?.oauth) return { error: "That channel cannot be connected yet." }
+
+  const parsed = adapter.oauth.parseAccountHint(accountHint)
+  if (!parsed.ok) return { error: parsed.message }
+
+  const { supabase, user, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data: channel, error: channelError } = await supabase
+    .from("channels")
+    .select("id, name, status")
+    .eq("key", channelKey)
+    .maybeSingle()
+
+  if (channelError) throw channelError
+  if (!channel) return { error: "That channel is not available." }
+  if (channel.status !== "available") {
+    return { error: `${channel.name} is not open for connections yet.` }
+  }
+
+  try {
+    const state = await createAuthorizationState({
+      workspaceId: workspace.id,
+      channelId: channel.id,
+      userId: user.id,
+      accountHint: parsed.value,
+    })
+
+    return {
+      error: null,
+      authorizeUrl: adapter.oauth.authorizeUrl({
+        state,
+        accountHint: parsed.value,
+        redirectUri: callbackUrl(channelKey),
+      }),
+    }
+  } catch (error) {
+    // Reaches here when the deployment has no client id or secret configured,
+    // which is a Fanwise problem and not something the creator can fix by
+    // retrying. Said plainly rather than dressed up as a transient failure.
+    console.error("[channels] could not begin authorization", error)
+    return {
+      error: `${channel.name} is not configured on this deployment yet. Nothing was changed.`,
+    }
+  }
 }
 
 /**
  * Disconnects a channel.
  *
- * Listings cascade with the connection. That is correct for A3, where a listing
- * carries no external object: nothing is left behind on a marketplace. Once A5
- * and A6 create real listings, disconnecting must stop deleting rows that
- * describe something still live on a provider, and this is the function that
- * has to change.
+ * Listings cascade with the connection, and since A5 that is only safe while
+ * none of them describes something a provider still holds. A3 left this as the
+ * function that would have to change once real listings existed, and this is
+ * that change.
+ *
+ * The refusal below is deliberately not a warning the creator can click past.
+ * Cascading away a listing that carries an external id does not remove the
+ * product from the marketplace; it removes Fanwise's only record of it, leaving
+ * a live product nothing points at and no way to publish to it again without
+ * creating a duplicate. Fanwise forgetting is worse than Fanwise refusing.
  *
  * Snapshots also cascade, and should not. That is recorded as a known
  * limitation rather than fixed here, because the right fix is to retain them
@@ -122,6 +204,24 @@ export async function disconnectChannelAction(
   connectionId: string,
 ): Promise<ActionState> {
   const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data: published, error: publishedError } = await supabase
+    .from("channel_listings")
+    .select("id")
+    .eq("channel_connection_id", connectionId)
+    .eq("workspace_id", workspace.id)
+    .not("external_listing_id", "is", null)
+
+  if (publishedError) throw publishedError
+
+  if (published && published.length > 0) {
+    return {
+      error:
+        published.length === 1
+          ? "One product is published to this channel. Remove it from the channel first, or it will stay for sale with nothing in Fanwise pointing at it."
+          : `${published.length} products are published to this channel. Remove them from the channel first, or they will stay for sale with nothing in Fanwise pointing at them.`,
+    }
+  }
 
   const { error } = await supabase
     .from("channel_connections")
@@ -134,7 +234,7 @@ export async function disconnectChannelAction(
     return { error: "That channel could not be disconnected. Try again." }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/channels`)
+  revalidatePath(routes.channels(workspaceSlug))
   return { error: null }
 }
 
@@ -181,28 +281,84 @@ export async function buildListingAction(
   const draft = buildDraft(adapter, subject)
   const evaluation = evaluate(adapter, draft, subject)
 
-  const { data: listing, error: listingError } = await supabase
+  /*
+   * Insert, and fall back to updating only what a rebuild is allowed to touch.
+   *
+   * This was one upsert, and the payload it wrote on conflict included `status`,
+   * `status_source` and `metadata`. Rebuilding a published listing therefore
+   * reset it to draft and self_reported while leaving external_listing_id and
+   * published_at in place, and blanked the metadata the runner had written.
+   *
+   * The status was the visible half. The metadata was the dangerous half:
+   * `metadata.externalState` is what the Shopify adapter reads to decide
+   * whether an update sends ACTIVE or DRAFT, so losing it turns the next edit
+   * into an instruction to take a live product off sale. Rebuilding is a
+   * regeneration of the *draft*, and it has no business having an opinion about
+   * what the channel is currently holding.
+   *
+   * Insert-then-update rather than read-then-write, so two concurrent rebuilds
+   * resolve on the unique constraint instead of racing.
+   */
+  const generatedAt = new Date().toISOString()
+
+  const insert = await supabase
     .from("channel_listings")
-    .upsert(
-      {
-        workspace_id: workspace.id,
-        product_id: product.id,
-        channel_id: channel.id,
-        channel_connection_id: connection.id,
-        status: "draft",
-        // Nothing has confirmed anything. A listing only becomes verified when
-        // a provider API says so, and an assisted channel never can.
-        status_source: "self_reported",
-        generated_at: new Date().toISOString(),
-        ...draftToColumns(draft),
-      },
-      { onConflict: "product_id,channel_connection_id" },
-    )
+    .insert({
+      workspace_id: workspace.id,
+      product_id: product.id,
+      channel_id: channel.id,
+      channel_connection_id: connection.id,
+      status: "draft",
+      // Nothing has confirmed anything. A listing only becomes verified when
+      // a provider API says so, and an assisted channel never can. Written on
+      // the first build only: after that, publication decides it.
+      status_source: "self_reported",
+      generated_at: generatedAt,
+      ...draftToColumns(draft),
+    })
     .select("id")
     .single()
 
-  if (listingError || !listing) {
-    console.error("[channels] build listing failed", listingError)
+  let listing = insert.data
+
+  if (insert.error) {
+    if (insert.error.code !== UNIQUE_VIOLATION) {
+      console.error("[channels] build listing failed", insert.error)
+      return { error: "That listing could not be built. Try again." }
+    }
+
+    // The listing already exists, so this is a regeneration. Read what
+    // publication recorded, and hand it back unchanged alongside the new draft.
+    const { data: existing } = await supabase
+      .from("channel_listings")
+      .select("id, metadata")
+      .eq("workspace_id", workspace.id)
+      .eq("product_id", product.id)
+      .eq("channel_connection_id", connection.id)
+      .maybeSingle()
+
+    if (!existing) {
+      console.error("[channels] build listing conflicted with a row it cannot read")
+      return { error: "That listing could not be built. Try again." }
+    }
+
+    const { data: updated, error: updateError } = await supabase
+      .from("channel_listings")
+      .update(rebuildColumns(draft, existing.metadata, generatedAt))
+      .eq("id", existing.id)
+      .eq("workspace_id", workspace.id)
+      .select("id")
+      .single()
+
+    if (updateError || !updated) {
+      console.error("[channels] build listing failed", updateError)
+      return { error: "That listing could not be built. Try again." }
+    }
+    listing = updated
+  }
+
+  if (!listing) {
+    console.error("[channels] build listing produced no row")
     return { error: "That listing could not be built. Try again." }
   }
 
@@ -212,7 +368,7 @@ export async function buildListingAction(
     product_id: product.id,
     channel_id: channel.id,
     snapshot_type: "build",
-    payload: snapshotPayload(draft, evaluation) as never,
+    payload: snapshotPayload(draft, evaluation, listingImages(subject)) as never,
   })
 
   if (snapshotError) {
@@ -222,7 +378,7 @@ export async function buildListingAction(
     console.error("[channels] snapshot insert failed", snapshotError)
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`)
+  revalidatePath(routes.product(workspaceSlug, product.slug))
   return { error: null }
 }
 
@@ -315,7 +471,7 @@ export async function updateListingAction(
     product_id: product.id,
     channel_id: channel.id,
     snapshot_type: "update",
-    payload: snapshotPayload(draft, evaluation) as never,
+    payload: snapshotPayload(draft, evaluation, listingImages(subject)) as never,
   })
 
   if (snapshotError) {
@@ -324,7 +480,7 @@ export async function updateListingAction(
     console.error("[channels] snapshot insert failed", snapshotError)
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`, "layout")
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
   return { error: null, savedAt: Date.now() }
 }
 
@@ -381,6 +537,6 @@ export async function pullFromCanonicalAction(
     return { error: "That field could not be updated. Try again." }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`, "layout")
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
   return { error: null }
 }

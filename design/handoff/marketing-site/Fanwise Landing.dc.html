@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <title>Fanwise — Create once. Sell everywhere.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@200;300;400;500;600&amp;family=Instrument+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+  <script src="theme.js"></script>
+  <script src="reveal.js"></script>
+  <style>
+    body { margin: 0; background: #DCDFE5; color: #070A11; font-family: "Instrument Sans", "Helvetica Neue", Arial, sans-serif; font-size: 16.5px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+    * { box-sizing: border-box; }
+    a { color: inherit; text-decoration: none; }
+    a:hover { color: inherit; }
+    h1, h2, h3 { margin: 0; }
+    p { margin: 0; }
+    input::placeholder { color: #5C688A; }
+    input:focus, select:focus { outline: none; border-color: #6C9BFF; }
+    select option { color: #0b0f18; }
+    :focus-visible { outline: 2px solid #6C9BFF; outline-offset: 3px; border-radius: 2px; }
+    @keyframes fwPulse { 0% { box-shadow: 0 0 0 0 rgba(70,214,149,.45); } 70% { box-shadow: 0 0 0 7px rgba(70,214,149,0); } 100% { box-shadow: 0 0 0 0 rgba(70,214,149,0); } }
+  </style>
+</helmet>
+
+<div style="max-width:1440px;margin:18px auto;border-radius:26px;overflow:hidden;background:#04060D">
+
+  <!-- HERO -->
+  <header id="top" style="position:relative;background:#04060D;padding-bottom:76px">
+    <canvas ref="{{ canvasRef }}" aria-label="A single point of light fanning out into six beams, one for each marketplace" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+    <div style="position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(102deg, rgba(4,6,13,.94) 0%, rgba(4,6,13,.72) 26%, rgba(4,6,13,.18) 52%, rgba(4,6,13,0) 70%)"></div>
+    <div style="position:relative;z-index:2;width:min(1160px,calc(100% - 48px));margin:0 auto;padding-top:54px;min-height:640px;display:flex;flex-direction:column">
+      <nav style="display:flex;align-items:center;justify-content:space-between;gap:24px;padding:22px 0;flex-wrap:wrap">
+        <a href="#top" style="display:flex;align-items:center;gap:9px;color:#E9F0FF;font-family:Archivo,sans-serif;font-weight:500;font-size:19px;letter-spacing:-0.02em">
+          <svg viewBox="0 0 24 24" aria-hidden="true" style="width:22px;height:22px;display:block"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 21 3.6 8.4"></path><path d="M12 21 7.6 4.6"></path><path d="M12 21V3.6"></path><path d="m12 21 4.4-16.4"></path><path d="M12 21 20.4 8.4"></path></g><circle cx="12" cy="21" r="1.7" fill="currentColor"></circle></svg>
+          Fanwise
+        </a>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <a href="#product" style="color:#98A6C2;font-size:14px;padding:8px 15px;border-radius:999px" style-hover="color:#E9F0FF;background:rgba(255,255,255,.06)">Product</a>
+          <a href="Fanwise Marketplaces.dc.html" style="color:#98A6C2;font-size:14px;padding:8px 15px;border-radius:999px" style-hover="color:#E9F0FF;background:rgba(255,255,255,.06)">Marketplaces</a>
+          <a href="Fanwise How It Works.dc.html" style="color:#98A6C2;font-size:14px;padding:8px 15px;border-radius:999px" style-hover="color:#E9F0FF;background:rgba(255,255,255,.06)">How it works</a>
+          <a href="Fanwise Pricing.dc.html" style="color:#98A6C2;font-size:14px;padding:8px 15px;border-radius:999px" style-hover="color:#E9F0FF;background:rgba(255,255,255,.06)">Pricing</a>
+          <a href="Fanwise About.dc.html" style="color:#98A6C2;font-size:14px;padding:8px 15px;border-radius:999px" style-hover="color:#E9F0FF;background:rgba(255,255,255,.06)">About</a>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <fw-theme-toggle variant="dark"></fw-theme-toggle>
+          <a href="Fanwise Start.dc.html" style="color:#98A6C2;font-size:14px;padding:10px 12px" style-hover="color:#E9F0FF">Sign in</a>
+          <a href="Fanwise Start.dc.html" style="display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:500;padding:10px 18px;border-radius:999px;border:1px solid #E9F0FF;background:#E9F0FF;color:#04060D" style-hover="background:#ffffff">Get started</a>
+        </div>
+      </nav>
+
+      <div style="padding-top:56px">
+        <span style="display:inline-flex;align-items:center;gap:9px;padding:7px 15px 7px 11px;border-radius:999px;border:1px solid rgba(200,218,255,.14);background:rgba(10,18,40,.55);color:#98A6C2;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase"><i style="width:6px;height:6px;border-radius:50%;background:#46D695;animation:fwPulse 2.4s ease-out infinite"></i> Six marketplaces connected</span>
+        <h1 style="font-family:Archivo,sans-serif;font-size:clamp(58px,12.4vw,172px);font-weight:200;line-height:.86;letter-spacing:-0.045em;color:#EDF3FF;margin:26px 0 0;max-width:12ch;text-wrap:balance">Create once.<br><b style="font-weight:400;color:#ffffff">Sell everywhere.</b></h1>
+      </div>
+
+      <div style="margin-top:auto;padding-top:64px;display:flex;flex-wrap:wrap;gap:32px;align-items:end;justify-content:space-between">
+        <p style="color:#98A6C2;font-size:17px;max-width:34ch;line-height:1.5">One canonical product, translated into a listing for every shop that sells it — previews, copy, tags and license, each to that shop's rules.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a href="#start" style="display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:500;padding:10px 18px;border-radius:999px;border:1px solid #E9F0FF;background:#E9F0FF;color:#04060D" style-hover="background:#ffffff">Get started</a>
+          <a href="#product" style="display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:500;padding:10px 18px;border-radius:999px;border:1px solid rgba(200,218,255,.14);color:#E9F0FF" style-hover="border-color:rgba(200,218,255,.4);background:rgba(255,255,255,.05)">See it working</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- LIGHT SLAB -->
+  <div style="position:relative;z-index:2;background:#F4F6FA;border-radius:30px 30px 0 0;margin-top:-30px">
+
+    <div style="width:min(1160px,calc(100% - 48px));margin:0 auto;padding:88px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px">
+      <h2 style="font-family:Archivo,sans-serif;font-size:clamp(27px,3.1vw,42px);line-height:1.18;font-weight:300;letter-spacing:-0.025em;text-wrap:balance">Fanwise holds one record of your product and hands every marketplace a listing <span style="color:#7E8697">in the exact shape it demands.</span></h2>
+      <div style="align-self:end;display:grid;gap:18px;justify-items:start">
+        <p style="color:#464E5D;font-size:16px;max-width:40ch">Fonts, templates, presets, icons, mockups, UI kits. If it ships as a file and sells as a listing, Fanwise fans it out.</p>
+        <a href="#product" style="display:inline-flex;align-items:center;gap:10px;font-weight:500;font-size:15px;border-bottom:1px solid #070A11;padding-bottom:3px">Look inside the workspace <span aria-hidden="true">&rarr;</span></a>
+      </div>
+    </div>
+
+    <!-- PRODUCT -->
+    <section id="product" data-screen-label="Workspace demo" style="width:min(1160px,calc(100% - 48px));margin:0 auto;padding-bottom:96px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px;align-items:end;margin-bottom:34px">
+        <div>
+          <span style="display:block;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#7E8697;margin-bottom:16px">The workspace</span>
+          <h2 style="font-family:Archivo,sans-serif;font-size:clamp(32px,3.8vw,52px);font-weight:300;letter-spacing:-0.025em;text-wrap:balance">One master, six drafts</h2>
+        </div>
+        <p style="color:#464E5D;font-size:17px;max-width:46ch">The master listing on the left is the only thing you write. Each shop's derived draft carries its own preview crop, copy length, tags and live status.</p>
+      </div>
+
+      <div style="background:#0D1526;border-radius:18px;overflow:hidden;box-shadow:0 40px 90px -30px rgba(8,18,50,.55), inset 0 2px 0 rgba(255,255,255,.04);color:#E9F0FF">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;border-bottom:1px solid rgba(200,218,255,.14);background:rgba(255,255,255,.02);flex-wrap:wrap">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;color:#98A6C2;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Library <i style="color:#46557A;font-style:normal">/</i> <b style="color:#E9F0FF;font-weight:500">Aster Grotesk</b> <i style="color:#46557A;font-style:normal">/</i> Fan out</div>
+          <div style="display:flex;align-items:center;gap:9px;font-size:12.5px;color:#98A6C2"><span aria-hidden="true" style="width:24px;height:24px;border-radius:50%;background:linear-gradient(140deg,#2E5CE6,#6C9BFF);display:grid;place-items:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:#ffffff">LP</span> Proctor Type Co.</div>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap">
+          <div style="flex:1 1 260px;max-width:340px;padding:22px;border-right:1px solid rgba(200,218,255,.14);display:grid;gap:16px;align-content:start">
+            <div style="aspect-ratio:4/3;border-radius:10px;background:linear-gradient(150deg,#16213B,#0A1122);border:1px solid rgba(200,218,255,.14);display:grid;place-items:center;position:relative;overflow:hidden">
+              <span style="font-family:Archivo,sans-serif;font-weight:200;font-size:74px;line-height:1;color:#E6EEFF;letter-spacing:-0.05em">Aa</span>
+              <small style="position:absolute;left:12px;bottom:10px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;color:#64749B">ASTER GROTESK &middot; 14 STYLES</small>
+            </div>
+            <h3 style="font-family:Archivo,sans-serif;font-size:21px;font-weight:400;letter-spacing:-0.03em">Aster Grotesk</h3>
+            <div style="display:grid;gap:9px">
+              <div style="display:flex;justify-content:space-between;gap:12px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.04em;color:#6E7EA6"><span>Files</span><b style="color:#E9F0FF;font-weight:500">4 &middot; 68 MB</b></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.04em;color:#6E7EA6"><span>Price</span><b style="color:#E9F0FF;font-weight:500">$48.00</b></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.04em;color:#6E7EA6"><span>License</span><b style="color:#E9F0FF;font-weight:500">Desktop + Web</b></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.04em;color:#6E7EA6"><span>Previews</span><b style="color:#E9F0FF;font-weight:500">9 at full size</b></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.04em;color:#6E7EA6"><span>Updated</span><b style="color:#E9F0FF;font-weight:500">Today, 09:14</b></div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.06em;padding:4px 8px;border-radius:5px;background:rgba(255,255,255,.05);color:#92A2C8">grotesque</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.06em;padding:4px 8px;border-radius:5px;background:rgba(255,255,255,.05);color:#92A2C8">sans serif</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.06em;padding:4px 8px;border-radius:5px;background:rgba(255,255,255,.05);color:#92A2C8">variable</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.06em;padding:4px 8px;border-radius:5px;background:rgba(255,255,255,.05);color:#92A2C8">editorial</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.06em;padding:4px 8px;border-radius:5px;background:rgba(255,255,255,.05);color:#92A2C8">display</span>
+            </div>
+          </div>
+
+          <div style="flex:1 1 420px;display:grid;align-content:start;min-width:0">
+            <div style="display:grid;grid-template-columns:1.25fr 1.15fr .9fr auto;gap:16px;padding:12px 22px;border-bottom:1px solid rgba(200,218,255,.14);font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#5A6892">
+              <div>Marketplace</div><div>Derived draft</div><div>Status</div><div style="text-align:right">Updated</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1.25fr 1.15fr .9fr auto;gap:16px;align-items:center;padding:14px 22px;border-bottom:1px solid rgba(200,218,255,.08)">
+              <div style="font-size:15px;font-weight:500;letter-spacing:-0.01em">Etsy</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6E7EA6">2000 px 4:3 &middot; 13 tags &middot; 140 char title</div>
+              <div><span style="display:inline-flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:5px 10px;border-radius:999px;color:#46D695;border:1px solid rgba(70,214,149,.3);background:rgba(70,214,149,.08);white-space:nowrap"><i style="width:5px;height:5px;border-radius:50%;background:#46D695;animation:fwPulse 2.4s ease-out infinite"></i> Live</span></div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#55628B;text-align:right">2m ago</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1.25fr 1.15fr .9fr auto;gap:16px;align-items:center;padding:14px 22px;border-bottom:1px solid rgba(200,218,255,.08)">
+              <div style="font-size:15px;font-weight:500;letter-spacing:-0.01em">Creative Market</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6E7EA6">1160 &times; 772 &middot; category tree &middot; markdown</div>
+              <div><span style="display:inline-flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:5px 10px;border-radius:999px;color:#46D695;border:1px solid rgba(70,214,149,.3);background:rgba(70,214,149,.08);white-space:nowrap"><i style="width:5px;height:5px;border-radius:50%;background:#46D695;animation:fwPulse 2.4s ease-out infinite"></i> Live</span></div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#55628B;text-align:right">2m ago</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1.25fr 1.15fr .9fr auto;gap:16px;align-items:center;padding:14px 22px;border-bottom:1px solid rgba(200,218,255,.08)">
+              <div style="font-size:15px;font-weight:500;letter-spacing:-0.01em">Envato Market</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6E7EA6">590 px inline &middot; 15 tags &middot; 50 char title</div>
+              <div><span style="display:inline-flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:5px 10px;border-radius:999px;color:#F5B944;border:1px solid rgba(245,185,68,.3);background:rgba(245,185,68,.08);white-space:nowrap"><i style="width:5px;height:5px;border-radius:50%;background:#F5B944"></i> In review</span></div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#55628B;text-align:right">2m ago</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1.25fr 1.15fr .9fr auto;gap:16px;align-items:center;padding:14px 22px;border-bottom:1px solid rgba(200,218,255,.08)">
+              <div style="font-size:15px;font-weight:500;letter-spacing:-0.01em">Gumroad</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6E7EA6">1280 &times; 720 cover &middot; rich text</div>
+              <div><span style="display:inline-flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:5px 10px;border-radius:999px;color:#46D695;border:1px solid rgba(70,214,149,.3);background:rgba(70,214,149,.08);white-space:nowrap"><i style="width:5px;height:5px;border-radius:50%;background:#46D695;animation:fwPulse 2.4s ease-out infinite"></i> Live</span></div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#55628B;text-align:right">2m ago</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1.25fr 1.15fr .9fr auto;gap:16px;align-items:center;padding:14px 22px">
+              <div style="font-size:15px;font-weight:500;letter-spacing:-0.01em">Adobe Stock</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6E7EA6">Rendered preview &middot; 49 keywords</div>
+              <div><span style="display:inline-flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:5px 10px;border-radius:999px;color:#FF8071;border:1px solid rgba(255,128,113,.32);background:rgba(255,128,113,.09);white-space:nowrap"><i style="width:5px;height:5px;border-radius:50%;background:#FF8071"></i> Needs a fix</span></div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#55628B;text-align:right">1m ago</div>
+            </div>
+            <div style="padding:0 22px 16px;border-bottom:1px solid rgba(200,218,255,.08)">
+              <div style="border-left:2px solid #FF8071;background:rgba(255,128,113,.06);border-radius:0 8px 8px 0;padding:12px 16px;display:flex;gap:16px;justify-content:space-between;align-items:center;flex-wrap:wrap">
+                <p style="font-size:13.5px;color:#C7D3EE"><b style="color:#ffffff;font-weight:500">Title runs 214 characters, 14 over the limit.</b> Fanwise trimmed it to 198 and kept the family name in front.</p>
+                <button type="button" style="font-family:inherit;font-size:12.5px;font-weight:500;padding:8px 16px;border-radius:999px;border:0;cursor:pointer;background:#E9F0FF;color:#04060D">Accept and resubmit</button>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1.25fr 1.15fr .9fr auto;gap:16px;align-items:center;padding:14px 22px">
+              <div style="font-size:15px;font-weight:500;letter-spacing:-0.01em">MyFonts</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#6E7EA6">OTF and TTF &middot; 8 specimens at 2:1</div>
+              <div><span style="display:inline-flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:5px 10px;border-radius:999px;color:#F5B944;border:1px solid rgba(245,185,68,.3);background:rgba(245,185,68,.08);white-space:nowrap"><i style="width:5px;height:5px;border-radius:50%;background:#F5B944"></i> Foundry review</span></div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#55628B;text-align:right">1m ago</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 22px;border-top:1px solid rgba(200,218,255,.14);font-family:'JetBrains Mono',monospace;font-size:11px;color:#6E7EA6;flex-wrap:wrap">
+          <div>6 drafts &middot; 3 live &middot; 2 pending &middot; <b style="color:#E9F0FF;font-weight:500">1 needs attention</b></div>
+          <div>Next sync in 4m</div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;gap:20px;margin-top:14px;flex-wrap:wrap">
+        <p style="font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.7;color:#7E8697;max-width:70ch">Interface shown with a sample workspace. A rejection comes back with the shop's reason and a suggested fix; accepting it rebuilds and resubmits that one draft.</p>
+        <a href="#start" style="display:inline-flex;align-items:center;gap:10px;font-weight:500;font-size:15px;border-bottom:1px solid #070A11;padding-bottom:3px;align-self:end">Fan out a product <span aria-hidden="true">&rarr;</span></a>
+      </div>
+    </section>
+  </div>
+
+  <!-- SHOPS RAIL -->
+  <div id="shops" style="border-top:1px solid #DFE4EC;border-bottom:1px solid #DFE4EC;background:#F4F6FA">
+    <div style="width:min(1160px,calc(100% - 48px));margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+      <div style="padding:24px 18px 24px 0;border-right:1px solid #DFE4EC"><strong style="display:block;font-family:Archivo,sans-serif;font-weight:400;font-size:18px;letter-spacing:-0.02em">Shopify</strong><span style="display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#7E8697;margin-top:8px"><i style="width:5px;height:5px;border-radius:50%;background:#21B573"></i> Storefront</span></div>
+      <div style="padding:24px 18px 24px 0;border-right:1px solid #DFE4EC"><strong style="display:block;font-family:Archivo,sans-serif;font-weight:400;font-size:18px;letter-spacing:-0.02em">Etsy</strong><span style="display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#7E8697;margin-top:8px"><i style="width:5px;height:5px;border-radius:50%;background:#21B573"></i> Automatic</span></div>
+      <div style="padding:24px 18px 24px 0;border-right:1px solid #DFE4EC"><strong style="display:block;font-family:Archivo,sans-serif;font-weight:400;font-size:18px;letter-spacing:-0.02em">Creative Market</strong><span style="display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#7E8697;margin-top:8px"><i style="width:5px;height:5px;border-radius:50%;background:#21B573"></i> Assisted</span></div>
+      <div style="padding:24px 18px 24px 0;border-right:1px solid #DFE4EC"><strong style="display:block;font-family:Archivo,sans-serif;font-weight:400;font-size:18px;letter-spacing:-0.02em">Gumroad</strong><span style="display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#7E8697;margin-top:8px"><i style="width:5px;height:5px;border-radius:50%;background:#21B573"></i> Assisted</span></div>
+      <div style="padding:24px 18px 24px 0;border-right:1px solid #DFE4EC"><strong style="display:block;font-family:Archivo,sans-serif;font-weight:400;font-size:18px;letter-spacing:-0.02em">Adobe Stock</strong><span style="display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#7E8697;margin-top:8px"><i style="width:5px;height:5px;border-radius:50%;background:#21B573"></i> Assisted</span></div>
+      <div style="padding:24px 18px 24px 0"><strong style="display:block;font-family:Archivo,sans-serif;font-weight:400;font-size:18px;letter-spacing:-0.02em">MyFonts</strong><span style="display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#7E8697;margin-top:8px"><i style="width:5px;height:5px;border-radius:50%;background:#21B573"></i> Assisted</span></div>
+    </div>
+  </div>
+
+  <div style="background:#F4F6FA">
+    <!-- ARITHMETIC -->
+    <section id="cost" data-screen-label="The arithmetic" style="width:min(1160px,calc(100% - 48px));margin:0 auto;padding:92px 0">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px;align-items:end;margin-bottom:50px">
+        <div>
+          <span style="display:block;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#7E8697;margin-bottom:16px">The arithmetic</span>
+          <h2 style="font-family:Archivo,sans-serif;font-size:clamp(32px,3.8vw,52px);font-weight:300;letter-spacing:-0.025em;text-wrap:balance">Making it takes a week.<br>Listing it used to take another.</h2>
+        </div>
+        <p style="color:#464E5D;font-size:17px;max-width:46ch">Every shop wants the same product in a slightly different shape. Six times over, by hand, for every release.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:56px;align-items:start">
+        <div aria-label="Time spent listing one font family by hand" style="border-top:1px solid #070A11">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:20px;padding:15px 0;border-bottom:1px solid #DFE4EC;font-size:15.5px"><span>Re-export previews for six image specs</span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#7E8697;font-variant-numeric:tabular-nums">1h 40m</span></div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:20px;padding:15px 0;border-bottom:1px solid #DFE4EC;font-size:15.5px"><span>Rewrite the description to six length limits</span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#7E8697;font-variant-numeric:tabular-nums">55m</span></div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:20px;padding:15px 0;border-bottom:1px solid #DFE4EC;font-size:15.5px"><span>Research and enter tags in six taxonomies</span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#7E8697;font-variant-numeric:tabular-nums">1h 10m</span></div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:20px;padding:15px 0;border-bottom:1px solid #DFE4EC;font-size:15.5px"><span>Map one license to six license menus</span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#7E8697;font-variant-numeric:tabular-nums">35m</span></div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:20px;padding:15px 0;border-bottom:1px solid #DFE4EC;font-size:15.5px"><span>Fill forms, upload, wait, fix rejections</span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#7E8697;font-variant-numeric:tabular-nums">2h 20m</span></div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:20px;padding:15px 0;border-bottom:1px solid #070A11;font-size:15.5px;font-weight:600"><span>One font family, listed by hand</span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#070A11;font-weight:500;font-variant-numeric:tabular-nums">6h 40m</span></div>
+        </div>
+        <div>
+          <div style="display:grid;gap:14px">
+            <div style="display:grid;gap:8px">
+              <div style="display:flex;justify-content:space-between;font-size:14px;color:#464E5D"><span>By hand, six shops</span><b style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:#070A11">6h 40m</b></div>
+              <div style="height:10px;border-radius:999px;background:#E9EDF3;overflow:hidden"><div style="height:100%;border-radius:999px;width:100%;background:#070A11"></div></div>
+            </div>
+            <div style="display:grid;gap:8px">
+              <div style="display:flex;justify-content:space-between;font-size:14px;color:#464E5D"><span>On Fanwise</span><b style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:#070A11">under 10m</b></div>
+              <div style="height:10px;border-radius:999px;background:#E9EDF3;overflow:hidden"><div style="height:100%;border-radius:999px;width:2.4%;min-width:10px;background:linear-gradient(90deg,#2E5CE6,#6C9BFF)"></div></div>
+            </div>
+          </div>
+          <p style="font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.7;color:#7E8697;margin-top:18px">Hand timings are what designers report for one font family across these six shops. The minutes on Fanwise are review and approval: Fanwise builds the drafts, a person signs them off.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section id="work" data-screen-label="How it works" style="width:min(1160px,calc(100% - 48px));margin:0 auto;padding:0 0 92px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px;align-items:end;margin-bottom:50px">
+        <div>
+          <span style="display:block;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#7E8697;margin-bottom:16px">Three steps</span>
+          <h2 style="font-family:Archivo,sans-serif;font-size:clamp(32px,3.8vw,52px);font-weight:300;letter-spacing:-0.025em">How it works</h2>
+        </div>
+        <p style="color:#464E5D;font-size:17px;max-width:46ch">The first step is the only one that takes real time, and it happens once per product.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:32px">
+        <div style="border-top:1px solid #DFE4EC;padding-top:20px;display:grid;gap:10px;align-content:start">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:#2E5CE6">STEP 01</div>
+          <h3 style="font-family:Archivo,sans-serif;font-size:23px;font-weight:400;letter-spacing:-0.025em">Build the master listing</h3>
+          <p style="color:#464E5D;font-size:15.5px">Upload the files, one set of full-size previews, a description, a license and a price. This is the single source every shop derives from.</p>
+        </div>
+        <div style="border-top:1px solid #DFE4EC;padding-top:20px;display:grid;gap:10px;align-content:start">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:#2E5CE6">STEP 02</div>
+          <h3 style="font-family:Archivo,sans-serif;font-size:23px;font-weight:400;letter-spacing:-0.025em">Pick the shops</h3>
+          <p style="color:#464E5D;font-size:15.5px">Toggle the marketplaces this product belongs on. Each gets its own draft: previews cropped to spec, copy trimmed to the limit, tags mapped to that shop's taxonomy.</p>
+        </div>
+        <div style="border-top:1px solid #DFE4EC;padding-top:20px;display:grid;gap:10px;align-content:start">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;color:#2E5CE6">STEP 03</div>
+          <h3 style="font-family:Archivo,sans-serif;font-size:23px;font-weight:400;letter-spacing:-0.025em">Review and publish</h3>
+          <p style="color:#464E5D;font-size:15.5px">Check the drafts side by side, adjust anything a shop will care about, publish. Fanwise tracks approvals and flags the rejections that need a human.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SPEC SHEET -->
+    <section id="specs" data-screen-label="Spec sheet" style="width:min(1160px,calc(100% - 48px));margin:0 auto;padding:0 0 92px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px;align-items:end;margin-bottom:50px">
+        <div>
+          <span style="display:block;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#7E8697;margin-bottom:16px">Reference</span>
+          <h2 style="font-family:Archivo,sans-serif;font-size:clamp(32px,3.8vw,52px);font-weight:300;letter-spacing:-0.025em">The spec sheet</h2>
+        </div>
+        <p style="color:#464E5D;font-size:17px;max-width:46ch">This is the work. Six sets of rules, none of them in agreement. Fanwise keeps them so you never have to.</p>
+      </div>
+      <div style="overflow-x:auto;border-top:1px solid #070A11">
+        <table style="width:100%;border-collapse:collapse;min-width:820px">
+          <thead>
+            <tr>
+              <th scope="col" style="text-align:left;padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7E8697;font-weight:500">Marketplace</th>
+              <th scope="col" style="text-align:left;padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7E8697;font-weight:500">Main preview</th>
+              <th scope="col" style="text-align:left;padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7E8697;font-weight:500">Title limit</th>
+              <th scope="col" style="text-align:left;padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7E8697;font-weight:500">Tags</th>
+              <th scope="col" style="text-align:left;padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7E8697;font-weight:500">Description</th>
+              <th scope="col" style="text-align:left;padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7E8697;font-weight:500">Review</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-family:Archivo,sans-serif;font-size:17px;color:#070A11;letter-spacing:-0.02em">Etsy</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">2000 px shortest side, 4:3</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">140 chars</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">13 max, 20 chars each</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Plain text, no HTML</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Instant</td></tr>
+            <tr><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-family:Archivo,sans-serif;font-size:17px;color:#070A11;letter-spacing:-0.02em">Creative Market</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">1160 &times; 772 px</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">60 chars</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Free-form plus category tree</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Markdown subset</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Shop approval, then instant</td></tr>
+            <tr><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-family:Archivo,sans-serif;font-size:17px;color:#070A11;letter-spacing:-0.02em">Envato Market</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">590 px inline, 80 &times; 80 thumb</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">50 chars</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">15 max</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">HTML subset</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Manual review, days</td></tr>
+            <tr><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-family:Archivo,sans-serif;font-size:17px;color:#070A11;letter-spacing:-0.02em">Gumroad</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">1280 &times; 720 px cover</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">No hard limit</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Discover categories</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Rich text</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Instant</td></tr>
+            <tr><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-family:Archivo,sans-serif;font-size:17px;color:#070A11;letter-spacing:-0.02em">Adobe Stock</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Rendered template preview</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">200 chars</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Up to 49 keywords</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Keywords only</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Moderation queue</td></tr>
+            <tr><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-family:Archivo,sans-serif;font-size:17px;color:#070A11;letter-spacing:-0.02em">MyFonts</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">5 to 15 PNG at 2:1</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Family name</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Foundry tags</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Under 500 words</td><td style="padding:15px 18px 15px 0;border-bottom:1px solid #DFE4EC;font-size:14px;color:#464E5D">Foundry review, 24h</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.7;color:#7E8697;margin-top:18px">Rules are maintained per marketplace and versioned. When a shop changes a requirement, affected drafts rebuild and you get a note saying which listings moved.</p>
+    </section>
+  </div>
+
+  <!-- PRICING -->
+  <section id="pricing" data-screen-label="Pricing" style="background:#070C1A;color:#E9F0FF;position:relative;overflow:hidden;padding:92px 0">
+    <div style="position:absolute;pointer-events:none;border-radius:50%;filter:blur(90px);opacity:.5;width:620px;height:620px;background:#1E44C8;top:-260px;right:-120px"></div>
+    <div style="width:min(1160px,calc(100% - 48px));margin:0 auto;position:relative;z-index:2">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px;align-items:end;margin-bottom:50px">
+        <div>
+          <span style="display:block;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#98A6C2;margin-bottom:16px">Pricing</span>
+          <h2 style="font-family:Archivo,sans-serif;font-size:clamp(32px,3.8vw,52px);font-weight:300;letter-spacing:-0.025em;color:#E9F0FF">One price, plus the shops</h2>
+        </div>
+        <p style="color:#98A6C2;font-size:17px;max-width:46ch">$9 a month, then $6 for each marketplace you connect. One owned storefront is included, the catalog is unlimited, and Fanwise never takes a percentage of sales.</p>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:14px">
+        <div style="flex:2 1 460px;border:1px solid rgba(108,155,255,.55);border-radius:18px;padding:28px 26px 30px;display:flex;flex-direction:column;gap:16px;background:linear-gradient(180deg, rgba(46,92,230,.16), rgba(255,255,255,.02) 60%)">
+          <h3 style="font-family:Archivo,sans-serif;font-size:21px;font-weight:400;letter-spacing:-0.025em;color:#E9F0FF">Fanwise</h3>
+          <div style="font-family:Archivo,sans-serif;font-weight:200;font-size:52px;line-height:1;letter-spacing:-0.04em">$9<small style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;color:#98A6C2;margin-left:8px;text-transform:uppercase">per month</small></div>
+          <p style="font-size:17px;color:#98A6C2;margin-top:-4px">plus <b style="color:#E9F0FF;font-weight:600">$6</b> for each marketplace connected</p>
+          <div role="group" aria-label="Choose marketplaces" style="display:flex;flex-wrap:wrap;gap:6px">
+            <sc-for list="{{ channels }}" as="ch" hint-placeholder-count="6">
+              <button type="button" aria-pressed="{{ ch.pressed }}" onClick="{{ ch.toggle }}" style="{{ ch.style }}">{{ ch.name }}</button>
+            </sc-for>
+          </div>
+          <p aria-live="polite" style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.06em;color:#98A6C2">$9 base + $6 &times; <b style="color:#E9F0FF;font-weight:500">{{ pickedCount }}</b> {{ pickedWord }}<em style="display:block;font-style:normal;color:#6C9BFF;margin-top:6px">= ${{ pickedTotal }} per month</em></p>
+          <ul style="list-style:none;margin:0;padding:0;display:grid;gap:9px;font-size:14.5px;color:#98A6C2">
+            <li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;top:9px;width:9px;height:1px;background:#6C9BFF"></span>Unlimited products, no per-product charge</li>
+            <li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;top:9px;width:9px;height:1px;background:#6C9BFF"></span>One owned storefront included</li>
+            <li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;top:9px;width:9px;height:1px;background:#6C9BFF"></span>Full preview, copy and tag mapping</li>
+            <li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;top:9px;width:9px;height:1px;background:#6C9BFF"></span>Status tracking and rejection fixes</li>
+            <li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;top:9px;width:9px;height:1px;background:#6C9BFF"></span>Add or drop a marketplace any month</li>
+          </ul>
+          <a href="#start" style="margin-top:auto;align-self:flex-start;display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:500;padding:10px 18px;border-radius:999px;border:1px solid #E9F0FF;background:#E9F0FF;color:#04060D" style-hover="background:#ffffff">Get started</a>
+        </div>
+        <div style="flex:1 1 280px;border:1px solid rgba(200,218,255,.14);border-radius:18px;padding:28px 26px 30px;display:flex;flex-direction:column;gap:16px;background:rgba(255,255,255,.02)">
+          <h3 style="font-family:Archivo,sans-serif;font-size:21px;font-weight:400;letter-spacing:-0.025em;color:#E9F0FF">Studio</h3>
+          <div style="font-family:Archivo,sans-serif;font-weight:200;font-size:52px;line-height:1;letter-spacing:-0.04em">$59<small style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;color:#98A6C2;margin-left:8px;text-transform:uppercase">per month</small></div>
+          <ul style="list-style:none;margin:0;padding:0;display:grid;gap:9px;font-size:14.5px;color:#98A6C2">
+            <li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;top:9px;width:9px;height:1px;background:#6C9BFF"></span>For foundries and creative teams</li>
+            <li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;top:9px;width:9px;height:1px;background:#6C9BFF"></span>Multiple seats and client workspaces</li>
+            <li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;top:9px;width:9px;height:1px;background:#6C9BFF"></span>Multiple accounts per marketplace</li>
+            <li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;top:9px;width:9px;height:1px;background:#6C9BFF"></span>Bulk publishing and updates</li>
+            <li style="padding-left:20px;position:relative"><span style="position:absolute;left:0;top:9px;width:9px;height:1px;background:#6C9BFF"></span>Advanced sync and analytics</li>
+          </ul>
+          <a href="#start" style="margin-top:auto;align-self:flex-start;display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:500;padding:10px 18px;border-radius:999px;border:1px solid rgba(200,218,255,.14);color:#E9F0FF" style-hover="border-color:rgba(200,218,255,.4);background:rgba(255,255,255,.05)">Join the Studio waitlist</a>
+        </div>
+      </div>
+      <p style="margin-top:22px;font-size:14px"><a href="Fanwise Pricing.dc.html" style="display:inline-flex;align-items:center;gap:10px;font-weight:500;font-size:15px;color:#E9F0FF;border-bottom:1px solid rgba(200,218,255,.4);padding-bottom:3px">The full pricing page <span aria-hidden="true">&rarr;</span></a></p>
+    </div>
+  </section>
+
+  <!-- START -->
+  <section id="start" data-screen-label="Get started" style="background:#0B142A;color:#E9F0FF;position:relative;overflow:hidden;padding:92px 0">
+    <div style="position:absolute;pointer-events:none;border-radius:50%;filter:blur(90px);width:760px;height:520px;background:#3A6BF5;bottom:-300px;left:-160px;opacity:.42"></div>
+    <div style="position:absolute;pointer-events:none;border-radius:50%;filter:blur(90px);width:420px;height:420px;background:#7FB2FF;top:-200px;right:8%;opacity:.28"></div>
+    <div style="width:min(1160px,calc(100% - 48px));margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:56px;align-items:center;position:relative;z-index:2">
+      <div>
+        <span style="display:block;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#98A6C2;margin-bottom:16px">Get started</span>
+        <h2 style="font-family:Archivo,sans-serif;font-size:clamp(34px,4.4vw,58px);font-weight:200;letter-spacing:-0.04em;color:#E9F0FF;text-wrap:balance">Bring one product.<br><b style="font-weight:400">Leave with six listings.</b></h2>
+        <p style="color:#98A6C2;margin-top:18px;max-width:36ch">Connect a shop, upload a product, and watch the drafts build. $9 a month, plus $6 for each marketplace connected.</p>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:24px;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#98A6C2">
+          <span style="display:inline-flex;align-items:center;gap:7px"><i style="width:5px;height:5px;border-radius:50%;background:#46D695"></i> Six shops connected</span>
+          <span style="display:inline-flex;align-items:center;gap:7px"><i style="width:5px;height:5px;border-radius:50%;background:#46D695"></i> $9 plus $6 a marketplace</span>
+          <span style="display:inline-flex;align-items:center;gap:7px"><i style="width:5px;height:5px;border-radius:50%;background:#46D695"></i> Export and leave anytime</span>
+        </div>
+      </div>
+      <div>
+        <sc-if value="{{ notSubmitted }}" hint-placeholder-val="{{ true }}">
+          <form onSubmit="{{ onSubmit }}" noValidate="{{ true }}" style="display:grid;gap:12px">
+            <div style="display:grid;gap:7px">
+              <label for="fw-name" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#98A6C2">Name</label>
+              <input id="fw-name" ref="{{ nameRef }}" type="text" autoComplete="name" placeholder="Full name" style="font:inherit;font-size:15px;padding:13px 15px;border-radius:10px;width:100%;border:1px solid rgba(200,218,255,.14);background:rgba(255,255,255,.04);color:#E9F0FF">
+            </div>
+            <div style="display:grid;gap:7px">
+              <label for="fw-email" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#98A6C2">Work email</label>
+              <input id="fw-email" ref="{{ emailRef }}" type="email" autoComplete="email" placeholder="name@studio.com" style="font:inherit;font-size:15px;padding:13px 15px;border-radius:10px;width:100%;border:1px solid rgba(200,218,255,.14);background:rgba(255,255,255,.04);color:#E9F0FF">
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+              <div style="display:grid;gap:7px">
+                <label for="fw-sells" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#98A6C2">Mostly sells</label>
+                <select id="fw-sells" ref="{{ sellsRef }}" style="font:inherit;font-size:15px;padding:13px 15px;border-radius:10px;width:100%;border:1px solid rgba(200,218,255,.14);background:rgba(255,255,255,.04);color:#E9F0FF">
+                  <option>Fonts</option><option>Templates</option><option>Presets and actions</option><option>Icons and illustration</option><option>Mockups</option><option>UI kits</option>
+                </select>
+              </div>
+              <div style="display:grid;gap:7px">
+                <label for="fw-shop" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#98A6C2">First shop to connect</label>
+                <select id="fw-shop" ref="{{ shopRef }}" style="font:inherit;font-size:15px;padding:13px 15px;border-radius:10px;width:100%;border:1px solid rgba(200,218,255,.14);background:rgba(255,255,255,.04);color:#E9F0FF">
+                  <option>Etsy</option><option>Creative Market</option><option>Envato</option><option>Gumroad</option><option>Adobe Stock</option><option>MyFonts</option>
+                </select>
+              </div>
+            </div>
+            <sc-if value="{{ hasError }}" hint-placeholder-val="{{ false }}">
+              <p style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#FFB4A8">{{ errText }}</p>
+            </sc-if>
+            <button type="submit" style="font:inherit;font-weight:500;font-size:15px;margin-top:4px;padding:14px 22px;border-radius:999px;border:0;cursor:pointer;background:#E9F0FF;color:#04060D;justify-self:start" style-hover="background:#ffffff">Create a workspace</button>
+          </form>
+        </sc-if>
+        <sc-if value="{{ submitted }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid rgba(200,218,255,.14);border-radius:18px;padding:30px;background:rgba(255,255,255,.03)">
+            <h3 style="font-family:Archivo,sans-serif;font-weight:300;font-size:30px;letter-spacing:-0.03em;color:#E9F0FF">Workspace ready.</h3>
+            <p style="color:#98A6C2;font-size:15px;margin-top:12px">{{ confirmDetail }}</p>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </section>
+
+  <footer style="background:#04060D;color:#98A6C2;padding:44px 0 48px">
+    <div style="width:min(1160px,calc(100% - 48px));margin:0 auto;display:flex;justify-content:space-between;align-items:end;gap:24px;flex-wrap:wrap">
+      <div style="display:grid;gap:14px">
+        <a href="#top" style="display:flex;align-items:center;gap:9px;color:#E9F0FF;font-family:Archivo,sans-serif;font-weight:500;font-size:19px;letter-spacing:-0.02em">
+          <svg viewBox="0 0 24 24" aria-hidden="true" style="width:22px;height:22px;display:block"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 21 3.6 8.4"></path><path d="M12 21 7.6 4.6"></path><path d="M12 21V3.6"></path><path d="m12 21 4.4-16.4"></path><path d="M12 21 20.4 8.4"></path></g><circle cx="12" cy="21" r="1.7" fill="currentColor"></circle></svg>
+          Fanwise
+        </a>
+        <span style="display:inline-flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase"><i style="width:5px;height:5px;border-radius:50%;background:#46D695;animation:fwPulse 2.4s ease-out infinite"></i> All systems operational</span>
+      </div>
+      <div style="display:flex;gap:20px;font-size:13.5px;flex-wrap:wrap">
+        <a href="#product" style-hover="color:#E9F0FF">Product</a>
+        <a href="Fanwise Marketplaces.dc.html" style-hover="color:#E9F0FF">Marketplaces</a>
+        <a href="Fanwise How It Works.dc.html" style-hover="color:#E9F0FF">How it works</a>
+        <a href="Fanwise Pricing.dc.html" style-hover="color:#E9F0FF">Pricing</a>
+        <a href="Fanwise About.dc.html" style-hover="color:#E9F0FF">About</a>
+        <a href="Fanwise Start.dc.html" style-hover="color:#E9F0FF">Sign in</a>
+        <a href="Fanwise Terms.dc.html" style-hover="color:#E9F0FF">Terms</a>
+        <a href="Fanwise Privacy.dc.html" style-hover="color:#E9F0FF">Privacy</a>
+      </div>
+      <p style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.04em;max-width:42ch;line-height:1.7">fanwise, adv. In the manner of a fan; spreading out from a single fixed point.</p>
+    </div>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;beamMotion&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Hero&quot;}}">
+class Component extends DCLogic {
+  state = {
+    picked: { "Etsy": true, "Creative Market": true, "Envato": false, "Gumroad": false, "Adobe Stock": false, "MyFonts": false },
+    submitted: false, errText: ""
+  };
+  canvasRef = React.createRef();
+  nameRef = React.createRef();
+  emailRef = React.createRef();
+  sellsRef = React.createRef();
+  shopRef = React.createRef();
+
+  componentDidMount() {
+    const canvas = this.canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const shops = ['ETSY', 'CREATIVE MARKET', 'ENVATO', 'GUMROAD', 'ADOBE STOCK', 'MYFONTS'];
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches || (this.props.beamMotion === false);
+    let W = 0, H = 0, dpr = 1, t = 0;
+    const size = () => {
+      const r = canvas.getBoundingClientRect();
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = r.width; H = r.height;
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    const draw = () => {
+      if (!W || !H) return;
+      const g = ctx.createLinearGradient(0, 0, W * 0.9, H);
+      g.addColorStop(0, '#04060D'); g.addColorStop(0.55, '#060B18'); g.addColorStop(1, '#0A1230');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      const narrow = W < 860;
+      const px = narrow ? W * 0.16 : W * 0.42;
+      const py = narrow ? H * 0.72 : H * 0.68;
+      const reach = narrow ? W * 1.05 : W * 0.62;
+      const spread = narrow ? 48 : 40;
+      const n = shops.length;
+      ctx.globalCompositeOperation = 'lighter';
+      for (let o = 0; o < 3; o++) {
+        const rx = reach * (0.30 + o * 0.24), ry = rx * (narrow ? 0.72 : 0.56);
+        ctx.beginPath();
+        ctx.ellipse(px + rx * 0.62, py, rx * 0.66, ry, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(150,185,255,' + (0.09 - o * 0.022) + ')';
+        ctx.lineWidth = 1; ctx.stroke();
+      }
+      for (let i = 0; i < n; i++) {
+        const f = i / (n - 1);
+        const ang = (-spread + f * spread * 2) * Math.PI / 180;
+        const puls = reduce ? 1 : 0.82 + 0.18 * Math.sin(t / 1000 + i * 1.1);
+        const ex = px + Math.cos(ang) * reach, ey = py + Math.sin(ang) * reach;
+        const lg = ctx.createLinearGradient(px, py, ex, ey);
+        lg.addColorStop(0, 'rgba(255,255,255,' + (0.55 * puls) + ')');
+        lg.addColorStop(0.16, 'rgba(190,220,255,' + (0.30 * puls) + ')');
+        lg.addColorStop(0.55, 'rgba(90,140,255,' + (0.13 * puls) + ')');
+        lg.addColorStop(1, 'rgba(50,90,220,0)');
+        const widths = [1, 3, 8, 18, 36, 64];
+        for (let w = 0; w < widths.length; w++) {
+          ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(ex, ey);
+          ctx.strokeStyle = lg;
+          ctx.globalAlpha = (0.9 / (w + 1)) * 0.5;
+          ctx.lineWidth = widths[w]; ctx.lineCap = 'round'; ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        if (!narrow) {
+          const lx = px + Math.cos(ang) * reach * 0.66, ly = py + Math.sin(ang) * reach * 0.66;
+          ctx.save(); ctx.translate(lx, ly); ctx.rotate(ang);
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.font = '500 10px "JetBrains Mono", monospace';
+          ctx.fillStyle = 'rgba(196,214,255,0.62)';
+          ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+          ctx.letterSpacing = '2px';
+          ctx.fillText(shops[i], 14, -8);
+          ctx.restore();
+          ctx.globalCompositeOperation = 'lighter';
+        }
+      }
+      const bloomR = narrow ? 120 : 190;
+      const bloom = ctx.createRadialGradient(px, py, 0, px, py, bloomR);
+      bloom.addColorStop(0, 'rgba(255,255,255,0.95)');
+      bloom.addColorStop(0.06, 'rgba(214,232,255,0.55)');
+      bloom.addColorStop(0.3, 'rgba(96,145,255,0.20)');
+      bloom.addColorStop(1, 'rgba(40,80,200,0)');
+      ctx.fillStyle = bloom;
+      ctx.beginPath(); ctx.arc(px, py, bloomR, 0, Math.PI * 2); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.beginPath(); ctx.arc(px, py, 13, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(190,215,255,0.55)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.beginPath(); ctx.arc(px, py, 3.2, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff'; ctx.fill();
+      if (!narrow) {
+        ctx.font = '500 10px "JetBrains Mono", monospace';
+        ctx.fillStyle = 'rgba(160,182,225,0.75)';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.letterSpacing = '2px';
+        ctx.fillText('ONE MASTER LISTING', px, py + 30);
+        ctx.beginPath(); ctx.moveTo(px, py + 14); ctx.lineTo(px, py + 24);
+        ctx.strokeStyle = 'rgba(160,182,225,0.5)'; ctx.stroke();
+      }
+      ctx.globalAlpha = 0.05;
+      for (let s = 0; s < 90; s++) {
+        ctx.fillStyle = '#cfe0ff';
+        ctx.fillRect((s * 137.5) % W, (s * 311.7) % H, 1, 1);
+      }
+      ctx.globalAlpha = 1;
+    };
+    const frame = (now) => { t = now || 0; if (!W || !H) size(); draw(); if (!reduce) this._raf = requestAnimationFrame(frame); };
+    this._resize = () => { size(); draw(); };
+    window.addEventListener('resize', this._resize);
+    this._ro = new ResizeObserver(() => { size(); draw(); });
+    this._ro.observe(canvas);
+    size(); draw();
+    if (!reduce) this._raf = requestAnimationFrame(frame);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+  }
+  componentWillUnmount() {
+    if (this._raf) cancelAnimationFrame(this._raf);
+    if (this._resize) window.removeEventListener('resize', this._resize);
+    if (this._ro) this._ro.disconnect();
+  }
+
+  renderVals() {
+    const names = ["Etsy", "Creative Market", "Envato", "Gumroad", "Adobe Stock", "MyFonts"];
+    const baseStyle = "font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:7px 12px;cursor:pointer;border-radius:999px;transition:color .15s,border-color .15s,background .15s;";
+    const channels = names.map((name) => {
+      const on = !!this.state.picked[name];
+      return {
+        name,
+        pressed: on ? "true" : "false",
+        style: baseStyle + (on
+          ? "border:1px solid rgba(108,155,255,.6);color:#E9F0FF;background:rgba(46,92,230,.2)"
+          : "border:1px solid rgba(200,218,255,.14);background:transparent;color:#7C8CB4"),
+        toggle: () => this.setState(s => ({ picked: { ...s.picked, [name]: !s.picked[name] } }))
+      };
+    });
+    const count = names.filter(n => this.state.picked[n]).length;
+    return {
+      canvasRef: this.canvasRef, nameRef: this.nameRef, emailRef: this.emailRef,
+      sellsRef: this.sellsRef, shopRef: this.shopRef,
+      channels,
+      pickedCount: count,
+      pickedWord: count === 1 ? "marketplace" : "marketplaces",
+      pickedTotal: 9 + 6 * count,
+      submitted: this.state.submitted,
+      notSubmitted: !this.state.submitted,
+      hasError: !!this.state.errText,
+      errText: this.state.errText,
+      confirmDetail: this.state.confirmDetail || "",
+      onSubmit: (e) => {
+        e.preventDefault();
+        const name = (this.nameRef.current?.value || "").trim();
+        const email = (this.emailRef.current?.value || "").trim();
+        if (!name) { this.setState({ errText: "Add a name so we know what to call the workspace." }); return; }
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { this.setState({ errText: "That email looks incomplete. Check it and try again." }); return; }
+        const sells = this.sellsRef.current?.value || "Fonts";
+        const shop = this.shopRef.current?.value || "Etsy";
+        this.setState({
+          errText: "", submitted: true,
+          confirmDetail: name.split(" ")[0] + ", your workspace is set up for " + sells.toLowerCase() + ". Connect " + shop + " first and bring one product — the drafts build from there."
+        });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

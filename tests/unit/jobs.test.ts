@@ -12,6 +12,7 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 const stubs = {
   finalize_asset: async () => {},
   build_derivative: async () => {},
+  publish_listing: async () => {},
 } satisfies Omit<JobHandlers, "noop">
 
 describe("job queue", () => {

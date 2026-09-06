@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
-import { signUpAndCreateWorkspace } from "./support"
+import { listingUrl, productUrl, signUpAndCreateWorkspace } from "./support"
 
 /**
  * A4's exit test: a person hand-writes a listing per channel and sees
@@ -12,20 +12,19 @@ import { signUpAndCreateWorkspace } from "./support"
 /**
  * Waits for the product page proper.
  *
- * `/products/[^/]+$` also matches `/products/new`, so waiting on that pattern
- * resolves instantly against the form we just submitted and races the redirect.
- * The trailing segment has to be excluded explicitly.
+ * Two separate races. `productUrl` excludes `/new` and the other reserved
+ * segments, so the URL match cannot resolve against the form that was just
+ * submitted. The URL is only half of it though: an App Router transition
+ * changes the URL before the page renders, so `waitForURL` returns while the
+ * loading boundary is still on screen and a count of anything is zero. The
+ * caller waits for real content too.
  */
 async function waitForProductPage(page: Page, slug: string) {
-  await page.waitForURL(
-    (url) =>
-      new RegExp(`^/w/${slug}/products/[^/]+$`).test(url.pathname) &&
-      !url.pathname.endsWith("/new"),
-  )
+  await page.waitForURL((url) => productUrl(slug).test(url.pathname))
 }
 
 async function connect(page: Page, slug: string, channelName: string) {
-  await page.goto(`/w/${slug}/channels`)
+  await page.goto(`/${slug}/channels`)
   await page
     .locator("section")
     .filter({ hasText: channelName })
@@ -37,11 +36,12 @@ async function connect(page: Page, slug: string, channelName: string) {
 }
 
 async function createProductWithListings(page: Page, slug: string, name: string) {
-  await page.goto(`/w/${slug}/products/new`)
+  await page.goto(`/${slug}/new`)
   await page.getByLabel("Product name").fill(name)
   await page.getByLabel("Product type").selectOption("font")
   await page.getByRole("button", { name: "Create product" }).click()
   await waitForProductPage(page, slug)
+  await expect(page.getByRole("heading", { name })).toBeVisible()
 
   // Click one at a time and wait for the re-render between clicks. Collecting
   // every handle up front and clicking them in turn leaves stale handles, since
@@ -61,7 +61,7 @@ test("a creator hand-writes a listing and watches readiness resolve", async ({ p
   await createProductWithListings(page, slug, "Aster Grotesk")
 
   await page.getByRole("link", { name: "Edit listing" }).first().click()
-  await page.waitForURL(new RegExp(`/w/${slug}/products/[^/]+/channels/[^/]+$`))
+  await page.waitForURL(listingUrl(slug))
 
   // Nothing has been written for this channel yet, so it says what it wants.
   await expect(page.getByText("Add at least 3 tags. There are 0.")).toBeVisible()
@@ -123,7 +123,7 @@ test("two channels judge the same hand-written copy differently", async ({ page 
   await connect(page, slug, "Mock Marketplace")
   await createProductWithListings(page, slug, "Two Channel Font")
 
-  const productUrl = page.url()
+  const productPage = page.url()
   const bars = page.getByRole("progressbar")
   await expect(bars).toHaveCount(2)
 
@@ -140,7 +140,7 @@ test("two channels judge the same hand-written copy differently", async ({ page 
   await page.getByRole("button", { name: "Save listing" }).click()
   await expect(page.getByRole("status")).toHaveText("Saved")
 
-  await page.goto(productUrl)
+  await page.goto(productPage)
   const titles = await page.locator("section p").allTextContents()
   expect(titles.filter((t) => t === "Only this channel")).toHaveLength(1)
 })
@@ -149,14 +149,17 @@ test("a field can be pulled from the canonical product on purpose", async ({ pag
   const { slug } = await signUpAndCreateWorkspace(page, "j4p", "Pull Studio")
   await connect(page, slug, "Mock Storefront")
 
-  await page.goto(`/w/${slug}/products/new`)
+  await page.goto(`/${slug}/new`)
   await page.getByLabel("Product name").fill("Canonical Font")
   await page.getByRole("button", { name: "Create product" }).click()
   await waitForProductPage(page, slug)
 
   await page.getByLabel("Canonical title").fill("The Canonical Title")
   await page.getByRole("button", { name: "Save changes" }).click()
-  await expect(page.getByRole("status")).toHaveText("Saved")
+  // The product form reports how long ago it saved, so this reads "Saved just
+  // now" and later "Saved 2 minutes ago". The listing editor's own indicator,
+  // asserted elsewhere in this file, still says exactly "Saved".
+  await expect(page.getByRole("status")).toHaveText(/^Saved/)
 
   await page.getByRole("button", { name: "Build listing" }).click()
   await page.getByRole("link", { name: "Edit listing" }).click()
