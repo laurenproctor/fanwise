@@ -58,7 +58,7 @@ them true now would have the UI offer a sales report that does not exist.
 | `product_type` | `productType` | Coarse Fanwise type, title-cased |
 | `brand_name` | `vendor` | Falls back to the workspace name |
 | `slug` | `handle` | Shopify uniquifies a collision itself |
-| `cover_image` asset | `files[0]` | `FileSetInput`, `contentType: IMAGE` |
+| `cover_image`, then `preview_image` assets | `files` | `FileSetInput`, `contentType: IMAGE`, cover first |
 | `deliverable` asset | **nothing** | No API exists. §6 |
 
 `currency` is the one field that does not survive the trip, and it is worth stating plainly
@@ -262,8 +262,11 @@ Nothing below is a guess about intent; each is a shape that only a 2xx can confi
    question is still open and needs a publicly reachable storage host to answer. What the
    run did settle is that a fetch failure is invisible: `productSet` returns success, the
    response carries nothing about media, and the product is simply imageless. §5 now reads
-   the product's media before writing and re-sends `files` when Shopify holds none, so the
-   state is repairable rather than permanent. Whether the fetch succeeds against a public
+   the product's media before writing and re-sends `files` when Shopify is holding fewer
+   usable images than the listing sends, so the state is repairable rather than permanent.
+   That comparison replaced "when Shopify holds none" on 6 September 2026: the older rule
+   repaired a product with no image but froze one that had one, so a product created before
+   Fanwise sent more than the cover could never receive the rest of its images. Whether the fetch succeeds against a public
    URL inside the TTL remains untested.
 4. `onlineStoreUrl` on a DRAFT product: expected null, so §12 stores the admin URL. Confirm
    it populates on activation, and whether it is worth a second read.
