@@ -24,6 +24,16 @@ import { startPublication } from "./start"
 export interface PublishState {
   error: string | null
   notice: string | null
+  /**
+   * True when an external write is actually on its way, as opposed to a
+   * refusal or an operation that had already happened.
+   *
+   * The panel watches for the send to land so it can say "Sent" and then go
+   * quiet, and it needs to know whether there is anything to wait for. A flag
+   * rather than the caller matching on the notice text: the copy is written
+   * for a person and should stay free to change without breaking a condition.
+   */
+  sending?: boolean
 }
 
 async function requireWorkspace(workspaceSlug: string) {
@@ -272,11 +282,11 @@ export async function publishChangesAction(
     case "already_done":
       return { error: null, notice: `${adapter.name} already has these changes.` }
     case "already_running":
-      return { error: null, notice: "These changes are already on their way." }
+      return { error: null, notice: "These changes are already on their way.", sending: true }
     case "retried":
-      return { error: null, notice: `Trying ${adapter.name} again.` }
+      return { error: null, notice: `Trying ${adapter.name} again.`, sending: true }
     default:
-      return { error: null, notice: `Sending your changes to ${adapter.name}.` }
+      return { error: null, notice: `Sending your changes to ${adapter.name}.`, sending: true }
   }
 }
 
