@@ -104,6 +104,19 @@ export default async function ProductPage({
         channelName: channel.name,
         integrationType: adapter!.integrationType,
         canPublish: adapter!.capabilities.automaticPublish,
+        /*
+         * Offered only where all three are true: the provider can take an
+         * update, the channel already has the product, and the listing holds
+         * something it has not been sent. The third is what stops this being a
+         * button whose only outcome is already_done — the same reason there is
+         * no second Publish.
+         */
+        canPublishChanges:
+          adapter!.capabilities.automaticUpdate &&
+          view !== undefined &&
+          view.listing.status === "published" &&
+          view.listing.external_listing_id !== null &&
+          view.unsentChanges,
         listingId,
         title: view?.listing.title ?? null,
         statusSource: view?.listing.status_source ?? null,
