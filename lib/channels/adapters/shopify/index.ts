@@ -249,16 +249,26 @@ const productMediaSchema = z.object({
 type ProductMedia = z.infer<typeof productMediaSchema>
 
 /**
- * True when the product has no image a buyer would actually see.
+ * True when Shopify holds fewer usable images than the listing means to send.
  *
- * A FAILED node is not one. Shopify's fetch of `originalSource` happens on its
- * own schedule after the mutation returns, so a URL that was unreachable —
- * expired signature, storage not publicly resolvable — leaves a product that
- * reported a clean publish and shows nothing.
+ * "Fewer than intended" rather than "none at all", and the difference is a bug
+ * that shipped. The earlier rule asked only whether the product had an image,
+ * so a product that received its cover on the create was frozen there: every
+ * later write omitted `files`, and previews added afterwards had no route to
+ * the storefront. Zero to four worked. One to four never did.
+ *
+ * A FAILED node is not a usable image. Shopify's fetch of `originalSource`
+ * happens on its own schedule after the mutation returns, so a URL that was
+ * unreachable — expired signature, storage not publicly resolvable — leaves a
+ * product that reported a clean publish and shows nothing.
+ *
+ * §13's curation rule survives the change: a creator who arranged media in the
+ * Shopify admin is holding at least as many images as Fanwise would send, so
+ * this is false and nothing overwrites their work.
  */
-function needsMedia(media: ProductMedia): boolean {
+function needsMedia(media: ProductMedia, intended: number): boolean {
   const nodes = media.product?.media.nodes ?? []
-  return nodes.filter((node) => node.status !== "FAILED").length === 0
+  return nodes.filter((node) => node.status !== "FAILED").length < intended
 }
 
 /** Shopify's single-variant convention. */
@@ -341,7 +351,7 @@ async function productSet(
   }
 
   /*
-   * Media goes out on the create, and again later only if the product has none.
+   * Media goes out on the create, and again later whenever Shopify is short.
    *
    * The second half is the repair path, and it is why this reads before it
    * writes. Shopify fetches `originalSource` asynchronously, after the mutation
@@ -350,9 +360,10 @@ async function productSet(
    * only on the create — which is what this did — made that state permanent:
    * every later write omitted the field, so nothing ever put the image back.
    *
-   * The condition is "Shopify holds no usable image", not "we have not sent one
-   * before". That is what keeps §13's rule intact: a creator who curated media
-   * in the Shopify admin has media, so nothing here overwrites it.
+   * The condition is "Shopify holds fewer usable images than this listing
+   * sends", not "we have not sent any before". That is what keeps §13's rule
+   * intact: a creator who curated media in the Shopify admin holds at least as
+   * many as Fanwise would send, so nothing here overwrites it.
    */
   /*
    * Every image the channel is meant to receive, not just the cover.
@@ -374,7 +385,7 @@ async function productSet(
     })
   }
 
-  if (images.length > 0 && (!externalId || (media && needsMedia(media)))) {
+  if (images.length > 0 && (!externalId || (media && needsMedia(media, images.length)))) {
     input.files = await Promise.all(
       images.map(async (asset) => ({
         originalSource: await context.assetUrl(asset),
