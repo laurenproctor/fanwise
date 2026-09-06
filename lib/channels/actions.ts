@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { routes } from "@/lib/routes"
 import { listProductAssets } from "@/lib/products/queries"
-import { buildDraft, draftToColumns, evaluate, snapshotPayload } from "./listings"
+import { buildDraft, draftToColumns, evaluate, rebuildColumns, snapshotPayload } from "./listings"
 import { listingImages } from "./images"
 import { findAdapter } from "./registry"
 import { updateListingSchema } from "./schemas"
@@ -281,28 +281,84 @@ export async function buildListingAction(
   const draft = buildDraft(adapter, subject)
   const evaluation = evaluate(adapter, draft, subject)
 
-  const { data: listing, error: listingError } = await supabase
+  /*
+   * Insert, and fall back to updating only what a rebuild is allowed to touch.
+   *
+   * This was one upsert, and the payload it wrote on conflict included `status`,
+   * `status_source` and `metadata`. Rebuilding a published listing therefore
+   * reset it to draft and self_reported while leaving external_listing_id and
+   * published_at in place, and blanked the metadata the runner had written.
+   *
+   * The status was the visible half. The metadata was the dangerous half:
+   * `metadata.externalState` is what the Shopify adapter reads to decide
+   * whether an update sends ACTIVE or DRAFT, so losing it turns the next edit
+   * into an instruction to take a live product off sale. Rebuilding is a
+   * regeneration of the *draft*, and it has no business having an opinion about
+   * what the channel is currently holding.
+   *
+   * Insert-then-update rather than read-then-write, so two concurrent rebuilds
+   * resolve on the unique constraint instead of racing.
+   */
+  const generatedAt = new Date().toISOString()
+
+  const insert = await supabase
     .from("channel_listings")
-    .upsert(
-      {
-        workspace_id: workspace.id,
-        product_id: product.id,
-        channel_id: channel.id,
-        channel_connection_id: connection.id,
-        status: "draft",
-        // Nothing has confirmed anything. A listing only becomes verified when
-        // a provider API says so, and an assisted channel never can.
-        status_source: "self_reported",
-        generated_at: new Date().toISOString(),
-        ...draftToColumns(draft),
-      },
-      { onConflict: "product_id,channel_connection_id" },
-    )
+    .insert({
+      workspace_id: workspace.id,
+      product_id: product.id,
+      channel_id: channel.id,
+      channel_connection_id: connection.id,
+      status: "draft",
+      // Nothing has confirmed anything. A listing only becomes verified when
+      // a provider API says so, and an assisted channel never can. Written on
+      // the first build only: after that, publication decides it.
+      status_source: "self_reported",
+      generated_at: generatedAt,
+      ...draftToColumns(draft),
+    })
     .select("id")
     .single()
 
-  if (listingError || !listing) {
-    console.error("[channels] build listing failed", listingError)
+  let listing = insert.data
+
+  if (insert.error) {
+    if (insert.error.code !== UNIQUE_VIOLATION) {
+      console.error("[channels] build listing failed", insert.error)
+      return { error: "That listing could not be built. Try again." }
+    }
+
+    // The listing already exists, so this is a regeneration. Read what
+    // publication recorded, and hand it back unchanged alongside the new draft.
+    const { data: existing } = await supabase
+      .from("channel_listings")
+      .select("id, metadata")
+      .eq("workspace_id", workspace.id)
+      .eq("product_id", product.id)
+      .eq("channel_connection_id", connection.id)
+      .maybeSingle()
+
+    if (!existing) {
+      console.error("[channels] build listing conflicted with a row it cannot read")
+      return { error: "That listing could not be built. Try again." }
+    }
+
+    const { data: updated, error: updateError } = await supabase
+      .from("channel_listings")
+      .update(rebuildColumns(draft, existing.metadata, generatedAt))
+      .eq("id", existing.id)
+      .eq("workspace_id", workspace.id)
+      .select("id")
+      .single()
+
+    if (updateError || !updated) {
+      console.error("[channels] build listing failed", updateError)
+      return { error: "That listing could not be built. Try again." }
+    }
+    listing = updated
+  }
+
+  if (!listing) {
+    console.error("[channels] build listing produced no row")
     return { error: "That listing could not be built. Try again." }
   }
 

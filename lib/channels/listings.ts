@@ -75,6 +75,41 @@ export function draftToColumns(draft: ChannelListingDraft) {
 }
 
 /**
+ * The columns a rebuild is allowed to write over an existing listing.
+ *
+ * Rebuilding regenerates the *draft*. It has no business having an opinion
+ * about what the channel is currently holding, and this function exists so that
+ * boundary is stated once rather than implied by the shape of an upsert.
+ *
+ * What is deliberately absent: `status` and `status_source`. Those describe
+ * publication, and a rebuild has published nothing. They were previously part
+ * of the same upsert, so regenerating a live listing set it back to draft and
+ * self_reported while leaving its external id in place — a row claiming to be
+ * unpublished while pointing at a real product.
+ *
+ * `externalState` survives, and it is the reason this is a function rather than
+ * a shorter object literal. The Shopify adapter reads it to decide whether an
+ * update sends ACTIVE or DRAFT, so dropping it turns the next edit into an
+ * instruction to take a live product off sale. The draft owns adapter metadata;
+ * publication owns this one key.
+ */
+export function rebuildColumns(
+  draft: ChannelListingDraft,
+  existingMetadata: unknown,
+  generatedAt: string,
+) {
+  const externalState = (existingMetadata as Record<string, unknown> | null)?.externalState
+
+  return {
+    ...draftToColumns(draft),
+    generated_at: generatedAt,
+    metadata: (externalState === undefined
+      ? draft.metadata
+      : { ...draft.metadata, externalState }) as never,
+  }
+}
+
+/**
  * The payload written to listing_snapshots.
  *
  * Snapshots exist to answer "what changed before revenue moved", which means
