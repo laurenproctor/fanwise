@@ -54,11 +54,28 @@ export function updateKey(
    */
   images: string,
 ): string {
-  // Hashed rather than interpolated. The fingerprint is a join of asset ids and
-  // grows with the gallery; the key column is unique-indexed and has no reason
-  // to carry a kilobyte of uuids.
+  return `update:${workspaceId}:${listingId}:${sentFingerprint(draft, images)}`
+}
+
+/**
+ * Everything that would be sent to the provider, as one value.
+ *
+ * Persisted on the listing after a successful write, and recomputed by the UI
+ * to decide whether there is anything left to send. It is the same expression
+ * updateKey is built from, deliberately: the question the creator is asked
+ * ("is there a change to publish?") and the question the idempotency key
+ * answers ("has this exact update already run?") must not be able to disagree
+ * about what counts as a change, and sharing the expression is what makes that
+ * structural rather than remembered.
+ *
+ * The image half is hashed rather than interpolated. The fingerprint is a join
+ * of asset ids and grows with the gallery; neither the key column, which is
+ * unique-indexed, nor the listing row has any reason to carry a kilobyte of
+ * uuids.
+ */
+export function sentFingerprint(draft: ChannelListingDraft, images: string): string {
   const imageDigest = createHash("sha256").update(images).digest("hex").slice(0, 16)
-  return `update:${workspaceId}:${listingId}:${fingerprint(draft)}:${imageDigest}`
+  return `${fingerprint(draft)}:${imageDigest}`
 }
 
 /**

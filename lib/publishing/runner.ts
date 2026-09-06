@@ -12,7 +12,9 @@ import type {
   PublishResult,
 } from "@/lib/channels/types"
 import type { Product, ProductAsset } from "@/lib/products/types"
+import { sentFingerprint } from "./idempotency"
 import type { PublicationKind } from "./idempotency"
+import { imagesFingerprint } from "@/lib/channels/images"
 
 /**
  * Performing one external write, exactly once.
@@ -315,12 +317,25 @@ async function recordSuccess(params: {
     externalState: result.externalState,
   }
 
+  /*
+   * What this write actually sent, so the UI can tell whether anything is left
+   * to send. Computed from the same draft the adapter was handed and the same
+   * image list it would have used, which is what makes it comparable to the
+   * fingerprint recomputed when the panel renders.
+   *
+   * Written for every kind, not only update. A publish sends content too, and
+   * a listing whose fingerprint were recorded only on update would offer
+   * "Publish changes" the moment it was first published, with nothing changed.
+   */
+  const draftSent = listingToDraft({ ...listing, metadata: metadata as never })
+
   await admin
     .from("channel_listings")
     .update({
       external_listing_id: result.externalListingId,
       external_url: result.externalUrl,
       status: "published",
+      last_sent_fingerprint: sentFingerprint(draftSent, imagesFingerprint(subject)),
       // A provider API confirmed this. The database trigger refuses `verified`
       // on an assisted channel, so this line can only ever be reached by a
       // channel that genuinely confirmed something.
@@ -356,8 +371,7 @@ async function recordSuccess(params: {
   // Evaluated against the real product and its real assets. A snapshot is
   // history, and a readiness verdict computed against a placeholder subject
   // would be a false one recorded in a table that can never be corrected.
-  const draft = listingToDraft({ ...listing, metadata: metadata as never })
-  const evaluation = evaluate(adapter, draft, subject)
+  const evaluation = evaluate(adapter, draftSent, subject)
 
   const { error: snapshotError } = await admin.from("listing_snapshots").insert({
     workspace_id: workspaceId,
@@ -366,7 +380,7 @@ async function recordSuccess(params: {
     channel_id: channel.id,
     snapshot_type: job.kind === "update" ? "update" : "publish",
     payload: {
-      ...snapshotPayload(draft, evaluation),
+      ...snapshotPayload(draftSent, evaluation),
       publication: {
         kind: job.kind,
         externalListingId: result.externalListingId,

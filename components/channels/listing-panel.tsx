@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button, ButtonLink } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { buildListingAction } from "@/lib/channels/actions"
-import { publishListingAction } from "@/lib/publishing/actions"
+import { publishChangesAction, publishListingAction } from "@/lib/publishing/actions"
 import { useBackgroundRefresh } from "@/lib/use-background-refresh"
 import { ReadinessBar } from "./readiness-bar"
 import { RequirementList } from "./requirement-list"
@@ -33,6 +33,7 @@ export interface ChannelListingCard {
   channelName: string
   integrationType: "api" | "assisted"
   canPublish: boolean
+  canPublishChanges: boolean
   listingId: string | null
   title: string | null
   statusSource: "verified" | "self_reported" | null
@@ -95,6 +96,24 @@ export function ListingPanel({
     setActingOn(connectionId)
     startTransition(async () => {
       const result = await publishListingAction(workspaceSlug, listingId)
+      setError(result.error)
+      setNotice(result.notice)
+      setActingOn(null)
+      router.refresh()
+    })
+  }
+
+  /*
+   * Same shape as publish, different verb. Kept separate rather than folded
+   * into one handler with a flag, because the two call different server actions
+   * with different guards and a shared wrapper would only hide which one ran.
+   */
+  function publishChanges(connectionId: string, listingId: string) {
+    setError(null)
+    setNotice(null)
+    setActingOn(connectionId)
+    startTransition(async () => {
+      const result = await publishChangesAction(workspaceSlug, listingId)
       setError(result.error)
       setNotice(result.notice)
       setActingOn(null)
@@ -253,6 +272,21 @@ export function ListingPanel({
                     </Button>
                   ) : null}
 
+                  {/*
+                    Present only when the channel is behind what the listing
+                    now holds. See canPublishChanges: a listing with nothing to
+                    send offers nothing, because the only thing this could tell
+                    that creator is `already_done`.
+                  */}
+                  {card.canPublishChanges ? (
+                    <Button
+                      onClick={() => publishChanges(card.connectionId, card.listingId!)}
+                      disabled={pending || !card.readiness?.ready}
+                    >
+                      {busy ? "Sending…" : "Publish changes"}
+                    </Button>
+                  ) : null}
+
                   {card.canPublish && card.liveness === "failed" ? (
                     <Button
                       onClick={() => publish(card.connectionId, card.listingId!)}
@@ -268,6 +302,17 @@ export function ListingPanel({
                   !card.readiness.ready ? (
                     <span className="text-[13px] text-[var(--color-ink-3)]">
                       Resolve what is blocking before publishing.
+                    </span>
+                  ) : null}
+
+                  {/*
+                    A published listing that has drifted out of readiness. The
+                    edit cannot be sent until it is fixed, and saying so is the
+                    difference between a disabled button and a mystery.
+                  */}
+                  {card.canPublishChanges && card.readiness && !card.readiness.ready ? (
+                    <span className="text-[13px] text-[var(--color-ink-3)]">
+                      Resolve what is blocking before sending these changes.
                     </span>
                   ) : null}
                 </div>

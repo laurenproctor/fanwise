@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { listProductAssets } from "@/lib/products/queries"
+import { hasUnsentChanges } from "@/lib/publishing/changes"
 import { findAdapter } from "./registry"
 import { evaluate, listingToDraft } from "./listings"
 import type { Evaluation } from "./listings"
@@ -68,6 +69,14 @@ export interface ListingView {
   connection: ChannelConnection | null
   adapter: ChannelAdapter | null
   evaluation: Evaluation | null
+  /**
+   * Whether the listing holds an edit the channel has not received.
+   *
+   * Computed here for the same reason the evaluation is: it is a comparison
+   * between the row as it stands now and what was last sent, and a stored
+   * answer would be stale the moment either side moved.
+   */
+  unsentChanges: boolean
 }
 
 /**
@@ -112,12 +121,15 @@ export async function listProductListings(
       connectionMetadata: (connection?.metadata as Record<string, unknown>) ?? {},
     }
 
+    const draft = listingToDraft(listing)
+
     return {
       listing,
       channel,
       connection,
       adapter,
-      evaluation: adapter ? evaluate(adapter, listingToDraft(listing), subject) : null,
+      evaluation: adapter ? evaluate(adapter, draft, subject) : null,
+      unsentChanges: hasUnsentChanges(listing, draft, subject),
     }
   })
 }

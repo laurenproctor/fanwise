@@ -8,6 +8,7 @@ import { evaluate, listingToDraft } from "@/lib/channels/listings"
 import { findAdapter } from "@/lib/channels/registry"
 import type { AdapterSubject, Channel, ChannelListing } from "@/lib/channels/types"
 import type { Product, ProductAsset } from "@/lib/products/types"
+import { imagesFingerprint } from "@/lib/channels/images"
 import { mergeManualSteps, readyToActivate } from "./manual-steps"
 import { startPublication } from "./start"
 
@@ -177,6 +178,105 @@ export async function publishListingAction(
       return { error: null, notice: `Trying ${adapter.name} again.` }
     default:
       return { error: null, notice: `Publishing to ${adapter.name}.` }
+  }
+}
+
+/**
+ * Sends an edited listing to a channel that already has it.
+ *
+ * The counterpart to publishListingAction, and the caller `kind: "update"` was
+ * built for and never had. Without it the adapter declared `automaticUpdate`
+ * while nothing in the product could invoke it, which is invariant 8 read
+ * backwards: the UI must not offer what a provider cannot do, and a capability
+ * a provider has that the UI never offers is the same gap seen from the other
+ * side.
+ *
+ * Not named updateListingAction: that already exists in lib/channels/actions
+ * and saves an edit to Fanwise's own row. This one is a publication, so it is
+ * named for the vocabulary the UI uses.
+ */
+export async function publishChangesAction(
+  workspaceSlug: string,
+  listingId: string,
+): Promise<PublishState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const loaded = await loadListing(supabase, workspace.id, listingId)
+  if (!loaded) return { error: "That listing could not be found.", notice: null }
+
+  const { listing, channel, connection, product, subject } = loaded
+
+  const adapter = findAdapter(channel.key)
+  if (!adapter) return { error: "That channel is not available.", notice: null }
+
+  // Same shape as publish: the UI does not offer it where the capability is
+  // absent, and the server refuses it anyway.
+  if (!adapter.capabilities.automaticUpdate || !adapter.update) {
+    return {
+      error: `${adapter.name} cannot receive an update automatically. You edit this listing there yourself.`,
+      notice: null,
+    }
+  }
+
+  if (!connection || connection.status !== "active") {
+    return {
+      error: `${adapter.name} is not connected. Reconnect it and try again.`,
+      notice: null,
+    }
+  }
+
+  // An update is an edit to something that exists. Without an external id there
+  // is nothing to update, and productSet without an identifier would create a
+  // second product rather than change the first.
+  if (listing.status !== "published" || !listing.external_listing_id) {
+    return { error: `Publish this listing to ${adapter.name} first.`, notice: null }
+  }
+
+  const draft = listingToDraft(listing)
+  const { readiness } = evaluate(adapter, draft, subject)
+  if (!readiness.ready) {
+    const first = readiness.blocking[0]
+    return {
+      error:
+        readiness.blocking.length === 1
+          ? `This listing is not ready: ${first?.message ?? first?.label}`
+          : `This listing has ${readiness.blocking.length} things to fix before it can be sent.`,
+      notice: null,
+    }
+  }
+
+  const outcome = await startPublication({
+    supabase,
+    workspaceId: workspace.id,
+    listingId,
+    kind: "update",
+    draft,
+    images: imagesFingerprint(subject),
+  })
+
+  if (outcome.kind === "error") return { error: outcome.message, notice: null }
+
+  /*
+   * Deliberately does not set status to `publishing`.
+   *
+   * Publish does, because there the listing is not on the channel yet and the
+   * spinner is the whole truth. Here the product is live while the write is in
+   * flight, and flipping the row would make the panel report a live product as
+   * not live for as long as the job takes. The button's own pending state is
+   * the feedback, and recordSuccess rewrites the row when the channel answers.
+   */
+
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
+
+  switch (outcome.kind) {
+    case "already_done":
+      return { error: null, notice: `${adapter.name} already has these changes.` }
+    case "already_running":
+      return { error: null, notice: "These changes are already on their way." }
+    case "retried":
+      return { error: null, notice: `Trying ${adapter.name} again.` }
+    default:
+      return { error: null, notice: `Sending your changes to ${adapter.name}.` }
   }
 }
 
