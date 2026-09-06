@@ -1,8 +1,9 @@
 # Roadmap
 
-**Current step: A5. Publishing is verified against a live Shopify store and idempotency is
-proven by test. One exit clause remains: a buyer has not downloaded the file. See the note
-below.**
+**Current step: A5. Publishing, updating and image repair are verified against a live Shopify
+store, and idempotency is proven by test. One exit clause remains unrun, and running the rest
+uncovered a blocker for it: an ACTIVE Shopify product is not on a sales channel and nobody can
+buy it. See the note below.**
 
 Three gates. Nothing after a gate begins until the gate passes. Update the line above when a
 step completes, and do not work on more than one step at a time.
@@ -49,7 +50,7 @@ One real product, published to two channels, by a person who is not you.
 | A2 | Canonical product, product types, assets, storage, checksums, image derivative service | A complete product exists with correct derivatives for two image specs, no channel connected | done |
 | A3 | Channel registry, connections, listings, adapter contract, capability matrix, requirements engine, two mock adapters, one `api`-shaped and one `assisted`-shaped | One product yields two independent mock listings, the assisted mock implements no `publish`, and the UI offers none. No marketplace string in the product domain | done |
 | A4 | Manual listing editor, no AI. Readiness UI | A user hand-writes a listing per channel and sees deterministic readiness | done |
-| A5 | Shopify: OAuth, adapter, publish, idempotency, error normalization, digital delivery decision | Real product publishes, second click creates nothing, the file is actually deliverable to a buyer | code done, two exit clauses **verified**, buyer download **unproven** |
+| A5 | Shopify: OAuth, adapter, publish, idempotency, error normalization, digital delivery decision | Real product publishes, second click creates nothing, the file is actually deliverable to a buyer | code done, two exit clauses **verified**, buyer download **blocked**: the product is not purchasable |
 | A6 | Etsy: OAuth, adapter, draft, images, digital file, activate, idempotency | Real product publishes and is purchasable | |
 | A7 | Publish Everywhere orchestration, jobs, progress, retry, activity log | One action, two live URLs, one failure recovered without duplicates | |
 
@@ -93,9 +94,66 @@ test order on the development store, and it is the one that catches a step ticke
 done.
 
 Two things this evidence is not. It is a hosted **development** project, not a production
-deployment. And it predates the fix that sends every image rather than only the cover — the
-adapter built a single `files` entry, so the supporting images a creator arranged never left
-Fanwise. That is fixed and unit tested; it has not been re-confirmed against Shopify.
+deployment. And it predated the fix that sends every image rather than only the cover.
+
+## The 6 September run
+
+Same development store. Four changes landed and were then exercised in one click, which is
+worth stating as one event because each depended on the ones before it.
+
+`Facette Display Typeface` (`gid://shopify/Product/9406555062508`) went from **one image to
+four**, cover still first, and stayed **ACTIVE**:
+
+- The image fix sends every image the listing holds when the channel is short, rather than
+  only when the channel holds none. The product had received its cover on the create and
+  could never have received the rest.
+- `update()` no longer reads a missing `metadata.externalState` as "this is a draft". That
+  listing's metadata was `{}`, so under the previous rule this same click would have sent
+  `DRAFT` and taken a live product off sale.
+- A migration repaired two listings a rebuild had reset to `draft`/`self_reported`, which is
+  what let the panel offer the action at all.
+- The update path was wired. It existed end to end and had no caller, so `automaticUpdate`
+  was declared and unreachable. This was the first `update` job in the project's history.
+
+This closes the "not re-confirmed against Shopify" caveat above: the image behaviour is now
+confirmed on a live product, not only in unit tests.
+
+**Three of §13's open questions in `docs/channels/shopify.md` are now answered by a read of
+the live products**, and one of them is answered the wrong way.
+
+| Item | Question | Answer |
+|---|---|---|
+| 1 | Is the default-variant convention accepted, and is a second mutation needed for price? | Accepted. One variant, `Title` / `Default Title`, price set in the same `productSet`. No second mutation. |
+| 2 | Is `requiresShipping: false` honored at creation rather than only on update? | Honored at creation. A product created and never updated reads `requiresShipping: false`, `tracked: false`. |
+| 4 | Does `onlineStoreUrl` populate on activation? | **No.** It is null on ACTIVE products, not only on drafts. |
+
+## The blocker this run uncovered
+
+**An ACTIVE Shopify product is not necessarily purchasable, and ours are not.**
+
+All three products read `publishedAt: null` and `onlineStoreUrl: null`, including the two
+that are ACTIVE. In Shopify, `status: ACTIVE` and *published to a sales channel* are
+different facts. Ours are active and on no sales channel, so no storefront page exists and
+no buyer can reach them.
+
+The adapter cannot currently fix this. `productSet` sets status, not channel publication;
+that needs `publishablePublish`, and the OAuth scopes in `lib/channels/adapters/shopify/config.ts`
+are `write_products` and `read_products` only. Adding a scope means re-authorising every
+existing connection, so this is a decision, not a patch.
+
+Two consequences, and the second is worse than the first:
+
+1. **The third exit clause is not merely unrun, it is blocked.** A buyer cannot download the
+   file because a buyer cannot reach the product.
+2. **Fanwise currently tells the creator something untrue.** `liveness` reports `live` as
+   "On the channel, and available to buy" once the manual file step is done. For these
+   products the first half is true and the second is false. That is precisely the confusion
+   `published_not_live` was invented to prevent — ADR 0001 built the distinction for the
+   unattached-file case and this is a second way to be unbuyable that the vocabulary does
+   not yet cover.
+
+Nothing here is a defect in the code that was written. It is an assumption — that ACTIVE
+means for sale — which nobody had tested, and which the exit test existed to catch.
 
 This step is still deliberately **not** recorded as done. A0 was marked complete on the
 strength of its checks passing while the app registrations it also owned were never filed, and
@@ -104,9 +162,19 @@ the same failure inverted — work genuinely done, and the roadmap still saying 
 account was outstanding. Both directions cost the same, so the rule does not change: a clause
 nobody has run is a clause that says so.
 
-What remains for A5: place a test order on the development store and download the file as a
-buyer. Worth doing in the same sitting: republish one of the two products and confirm the
-supporting images now arrive. Neither is a code change.
+What remains for A5, in order:
+
+1. **Decide how a product reaches a sales channel.** Either Fanwise publishes it, which means
+   adding a publications scope and re-authorising every connection, or it does not, which
+   means the creator does it in the Shopify admin and it becomes a manual step with the same
+   standing as attaching the file. Until this is decided, "live" cannot honestly be shown.
+2. **Correct what `liveness` claims** in whichever direction step 1 settles. A product that
+   is on no sales channel must not be reported as available to buy.
+3. **Then place a test order and download the file as a buyer**, which is the clause that has
+   never been attempted and cannot be attempted before step 1.
+
+The image half of the old "worth doing in the same sitting" note is done: republishing
+confirmed the supporting images arrive.
 
 **No third channel joins Gate A.** Creative Market was considered for it, on the argument
 that the pricing model is not real until a billable channel exists, and that at Gate A exit

@@ -254,10 +254,13 @@ original is recoverable, and is never rendered.
 
 Nothing below is a guess about intent; each is a shape that only a 2xx can confirm.
 
-1. `productSet` with `productOptions` + `variants` on a brand new product: confirm the
-   default-variant convention is accepted and no second mutation is needed for price.
-2. `InventoryItemInput.requiresShipping: false` on a `productSet` variant: confirm it is
-   honored at creation rather than only on update.
+1. `productSet` with `productOptions` + `variants` on a brand new product: **answered,
+   6 September 2026.** Accepted. The live products carry one variant, option `Title` with
+   value `Default Title`, and a price set by the same mutation. No second mutation.
+2. `InventoryItemInput.requiresShipping: false` on a `productSet` variant: **answered,
+   6 September 2026.** Honored at creation. A product created and never updated since reads
+   `requiresShipping: false` and `tracked: false`, so no buyer is asked for a shipping
+   address on a font.
 3. `files: [FileSetInput]` with a Supabase signed URL: **answered, 5 September 2026.** A
    publish against a publicly reachable Supabase project put the image on the product, so the
    async fetch does complete inside the signed URL's TTL. The earlier failure was
@@ -276,8 +279,17 @@ Nothing below is a guess about intent; each is a shape that only a 2xx can confi
    repaired a product with no image but froze one that had one, so a product created before
    Fanwise sent more than the cover could never receive the rest of its images. Whether the fetch succeeds against a public
    URL inside the TTL remains untested.
-4. `onlineStoreUrl` on a DRAFT product: expected null, so §12 stores the admin URL. Confirm
-   it populates on activation, and whether it is worth a second read.
+4. `onlineStoreUrl` on a DRAFT product: **answered, 6 September 2026, and not as expected.**
+   It is null on ACTIVE products too. §12's decision to store the admin URL is right, and for
+   a stronger reason than anticipated: there is no storefront URL to store, because
+   `status: ACTIVE` does not put a product on a sales channel. Both live products read
+   `publishedAt: null`, meaning they are on none, so no buyer can reach them.
+
+   This adapter cannot change that. `productSet` sets status, not channel publication, which
+   needs `publishablePublish` and a publications scope this app does not request. See the
+   blocker note in `docs/roadmap.md`: it decides whether Fanwise publishes to a sales channel
+   or declares it a manual step, and until it is decided the UI must not say a product is
+   available to buy.
 5. The exact `code` values on `ProductSetUserError`, so §11's `validation_rejected` messages
    can name the offending field rather than repeating Shopify's sentence.
 6. Whether an unlisted app install without App Store review grants `write_products` in full,
