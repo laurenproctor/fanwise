@@ -109,6 +109,14 @@ mutation FanwiseProductSet($identifier: ProductSetIdentifiers, $input: ProductSe
 That is what makes a retry converge rather than duplicate: with an identifier, `productSet`
 is an update.
 
+An update preserves whether the product is on sale, and it does not infer that from
+absence. `listing.metadata.externalState` is used when it says something; when it says
+nothing — a listing published before Fanwise wrote that field, or one a rebuild blanked —
+the adapter reads the product's own `status` and sends it back unchanged, ARCHIVED
+included. A status it cannot read is refused rather than defaulted: sending DRAFT because
+a read came back empty would take a live product off sale, which is the failure the whole
+arrangement exists to prevent.
+
 The variant is the Shopify single-variant convention, one option named `Title` with the value
 `Default Title`, and the digital shape is set on the inventory item:
 

@@ -130,24 +130,39 @@ function productSetOk(status: "DRAFT" | "ACTIVE" = "DRAFT") {
   }
 }
 
-/** A productMedia response. `nodes: []` is a product Shopify holds no image for. */
-function productMediaOk(nodes: { id: string; status: string }[] = []) {
-  return { data: { product: { media: { nodes } } } }
+/**
+ * A productState response: what Shopify currently holds.
+ *
+ * `nodes: []` is a product with no image. `holds` is the product's own status,
+ * which is what an update with the `preserve` intent reads.
+ */
+function productStateOk(nodes: { id: string; status: string }[] = [], holds = "DRAFT") {
+  return { data: { product: { status: holds, media: { nodes } } } }
 }
 
 /**
  * Answers whichever operation the adapter actually sent.
  *
- * The adapter reads media before it writes, so a stub that returns a
- * productSet payload to every request feeds a product-shaped body to the media
+ * The adapter reads the product before it writes, so a stub that returns a
+ * productSet payload to every request feeds a product-shaped body to the state
  * schema and fails for a reason that has nothing to do with the test.
  */
 function respondTo(
   body: unknown,
-  options: { status?: "DRAFT" | "ACTIVE"; media?: { id: string; status: string }[] } = {},
+  options: {
+    status?: "DRAFT" | "ACTIVE"
+    media?: { id: string; status: string }[]
+    /** What Shopify says the product's status currently is. */
+    holds?: string
+    /** Answer the state read with no product at all, as a deleted id would. */
+    missing?: boolean
+  } = {},
 ): Response {
   const query = String((body as { query?: string }).query ?? "")
-  if (query.includes("FanwiseProductMedia")) return jsonResponse(productMediaOk(options.media))
+  if (query.includes("FanwiseProductState")) {
+    if (options.missing) return jsonResponse({ data: { product: null } })
+    return jsonResponse(productStateOk(options.media, options.holds))
+  }
   return jsonResponse(productSetOk(options.status))
 }
 
@@ -586,6 +601,95 @@ describe("publish", () => {
 
     const input = productSetVariables(bodies).input as { status: string }
     expect(input.status).toBe("DRAFT")
+  })
+
+  it("asks Shopify when the listing has no record of whether the product is live", async () => {
+    /*
+      The bug this closes. `metadata.externalState` is absent on any listing
+      published before Fanwise wrote it, and a rebuild used to blank it. The
+      old reading was `externalState === "live" ? ACTIVE : DRAFT`, so absence
+      was indistinguishable from a positive "this is a draft" and an ordinary
+      edit took a live product off sale.
+    */
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body, { holds: "ACTIVE" })),
+    )
+
+    await shopifyAdapter.update!(
+      context({
+        listing: listing({
+          external_listing_id: "gid://shopify/Product/900",
+          metadata: {},
+        }),
+      }),
+    )
+
+    const input = productSetVariables(bodies).input as { status: string }
+    expect(input.status).toBe("ACTIVE")
+  })
+
+  it("preserves an archived product rather than reviving it as a draft", async () => {
+    // ARCHIVED is a state a creator chose. Mapping it onto DRAFT would put an
+    // archived product back into their active list.
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body, { holds: "ARCHIVED" })),
+    )
+
+    await shopifyAdapter.update!(
+      context({
+        listing: listing({ external_listing_id: "gid://shopify/Product/900", metadata: {} }),
+      }),
+    )
+
+    const input = productSetVariables(bodies).input as { status: string }
+    expect(input.status).toBe("ARCHIVED")
+  })
+
+  it("refuses the update rather than guessing when the status cannot be read", async () => {
+    // Defaulting to DRAFT here is the deactivation this whole change exists to
+    // prevent. A creator would rather retry than find their product off sale.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) =>
+        respondTo(JSON.parse(String(init.body)), { missing: true }),
+      ),
+    )
+
+    await expect(
+      shopifyAdapter.update!(
+        context({
+          listing: listing({ external_listing_id: "gid://shopify/Product/900", metadata: {} }),
+        }),
+      ),
+    ).rejects.toThrow(/could not read whether this product is currently on sale/)
+  })
+
+  it("still trusts a recorded state without reading the product", async () => {
+    // The read costs a round trip. A listing that already knows should not pay
+    // for one, and the recorded value is what publication itself wrote.
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body, { status: "ACTIVE" })),
+    )
+
+    await shopifyAdapter.update!(
+      context({
+        listing: listing({
+          external_listing_id: "gid://shopify/Product/900",
+          metadata: { externalState: "live" },
+        }),
+        // No images, so nothing else would trigger a read either.
+        subject: { ...subject(), assets: [] },
+      }),
+    )
+
+    const queries = bodies.map((b) => String((b as { query?: string }).query ?? ""))
+    expect(queries.some((q) => q.includes("FanwiseProductState"))).toBe(false)
   })
 })
 

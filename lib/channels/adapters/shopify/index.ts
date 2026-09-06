@@ -198,17 +198,25 @@ const productSetSchema = z.object({
 })
 
 /**
- * What the product currently holds, so a missing image can be sent again.
+ * What the product currently is, so a write does not have to guess.
  *
- * `files` goes out only when there is nothing to overwrite (see productSet), so
+ * Two questions in one round trip, because both are asked at the same moment
+ * and a second request would only be a second thing that can fail.
+ *
+ * `media`: `files` goes out only when Shopify is short (see productSet), so
  * this read is what makes that condition answerable. FAILED is asked for by
  * name: Shopify keeps a media row whose fetch did not succeed, and counting it
  * as media present would make a permanently broken image permanently
  * unrepairable, which is the exact failure this exists to end.
+ *
+ * `status`: whether Shopify is holding the product live. An update must
+ * preserve that, and the listing metadata which used to be the only record of
+ * it can be missing. See the `preserve` intent on productSet.
  */
-const PRODUCT_MEDIA = `
-  query FanwiseProductMedia($id: ID!) {
+const PRODUCT_STATE = `
+  query FanwiseProductState($id: ID!) {
     product(id: $id) {
+      status
       media(first: 10) {
         nodes {
           id
@@ -222,9 +230,10 @@ const PRODUCT_MEDIA = `
   }
 `
 
-const productMediaSchema = z.object({
+const productStateSchema = z.object({
   product: z
     .object({
+      status: z.string().nullish(),
       media: z.object({
         nodes: z.array(
           z.object({
@@ -246,7 +255,7 @@ const productMediaSchema = z.object({
     .nullish(),
 })
 
-type ProductMedia = z.infer<typeof productMediaSchema>
+type ProductState = z.infer<typeof productStateSchema>
 
 /**
  * True when Shopify holds fewer usable images than the listing means to send.
@@ -266,8 +275,8 @@ type ProductMedia = z.infer<typeof productMediaSchema>
  * Shopify admin is holding at least as many images as Fanwise would send, so
  * this is false and nothing overwrites their work.
  */
-function needsMedia(media: ProductMedia, intended: number): boolean {
-  const nodes = media.product?.media.nodes ?? []
+function needsMedia(state: ProductState, intended: number): boolean {
+  const nodes = state.product?.media.nodes ?? []
   return nodes.filter((node) => node.status !== "FAILED").length < intended
 }
 
@@ -307,48 +316,44 @@ async function clientFor(context: PublishContext) {
 }
 
 /**
+ * What a write intends the product's published state to be.
+ *
+ * `preserve` is the one that needed a name. An update must not change whether
+ * a product is on sale, and the only local record of that is
+ * `listing.metadata.externalState` — which a rebuild used to blank, and which
+ * is simply absent on any listing published before it was first written. A
+ * missing value is not the same claim as "it is a draft", and treating the two
+ * as equal is how an edit silently takes a live product off sale. `preserve`
+ * says "ask Shopify" instead of guessing.
+ */
+type PublishIntent = "DRAFT" | "ACTIVE" | "preserve"
+
+/**
+ * Shopify's own product statuses, which are what `preserve` preserves.
+ * ARCHIVED is included because mapping it onto DRAFT would un-archive a
+ * product the creator archived deliberately.
+ */
+const SHOPIFY_STATUSES = ["ACTIVE", "DRAFT", "ARCHIVED"] as const
+
+/**
  * The one external write this adapter makes.
  *
  * `productSet` with an identifier is an update and without one is a create,
  * which is what makes a retry converge instead of duplicating: once the product
  * id is recorded, every subsequent call is an update of that product.
  *
- * `files` is sent only on the create. productSet leaves an omitted field alone,
- * so re-sending media on every update would risk replacing a media list the
- * creator may have since curated in Shopify. Confirming that is item 3 in
- * docs/channels/shopify.md section 13.
+ * It reads before it writes, and both halves of that read are load-bearing:
+ * which images Shopify is holding, and whether the product is on sale. Neither
+ * can be answered from Fanwise's own tables with enough confidence to risk
+ * being wrong, because productSet leaves an omitted field alone and overwrites
+ * a supplied one.
  */
-async function productSet(
-  context: PublishContext,
-  status: "DRAFT" | "ACTIVE",
-): Promise<PublishResult> {
+async function productSet(context: PublishContext, intent: PublishIntent): Promise<PublishResult> {
   const { listing, subject } = context
   const { shopDomain, client } = await clientFor(context)
 
   const externalId = listing.external_listing_id
   const price = toMoney(listing.price === null ? null : Number(listing.price))
-
-  const input: Record<string, unknown> = {
-    title: listing.title ?? subject.product.name,
-    descriptionHtml: toDescriptionHtml(listing.description),
-    handle: subject.product.slug,
-    productType: toProductType(listing.category ?? subject.product.product_type),
-    vendor: subject.product.brand_name ?? undefined,
-    tags: listing.tags ?? [],
-    status,
-    seo: { description: toSeoDescription(listing.short_description) },
-    productOptions: [{ name: OPTION_NAME, values: [{ name: OPTION_VALUE }] }],
-    variants: [
-      {
-        optionValues: [{ optionName: OPTION_NAME, name: OPTION_VALUE }],
-        ...(price === null ? {} : { price }),
-        taxable: true,
-        // Not cosmetic. Left true, Shopify asks a buyer for a shipping address
-        // and may quote a shipping rate on a font.
-        inventoryItem: { requiresShipping: false, tracked: false },
-      },
-    ],
-  }
 
   /*
    * Media goes out on the create, and again later whenever Shopify is short.
@@ -376,16 +381,76 @@ async function productSet(
    */
   const images = listingImages(subject)
 
-  let media: ProductMedia | null = null
-  if (images.length > 0 && externalId) {
-    media = await client.request({
-      query: PRODUCT_MEDIA,
+  /*
+   * One read, asked for by either question that needs it.
+   *
+   * Media needs it to know whether Shopify is short. `preserve` needs it to
+   * know whether the product is on sale. Reading once when either applies
+   * keeps an update to a single round trip in the common case.
+   */
+  let state: ProductState | null = null
+  if (externalId && (images.length > 0 || intent === "preserve")) {
+    state = await client.request({
+      query: PRODUCT_STATE,
       variables: { id: externalId },
-      schema: productMediaSchema,
+      schema: productStateSchema,
     })
   }
 
-  if (images.length > 0 && (!externalId || (media && needsMedia(media, images.length)))) {
+  /*
+   * Resolve the intent into the status this write actually sends.
+   *
+   * A create has nothing to preserve and is a draft by ADR 0001, so `preserve`
+   * on a product that does not exist yet is DRAFT. On a product that does
+   * exist, an unreadable status is refused rather than guessed: sending DRAFT
+   * because the read came back empty is exactly the silent deactivation this
+   * intent exists to prevent, and a creator would rather retry than find their
+   * product off sale.
+   */
+  let status: (typeof SHOPIFY_STATUSES)[number]
+  if (intent !== "preserve") {
+    status = intent
+  } else if (!externalId) {
+    status = "DRAFT"
+  } else {
+    const current = state?.product?.status
+    const known = SHOPIFY_STATUSES.find((candidate) => candidate === current)
+    if (!known) {
+      throw new ChannelError(
+        normalized(
+          "unknown",
+          "Fanwise could not read whether this product is currently on sale in Shopify, " +
+            "so it did not risk changing that. Try again.",
+          state,
+        ),
+      )
+    }
+    status = known
+  }
+
+  const input: Record<string, unknown> = {
+    title: listing.title ?? subject.product.name,
+    descriptionHtml: toDescriptionHtml(listing.description),
+    handle: subject.product.slug,
+    productType: toProductType(listing.category ?? subject.product.product_type),
+    vendor: subject.product.brand_name ?? undefined,
+    tags: listing.tags ?? [],
+    status,
+    seo: { description: toSeoDescription(listing.short_description) },
+    productOptions: [{ name: OPTION_NAME, values: [{ name: OPTION_VALUE }] }],
+    variants: [
+      {
+        optionValues: [{ optionName: OPTION_NAME, name: OPTION_VALUE }],
+        ...(price === null ? {} : { price }),
+        taxable: true,
+        // Not cosmetic. Left true, Shopify asks a buyer for a shipping address
+        // and may quote a shipping rate on a font.
+        inventoryItem: { requiresShipping: false, tracked: false },
+      },
+    ],
+  }
+
+  if (images.length > 0 && (!externalId || (state && needsMedia(state, images.length)))) {
     input.files = await Promise.all(
       images.map(async (asset) => ({
         originalSource: await context.assetUrl(asset),
@@ -428,12 +493,13 @@ async function productSet(
     externalUrl: adminProductUrl(shopDomain, product.legacyResourceId),
     externalState: product.status === "ACTIVE" ? "live" : "draft",
     /*
-      The media read travels with the write. A publish that reported success
-      while the image never arrived is the failure that started this, and the
-      job row is where someone looks afterwards; `mediaBefore` is what Shopify
-      held at the moment we decided whether to send one.
+      The read travels with the write. A publish that reported success while
+      the image never arrived is the failure that started this, and the job row
+      is where someone looks afterwards; `stateBefore` is what Shopify held at
+      the moment we decided what to send — both which images, and whether the
+      product was on sale.
     */
-    providerResponse: media === null ? result : { ...result, mediaBefore: media },
+    providerResponse: state === null ? result : { ...result, stateBefore: state },
   }
 }
 
@@ -483,10 +549,19 @@ export const shopifyAdapter: ChannelAdapter = {
    * Updates in place, preserving whether the product is currently live. An edit
    * must not quietly take a live product off sale, and must not quietly put a
    * draft one on it.
+   *
+   * The local record is used when it exists and is trusted only when it says
+   * something. It is absent on any listing published before Fanwise wrote it,
+   * and a rebuild used to blank it, so the previous reading of "not live"
+   * turned an ordinary edit into a deactivation. Absence now means unknown,
+   * and unknown is answered by the provider rather than by a default.
    */
   update(context: PublishContext): Promise<PublishResult> {
-    const wasLive = context.listing.metadata as Record<string, unknown> | null
-    return productSet(context, wasLive?.["externalState"] === "live" ? "ACTIVE" : "DRAFT")
+    const metadata = context.listing.metadata as Record<string, unknown> | null
+    const recorded = metadata?.["externalState"]
+    if (recorded === "live") return productSet(context, "ACTIVE")
+    if (recorded === "draft") return productSet(context, "DRAFT")
+    return productSet(context, "preserve")
   },
 
   /** The other half of ADR 0001: the file is attached, so the product goes live. */
