@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Button, ButtonLink } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { buildListingAction } from "@/lib/channels/actions"
 import { publishChangesAction, publishListingAction } from "@/lib/publishing/actions"
 import { useBackgroundRefresh } from "@/lib/use-background-refresh"
+import { resolveSend } from "@/lib/publishing/send-outcome"
 import { ReadinessBar } from "./readiness-bar"
 import { RequirementList } from "./requirement-list"
 import { StatusPill } from "./status-pill"
@@ -27,6 +28,18 @@ import { routes } from "@/lib/routes"
  * one, because a greyed-out button still says "this will work later" and here
  * it never will.
  */
+
+/** Shown when a send has landed, and only then. See the effect that sets it. */
+const SENT_NOTICE = "Sent."
+
+/** How long "Sent" stays before the panel goes quiet again. */
+const SENT_NOTICE_MS = 2500
+
+/**
+ * How long to keep watching a send. Slightly longer than useBackgroundRefresh
+ * polls, so the last refresh is counted before this gives up on it.
+ */
+const SEND_WATCH_MS = 45000
 
 export interface ChannelListingCard {
   connectionId: string
@@ -65,6 +78,22 @@ export function ListingPanel({
   const [actingOn, setActingOn] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
+  /*
+   * The listing whose changes are in flight, if any.
+   *
+   * A publish announces itself in the row — status goes to `publishing` and the
+   * card says so — and an update deliberately does not, because the product is
+   * live throughout and flipping the row would report a live product as not
+   * live. That left the notice with nothing to end it: "Sending your changes"
+   * was set when the job was queued and no later render had any reason to
+   * replace it, so it sat there after the images had already arrived.
+   *
+   * Held in the client instead. The server-side fact that the send landed is
+   * the listing's fingerprint matching what it holds, which is exactly what
+   * clears `canPublishChanges`.
+   */
+  const [sending, setSending] = useState<string | null>(null)
+
   const publishing = cards.some((card) => card.liveness === "publishing")
 
   /*
@@ -72,7 +101,64 @@ export function ListingPanel({
    * know when it finished. It asks, briefly. A7 replaces this with real
    * progress, which is where it belongs.
    */
-  useBackgroundRefresh(publishing)
+  useBackgroundRefresh(publishing || sending !== null)
+
+  /*
+   * Ends the send, on evidence rather than on a timer.
+   *
+   * "Sent" is a claim about the channel, so it waits for the same fact the
+   * button does: the listing no longer holds anything unsent, which only
+   * recordSuccess can bring about. Saying it when the job was merely queued
+   * would be the panel guessing, which is the habit this file is otherwise
+   * careful not to have.
+   *
+   * Resolved while rendering rather than in an effect. The answer is a
+   * function of the props that just arrived, so an effect would render the
+   * stale message once and then correct it — and React's lint refuses a
+   * synchronous setState in an effect for exactly that reason. The guard is
+   * false on the pass this triggers, so it settles in one extra render and
+   * cannot loop.
+   */
+  const outcome = resolveSend(
+    sending === null ? undefined : cards.find((card) => card.listingId === sending),
+  )
+  if (sending !== null && outcome.kind !== "waiting") {
+    setSending(null)
+    if (outcome.kind === "failed") {
+      setError(outcome.message)
+      setNotice(null)
+    } else {
+      setNotice(SENT_NOTICE)
+    }
+  }
+
+  /*
+   * "Sent" is a moment, not a state. It says the thing that just happened and
+   * then gets out of the way, rather than persisting into a page that no longer
+   * has anything to do with it.
+   */
+  useEffect(() => {
+    if (notice !== SENT_NOTICE) return
+    const timer = setTimeout(() => setNotice(null), SENT_NOTICE_MS)
+    return () => clearTimeout(timer)
+  }, [notice])
+
+  /*
+   * The send that never lands.
+   *
+   * useBackgroundRefresh gives up after forty seconds, and without this the
+   * notice would go back to sitting there forever — the exact bug being fixed,
+   * reached by a slower road. Says what is actually known: it was queued, and
+   * this page stopped watching.
+   */
+  useEffect(() => {
+    if (sending === null) return
+    const timer = setTimeout(() => {
+      setSending(null)
+      setNotice("Still sending. Reload to see where it got to.")
+    }, SEND_WATCH_MS)
+    return () => clearTimeout(timer)
+  }, [sending])
 
   function build(connectionId: string) {
     setError(null)
@@ -117,6 +203,10 @@ export function ListingPanel({
       setError(result.error)
       setNotice(result.notice)
       setActingOn(null)
+      // Only when something is actually on its way. `already_done` and a
+      // refusal both return a notice and nothing to wait for, and watching for
+      // a landing that will never come would hang the message again.
+      if (result.sending) setSending(listingId)
       router.refresh()
     })
   }
