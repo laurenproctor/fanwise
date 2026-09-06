@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <title>Get started — Fanwise</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@200;300;400;500;600&amp;family=Instrument+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+  <script src="theme.js"></script>
+  <script src="reveal.js"></script>
+  <style>
+    body { margin: 0; background: #04060D; color: #E9F0FF; font-family: "Instrument Sans", "Helvetica Neue", Arial, sans-serif; font-size: 16.5px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+    * { box-sizing: border-box; }
+    a { color: inherit; text-decoration: none; }
+    a:hover { color: inherit; }
+    h1, h2, h3 { margin: 0; }
+    p { margin: 0; }
+    input::placeholder { color: #5C688A; }
+    input:focus, select:focus { outline: none; border-color: #6C9BFF; }
+    select option { color: #0b0f18; }
+    :focus-visible { outline: 2px solid #6C9BFF; outline-offset: 3px; border-radius: 2px; }
+    @keyframes fwPulse { 0% { box-shadow: 0 0 0 0 rgba(70,214,149,.45); } 70% { box-shadow: 0 0 0 7px rgba(70,214,149,0); } 100% { box-shadow: 0 0 0 0 rgba(70,214,149,0); } }
+  </style>
+</helmet>
+
+<div style="min-height:100vh;position:relative;overflow:hidden">
+  <div style="position:absolute;pointer-events:none;border-radius:50%;filter:blur(100px);width:720px;height:560px;background:#1E44C8;top:-260px;right:-160px;opacity:.4"></div>
+  <div style="position:absolute;pointer-events:none;border-radius:50%;filter:blur(100px);width:520px;height:520px;background:#3A6BF5;bottom:-280px;left:-180px;opacity:.3"></div>
+
+  <div style="width:min(1080px,calc(100% - 48px));margin:0 auto;position:relative;z-index:2">
+    <nav style="display:flex;align-items:center;justify-content:space-between;gap:24px;padding:28px 0;flex-wrap:wrap">
+      <a href="Fanwise Landing.dc.html" style="display:flex;align-items:center;gap:9px;color:#E9F0FF;font-family:Archivo,sans-serif;font-weight:500;font-size:19px;letter-spacing:-0.02em">
+        <svg viewBox="0 0 24 24" aria-hidden="true" style="width:22px;height:22px;display:block"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 21 3.6 8.4"></path><path d="M12 21 7.6 4.6"></path><path d="M12 21V3.6"></path><path d="m12 21 4.4-16.4"></path><path d="M12 21 20.4 8.4"></path></g><circle cx="12" cy="21" r="1.7" fill="currentColor"></circle></svg>
+        Fanwise
+      </a>
+      <div style="display:flex;gap:26px;font-size:14.5px;color:#98A6C2;flex-wrap:wrap">
+        <a href="Fanwise Landing.dc.html" style-hover="color:#E9F0FF">Product</a>
+        <a href="Fanwise Marketplaces.dc.html" style-hover="color:#E9F0FF">Marketplaces</a>
+        <a href="Fanwise How It Works.dc.html" style-hover="color:#E9F0FF">How it works</a>
+        <a href="Fanwise Pricing.dc.html" style-hover="color:#E9F0FF">Pricing</a>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <fw-theme-toggle variant="dark"></fw-theme-toggle>
+        <a href="#form" style="font-size:14.5px;color:#98A6C2" style-hover="color:#E9F0FF">Sign in</a>
+      </div>
+    </nav>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:64px;align-items:center;padding:64px 0 96px">
+      <div>
+        <span style="display:inline-flex;align-items:center;gap:9px;padding:7px 15px 7px 11px;border-radius:999px;border:1px solid rgba(200,218,255,.14);background:rgba(10,18,40,.55);color:#98A6C2;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase"><i style="width:6px;height:6px;border-radius:50%;background:#46D695;animation:fwPulse 2.4s ease-out infinite"></i> Six marketplaces connected</span>
+        <h1 style="font-family:Archivo,sans-serif;font-size:clamp(40px,5.4vw,68px);font-weight:200;line-height:1.02;letter-spacing:-0.04em;color:#EDF3FF;margin-top:24px;text-wrap:balance">Bring one product.<br><b style="font-weight:400;color:#ffffff">Leave with six listings.</b></h1>
+        <p style="color:#98A6C2;margin-top:22px;max-width:40ch;font-size:17px">Create a workspace, connect a shop, upload a product, and watch the drafts build. $9 a month plus $6 for each marketplace connected.</p>
+        <div style="display:grid;gap:12px;margin-top:32px;max-width:420px">
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:baseline"><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.12em;color:#6C9BFF">01</span><p style="color:#C7D3EE;font-size:15px">Create your workspace — no card needed to look around.</p></div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:baseline"><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.12em;color:#6C9BFF">02</span><p style="color:#C7D3EE;font-size:15px">Connect the first shop and upload one product.</p></div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:baseline"><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.12em;color:#6C9BFF">03</span><p style="color:#C7D3EE;font-size:15px">Review the drafts side by side and publish.</p></div>
+        </div>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:30px;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#98A6C2">
+          <span style="display:inline-flex;align-items:center;gap:7px"><i style="width:5px;height:5px;border-radius:50%;background:#46D695"></i> No revenue share</span>
+          <span style="display:inline-flex;align-items:center;gap:7px"><i style="width:5px;height:5px;border-radius:50%;background:#46D695"></i> Unlimited catalog</span>
+          <span style="display:inline-flex;align-items:center;gap:7px"><i style="width:5px;height:5px;border-radius:50%;background:#46D695"></i> Export and leave anytime</span>
+        </div>
+      </div>
+
+      <div id="form">
+        <sc-if value="{{ notSubmitted }}" hint-placeholder-val="{{ true }}">
+          <form onSubmit="{{ onSubmit }}" noValidate="{{ true }}" style="display:grid;gap:12px;border:1px solid rgba(200,218,255,.14);border-radius:18px;padding:30px;background:rgba(255,255,255,.03)">
+            <h2 style="font-family:Archivo,sans-serif;font-size:24px;font-weight:300;letter-spacing:-0.03em;color:#E9F0FF;margin-bottom:6px">Create a workspace</h2>
+            <div style="display:grid;gap:7px">
+              <label for="fw-name" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#98A6C2">Name</label>
+              <input id="fw-name" ref="{{ nameRef }}" type="text" autoComplete="name" placeholder="Full name" style="font:inherit;font-size:15px;padding:13px 15px;border-radius:10px;width:100%;border:1px solid rgba(200,218,255,.14);background:rgba(255,255,255,.04);color:#E9F0FF">
+            </div>
+            <div style="display:grid;gap:7px">
+              <label for="fw-email" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#98A6C2">Work email</label>
+              <input id="fw-email" ref="{{ emailRef }}" type="email" autoComplete="email" placeholder="name@studio.com" style="font:inherit;font-size:15px;padding:13px 15px;border-radius:10px;width:100%;border:1px solid rgba(200,218,255,.14);background:rgba(255,255,255,.04);color:#E9F0FF">
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+              <div style="display:grid;gap:7px">
+                <label for="fw-sells" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#98A6C2">Mostly sells</label>
+                <select id="fw-sells" ref="{{ sellsRef }}" style="font:inherit;font-size:15px;padding:13px 15px;border-radius:10px;width:100%;border:1px solid rgba(200,218,255,.14);background:rgba(255,255,255,.04);color:#E9F0FF">
+                  <option>Fonts</option><option>Templates</option><option>Presets and actions</option><option>Icons and illustration</option><option>Mockups</option><option>UI kits</option>
+                </select>
+              </div>
+              <div style="display:grid;gap:7px">
+                <label for="fw-shop" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#98A6C2">First shop to connect</label>
+                <select id="fw-shop" ref="{{ shopRef }}" style="font:inherit;font-size:15px;padding:13px 15px;border-radius:10px;width:100%;border:1px solid rgba(200,218,255,.14);background:rgba(255,255,255,.04);color:#E9F0FF">
+                  <option>Etsy</option><option>Creative Market</option><option>Envato</option><option>Gumroad</option><option>Adobe Stock</option><option>MyFonts</option>
+                </select>
+              </div>
+            </div>
+            <sc-if value="{{ hasError }}" hint-placeholder-val="{{ false }}">
+              <p style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#FFB4A8">{{ errText }}</p>
+            </sc-if>
+            <button type="submit" style="font:inherit;font-weight:500;font-size:15px;margin-top:4px;padding:14px 22px;border-radius:999px;border:0;cursor:pointer;background:#E9F0FF;color:#04060D" style-hover="background:#ffffff">Create a workspace</button>
+            <small style="font-size:12.5px;color:#7C8CB4;text-align:center">Already have one? <a href="#form" style="color:#C7D3EE;border-bottom:1px solid rgba(200,218,255,.4)">Sign in</a></small>
+          </form>
+        </sc-if>
+        <sc-if value="{{ submitted }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid rgba(200,218,255,.14);border-radius:18px;padding:30px;background:rgba(255,255,255,.03)">
+            <h2 style="font-family:Archivo,sans-serif;font-weight:300;font-size:30px;letter-spacing:-0.03em;color:#E9F0FF">Workspace ready.</h2>
+            <p style="color:#98A6C2;font-size:15px;margin-top:12px">{{ confirmDetail }}</p>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+    <footer style="padding:0 0 48px;display:flex;justify-content:space-between;gap:22px;flex-wrap:wrap;align-items:end;color:#98A6C2">
+      <span style="display:inline-flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase"><i style="width:5px;height:5px;border-radius:50%;background:#46D695;animation:fwPulse 2.4s ease-out infinite"></i> All systems operational</span>
+      <div style="display:flex;gap:20px;font-size:13.5px">
+        <a href="Fanwise Terms.dc.html" style-hover="color:#E9F0FF">Terms</a>
+        <a href="Fanwise Privacy.dc.html" style-hover="color:#E9F0FF">Privacy</a>
+      </div>
+      <p style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.04em;max-width:42ch;line-height:1.7">fanwise, adv. In the manner of a fan; spreading out from a single fixed point.</p>
+    </footer>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { submitted: false, errText: "" };
+  nameRef = React.createRef();
+  emailRef = React.createRef();
+  sellsRef = React.createRef();
+  shopRef = React.createRef();
+  renderVals() {
+    return {
+      nameRef: this.nameRef, emailRef: this.emailRef, sellsRef: this.sellsRef, shopRef: this.shopRef,
+      submitted: this.state.submitted,
+      notSubmitted: !this.state.submitted,
+      hasError: !!this.state.errText,
+      errText: this.state.errText,
+      confirmDetail: this.state.confirmDetail || "",
+      onSubmit: (e) => {
+        e.preventDefault();
+        const name = (this.nameRef.current?.value || "").trim();
+        const email = (this.emailRef.current?.value || "").trim();
+        if (!name) { this.setState({ errText: "Add a name so we know what to call the workspace." }); return; }
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { this.setState({ errText: "That email looks incomplete. Check it and try again." }); return; }
+        const sells = this.sellsRef.current?.value || "Fonts";
+        const shop = this.shopRef.current?.value || "Etsy";
+        this.setState({
+          errText: "", submitted: true,
+          confirmDetail: name.split(" ")[0] + ", your workspace is set up for " + sells.toLowerCase() + ". Connect " + shop + " first and bring one product — the drafts build from there."
+        });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -35,13 +35,32 @@ function sourceFiles(dir: string): string[] {
   return out
 }
 
-/** Where a channel key is allowed to appear. */
+/**
+ * Where a channel key is allowed to appear.
+ *
+ * The adapter layer, obviously. And the marketing site, less obviously, which
+ * is worth stating rather than assuming.
+ *
+ * Invariant 2 exists so that no part of the product takes a marketplace's shape:
+ * a provider name in `lib/products` or in a shared util means logic somewhere is
+ * branching on which shop it is talking to. The marketing site does not have
+ * that failure mode. Naming Etsy on a page whose job is to say which shops
+ * Fanwise publishes to is the copy, not a leak — a Marketplaces page that could
+ * not name a marketplace would have nothing to say.
+ *
+ * The exemption is narrow and paid for by `the marketing site names providers
+ * without deriving behavior from them` below, which holds the line that matters:
+ * marketing may print a provider's name and may not import the adapter layer.
+ */
+const MARKETING = ["components/marketing/", "app/(marketing)/"]
+
 function isSanctioned(path: string): boolean {
   const rel = relative(ROOT, path).split(sep).join("/")
   return (
     rel.startsWith("lib/channels/") ||
     rel.startsWith("components/channels/") ||
     rel.startsWith("app/[slug]/channels/") ||
+    MARKETING.some((dir) => rel.startsWith(dir)) ||
     rel.startsWith("tests/")
   )
 }
@@ -61,6 +80,25 @@ describe("provider names stay inside the adapter layer", () => {
         const needles = [key, key.replace(/_/g, "")].map((n) => n.toLowerCase())
         if (needles.some((needle) => contents.includes(needle))) {
           offenders.push(`${relative(ROOT, file)} mentions ${key}`)
+        }
+      }
+    }
+
+    expect(offenders).toEqual([])
+  })
+
+  it("the marketing site names providers without deriving behavior from them", () => {
+    // The price of the exemption above. A marketing page may write "Shopify" in
+    // a sentence; the moment it imports the registry, the site is rendering
+    // itself from the adapter layer and a channel added for the product silently
+    // changes the public copy.
+    const offenders: string[] = []
+
+    for (const dir of MARKETING) {
+      for (const file of sourceFiles(join(ROOT, ...dir.split("/")))) {
+        const contents = readFileSync(file, "utf8")
+        if (/from ["']@\/lib\/channels/.test(contents)) {
+          offenders.push(relative(ROOT, file))
         }
       }
     }

@@ -21,13 +21,20 @@
  * list in `lib/routes.ts` is the other half of this rule.
  */
 export const RESERVED_WORKSPACE_SLUGS: ReadonlySet<string> = new Set([
+  "about",
   "api",
   "auth",
   "forgot-password",
+  "how-it-works",
+  "marketplaces",
   "onboarding",
+  "pricing",
+  "privacy",
   "reset-password",
   "sign-in",
   "sign-up",
+  "start",
+  "terms",
 ])
 
 export const RESERVED_PRODUCT_SLUGS: ReadonlySet<string> = new Set([

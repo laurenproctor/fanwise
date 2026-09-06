@@ -15,6 +15,29 @@
  * segment there, in the same commit.
  */
 
+/**
+ * The marketing site. Public, unauthenticated, and the only routes here that a
+ * signed-out visitor can reach. `/` is shared: it serves the landing page to a
+ * visitor and resolves to a workspace for someone signed in.
+ *
+ * Every "Get started" on the site points at `signUp`, which is the real account
+ * form. `start` is the address the design used for a signup page of its own; it
+ * survives only as a redirect onto `signUp`, so a link written against the
+ * mockups still lands somewhere that works.
+ */
+export const marketingRoutes = {
+  landing: "/",
+  marketplaces: "/marketplaces",
+  howItWorks: "/how-it-works",
+  pricing: "/pricing",
+  about: "/about",
+  start: "/start",
+  terms: "/terms",
+  privacy: "/privacy",
+  signIn: "/sign-in",
+  signUp: "/sign-up",
+} as const
+
 export const routes = {
   /** The catalog. A workspace's home is the list of what it sells. */
   workspace: (workspace: string) => `/${workspace}`,
