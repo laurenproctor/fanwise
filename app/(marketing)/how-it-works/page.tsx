@@ -145,6 +145,10 @@ export default function HowItWorksPage() {
             </div>
           </article>
         ))}
+        <p className="fw-footnote fw-footnote--page" style={{ paddingTop: 28 }}>
+          The panels show a sample workspace. The product, its figures and the spec values are
+          illustrative.
+        </p>
       </section>
 
       <section style={{ padding: "48px 0 92px" }}>

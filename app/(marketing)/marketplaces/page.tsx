@@ -94,6 +94,10 @@ export default function MarketplacesPage() {
             affected drafts rebuild and you get a note saying which listings moved.
           </p>
         </div>
+        <p className="fw-footnote fw-footnote--page" style={{ margin: "-22px 0 26px" }}>
+          Spec values on this page are illustrative. Each marketplace publishes its own requirements
+          and Fanwise tracks them per channel.
+        </p>
         <div className="fw-table-scroll">
           <table className="fw-table">
             <thead>

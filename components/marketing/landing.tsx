@@ -380,8 +380,9 @@ export function Landing() {
 
             <div className="fw-mock__caption">
               <p className="fw-footnote">
-                Interface shown with a sample workspace. A rejection comes back with the shop&apos;s
-                reason and a suggested fix; accepting it rebuilds and resubmits that one draft.
+                Interface shown with a sample workspace; the product, figures and statuses are
+                illustrative. A rejection comes back with the shop&apos;s reason and a suggested
+                fix; accepting it rebuilds and resubmits that one draft.
               </p>
               <a href="#start" className="fw-arrow-link">
                 Fan out a product <span aria-hidden="true">&rarr;</span>
@@ -420,7 +421,10 @@ export function Landing() {
               </p>
             </div>
             <div className="fw-arith">
-              <div aria-label="Time spent listing one font family by hand" className="fw-tally">
+              <div
+                aria-label="Illustrative time spent listing one font family by hand"
+                className="fw-tally"
+              >
                 {TALLY.map(([task, time]) => (
                   <div key={task} className="fw-tally__row">
                     <span>{task}</span>
@@ -457,9 +461,9 @@ export function Landing() {
                   </div>
                 </div>
                 <p className="fw-footnote" style={{ marginTop: 18 }}>
-                  Hand timings are what designers report for one font family across these six shops.
-                  The minutes on Fanwise are review and approval: Fanwise builds the drafts, a
-                  person signs them off.
+                  Illustrative timings for one font family across six shops, not a measured
+                  benchmark. The minutes on Fanwise are review and approval: Fanwise builds the
+                  drafts, a person signs them off.
                 </p>
               </div>
             </div>
@@ -521,8 +525,9 @@ export function Landing() {
               </table>
             </div>
             <p className="fw-footnote" style={{ marginTop: 18 }}>
-              Rules are maintained per marketplace and versioned. When a shop changes a requirement,
-              affected drafts rebuild and you get a note saying which listings moved.
+              Spec values are illustrative. Rules are maintained per marketplace and versioned; when
+              a shop changes a requirement, affected drafts rebuild and you get a note saying which
+              listings moved.
             </p>
           </section>
         </div>
