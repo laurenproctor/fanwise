@@ -39,6 +39,7 @@ Keep these here only as pointers. Do not relitigate them from this file.
 | Where credentials live | Their own table with no grant to `authenticated` at all. RLS filters rows, not columns | `docs/data-model.md`, A3 revision |
 | Listing editing model | Independent rows plus a per-field pull from canonical. Never a live binding | `docs/channel-adapters.md` |
 | Re-verify ADR 0001 before A5 | Done, 4 September 2026. Shopify still has no digital-file API, so the ADR stands unchanged | this file |
+| How a Shopify product reaches a sales channel | Manual step for Gate A, scope afterwards. `status: ACTIVE` does not put a product on a channel, and `publishablePublish` needs a scope that re-authorises every connection | `docs/channels/shopify.md` §6 |
 | Reconnect gaming | A connection bills for a minimum of one full period | `CLAUDE.md`, pricing |
 | V1 roles | Owner only. The enum holds four, the UI exposes one | `docs/data-model.md`, A1 |
 
@@ -102,31 +103,26 @@ before any public launch, because a custom app does not scale to self-serve sign
 
 ### 4a. How a Shopify product reaches a sales channel
 
-**Found by running A5's exit test on 6 September 2026, and it blocks the last clause.**
+**Answered, 6 September 2026: a manual step for Gate A, the scope afterwards.** Kept here
+rather than only in the table above, because the reasoning matters when the scope is picked
+up later.
 
-`status: ACTIVE` does not make a product purchasable. Both live products read
-`publishedAt: null` and `onlineStoreUrl: null`: they are active and on no sales channel, so
-no storefront page exists and no buyer can reach them. `activate()` sets status and nothing
-else, which is all `productSet` can do.
+`status: ACTIVE` does not make a product purchasable. Found by running A5's exit test: both
+live products read `publishedAt: null` and `onlineStoreUrl: null` — active, on no sales
+channel, reachable by nobody, and reported by Fanwise as available to buy.
 
-Two ways to answer it, and they are not close in cost.
+Shopify can do this through the API, unlike the file step, so this was a choice rather than a
+limit. `publishablePublish` needs a publications scope the app does not request, and adding
+one re-authorises every existing connection.
 
-**Fanwise publishes to the channel.** Needs `publishablePublish` and a publications scope
-this app does not request. Adding a scope re-authorises every existing connection, so it is
-not a silent change even at three connections. It is the answer that makes **Publish
-Everywhere** mean what it says.
+The step won because it converts into the scope later and the reverse does not: taking the
+scope now spends a reconnection from every creator, at a gate whose entire purpose is closing
+the loop for a handful of them. The step is `required` and `gatesActivation`, so the product
+does not go live until a person has confirmed it — which also corrected `liveness`, the half
+that was not conditional on this decision.
 
-**The creator publishes it.** Becomes a manual step beside `attach_digital_file`, with the
-same standing: Fanwise says what to do, the creator asserts it is done, and `status_source`
-stays honest about who confirmed it. Cheap, and consistent with ADR 0001's shape for things
-Shopify will not let an app do — except that Shopify *will* let an app do this one, so the
-manual step would be a choice rather than a limit.
-
-**Recommendation:** the manual step for Gate A, the scope afterwards. Gate A is about closing
-the loop with a handful of creators, and a re-authorisation of every connection is a poor
-thing to spend that on; the step is reversible into the scope later, and the reverse is not
-true. Whichever is chosen, `liveness` must stop reporting `live` as "available to buy" for a
-product on no sales channel — that half is not optional and does not wait for this decision.
+**When the scope is taken**, delete the step rather than keeping both. Two ways to reach the
+same state, one automatic and one asserted, is how `status_source` stops meaning anything.
 
 ### 5. The credentials encryption key rotation plan
 

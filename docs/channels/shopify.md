@@ -142,22 +142,39 @@ confirm.
 
 Per ADR 0001 the deliverable is attached by hand, once per product, in Shopify admin.
 
-Fanwise makes that safe rather than merely documented:
+Two things stand between a published product and a buyer, and `status: ACTIVE` is neither of
+them. The second was found by running A5's exit test on 6 September 2026: a Shopify product
+can be active and on no sales channel, in which case it has no storefront page and nobody can
+reach it. Both live products read `publishedAt: null`, and Fanwise was reporting them as
+available to buy.
+
+Fanwise makes both safe rather than merely documented:
 
 ```
 publish()            product created with status DRAFT
                      listing.status = published, status_source = verified
                      manual step attach_digital_file, incomplete
+                     manual step publish_to_sales_channel, incomplete
                      Fanwise reports "Published, not live"
 
-mark attached        productSet identifier:{id} status ACTIVE
-                     manual step complete
+both steps marked    productSet identifier:{id} status ACTIVE
                      Fanwise reports "Live"
 ```
 
-The product is not purchasable until the creator confirms the file is on it. The window in
-which a buyer can pay and receive nothing does not exist, rather than existing and being
-warned about.
+The product is not purchasable until the creator confirms the file is on it **and** that it is
+on a storefront. Both steps are `required`, so an incomplete one holds the listing at
+"Published, not live"; both `gatesActivation`, so the product does not go ACTIVE until a
+person has confirmed both. The window in which a buyer can pay and receive nothing does not
+exist, and neither does the window in which Fanwise claims a product is for sale that nobody
+can find.
+
+The sales-channel step is a **choice, not a limit**, and that distinguishes it from the file
+step. Shopify has no API for attaching a digital file; it does have one for channel
+publication, `publishablePublish`, which needs a publications scope this app does not request.
+Adding a scope re-authorises every existing connection. Open decision 4a takes the step for
+Gate A and the scope afterwards, because a step converts into a scope later and the reverse
+costs every creator a reconnection. When the scope arrives, this step is deleted rather than
+kept alongside it.
 
 **This refines ADR 0001's UI sketch**, which showed the product created live with the file
 step outstanding. The ADR's own normative text asks for the opposite — "do not report the
