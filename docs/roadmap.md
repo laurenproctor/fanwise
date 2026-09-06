@@ -1,9 +1,9 @@
 # Roadmap
 
 **Current step: A5. Publishing, updating and image repair are verified against a live Shopify
-store, and idempotency is proven by test. One exit clause remains unrun, and running the rest
-uncovered a blocker for it: an ACTIVE Shopify product is not on a sales channel and nobody can
-buy it. See the note below.**
+store, and idempotency is proven by test. One exit clause remains unrun: no buyer has bought
+anything. The blocker that stopped it — an ACTIVE product on no sales channel — is answered by
+a manual step, so the clause is now reachable. See the note below.**
 
 Three gates. Nothing after a gate begins until the gate passes. Update the line above when a
 step completes, and do not work on more than one step at a time.
@@ -50,7 +50,7 @@ One real product, published to two channels, by a person who is not you.
 | A2 | Canonical product, product types, assets, storage, checksums, image derivative service | A complete product exists with correct derivatives for two image specs, no channel connected | done |
 | A3 | Channel registry, connections, listings, adapter contract, capability matrix, requirements engine, two mock adapters, one `api`-shaped and one `assisted`-shaped | One product yields two independent mock listings, the assisted mock implements no `publish`, and the UI offers none. No marketplace string in the product domain | done |
 | A4 | Manual listing editor, no AI. Readiness UI | A user hand-writes a listing per channel and sees deterministic readiness | done |
-| A5 | Shopify: OAuth, adapter, publish, idempotency, error normalization, digital delivery decision | Real product publishes, second click creates nothing, the file is actually deliverable to a buyer | code done, two exit clauses **verified**, buyer download **blocked**: the product is not purchasable |
+| A5 | Shopify: OAuth, adapter, publish, idempotency, error normalization, digital delivery decision | Real product publishes, second click creates nothing, the file is actually deliverable to a buyer | code done, two exit clauses **verified**, buyer download **unrun** |
 | A6 | Etsy: OAuth, adapter, draft, images, digital file, activate, idempotency | Real product publishes and is purchasable | |
 | A7 | Publish Everywhere orchestration, jobs, progress, retry, activity log | One action, two live URLs, one failure recovered without duplicates | |
 
@@ -127,9 +127,9 @@ the live products**, and one of them is answered the wrong way.
 | 2 | Is `requiresShipping: false` honored at creation rather than only on update? | Honored at creation. A product created and never updated reads `requiresShipping: false`, `tracked: false`. |
 | 4 | Does `onlineStoreUrl` populate on activation? | **No.** It is null on ACTIVE products, not only on drafts. |
 
-## The blocker this run uncovered
+## The blocker this run uncovered, and its answer
 
-**An ACTIVE Shopify product is not necessarily purchasable, and ours are not.**
+**An ACTIVE Shopify product is not necessarily purchasable, and ours were not.**
 
 All three products read `publishedAt: null` and `onlineStoreUrl: null`, including the two
 that are ACTIVE. In Shopify, `status: ACTIVE` and *published to a sales channel* are
@@ -152,8 +152,14 @@ Two consequences, and the second is worse than the first:
    unattached-file case and this is a second way to be unbuyable that the vocabulary does
    not yet cover.
 
-Nothing here is a defect in the code that was written. It is an assumption — that ACTIVE
+Nothing here was a defect in the code that was written. It was an assumption — that ACTIVE
 means for sale — which nobody had tested, and which the exit test existed to catch.
+
+**Answered on 6 September 2026** by open decision 4a: a manual step for Gate A, the scope
+afterwards. Both consequences above are closed. The step gates activation, so a product no
+longer goes ACTIVE before a person has confirmed it is on a storefront, and `liveness` no
+longer reports a product nobody can reach as available to buy. The two already-published
+products now read "Published, not live", which is what they always were.
 
 This step is still deliberately **not** recorded as done. A0 was marked complete on the
 strength of its checks passing while the app registrations it also owned were never filed, and
@@ -162,16 +168,19 @@ the same failure inverted — work genuinely done, and the roadmap still saying 
 account was outstanding. Both directions cost the same, so the rule does not change: a clause
 nobody has run is a clause that says so.
 
-What remains for A5, in order:
+**The blocker is answered.** Open decision 4a took the manual step for Gate A and the scope
+afterwards. `publish_to_sales_channel` is `required` and `gatesActivation`, so a product does
+not go ACTIVE until a person has confirmed both it and the file, and a listing with either
+outstanding reports "Published, not live" rather than "Live". That corrected what `liveness`
+claimed, which was the half that did not depend on the decision.
 
-1. **Decide how a product reaches a sales channel.** Either Fanwise publishes it, which means
-   adding a publications scope and re-authorising every connection, or it does not, which
-   means the creator does it in the Shopify admin and it becomes a manual step with the same
-   standing as attaching the file. Until this is decided, "live" cannot honestly be shown.
-2. **Correct what `liveness` claims** in whichever direction step 1 settles. A product that
-   is on no sales channel must not be reported as available to buy.
-3. **Then place a test order and download the file as a buyer**, which is the clause that has
-   never been attempted and cannot be attempted before step 1.
+What remains for A5:
+
+1. **Complete both steps on a real product**, which for the two already published means
+   putting them on the Online Store in the Shopify admin. They currently read
+   "Published, not live", correctly, where before they read "Live" incorrectly.
+2. **Then place a test order and download the file as a buyer.** Still never attempted, and
+   now actually possible.
 
 The image half of the old "worth doing in the same sitting" note is done: republishing
 confirmed the supporting images arrive.

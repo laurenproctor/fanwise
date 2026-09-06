@@ -136,8 +136,25 @@ const requirements: readonly RequirementSpec[] = [
   },
 ]
 
-/** ADR 0001's assisted file step, and the only manual step this channel has. */
+/** ADR 0001's assisted file step. */
 export const ATTACH_DIGITAL_FILE = "attach_digital_file"
+
+/**
+ * The second thing standing between a published product and a buyer.
+ *
+ * Found by running A5's exit test on 6 September 2026: `status: ACTIVE` does
+ * not put a product on a sales channel. Both live products read
+ * `publishedAt: null` and `onlineStoreUrl: null` — active, on no channel, and
+ * unreachable by anyone. Fanwise was reporting them as available to buy.
+ *
+ * Shopify *can* do this through the API, unlike the file step, so this is a
+ * choice rather than a limit: `publishablePublish` needs a publications scope
+ * this app does not request, and adding one re-authorises every existing
+ * connection. Open decision 4a takes the manual step for Gate A and the scope
+ * afterwards, because a step converts into a scope later and the reverse costs
+ * every creator a reconnection.
+ */
+export const PUBLISH_TO_SALES_CHANNEL = "publish_to_sales_channel"
 
 const manualSteps: readonly ManualStepSpec[] = [
   {
@@ -145,7 +162,7 @@ const manualSteps: readonly ManualStepSpec[] = [
     label: "Attach the download file",
     description:
       "Shopify has no API for digital files, so this step is manual, once per product. " +
-      "The product stays a draft until you confirm it, so nobody can buy it before the file is on it.",
+      "The product stays a draft until every step here is done, so nobody can buy it before the file is on it.",
     instructions: [
       "Download the deliverable from Fanwise.",
       "Open the product in Shopify.",
@@ -154,6 +171,24 @@ const manualSteps: readonly ManualStepSpec[] = [
     required: true,
     gatesActivation: true,
     needsDeliverable: true,
+  },
+  {
+    key: PUBLISH_TO_SALES_CHANNEL,
+    label: "Put the product on your storefront",
+    description:
+      "A Shopify product can be active and still on no sales channel, which means it has no " +
+      "storefront page and nobody can reach it. Fanwise cannot do this for you yet.",
+    instructions: [
+      "Open the product in Shopify.",
+      "Find Publishing, or Sales channels, in the sidebar.",
+      "Add Online Store, plus any other channel you sell through.",
+    ],
+    required: true,
+    // Gates activation for the same reason the file step does. A product goes
+    // ACTIVE when it is genuinely ready to sell and not before, which is the
+    // whole shape ADR 0001 chose when it made the product a draft at creation.
+    gatesActivation: true,
+    needsDeliverable: false,
   },
 ]
 

@@ -248,6 +248,44 @@ describe("transforms", () => {
   })
 })
 
+describe("the manual steps standing between a product and a buyer", () => {
+  /*
+    Two things make a Shopify product purchasable and neither is `status:
+    ACTIVE`. A5's exit test found the second the hard way: both live products
+    read publishedAt: null, meaning active, on no sales channel, and reachable
+    by nobody — while Fanwise reported them as available to buy.
+
+    Both steps gate activation, so the product stays a draft until a person has
+    confirmed both. That is the shape ADR 0001 chose when it created the
+    product as a draft rather than live: nothing is purchasable before it is
+    genuinely ready to sell.
+  */
+  it("requires the file and the sales channel, and both hold the product back", () => {
+    const keys = shopifyAdapter.manualSteps.map((step) => step.key)
+    expect(keys).toEqual(["attach_digital_file", "publish_to_sales_channel"])
+
+    for (const step of shopifyAdapter.manualSteps) {
+      // required: an incomplete one means "published, not live" rather than live.
+      expect(step.required).toBe(true)
+      // gatesActivation: the adapter does not flip the product live until it is done.
+      expect(step.gatesActivation).toBe(true)
+    }
+  })
+
+  it("does not claim the creator needs the file in hand to reach a sales channel", () => {
+    // needsDeliverable drives whether the UI offers a download beside the step.
+    // Offering one here would suggest the file is involved, and it is not.
+    const salesChannel = shopifyAdapter.manualSteps.find(
+      (step) => step.key === "publish_to_sales_channel",
+    )
+    expect(salesChannel?.needsDeliverable).toBe(false)
+  })
+
+  it("implements activate, which is what declaring gatesActivation promises", () => {
+    expect(typeof shopifyAdapter.activate).toBe("function")
+  })
+})
+
 describe("requirements", () => {
   it("blocks on a missing deliverable, because the manual step needs a file", () => {
     const withoutFile = subject({ assets: [asset()] })
