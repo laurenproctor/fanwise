@@ -389,10 +389,10 @@ Nothing below is a guess about intent; each is a shape that only a 2xx can confi
 8. `seo.title` on `productSet`. `seo.description` has been sent since the first publish and
    is known to be accepted; the title half has not.
 9. Whether `product(id:)` returns null rather than erroring for an id that was deleted
-   rather than never existing. §15 depends on it, and it is asserted against a recorded
-   fake. A GraphQL error instead of a null would normalize to `unknown` and leave the
-   listing stuck in exactly the way §15 was written to end — visibly, at least, rather than
-   silently.
+   rather than never existing: **answered, 7 September 2026.** Null, with no `errors`
+   entry, for a product deleted in the admin minutes earlier. §16 records the run.
+7. and 8. are likewise **answered, 7 September 2026**: `category` with `so-2-5` and
+   `seo.title` were both accepted and read back from a live product. §16.
 
 ## 14. Category, product type, and the two SEO fields
 
@@ -601,6 +601,34 @@ Three things the run taught that the fake did not:
    unknown and unknown keeps the old answer, so the display stayed Live — by luck. Had the
    value been `false`, the same rebuild would have promoted a product on no channel to
    "available to buy". Fixed the same day: both keys are publication-owned and survive.
+
+**Run a second time, same day, on the same listing after its product was deleted.** The
+creator deleted `9409212186860` in the Shopify admin, edited the listing so there was
+something to send, and clicked Publish changes:
+
+```
+17:33:58  update   failed     external_object_missing    raw: {"product": null}
+17:34:13  publish  succeeded  generation 1  →  gid://shopify/Product/9409237975276
+17:39:29  activate succeeded  generation 1  →  ACTIVE, on Online Store, count 1
+```
+
+That is §15 end to end: Shopify returns `null` rather than an error for a deleted id (§13
+item 9, answered), the runner withdraws the listing's claim and moves the generation, the new
+publish key is not the claimed one, and the fresh product carried the category and both SEO
+overrides. The re-created product went live on the Online Store by handle, exactly as the
+first had.
+
+It also found a fourth thing, fixed the same hour: the reset had left the manual steps alone,
+so the new draft inherited a file step marked done on the deleted product, read "no steps
+outstanding, not purchasable", and offered nothing to click — activate has no trigger except a
+step being marked done. The reset now reopens the steps; a file attached to a product that no
+longer exists is not attached.
+
+**A limitation to state plainly.** A deletion is noticed only when Fanwise next writes.
+There is no "check the channel" action, so a product deleted in Shopify goes on reading Live
+until the creator sends something. That is deliberate at A5 — a status poll is A7's
+orchestration work, not a patch here — and it means the honesty of the Live badge is bounded
+by the last write, which the spec should say rather than imply.
 
 A rebuild also regenerates the SEO overrides to null, exactly as it does the title and
 description, and the update that followed sent the fallbacks. That is a rebuild doing what a
