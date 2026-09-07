@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useEffect, useRef, useState } from "react"
+import { startTransition, useActionState, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field } from "@/components/ui/field"
 import { RequiredMark } from "@/components/ui/required-mark"
@@ -66,19 +66,57 @@ export function ProductForm({
 
   const formRef = useRef<HTMLFormElement>(null)
   const [dirty, setDirty] = useState(false)
+  /*
+   * When the last edit happened. The idle timer is keyed on this rather than
+   * on `dirty`, and the difference is the whole bug it replaces: `dirty` is
+   * true after the first keystroke and stays true, so setting it again on the
+   * second keystroke changed nothing, nothing re-rendered, and the timer that
+   * started on the first character ran out while the creator was still in the
+   * middle of the word. Every save then landed mid-sentence. A timestamp
+   * changes on every input, so every keystroke restarts the clock and a
+   * paragraph typed without pausing is one save at the end, as intended.
+   */
+  const [editedAt, setEditedAt] = useState(0)
+
+  function markEdited() {
+    setDirty(true)
+    setEditedAt(Date.now())
+  }
 
   /*
-   * Autosave by asking the form to submit itself, rather than by assembling a
-   * FormData by hand. The action, its validation and its error handling are
-   * the same ones the button uses, so there is one save path and not two that
-   * can disagree. requestSubmit also runs native validation, which a direct
-   * call to the action would skip.
+   * One save path, called by the timer and by the button alike.
+   *
+   * Deliberately not `requestSubmit` on a form with an `action` prop. React
+   * resets an uncontrolled form once its action resolves, which is right for
+   * a form that submits and leaves and wrong for one that saves while you
+   * type: every field snapped back to its server value at the end of each
+   * save, taking with it whatever had been typed since the save began. The
+   * data is read from the form and dispatched inside a transition instead,
+   * which keeps `isPending` and the action's result and skips the reset.
+   * Native validation still runs, by asking for it.
    */
+  function save() {
+    const form = formRef.current
+    if (!form || isPending) return
+    if (!form.checkValidity()) {
+      form.reportValidity()
+      return
+    }
+    // A save in flight covers everything typed up to this point. Typing during
+    // the save marks the form dirty again through onInput.
+    setDirty(false)
+    const data = new FormData(form)
+    startTransition(() => formAction(data))
+  }
+
   useEffect(() => {
     if (!dirty || isPending) return
-    const timer = setTimeout(() => formRef.current?.requestSubmit(), AUTOSAVE_IDLE_MS)
+    const timer = setTimeout(save, AUTOSAVE_IDLE_MS)
     return () => clearTimeout(timer)
-  }, [dirty, isPending])
+    // `save` reads the form ref and the pending flag at call time; listing it
+    // would restart the timer on every render rather than on every edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, editedAt, isPending])
 
   /*
    * The last line of defence, not the first. Autosave should mean this never
@@ -119,12 +157,12 @@ export function ProductForm({
 
       <form
         ref={formRef}
-        action={formAction}
-        onInput={() => setDirty(true)}
-        onChange={() => setDirty(true)}
-        // A save in flight covers everything typed up to this point. Typing
-        // during the save sets it again through onInput.
-        onSubmit={() => setDirty(false)}
+        onInput={markEdited}
+        onChange={markEdited}
+        onSubmit={(event) => {
+          event.preventDefault()
+          save()
+        }}
         className="flex flex-col gap-5"
       >
         <FormError message={state.error} />
