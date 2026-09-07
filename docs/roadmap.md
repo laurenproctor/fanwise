@@ -1,11 +1,16 @@
 # Roadmap
 
-**Current step: A5 is done, 7 September 2026, and promoted to `main`. All three exit clauses
-have run against a live Shopify store: a real product publishes, a second click creates
-nothing, and the product is ACTIVE *and* on the Online Store sales channel with the placement
-read back rather than assumed. A6 (Etsy) is next and does not begin until Etsy's developer
-app and commercial access are approved; neither is gated on code. See the note below for what
-the run found and fixed.**
+**Current step: B1, out of order, decided 7 September 2026.** A5 is done and promoted to
+`main`; all three exit clauses ran against a live Shopify store. What remains of Gate A is
+blocked on things no code can move: A6 on Etsy's developer app and commercial access, A8 on a
+Creative Market seller login, and the gate's own exit — an outside creator, unassisted — on a
+real portfolio to hand them. B1 (AI provider abstraction, FactSheet, factuality validator,
+Trigger.dev) depends on none of those and on nothing after A5, so it starts now. **Gate A is
+not passed.** A6, A7 and A8 resume the moment their blockers clear, and Gate A's exit test is
+still owed before Gate B's is attempted. See "Reordering" below.
+
+Before B1 opens, two decisions in `docs/decisions/0002` are owed answers: 12 (model and
+cost per generation) and 13 (metered or unlimited). And `ANTHROPIC_API_KEY` has to exist.**
 
 Three gates. Nothing after a gate begins until the gate passes. Update the line above when a
 step completes, and do not work on more than one step at a time.
@@ -252,6 +257,26 @@ the channels that can be published to, and Creative Market is not one of them �
 to call. A8 arrives after A7 and does not widen A7's exit test. What A8 does put in front of
 Publish Everywhere is a connected channel the action must visibly skip rather than silently
 omit, which is the capability-matrix case A3's assisted mock was built to rehearse.
+
+## Reordering, 7 September 2026
+
+"Nothing after a gate begins until the gate passes" is the rule at the top of this file, and
+this is the first exception, so the reasoning is written down where the rule is.
+
+Gate A's remaining steps are all blocked on external parties or on time: Etsy's approvals
+(A6), a Creative Market seller login (A8), and a real portfolio for the outside creator the
+gate's exit test needs. A7 is orchestration over channels that can be published to, and with
+one such channel live it would be orchestrating a list of one. None of that is code, and
+waiting on it with nothing to build is the expensive choice.
+
+B1 depends on A2 (canonical product), A3/A4 (listings and the editor) and A5 (a real channel
+with a real profile to generate against) — all done — and on nothing in A6–A8. Adopting
+Trigger.dev at B1 also means A7, when it resumes, is built on the real job system rather than
+on the in-process queue it would otherwise have had to migrate off.
+
+What is accepted, not argued away: Gate A's exit test has not run and is not made easier by
+this. B2's listing review and B2a's composed-listing test both need creators, which is the
+same portfolio problem A's exit has. Reordering buys time for B1; it does not buy a Gate.
 
 ## Gate B: the abstraction holds and the money comes back
 
