@@ -148,9 +148,11 @@ beforeAll(async () => {
       channel_connection_id: connection.id,
       title: "Hand-written title",
       description: "Hand-written description that the creator typed.",
-      price: 48,
+      // Built before the creator priced the product, as the first live
+      // generation was. Composing is expected to fill it from the product.
+      price: null,
       currency: "USD",
-      category: "font",
+      category: null,
     })
     .select("id")
     .single()
@@ -230,8 +232,10 @@ describe("a supported listing", () => {
     expect(listing.title).toBe("Aster Grotesk — a grotesque for long text")
     expect(listing.tags).toEqual(["grotesque", "sans"])
     expect(listing.seo_title).toBeNull()
-    // Not the model's to decide.
+    // Not the model's to write. The listing had no price and no category, so
+    // both are taken from the product through the adapter, as a build would.
     expect(Number(listing.price)).toBe(48)
+    expect(listing.currency).toBe("USD")
     expect(listing.category).toBe("font")
     expect(listing.generated_at).not.toBeNull()
     expect((listing.metadata as Record<string, unknown>).composedAt).toBeTruthy()
@@ -278,6 +282,24 @@ describe("a supported listing", () => {
       .eq("channel_listing_id", listingId)
       .eq("status", "pending")
     await settle()
+  })
+})
+
+describe("a price the creator set on the listing", () => {
+  it("survives a compose, whatever the product says", async () => {
+    await adminClient().from("channel_listings").update({ price: 12 }).eq("id", listingId)
+    await generate(
+      scripted({
+        title: "Aster Grotesk",
+        description: "Nine weights, drawn for running text.",
+        shortDescription: "",
+        seoTitle: "",
+        seoDescription: "",
+        tags: ["grotesque"],
+      }),
+    )
+    const listing = await listingRow(listingId)
+    expect(Number(listing.price)).toBe(12)
   })
 })
 

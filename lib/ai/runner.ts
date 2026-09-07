@@ -251,6 +251,28 @@ async function execute(
     [COMPOSED_AT_KEY]: now,
   }
 
+  const subject: AdapterSubject = { product: product as Product, assets }
+
+  /*
+   * The fields the model does not write, filled where the listing has none.
+   *
+   * A listing built before the creator entered a price is born without one,
+   * and nothing back-fills it: listings are independent rows and never a live
+   * binding to the product. Composing is the moment the creator asks for a
+   * finished listing, so it takes what a build would take now — the adapter's
+   * own draft — for price, currency and category, and only where the listing
+   * holds nothing. A price the creator set on the listing is theirs and stays.
+   * Found on the first live generation, where the composed listing was
+   * complete in every field but the one the model is forbidden to touch.
+   */
+  const fresh = adapter.buildListing(subject)
+  const priceFill =
+    listing.price === null && fresh.price !== null
+      ? { price: fresh.price, currency: fresh.currency }
+      : {}
+  const categoryFill =
+    listing.category === null && fresh.category !== null ? { category: fresh.category } : {}
+
   const { data: updated, error: updateError } = await admin
     .from("channel_listings")
     .update({
@@ -260,6 +282,8 @@ async function execute(
       seo_title: blank(output.seoTitle),
       seo_description: blank(output.seoDescription),
       tags: output.tags,
+      ...priceFill,
+      ...categoryFill,
       generated_at: now,
       metadata: metadata as never,
     })
@@ -280,7 +304,6 @@ async function execute(
     return
   }
 
-  const subject: AdapterSubject = { product: product as Product, assets }
   const draft = listingToDraft(updated as ChannelListing)
   const evaluation = evaluate(adapter, draft, subject)
 
