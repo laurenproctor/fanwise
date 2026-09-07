@@ -75,6 +75,23 @@ describe("externalState survives a rebuild", () => {
     expect(rebuildColumns(draft, {}, AT).metadata).not.toHaveProperty("externalState")
   })
 
+  it("keeps purchasable too, or a rebuild would make an unbuyable product look live", () => {
+    /*
+      Found on the first live run. Activate recorded purchasable: true, the
+      creator rebuilt the listing, and the key was gone — the old rule kept
+      externalState alone. Absent reads as unknown and unknown keeps the old
+      answer, so the display stayed "Live" by luck. Had the recorded value been
+      false, the same rebuild would have promoted a product on no sales channel
+      to "available to buy".
+    */
+    const columns = rebuildColumns(draft, { externalState: "live", purchasable: false }, AT)
+    expect(columns.metadata).toMatchObject({ externalState: "live", purchasable: false })
+    expect(rebuildColumns(draft, { purchasable: true }, AT).metadata).toMatchObject({
+      purchasable: true,
+    })
+    expect(rebuildColumns(draft, {}, AT).metadata).not.toHaveProperty("purchasable")
+  })
+
   it("prefers the recorded state over anything the draft carries", () => {
     // Only publication may write this key, so publication wins.
     const columns = rebuildColumns(

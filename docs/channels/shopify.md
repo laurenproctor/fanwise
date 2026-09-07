@@ -575,6 +575,38 @@ would be reasonable to skip the publish call for a publication that auto-publish
 not skipped: it is the merchant's setting, it can change between one publish and the next,
 and publishing something already published is the cheaper of the two ways to be wrong.
 
+### Run against the live store, 7 September 2026
+
+`Test Type` (`gid://shopify/Product/9409212186860`), a product created for the purpose. In
+one sitting, through the UI: publish created it as a DRAFT with category `so-2-5`, both SEO
+overrides, price, `requiresShipping: false` and the cover image; marking the file step done
+fired `activate`, which set ACTIVE, resolved `…654636` **by handle** with `pos` and
+`shop-72` present as wrong answers, called `publishablePublish`, and read back a count of 1.
+The job row records `resolvedBy: "handle"`. Fanwise reported **Live**, and Shopify agreed:
+`publishedAt` set, on the Online Store, not on Point of Sale.
+
+Three things the run taught that the fake did not:
+
+1. **The product landed on two publications, and Fanwise put it on one.** The second is
+   `216151687404`, "Microsoft Copilot" — a channel app on the store that auto-publishes new
+   products through its own catalog. It did not appear in the `publications` query and
+   `resourcePublicationsCount` does not count it. Fanwise neither caused it nor can see it,
+   which is fine; it is recorded so the next person reading `resourcePublications` does not
+   go looking for the bug.
+2. **`onlineStoreUrl` is still null** on a product that is ACTIVE *and* on the Online Store.
+   §13 item 4's decision to store the admin URL is right for a third reason now. The likely
+   cause is the development store's storefront password, which is unverified.
+3. **A rebuild erased `purchasable`.** `rebuildColumns` preserved only `externalState`, so
+   regenerating the listing after activation dropped the recorded `true`. Absent reads as
+   unknown and unknown keeps the old answer, so the display stayed Live — by luck. Had the
+   value been `false`, the same rebuild would have promoted a product on no channel to
+   "available to buy". Fixed the same day: both keys are publication-owned and survive.
+
+A rebuild also regenerates the SEO overrides to null, exactly as it does the title and
+description, and the update that followed sent the fallbacks. That is a rebuild doing what a
+rebuild does, not a defect; it is noted because the run's "asfd" became "Test Type" and the
+first reading of that was a lost write.
+
 ### What the listing records
 
 `PublishResult.purchasable`, persisted to `channel_listings.metadata.purchasable`, and read

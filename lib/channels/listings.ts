@@ -91,25 +91,40 @@ export function draftToColumns(draft: ChannelListingDraft) {
  * self_reported while leaving its external id in place — a row claiming to be
  * unpublished while pointing at a real product.
  *
- * `externalState` survives, and it is the reason this is a function rather than
- * a shorter object literal. The Shopify adapter reads it to decide whether an
- * update sends ACTIVE or DRAFT, so dropping it turns the next edit into an
- * instruction to take a live product off sale. The draft owns adapter metadata;
- * publication owns this one key.
+ * Two keys survive, and they are the reason this is a function rather than a
+ * shorter object literal. The draft owns adapter metadata; publication owns
+ * these:
+ *
+ *   `externalState`  read by the adapter to decide whether an update sends
+ *                    ACTIVE or DRAFT. Dropping it turns the next edit into an
+ *                    instruction to take a live product off sale.
+ *   `purchasable`    read by liveness to decide whether "Live" may be shown.
+ *                    Dropping it was a bug that shipped: a rebuild after
+ *                    activation erased a recorded `false`, absent reads as
+ *                    unknown, and unknown keeps the old answer — so a product
+ *                    on no sales channel would have been reported as buyable
+ *                    the moment its listing was regenerated. Found on the
+ *                    first live run, 7 September 2026, where the erased value
+ *                    happened to be `true` and the display happened to stay
+ *                    right for the wrong reason.
  */
+const PUBLICATION_OWNED_KEYS = ["externalState", "purchasable"] as const
+
 export function rebuildColumns(
   draft: ChannelListingDraft,
   existingMetadata: unknown,
   generatedAt: string,
 ) {
-  const externalState = (existingMetadata as Record<string, unknown> | null)?.externalState
+  const existing = (existingMetadata as Record<string, unknown> | null) ?? {}
+  const kept: Record<string, unknown> = {}
+  for (const key of PUBLICATION_OWNED_KEYS) {
+    if (existing[key] !== undefined) kept[key] = existing[key]
+  }
 
   return {
     ...draftToColumns(draft),
     generated_at: generatedAt,
-    metadata: (externalState === undefined
-      ? draft.metadata
-      : { ...draft.metadata, externalState }) as never,
+    metadata: { ...draft.metadata, ...kept } as never,
   }
 }
 
