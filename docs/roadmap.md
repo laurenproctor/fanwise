@@ -178,7 +178,9 @@ the adapter had been confusing it with, and the meta title. See §14.
 
 What remains for A5, in order:
 
-1. **Decide how a product reaches a sales channel.** Either Fanwise publishes it, which means
+1. **Decide how a product reaches a sales channel.** Written up as
+   `docs/decisions/0004-shopify-sales-channel-publication.md`, which costs both options and
+   recommends one; the decision itself is still owed. Either Fanwise publishes it, which means
    adding a publications scope and re-authorising every connection, or it does not, which
    means the creator does it in the Shopify admin and it becomes a manual step with the same
    standing as attaching the file. Until this is decided, "live" cannot honestly be shown.
