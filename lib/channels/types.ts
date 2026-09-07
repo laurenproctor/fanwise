@@ -162,6 +162,24 @@ export interface PublishResult {
   externalUrl: string | null
   externalState: ExternalListingState
   /**
+   * Whether a buyer can actually reach and buy the thing that was just written.
+   *
+   * Separate from `externalState`, and the separation is the whole point. A5's
+   * exit test found a provider where the object's own status says "active" and
+   * a buyer still cannot reach it, because being active and being on a sales
+   * channel are two different facts there. `externalState` answers the first —
+   * it has to, because an update reads it back to avoid taking a live object
+   * off sale — so it cannot also answer the second without one of the two
+   * questions getting the wrong answer.
+   *
+   * `null` means the adapter did not establish it. That is not the same as
+   * false and must never be rendered as one: a channel with no such concept,
+   * and every listing published before this field existed, are both null, and
+   * reporting those as "nobody can buy this" would be a fresh lie in the
+   * opposite direction.
+   */
+  purchasable?: boolean | null
+  /**
    * The provider's own response, persisted to publication_jobs. Never rendered,
    * and never a credential: adapters return what came back from a write.
    */
@@ -241,6 +259,20 @@ export interface ChannelOAuth {
   /** Label and placeholder for the account field, e.g. a shop domain. */
   accountHintLabel: string
   accountHintPlaceholder: string
+  /**
+   * Everything this build asks the provider for.
+   *
+   * Declared here rather than left inside the adapter so shared code can ask
+   * whether an existing connection was granted it, without naming a provider.
+   * `channel_connections.scopes` records what was actually granted, and until
+   * this field existed nothing compared the two — the column was written at
+   * every authorization and read by nothing, which was survivable only while
+   * the list never changed.
+   *
+   * It changes. A connection authorized before a scope was added holds a token
+   * that cannot do the new thing, and the creator has to be asked again.
+   */
+  scopes: readonly string[]
   /**
    * Validates and normalizes what the creator typed, before it reaches a URL.
    * An account hint becomes a hostname Fanwise redirects a person to and then

@@ -38,6 +38,7 @@ export function ConnectButton({
   disabled,
   publishedCount,
   oauth,
+  needsReauthorization,
 }: {
   workspaceSlug: string
   channelKey: string
@@ -58,6 +59,18 @@ export function ConnectButton({
   disabled?: boolean
   /** Present when this channel is connected by authorizing it. */
   oauth: OAuthPrompt | null
+  /**
+   * True when this build asks the provider for more than this connection was
+   * granted.
+   *
+   * The button this drives is not a convenience. Disconnecting removes the
+   * channel's listings, so without a way to re-authorize in place, a connection
+   * whose scopes have fallen behind has exactly one affordance and it is
+   * destructive — the creator would have to delete their listings to fix a
+   * permission. Reconnecting upserts on the same account and keeps the
+   * connection id, so the listings hanging off it are untouched.
+   */
+  needsReauthorization?: boolean
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -151,6 +164,35 @@ export function ConnectButton({
         </Button>
         <FormError message={error} />
       </div>
+    )
+  }
+
+  if (connectionId && needsReauthorization && oauth) {
+    return (
+      <form
+        className="grid gap-3"
+        onSubmit={(event) => {
+          event.preventDefault()
+          authorize()
+        }}
+      >
+        <p className="border-l-2 border-[var(--color-warn)] pl-3 text-[13px] text-[var(--color-ink-2)]">
+          Fanwise needs one more permission on this account before it can put products on sale.
+          Reconnecting keeps your listings and everything already published.
+        </p>
+        <Field
+          label={oauth.accountHintLabel}
+          name="accountHint"
+          value={accountHint}
+          onChange={(event) => setAccountHint(event.target.value)}
+          placeholder={accountName ?? oauth.accountHintPlaceholder}
+          required
+        />
+        <Button type="submit" disabled={pending}>
+          {pending ? "Taking you there…" : `Reconnect ${channelName}`}
+        </Button>
+        <FormError message={error} />
+      </form>
     )
   }
 

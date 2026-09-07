@@ -9,6 +9,7 @@ vi.mock("@/lib/credentials", () => ({
 import { createShopifyClient } from "@/lib/channels/adapters/shopify/client"
 import { shopifyAdapter } from "@/lib/channels/adapters/shopify"
 import { constraintsFor } from "@/lib/channels/constraints"
+import { SCOPES } from "@/lib/channels/adapters/shopify/config"
 import { evaluate } from "@/lib/channels/listings"
 import { ChannelError } from "@/lib/channels/errors"
 import {
@@ -139,6 +140,9 @@ function context(overrides: Partial<PublishContext> = {}): PublishContext {
       workspace_id: "ws-1",
       external_account_id: "aster-type.myshopify.com",
       metadata: { currencyCode: "USD" },
+      // A connection authorized by this build. A shorter list is a connection
+      // from before ADR 0004, which is its own case below.
+      scopes: [...SCOPES],
     } as unknown as ChannelConnection,
     subject: subject(),
     assetUrl: async () => "https://signed.example/cover.png",
@@ -190,6 +194,10 @@ function respondTo(
     holds?: string
     /** Answer the state read with no product at all, as a deleted id would. */
     missing?: boolean
+    /** The shop's sales channels, for the publication lookup. */
+    publications?: { id: string; handle: string | null; autoPublish?: boolean }[]
+    /** How many publications the product sits on after publishablePublish. */
+    publishedTo?: number
   } = {},
 ): Response {
   const query = String((body as { query?: string }).query ?? "")
@@ -197,7 +205,43 @@ function respondTo(
     if (options.missing) return jsonResponse({ data: { product: null } })
     return jsonResponse(productStateOk(options.media, options.holds))
   }
+  if (query.includes("FanwisePublications")) {
+    return jsonResponse(publicationsOk(options.publications))
+  }
+  if (query.includes("FanwisePublishablePublish")) {
+    return jsonResponse(publishablePublishOk(options.publishedTo ?? 1))
+  }
   return jsonResponse(productSetOk(options.status))
+}
+
+/** A publications response: one channel, handled like an Online Store. */
+function publicationsOk(
+  nodes: { id: string; handle: string | null; autoPublish?: boolean }[] = [
+    { id: "gid://shopify/Publication/1", handle: "online_store" },
+  ],
+) {
+  return {
+    data: {
+      publications: {
+        nodes: nodes.map((node) => ({
+          id: node.id,
+          autoPublish: node.autoPublish ?? false,
+          channels: { nodes: [{ id: `${node.id}-channel`, handle: node.handle }] },
+        })),
+      },
+    },
+  }
+}
+
+function publishablePublishOk(count = 1) {
+  return {
+    data: {
+      publishablePublish: {
+        publishable: { resourcePublicationsCount: { count } },
+        userErrors: [],
+      },
+    },
+  }
 }
 
 /** The productSet call, wherever it landed among the reads. */
@@ -966,6 +1010,187 @@ describe("publish", () => {
     // Shopify says DRAFT, the listing's own record says live, and the record
     // wins. `preserve` is for a listing that has no record at all.
     expect((productSetVariables(bodies).input as { status: string }).status).toBe("ACTIVE")
+  })
+})
+
+describe("putting the product on a sales channel", () => {
+  /*
+    ADR 0004. `status: ACTIVE` does not make a Shopify product purchasable —
+    being active and being on a sales channel are separate facts, and A5's exit
+    test found three products that were the first and not the second. activate()
+    used to set the status and stop, and Fanwise reported the result as "Live".
+  */
+
+  it("sets ACTIVE and then puts the product on the channel", async () => {
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body, { status: "ACTIVE", holds: "ACTIVE" })),
+    )
+
+    const result = await shopifyAdapter.activate!(
+      context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
+    )
+
+    const queries = bodies.map((b) => String((b as { query?: string }).query ?? ""))
+    expect(queries.some((q) => q.includes("FanwiseProductSet"))).toBe(true)
+    expect(queries.some((q) => q.includes("FanwisePublishablePublish"))).toBe(true)
+    expect(result.purchasable).toBe(true)
+  })
+
+  it("reports the product as not purchasable when it landed on no publication", async () => {
+    /*
+      The assertion the whole change turns on. publishablePublish returned no
+      userErrors, so the old reading is "it worked" — and the product is on
+      zero publications, which means no storefront page and no buyer. The count
+      is the answer; the absence of errors is not.
+    */
+    vi.stubGlobal(
+      "fetch",
+      captureFetch([], (body) =>
+        respondTo(body, { status: "ACTIVE", holds: "ACTIVE", publishedTo: 0 }),
+      ),
+    )
+
+    const result = await shopifyAdapter.activate!(
+      context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
+    )
+
+    expect(result.purchasable).toBe(false)
+  })
+
+  it("creates a draft as explicitly not purchasable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      captureFetch([], (body) => respondTo(body)),
+    )
+
+    const result = await shopifyAdapter.publish!(context())
+
+    // False rather than absent. Absent means nobody established it, and the two
+    // must stay tellable apart or liveness cannot use either.
+    expect(result.purchasable).toBe(false)
+  })
+
+  it("leaves purchasability alone on an ordinary update", async () => {
+    // An update does not look at publications, so it has no opinion. Returning
+    // false here would take a live product's badge away for no reason.
+    vi.stubGlobal(
+      "fetch",
+      captureFetch([], (body) => respondTo(body, { holds: "ACTIVE" })),
+    )
+
+    const result = await shopifyAdapter.update!(
+      context({
+        listing: listing({
+          external_listing_id: "gid://shopify/Product/900",
+          metadata: { externalState: "live" },
+        }),
+      }),
+    )
+
+    expect(result.purchasable).toBeUndefined()
+  })
+
+  it("refuses rather than guessing when the store's channels are ambiguous", async () => {
+    /*
+      Publication.name and Publication.app are both deprecated on 2026-07, so
+      the Online Store is identified by a channel handle that shopify.dev does
+      not document. When that convention does not match, the alternative to an
+      error is putting a font on Point of Sale, or into a wholesale catalog with
+      its own price list, on a channel the creator may not know they have.
+    */
+    vi.stubGlobal(
+      "fetch",
+      captureFetch([], (body) =>
+        respondTo(body, {
+          status: "ACTIVE",
+          holds: "ACTIVE",
+          publications: [
+            { id: "gid://shopify/Publication/1", handle: "point_of_sale" },
+            { id: "gid://shopify/Publication/2", handle: "some_marketplace" },
+          ],
+        }),
+      ),
+    )
+
+    await expect(
+      shopifyAdapter.activate!(
+        context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
+      ),
+    ).rejects.toThrow(/could not tell which of this store's sales channels is the Online Store/)
+  })
+
+  it("takes the only channel a single-publication store has", async () => {
+    // A development store is usually this. There is no judgement to get wrong
+    // when there is one place a product can go.
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) =>
+        respondTo(body, {
+          status: "ACTIVE",
+          holds: "ACTIVE",
+          publications: [{ id: "gid://shopify/Publication/7", handle: null }],
+        }),
+      ),
+    )
+
+    const result = await shopifyAdapter.activate!(
+      context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
+    )
+
+    expect(result.purchasable).toBe(true)
+    expect(result.providerResponse).toMatchObject({
+      publication: { id: "gid://shopify/Publication/7", resolvedBy: "only_publication" },
+    })
+  })
+
+  it("asks for a reconnect before it makes a call the token cannot make", async () => {
+    /*
+      Fanwise runs its own OAuth, not Shopify's managed installation, so nothing
+      prompts a creator when the scope list grows. Without this the failure is a
+      403 arriving at the end of an activate — after the product exists and
+      after the creator has already attached the file by hand.
+    */
+    const fetchSpy = vi.fn()
+    vi.stubGlobal("fetch", fetchSpy)
+
+    const stale = context()
+    const connection = {
+      ...stale.connection,
+      scopes: ["write_products", "read_products"],
+    } as ChannelConnection
+
+    await expect(
+      shopifyAdapter.activate!({
+        ...stale,
+        connection,
+        listing: listing({ external_listing_id: "gid://shopify/Product/900" }),
+      }),
+    ).rejects.toThrow(/Reconnect the store and accept the permissions/)
+
+    // Nothing was attempted. The point is to ask before failing, not after.
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it("leaves a connection from before the scopes column was populated alone", async () => {
+    // An empty stored list means "we did not record it", not "nothing was
+    // granted". Forcing a re-authorization on that guess is the more expensive
+    // mistake, so it is not made.
+    vi.stubGlobal(
+      "fetch",
+      captureFetch([], (body) => respondTo(body, { status: "ACTIVE", holds: "ACTIVE" })),
+    )
+
+    const base = context()
+    const result = await shopifyAdapter.activate!({
+      ...base,
+      connection: { ...base.connection, scopes: [] } as ChannelConnection,
+      listing: listing({ external_listing_id: "gid://shopify/Product/900" }),
+    })
+
+    expect(result.purchasable).toBe(true)
   })
 })
 

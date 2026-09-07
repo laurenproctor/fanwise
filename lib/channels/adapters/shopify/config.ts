@@ -47,8 +47,49 @@ export const ADMIN_API_VERSION = "2026-07"
  * changed, so the creator should be asked again. Requesting it now to avoid the
  * re-prompt would mean holding order-reading permission on a creator's shop for
  * two gates before there is any code that reads an order.
+ *
+ * The two publication scopes arrived with ADR 0004, and they are a pair rather
+ * than a choice. `publishablePublish` needs write access; finding which
+ * publication is the Online Store needs read access first, because a
+ * publication cannot be published to before it is enumerated and its id is per
+ * shop. Asking for the write half alone would produce an app that is permitted
+ * to publish and unable to say where.
+ *
+ * Adding these re-authorizes every existing connection, and Fanwise has to
+ * drive that itself: Shopify's "merchants approve new scopes the next time they
+ * open the app" is the managed-installation flow, and this app runs its own
+ * authorization code grant. See `staleScopes` below.
  */
-export const SCOPES = ["write_products", "read_products"] as const
+export const SCOPES = [
+  "write_products",
+  "read_products",
+  "read_publications",
+  "write_publications",
+] as const
+
+/**
+ * The scopes a connection is missing, if any.
+ *
+ * `channel_connections.scopes` has been written at every authorization since A5
+ * and read by nothing, which was fine while the list never changed. It changed.
+ * A connection authorized before ADR 0004 holds a token that cannot publish to
+ * a sales channel, and the failure that produces without this check is a 403
+ * from deep inside an activate — normalized correctly, but arriving after the
+ * product has already been created and the creator has already done the manual
+ * file step.
+ *
+ * Checked before the call instead, so the ask comes with an explanation rather
+ * than as the tail end of a failure.
+ *
+ * An empty stored list means the connection predates the column being
+ * populated, not that it was granted nothing. Those are left alone: the token
+ * is probably fine, and forcing a re-authorization on a guess is the more
+ * expensive mistake.
+ */
+export function staleScopes(granted: readonly string[]): string[] {
+  if (granted.length === 0) return []
+  return SCOPES.filter((scope) => !granted.includes(scope))
+}
 
 let cached: ShopifyConfig | null = null
 

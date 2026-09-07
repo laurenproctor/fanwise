@@ -15,6 +15,13 @@ import { createShopifyClient } from "./client"
 import { userErrors } from "./errors"
 import { shopifyCredentialsSchema, shopifyOAuth } from "./oauth"
 import { CATEGORY_LABELS, defaultCategoryLabel, taxonomyCategoryId } from "./categories"
+import { staleScopes } from "./config"
+import {
+  PUBLICATIONS,
+  publicationsSchema,
+  resolvePublication,
+  type ResolvedPublication,
+} from "./publications"
 import {
   SEO_DESCRIPTION_LIMIT,
   SEO_TITLE_LIMIT,
@@ -237,6 +244,37 @@ const productSetSchema = z.object({
 })
 
 /**
+ * Putting the product on a sales channel, which `productSet` cannot do.
+ *
+ * ADR 0004. `status: ACTIVE` and *on a sales channel* are separate facts on
+ * Shopify, and setting the first without the second is what produced three
+ * products nobody could buy. `resourcePublicationsCount` comes back so the
+ * result can be asserted rather than assumed: this is the call that decides
+ * whether Fanwise is allowed to tell a creator their product is on sale.
+ */
+const PUBLISHABLE_PUBLISH = `
+  mutation FanwisePublishablePublish($id: ID!, $input: [PublicationInput!]!) {
+    publishablePublish(id: $id, input: $input) {
+      publishable {
+        resourcePublicationsCount { count }
+      }
+      userErrors { field message }
+    }
+  }
+`
+
+const publishablePublishSchema = z.object({
+  publishablePublish: z.object({
+    publishable: z
+      .object({
+        resourcePublicationsCount: z.object({ count: z.number() }).nullish(),
+      })
+      .nullish(),
+    userErrors: z.array(z.object({ field: z.array(z.string()).nullish(), message: z.string() })),
+  }),
+})
+
+/**
  * What the product currently is, so a write does not have to guess.
  *
  * Two questions in one round trip, because both are asked at the same moment
@@ -324,6 +362,29 @@ const OPTION_NAME = "Title"
 const OPTION_VALUE = "Default Title"
 
 async function clientFor(context: PublishContext) {
+  /*
+   * The connection is authorized, but is it authorized for what this build
+   * needs? ADR 0004 added two scopes, and Fanwise runs its own OAuth rather
+   * than Shopify's managed installation, so nothing has prompted the creator
+   * on its behalf. Their existing token simply cannot do the new thing.
+   *
+   * Asked here, before any call, so the ask arrives as an explanation rather
+   * than as a 403 at the end of an activate — after the product exists and
+   * after the creator has already attached the file by hand.
+   */
+  const missing = staleScopes(context.connection.scopes ?? [])
+  if (missing.length > 0) {
+    throw new ChannelError(
+      normalized(
+        "permission_denied",
+        "Fanwise needs one more permission on this Shopify store before it can put products on " +
+          "sale. Reconnect the store and accept the permissions it asks for. Your existing " +
+          "products are not affected.",
+        { missing },
+      ),
+    )
+  }
+
   const shopDomain = context.connection.external_account_id
   if (!shopDomain) {
     throw new ChannelError(
@@ -616,6 +677,68 @@ async function productSet(context: PublishContext, intent: PublishIntent): Promi
   }
 }
 
+/**
+ * Puts a product on a sales channel, and confirms it landed there.
+ *
+ * Two calls, and the second is not optional. `publishablePublish` reports its
+ * own userErrors, but the question this function exists to answer is not "did
+ * the mutation succeed" — it is "can a buyer reach this now", and only the
+ * count of publications the product actually sits on answers that. A5's whole
+ * blocker was a mutation reporting success about a fact nobody checked.
+ *
+ * Returns whether the product is purchasable, which the caller passes up to the
+ * listing. It never returns true on an assumption.
+ */
+async function publishToSalesChannel(
+  context: PublishContext,
+  productId: string,
+): Promise<{ purchasable: boolean; publication: ResolvedPublication; count: number }> {
+  const { client } = await clientFor(context)
+
+  const publications = await client.request({
+    query: PUBLICATIONS,
+    variables: {},
+    schema: publicationsSchema,
+  })
+
+  // Throws rather than picks when the shop's channels are ambiguous. Putting a
+  // font on Point of Sale because a handle did not match is worse than an error
+  // a creator can act on.
+  const publication = resolvePublication(publications)
+
+  const result = await client.request({
+    query: PUBLISHABLE_PUBLISH,
+    variables: {
+      id: productId,
+      input: [{ publicationId: publication.publicationId }],
+    },
+    schema: publishablePublishSchema,
+  })
+
+  if (result.publishablePublish.userErrors.length > 0) {
+    throw new ChannelError(
+      userErrors(
+        result.publishablePublish.userErrors.map((error) => ({
+          field: error.field,
+          message: error.message,
+        })),
+      ),
+    )
+  }
+
+  /*
+   * The count is the answer, not the absence of errors.
+   *
+   * A publication the product could not be added to for a reason Shopify
+   * expresses as something other than a userError would otherwise be reported
+   * to the creator as "Live", which is the exact sentence this whole change
+   * exists to stop being a lie.
+   */
+  const count = result.publishablePublish.publishable?.resourcePublicationsCount?.count ?? 0
+
+  return { purchasable: count > 0, publication, count }
+}
+
 export const shopifyAdapter: ChannelAdapter = {
   key: "shopify",
   name: "Shopify",
@@ -664,8 +787,12 @@ export const shopifyAdapter: ChannelAdapter = {
   },
 
   /** Creates the product as a draft. Nobody can buy it yet, on purpose. */
-  publish(context: PublishContext): Promise<PublishResult> {
-    return productSet(context, "DRAFT")
+  async publish(context: PublishContext): Promise<PublishResult> {
+    const result = await productSet(context, "DRAFT")
+    // Stated rather than left unknown. A draft is definitively not purchasable,
+    // and recording that is what lets the UI distinguish it later from a
+    // listing whose purchasability nothing has established.
+    return { ...result, purchasable: false }
   },
 
   /**
@@ -687,8 +814,41 @@ export const shopifyAdapter: ChannelAdapter = {
     return productSet(context, "preserve")
   },
 
-  /** The other half of ADR 0001: the file is attached, so the product goes live. */
-  activate(context: PublishContext): Promise<PublishResult> {
-    return productSet(context, "ACTIVE")
+  /**
+   * The other half of ADR 0001, and now the whole of ADR 0004.
+   *
+   * Two facts have to become true before a buyer can buy, and Shopify keeps
+   * them apart: the product must be ACTIVE, and it must be on a sales channel.
+   * A5's exit test found products that were the first and not the second, and
+   * `activate` claiming success on the first alone is what let Fanwise report
+   * "Live" about a product with no storefront page.
+   *
+   * Ordered deliberately. The status write goes first because it is the one
+   * that converges — `productSet` with an identifier is an update, so a retry
+   * after a failed publish step costs nothing and changes nothing. If the
+   * channel publish then fails, the product is ACTIVE and unreachable, which
+   * is a state the listing now describes accurately instead of one it used to
+   * describe as live.
+   */
+  async activate(context: PublishContext): Promise<PublishResult> {
+    const result = await productSet(context, "ACTIVE")
+    const placement = await publishToSalesChannel(context, result.externalListingId)
+
+    return {
+      ...result,
+      purchasable: placement.purchasable,
+      providerResponse: {
+        productSet: result.providerResponse,
+        publication: {
+          id: placement.publication.publicationId,
+          // How it was chosen, kept because a match on a handle and a shop that
+          // simply had one channel are not equally strong answers, and the job
+          // row is where somebody looks when a product lands somewhere odd.
+          resolvedBy: placement.publication.reason,
+          autoPublish: placement.publication.autoPublish,
+          resourcePublicationsCount: placement.count,
+        },
+      },
+    }
   },
 }

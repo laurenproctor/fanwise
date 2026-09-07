@@ -149,6 +149,7 @@ async function exchangeCode(params: {
 }
 
 export const shopifyOAuth: ChannelOAuth = {
+  scopes: SCOPES,
   accountHintLabel: "Your Shopify store domain",
   accountHintPlaceholder: "aster-type.myshopify.com",
 

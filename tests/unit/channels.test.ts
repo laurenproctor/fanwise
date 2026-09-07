@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { evaluateRequirements } from "@/lib/channels/requirements"
 import { computeReadiness, readinessPercent } from "@/lib/channels/readiness"
 import { buildDraft, evaluate, listingToDraft, snapshotPayload } from "@/lib/channels/listings"
+import { missingScopes } from "@/lib/channels/oauth"
 import { getAdapter, listAdapters } from "@/lib/channels/registry"
 import type {
   AdapterSubject,
@@ -408,5 +409,42 @@ describe("listings round trip", () => {
     expect(payload).toHaveProperty("readiness")
     expect(payload).toHaveProperty("requirements")
     expect((payload.readiness as { ready: boolean }).ready).toBe(false)
+  })
+})
+
+describe("scopes a connection is missing", () => {
+  /*
+    channel_connections.scopes was written at every authorization and read by
+    nothing, which was survivable only while the list never changed. ADR 0004
+    changed it, and Fanwise runs its own OAuth rather than Shopify's managed
+    installation, so nothing prompts a creator on its behalf.
+  */
+
+  it("names what this build asks for and the connection was never granted", () => {
+    const adapter = getAdapter("shopify")
+    const required = adapter.oauth!.scopes
+    const granted = required.slice(0, 1)
+    expect(missingScopes(adapter, granted)).toEqual([...required.slice(1)])
+  })
+
+  it("is empty when the connection holds everything asked for", () => {
+    const adapter = getAdapter("shopify")
+    expect(missingScopes(adapter, [...adapter.oauth!.scopes])).toEqual([])
+  })
+
+  it("treats an unrecorded scope list as unknown, not as nothing granted", () => {
+    // Empty means the column was never populated for this row. Reading it as
+    // "granted nothing" would force every such creator through a reconnect to
+    // fix a problem most of them do not have.
+    const adapter = getAdapter("shopify")
+    expect(missingScopes(adapter, [])).toEqual([])
+    expect(missingScopes(adapter, null)).toEqual([])
+  })
+
+  it("says nothing about a channel that has no authorization at all", () => {
+    // An assisted channel is connected by assertion, not by OAuth. It has no
+    // scopes to be missing, and a rule that reported some would put a
+    // reconnect button on a card that cannot be reconnected.
+    expect(missingScopes(getAdapter("mock_assisted"), ["anything"])).toEqual([])
   })
 })

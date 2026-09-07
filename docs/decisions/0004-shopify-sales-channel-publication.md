@@ -1,6 +1,7 @@
 # ADR 0004: How a Shopify product reaches a sales channel
 
-**Status:** proposed, 7 September 2026. Awaiting a decision.
+**Status:** accepted, 7 September 2026. **Option A**, overruling the recommendation below,
+which is kept as written rather than rewritten to agree.
 **Date:** September 2026
 **Blocks:** A5's third exit clause, and therefore Gate A
 **Supersedes:** the open-decisions register entry 4a, which stays as the index pointer
@@ -88,24 +89,73 @@ not on by default.
 
 ## Decision
 
-**Not yet made. This document exists to make it once rather than repeatedly.**
+**Option A. Fanwise publishes the product to the sales channel.** Decided 7 September 2026.
 
-The recommendation carried over from register entry 4a, and unchanged by the API detail
-found since: **option B for Gate A, option A afterwards.**
+The recommendation below was option B for Gate A, and it was overruled. The reasoning that
+carried the day is the one this document already recorded as the strongest case against its
+own recommendation: Shopify *will* let an app do this, so a manual step here would be a step
+by choice rather than by limit, and asking a creator to take "Shopify cannot" and "please
+also click Publish yourself" on the same trust is asking too much of two sentences that are
+not true in the same way.
 
-Two things are worth separating, because only one of them is a decision:
+The recommendation is left standing above rather than edited into agreement. A decision
+record that quietly rewrites its own advice to match what was chosen is a record of nothing.
 
-**The honesty fix is not optional and does not wait for this.** `liveness` currently reports
-`live` as "On the channel, and available to buy" once the manual file step is done. For these
-products the first half is true and the second is false. That must be corrected in whichever
-direction this lands, and it should land before either option is built. ADR 0001 invented
-`published_not_live` for the unattached-file case; this is a second way to be unbuyable that
-the vocabulary does not yet cover, and shipping a third state is a smaller change than either
-option here.
+### What was built
+
+| Piece | Where |
+|---|---|
+| `read_publications`, `write_publications` | `adapters/shopify/config.ts` |
+| Finding the Online Store, and refusing when it is ambiguous | `adapters/shopify/publications.ts` |
+| `publishablePublish` inside `activate()`, with the placement asserted | `adapters/shopify/index.ts` |
+| Scope drift asked before the call, not discovered after it | `staleScopes`, `missingScopes` |
+| A non-destructive Reconnect | `components/channels/connect-button.tsx` |
+| `liveness` withholding "available to buy" | `lib/publishing/manual-steps.ts` |
+
+Two things came out differently from how this document anticipated them, and both are worth
+recording because they were found by building it.
+
+**Identifying the Online Store is not a solved problem on `2026-07`.** `Publication.name` and
+`Publication.app` are both deprecated, which leaves `Publication.channels` and a
+`Channel.handle` whose value for the Online Store shopify.dev does not document anywhere.
+The adapter matches on a small set of conventional handles, falls through to "the shop has
+only one publication, so there is nothing to get wrong", and **refuses** otherwise. Guessing
+would put a font on Point of Sale, or into a wholesale catalog with its own price list, on a
+channel the creator may not know they have. An error a creator can act on is better than a
+product quietly appearing somewhere they did not ask for.
+
+**The Reconnect button was not optional and was nearly missed.** Once a channel is connected
+the UI offered exactly one action, Disconnect, and `channel_listings` cascades from the
+connection — so before this change a creator whose scopes had fallen behind would have had to
+delete their listings to fix a permission. Reconnecting upserts on
+`(workspace, channel, external_account_id)` and keeps the connection id, so listings are
+untouched.
+
+**The honesty fix shipped first, and was never contingent on this decision.** `liveness`
+reported `live` as "On the channel, and available to buy" once the manual file step was done.
+For these products the first half was true and the second was false, and that was wrong under
+either option. It is fixed as its own commit, ahead of the rest: a listing reports
+`published_not_live` when the channel has said a buyer cannot reach it.
+
+It needed no new word. ADR 0001 invented `published_not_live` for a deliverable nobody has
+attached, and this is a second way to be unreachable — the sign that the original word was
+the right one is that both are "the channel has it and a buyer cannot buy it", which is all a
+creator needs to hold in their head.
+
+What it did need was a fact the adapter had never established, so `PublishResult` gained
+`purchasable`. It is deliberately separate from `externalState`, which cannot answer this:
+`externalState` records the provider's own status because `update()` reads it back to avoid
+taking a live product off sale, and one field cannot mean both "the object is active" and "a
+buyer can reach it" on a provider where those differ. `null` means unestablished and is not
+rendered as false — every listing published before this, and every channel with no such
+concept, is null, and reading those as "nobody can buy this" would be a fresh lie pointing
+the other way.
 
 ---
 
-## Why B first
+## Why B was recommended, and why that lost
+
+Kept in full. The costs below are real and were accepted, not disproved.
 
 **Gate A is about closing the loop with a handful of creators.** Its exit condition is one
 outside creator taking a real product to two live listings. Spending that gate's goodwill on

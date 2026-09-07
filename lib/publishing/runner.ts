@@ -393,6 +393,16 @@ async function recordSuccess(params: {
     // Read back by the adapter's update() so an edit does not silently take a
     // live product off sale, or put a draft one on it.
     externalState: result.externalState,
+    /*
+     * Whether a buyer can reach it, which is not what externalState answers.
+     * Written only when the adapter established it: an absent key means
+     * unknown, and liveness treats unknown as "no opinion" rather than as no.
+     * Overwriting a known answer with null on a later write that did not check
+     * would lose the one fact the UI is not allowed to guess at.
+     */
+    ...(result.purchasable === undefined || result.purchasable === null
+      ? {}
+      : { purchasable: result.purchasable }),
   }
 
   /*
