@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <title>Fanwise Marketplaces</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@200;300;400;500;600&amp;family=Instrument+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+  <script src="theme.js"></script>
+  <script src="reveal.js"></script>
+  <style>
+    body { margin: 0; background: #FBFAF7; color: #14161C; font-family: "Instrument Sans", "Helvetica Neue", Arial, sans-serif; font-size: 16.5px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+    * { box-sizing: border-box; }
+    a { color: inherit; text-decoration: none; }
+    a:hover { color: inherit; }
+    h1, h2, h3, h4 { margin: 0; }
+    p { margin: 0; }
+    :focus-visible { outline: 2px solid #1E3ED4; outline-offset: 3px; border-radius: 2px; }
+    @keyframes fwPulse { 0% { box-shadow: 0 0 0 0 rgba(70,214,149,.45); } 70% { box-shadow: 0 0 0 7px rgba(70,214,149,0); } 100% { box-shadow: 0 0 0 0 rgba(70,214,149,0); } }
+  </style>
+</helmet>
+
+<div style="width:min(1080px,calc(100% - 48px));margin:0 auto">
+  <nav style="display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px 0;flex-wrap:wrap">
+    <a href="Fanwise Landing.dc.html" style="display:flex;align-items:center;gap:9px;font-family:Archivo,sans-serif;font-weight:500;font-size:19px;letter-spacing:-0.02em">
+      <svg viewBox="0 0 24 24" aria-hidden="true" style="width:21px;height:21px;display:block"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 21 3.6 8.4"></path><path d="M12 21 7.6 4.6"></path><path d="M12 21V3.6"></path><path d="m12 21 4.4-16.4"></path><path d="M12 21 20.4 8.4"></path></g><circle cx="12" cy="21" r="1.7" fill="currentColor"></circle></svg>
+      Fanwise
+    </a>
+    <div style="display:flex;gap:26px;font-size:14.5px;color:#4C525F;flex-wrap:wrap">
+      <a href="Fanwise Landing.dc.html" style-hover="color:#14161C">Product</a>
+      <a href="Fanwise How It Works.dc.html" style-hover="color:#14161C">How it works</a>
+      <a href="#specs" style-hover="color:#14161C">Spec sheet</a>
+      <a href="Fanwise Pricing.dc.html" style-hover="color:#14161C">Pricing</a>
+      <a href="Fanwise About.dc.html" style-hover="color:#14161C">About</a>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <fw-theme-toggle variant="light"></fw-theme-toggle>
+      <a href="Fanwise Start.dc.html" style="font-size:14.5px;color:#4C525F" style-hover="color:#14161C">Sign in</a>
+      <a href="Fanwise Start.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:15px;padding:12px 22px;border-radius:999px;border:1px solid #14161C;background:#14161C;color:#FBFAF7" style-hover="background:#2A2E38;border-color:#2A2E38">Get started</a>
+    </div>
+  </nav>
+
+  <header style="padding:68px 0 0;max-width:820px">
+    <span style="display:block;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#838996;margin-bottom:20px">Marketplaces</span>
+    <h1 style="font-family:Archivo,sans-serif;font-size:clamp(40px,6vw,72px);font-weight:200;line-height:1.04;letter-spacing:-0.035em;text-wrap:balance">Six shops. Six rulebooks. One of yours.</h1>
+    <p style="max-width:56ch;color:#4C525F;font-size:18px;margin-top:26px">Every marketplace below is a first-class destination in Fanwise. Connect the ones you sell on for $6 each a month; your Shopify storefront is included.</p>
+  </header>
+
+  <section style="padding:72px 0 40px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px">
+    <sc-for list="{{ shops }}" as="s" hint-placeholder-count="6">
+      <article style="border:1px solid #E3E0D9;border-radius:16px;background:#FFFFFF;padding:28px 28px 30px;display:grid;gap:18px;align-content:start;transition:transform .25s ease, box-shadow .25s ease, border-color .25s ease" style-hover="transform:translateY(-4px);box-shadow:0 18px 36px -22px rgba(20,22,28,.28);border-color:#CFCBC1">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:14px">
+          <h2 style="font-family:Archivo,sans-serif;font-size:24px;font-weight:400;letter-spacing:-0.028em">{{ s.name }}</h2>
+          <span style="{{ s.badgeStyle }}">{{ s.badge }}</span>
+        </div>
+        <p style="color:#4C525F;font-size:15px">{{ s.blurb }}</p>
+        <div style="display:grid;gap:8px;border-top:1px solid #EDEBE5;padding-top:16px">
+          <div style="display:flex;justify-content:space-between;gap:14px;font-size:13.5px"><span style="color:#838996;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding-top:3px">Preview</span><span style="color:#14161C;text-align:right">{{ s.preview }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:14px;font-size:13.5px"><span style="color:#838996;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding-top:3px">Title</span><span style="color:#14161C;text-align:right">{{ s.title }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:14px;font-size:13.5px"><span style="color:#838996;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding-top:3px">Tags</span><span style="color:#14161C;text-align:right">{{ s.tags }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:14px;font-size:13.5px"><span style="color:#838996;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding-top:3px">Copy</span><span style="color:#14161C;text-align:right">{{ s.copy }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:14px;font-size:13.5px"><span style="color:#838996;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding-top:3px">Review</span><span style="color:#14161C;text-align:right">{{ s.review }}</span></div>
+        </div>
+        <p style="font-size:14px;color:#4C525F;border-left:2px solid #1E3ED4;padding:2px 0 2px 14px">{{ s.handles }}</p>
+      </article>
+    </sc-for>
+  </section>
+
+  <!-- FULL SPEC TABLE -->
+  <section id="specs" style="padding:52px 0 92px">
+    <div style="max-width:640px;margin-bottom:40px">
+      <span style="display:block;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#838996;margin-bottom:18px">Reference</span>
+      <h2 style="font-family:Archivo,sans-serif;font-size:clamp(30px,3.6vw,44px);font-weight:300;letter-spacing:-0.028em">The spec sheet, side by side.</h2>
+      <p style="color:#4C525F;margin-top:16px;font-size:17px">Rules are maintained per marketplace and versioned. When a shop changes a requirement, affected drafts rebuild and you get a note saying which listings moved.</p>
+    </div>
+    <div style="overflow-x:auto;border-top:1px solid #14161C">
+      <table style="width:100%;border-collapse:collapse;min-width:820px">
+        <thead>
+          <tr>
+            <th scope="col" style="text-align:left;padding:15px 18px 15px 0;border-bottom:1px solid #E3E0D9;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#838996;font-weight:500">Marketplace</th>
+            <th scope="col" style="text-align:left;padding:15px 18px 15px 0;border-bottom:1px solid #E3E0D9;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#838996;font-weight:500">Main preview</th>
+            <th scope="col" style="text-align:left;padding:15px 18px 15px 0;border-bottom:1px solid #E3E0D9;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#838996;font-weight:500">Title limit</th>
+            <th scope="col" style="text-align:left;padding:15px 18px 15px 0;border-bottom:1px solid #E3E0D9;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#838996;font-weight:500">Tags</th>
+            <th scope="col" style="text-align:left;padding:15px 18px 15px 0;border-bottom:1px solid #E3E0D9;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#838996;font-weight:500">Description</th>
+            <th scope="col" style="text-align:left;padding:15px 18px 15px 0;border-bottom:1px solid #E3E0D9;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#838996;font-weight:500">Review</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{ shops }}" as="s" hint-placeholder-count="6">
+            <tr>
+              <td style="padding:15px 18px 15px 0;border-bottom:1px solid #EDEBE5;font-family:Archivo,sans-serif;font-size:17px;letter-spacing:-0.02em">{{ s.name }}</td>
+              <td style="padding:15px 18px 15px 0;border-bottom:1px solid #EDEBE5;font-size:14px;color:#4C525F">{{ s.preview }}</td>
+              <td style="padding:15px 18px 15px 0;border-bottom:1px solid #EDEBE5;font-size:14px;color:#4C525F">{{ s.title }}</td>
+              <td style="padding:15px 18px 15px 0;border-bottom:1px solid #EDEBE5;font-size:14px;color:#4C525F">{{ s.tags }}</td>
+              <td style="padding:15px 18px 15px 0;border-bottom:1px solid #EDEBE5;font-size:14px;color:#4C525F">{{ s.copy }}</td>
+              <td style="padding:15px 18px 15px 0;border-bottom:1px solid #EDEBE5;font-size:14px;color:#4C525F">{{ s.review }}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section style="padding:0 0 92px">
+    <div style="background:#14161C;color:#F4F3F0;border-radius:18px;padding:64px 48px 68px;text-align:center;display:grid;justify-items:center;gap:20px">
+      <h2 style="font-family:Archivo,sans-serif;font-size:clamp(30px,4.4vw,54px);font-weight:200;letter-spacing:-0.045em;color:#ffffff;text-wrap:balance">Connect the shops you already sell on.</h2>
+      <p style="color:#A9AEBA;max-width:46ch;font-size:17px">$9 a month, plus $6 for each marketplace. Your storefront is included.</p>
+      <a href="Fanwise Start.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:15px;padding:12px 22px;border-radius:999px;border:1px solid #ffffff;background:#ffffff;color:#14161C;margin-top:8px" style-hover="background:#E8E7E3;border-color:#E8E7E3">Get started</a>
+    </div>
+  </section>
+
+  <footer style="padding:0 0 56px;display:flex;justify-content:space-between;gap:22px;flex-wrap:wrap;align-items:end">
+    <a href="Fanwise Landing.dc.html" style="display:flex;align-items:center;gap:9px;font-family:Archivo,sans-serif;font-weight:500;font-size:19px;letter-spacing:-0.02em">
+      <svg viewBox="0 0 24 24" aria-hidden="true" style="width:21px;height:21px;display:block"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 21 3.6 8.4"></path><path d="M12 21 7.6 4.6"></path><path d="M12 21V3.6"></path><path d="m12 21 4.4-16.4"></path><path d="M12 21 20.4 8.4"></path></g><circle cx="12" cy="21" r="1.7" fill="currentColor"></circle></svg>
+      Fanwise
+    </a>
+    <div style="display:flex;gap:20px;font-size:14px;color:#4C525F;flex-wrap:wrap">
+      <a href="Fanwise Landing.dc.html" style-hover="color:#14161C">Product</a>
+      <a href="Fanwise How It Works.dc.html" style-hover="color:#14161C">How it works</a>
+      <a href="Fanwise Pricing.dc.html" style-hover="color:#14161C">Pricing</a>
+      <a href="Fanwise About.dc.html" style-hover="color:#14161C">About</a>
+      <a href="Fanwise Terms.dc.html" style-hover="color:#14161C">Terms</a>
+      <a href="Fanwise Privacy.dc.html" style-hover="color:#14161C">Privacy</a>
+    </div>
+    <p style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#838996;line-height:1.7;max-width:44ch">fanwise, adv. In the manner of a fan; spreading out from a single fixed point.</p>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const badge = (kind) => kind === "storefront"
+      ? "font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;padding:5px 11px;border-radius:999px;color:#1E3ED4;border:1px solid rgba(30,62,212,.3);background:#EBEEFC;white-space:nowrap"
+      : "font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;padding:5px 11px;border-radius:999px;color:#1B8A5A;border:1px solid rgba(27,138,90,.3);background:rgba(27,138,90,.07);white-space:nowrap";
+    return {
+      shops: [
+        { name: "Shopify", badge: "Storefront · Included", badgeStyle: badge("storefront"),
+          blurb: "Your owned store is the center of the system. Fanwise publishes the canonical listing here first, at full fidelity.",
+          preview: "Your theme's image sizes", title: "255 chars", tags: "Unlimited product tags", copy: "Full rich text", review: "Instant",
+          handles: "Fanwise keeps your storefront and every marketplace copy in step: change the master, and the store updates with the drafts." },
+        { name: "Etsy", badge: "Marketplace · $6/mo", badgeStyle: badge("mkt"),
+          blurb: "The biggest audience and the fussiest image rules. Etsy rewards complete listings and precise tags.",
+          preview: "2000 px shortest side, 4:3", title: "140 chars", tags: "13 max, 20 chars each", copy: "Plain text, no HTML", review: "Instant",
+          handles: "Fanwise crops previews to 4:3, strips formatting from your description, and fits your keywords into Etsy's 13-tag budget." },
+        { name: "Creative Market", badge: "Marketplace · $6/mo", badgeStyle: badge("mkt"),
+          blurb: "A curated design marketplace with its own category tree and a shop-approval step before your first listing.",
+          preview: "1160 × 772 px", title: "60 chars", tags: "Free-form plus category tree", copy: "Markdown subset", review: "Shop approval, then instant",
+          handles: "Fanwise renders the 1160 × 772 hero, converts your description to its markdown subset, and maps tags onto the category tree." },
+        { name: "Envato Market", badge: "Marketplace · $6/mo", badgeStyle: badge("mkt"),
+          blurb: "GraphicRiver and friends: strict manual review, short titles, and an HTML description format all their own.",
+          preview: "590 px inline, 80 × 80 thumb", title: "50 chars", tags: "15 max", copy: "HTML subset", review: "Manual review, days",
+          handles: "Fanwise trims your title to 50 characters without losing the product name and tracks the review queue so you don't have to." },
+        { name: "Adobe Stock", badge: "Marketplace · $6/mo", badgeStyle: badge("mkt"),
+          blurb: "Templates and assets discovered almost entirely through keywords. No prose, no tags — just 49 chances to be found.",
+          preview: "Rendered template preview", title: "200 chars", tags: "Up to 49 keywords", copy: "Keywords only", review: "Moderation queue",
+          handles: "Fanwise converts your description into a ranked keyword set and renders the preview Adobe's moderation expects." },
+        { name: "MyFonts", badge: "Marketplace · $6/mo", badgeStyle: badge("mkt"),
+          blurb: "The type-specific channel: foundry review, specimen images at 2:1, and metadata that lives inside the font files.",
+          preview: "5 to 15 PNG at 2:1", title: "Family name", tags: "Foundry tags", copy: "Under 500 words", review: "Foundry review, 24h",
+          handles: "Fanwise generates 2:1 specimens from your previews and keeps the family's style names consistent with the font metadata." }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

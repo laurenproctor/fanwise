@@ -4,7 +4,7 @@ import Link from "next/link"
  * The root not-found boundary.
  *
  * This is where a workspace guard lands. `notFound()` thrown from
- * app/w/[slug]/layout.tsx cannot be caught by a not-found file nested inside
+ * app/[slug]/layout.tsx cannot be caught by a not-found file nested inside
  * that same layout, because the layout is what failed to render, so it bubbles
  * to here.
  *

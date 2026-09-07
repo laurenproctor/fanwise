@@ -14,12 +14,103 @@
 
 ## Credentials
 
-A dedicated service, added at step A5 with the first Shopify connection. Requirements:
-encryption at rest with a rotatable key, server-only access, token refresh, and no path by
-which a credential reaches a log line, an error message, a prompt, or a client response.
+Built at A5, in `lib/credentials`. It is the only path to
+`channel_connection_secrets`, which carries no grant to `anon` or `authenticated` at all, so
+every call goes through the service role and scopes its own workspace in code.
 
-`CREDENTIALS_ENCRYPTION_KEY` is a base64 32-byte key. Rotation plan gets written before the
-first real credential is stored, not after.
+AES-256-GCM, with the connection identity passed as **additional authenticated data**:
+
+```
+channel_connection:<workspace_id>:<connection_id>
+```
+
+Encryption alone does not give this. Ciphertext with no binding is portable, so a sealed blob
+copied from one connection row to another — or from one workspace to another — would open
+happily into the wrong tenant's connection. With the binding it fails to open instead. The
+consequence worth knowing before meeting it at 2am: **a credential row cannot be moved
+between connections.** Re-parenting a connection means re-authorizing it.
+
+`CREDENTIALS_ENCRYPTION_KEY` holds a **keyring**, not a key. A bare base64 32-byte value
+means version 1; `2:<new>,1:<old>` is a rotation in progress, and the highest version is
+active. `channel_connection_secrets.key_version` selects the key a row is opened with.
+
+**The rotation plan is `docs/decisions/0003-credential-key-rotation.md`**, written before the
+first credential was stored, as this document required. Rows re-seal lazily on read; a key
+version is retired only once no row references it, and the count query that proves that is
+step 5 of the procedure. Skipping it is the one way to get this wrong.
+
+The variable is parsed lazily rather than at boot, because an application with no marketplace
+credentials is a valid application: every step before A5, every CI run and every fresh
+checkout is one. The cost of that is a loud failure at the moment a credential is actually
+handled, which is where it belongs.
+
+Nothing in `lib/credentials` logs, and no error thrown from it carries plaintext or key
+material. A caller learns that decryption failed, not what was in the box.
+
+## OAuth
+
+State is a **single-use row**, not a cookie (`channel_oauth_states`). A cookie satisfies rule
+6 literally and not actually: the same callback URL opened twice validates twice. A row is
+consumed by a conditional update carrying `consumed_at is null`, so two callbacks racing on
+one state produce exactly one winner, decided by the database rather than by a read followed
+by a write.
+
+The callback route's order is the security of it, and it is deliberate:
+
+1. verify the provider's signature, before any parameter is used
+2. consume the state, exactly once
+3. confirm the person finishing is the person who started
+4. only then exchange the code
+
+Doing 4 before 1 would have Fanwise send its client secret in response to an unauthenticated
+GET that anyone can trigger. Doing 3 before 2 would leave a usable state behind after a
+failed attempt.
+
+The redirect URI is built from `NEXT_PUBLIC_APP_URL`, never from an incoming header: a
+redirect URI derived from a header is a redirect URI an attacker can suggest. The account
+identifier a creator types is validated against a fixed pattern before it reaches a URL,
+because it becomes a hostname Fanwise redirects a person to and then posts a client secret
+to.
+
+A failed exchange returns a normalized sentence and nothing else. The thrown value may hold a
+provider response body, and the request that produced it held a client secret.
+
+## Password recovery
+
+The flow is `/forgot-password` to `/auth/confirm` to `/reset-password`, and the three
+properties that make it safe are each held in one place.
+
+**It never says whether an address has an account.** `requestPasswordResetAction` answers with
+the same sentence for a registered address, an unregistered one, and a send the provider
+refused. Reporting the provider's error would be an oracle: "too many attempts" comes back
+only for an address that exists, and that is enough to enumerate a customer list one address
+at a time. The only thing reported is a malformed address, which the browser knows already and
+which depends on no account. An E2E test compares the two responses character for character,
+because this property is lost by a well-meaning improvement to an error message.
+
+**The link is spent server-side, once.** `/auth/confirm` exchanges the emailed token for a
+session and redirects. The token never reaches a client component, and it is single use at the
+auth server, which `tests/db/password-recovery.test.ts` proves by replaying one. Everything
+after the redirect authorizes on the session cookie, so `updatePasswordAction` takes no token
+parameter and re-checks the session itself, per rule 7.
+
+**The redirect target is checked.** `safeRedirectTarget` narrows the `next` parameter to a
+plain same-origin path. Unchecked, it is an open redirect on a URL that arrives by email and
+has just established a session, which is the most valuable moment to steer someone somewhere
+else. The base URL is `NEXT_PUBLIC_APP_URL`, never a request header, for the same reason the
+OAuth redirect URI is.
+
+Changing the password calls `signOut({ scope: "others" })`. Recovery exists because the old
+password may be in someone else's hands, so sessions opened with it do not survive.
+
+The recovery email is a project template, `supabase/templates/recovery.html`, and it points at
+Fanwise carrying `token_hash`. The stock template routes through Supabase's verify endpoint and
+returns a PKCE code, which only works in the browser that asked for the reset: a person who
+requests a reset on a laptop and opens the mail on their phone gets an invalid link, and
+recovery is exactly the flow where that happens. `/auth/confirm` still accepts a code, so a
+deployment whose template has not been updated degrades rather than breaks. **A hosted project
+does not inherit `config.toml`, so the template has to be set on the project itself, and the
+`/auth/confirm` URL added to its redirect allowlist.**
 
 ## Password recovery
 

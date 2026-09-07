@@ -14,14 +14,14 @@ export type ListingStatusSource = Database["public"]["Enums"]["listing_status_so
 export type SnapshotType = Database["public"]["Enums"]["snapshot_type"]
 
 /**
- * Every channel Fanwise knows about. A3 ships two mocks and nothing else; real
- * providers are added here as their adapters land.
+ * Every channel Fanwise knows about. A3 shipped two mocks; A5 adds the first
+ * real provider, and the rest arrive here as their adapters land.
  *
  * This union is what keeps provider names out of the rest of the codebase: a
  * component that wants to special-case a marketplace has to name a key, and a
  * unit test fails the moment a key appears outside lib/channels/adapters.
  */
-export const CHANNEL_KEYS = ["mock_api", "mock_assisted"] as const
+export const CHANNEL_KEYS = ["mock_api", "mock_assisted", "shopify"] as const
 export type ChannelKey = (typeof CHANNEL_KEYS)[number]
 export const channelKeySchema = z.enum(CHANNEL_KEYS)
 
@@ -75,6 +75,18 @@ export const CAPABILITY_LABELS: Record<CapabilityKey, string> = {
 export interface AdapterSubject {
   product: Product
   assets: ProductAsset[]
+  /**
+   * Non-secret facts the connection learned about the account at authorization
+   * time, such as the currency a storefront actually sells in.
+   *
+   * Deliberately an opaque bag rather than typed fields: the adapter wrote
+   * these keys and is the only thing that reads them, so naming them here would
+   * put provider-shaped fields on a shared type. It is `metadata` from
+   * channel_connections and never `channel_connection_secrets`, so nothing in
+   * it is a credential and it is safe to send to the browser, which the editor
+   * does so client-side readiness matches the server's.
+   */
+  connectionMetadata?: Record<string, unknown>
 }
 
 export type RequirementSeverity = "error" | "warning" | "info"
@@ -116,6 +128,19 @@ export interface ChannelListingDraft {
   title: string | null
   description: string | null
   shortDescription: string | null
+  /**
+   * The search-result title and description, when the creator wants them to
+   * differ from the listing's own.
+   *
+   * Both are overrides and null is the ordinary state: a channel that has these
+   * fields falls back to the listing title and the short description, which is
+   * usually the right answer. They are separate from `shortDescription` because
+   * a blurb written for a product page and a line written for a search result
+   * are two pieces of writing, and a channel that offers both fields is a
+   * channel that expects two.
+   */
+  seoTitle: string | null
+  seoDescription: string | null
   price: number | null
   currency: string
   category: string | null
@@ -123,9 +148,163 @@ export interface ChannelListingDraft {
   metadata: Record<string, unknown>
 }
 
+/**
+ * What the provider now holds after a write.
+ *
+ * `externalState` is the field that keeps ADR 0001 honest. A channel that
+ * cannot receive the deliverable through its API creates the object in a state
+ * a buyer cannot reach, and only a human confirming the file is attached moves
+ * it to `live`. Without this field "published" would be one word covering both
+ * "for sale" and "for sale with nothing behind it".
+ */
 export interface PublishResult {
   externalListingId: string
   externalUrl: string | null
+  externalState: ExternalListingState
+  /**
+   * Whether a buyer can actually reach and buy the thing that was just written.
+   *
+   * Separate from `externalState`, and the separation is the whole point. A5's
+   * exit test found a provider where the object's own status says "active" and
+   * a buyer still cannot reach it, because being active and being on a sales
+   * channel are two different facts there. `externalState` answers the first —
+   * it has to, because an update reads it back to avoid taking a live object
+   * off sale — so it cannot also answer the second without one of the two
+   * questions getting the wrong answer.
+   *
+   * `null` means the adapter did not establish it. That is not the same as
+   * false and must never be rendered as one: a channel with no such concept,
+   * and every listing published before this field existed, are both null, and
+   * reporting those as "nobody can buy this" would be a fresh lie in the
+   * opposite direction.
+   */
+  purchasable?: boolean | null
+  /**
+   * The provider's own response, persisted to publication_jobs. Never rendered,
+   * and never a credential: adapters return what came back from a write.
+   */
+  providerResponse?: unknown
+}
+
+export type ExternalListingState = "draft" | "live"
+
+/**
+ * Everything an adapter needs to perform an external write.
+ *
+ * `assetUrl` is injected rather than imported so the adapter never reaches into
+ * lib/products/storage. Providers that ingest media by URL get a time-limited
+ * signed link; the adapter asks for one and does not know or care where the
+ * bytes live.
+ */
+export interface PublishContext {
+  listing: ChannelListing
+  connection: ChannelConnection
+  subject: AdapterSubject
+  assetUrl(asset: ProductAsset): Promise<string>
+}
+
+/**
+ * Work the provider's API cannot do and a person must.
+ *
+ * Declared in the adapter, in code, for the same reason capabilities are: the
+ * database row records only which step and whether it is done. A row that also
+ * carried "required" would be a requirement somebody could edit away.
+ *
+ * ADR 0001 is the worked example. Shopify has no API for attaching a
+ * buyer-downloadable file, so the creator does it once per product, and until
+ * they have, the product is not purchasable.
+ */
+export interface ManualStepSpec {
+  key: string
+  label: string
+  description: string
+  /** Rendered as a numbered list, in order. */
+  instructions: readonly string[]
+  /** An incomplete required step means published, but not live. */
+  required: boolean
+  /**
+   * True when the provider object stays in a draft state until this is done and
+   * the adapter flips it live afterwards. An adapter declaring this must
+   * implement `activate`, which a unit test checks.
+   */
+  gatesActivation: boolean
+  /** True when the creator needs the deliverable in hand to perform the step. */
+  needsDeliverable: boolean
+}
+
+/** What the creator types before an authorization begins. */
+export interface OAuthAuthorizeRequest {
+  state: string
+  accountHint: string
+  redirectUri: string
+}
+
+/**
+ * The result of a completed authorization.
+ *
+ * `credentials` is the only secret-bearing field, is sealed by
+ * lib/credentials before it reaches a row, and never leaves the server.
+ * Everything else is non-secret and lands on channel_connections.
+ */
+export interface OAuthGrant {
+  externalAccountId: string
+  externalAccountName: string | null
+  scopes: string[]
+  expiresAt: string | null
+  credentials: Record<string, unknown>
+  metadata: Record<string, unknown>
+}
+
+export interface ChannelOAuth {
+  /** Label and placeholder for the account field, e.g. a shop domain. */
+  accountHintLabel: string
+  accountHintPlaceholder: string
+  /**
+   * Everything this build asks the provider for.
+   *
+   * Declared here rather than left inside the adapter so shared code can ask
+   * whether an existing connection was granted it, without naming a provider.
+   * `channel_connections.scopes` records what was actually granted, and until
+   * this field existed nothing compared the two — the column was written at
+   * every authorization and read by nothing, which was survivable only while
+   * the list never changed.
+   *
+   * It changes. A connection authorized before a scope was added holds a token
+   * that cannot do the new thing, and the creator has to be asked again.
+   */
+  scopes: readonly string[]
+  /**
+   * Whether a granted list covers one required scope.
+   *
+   * Optional, and the default is plain membership. It exists because plain
+   * membership is wrong on at least one provider and shared code has no way to
+   * know which: Shopify treats `write_x` as implying `read_x` and grants back
+   * only the write half, so a literal comparison reports a scope missing on a
+   * connection that holds it — permanently, since reconnecting cannot add an
+   * entry the provider will not return.
+   *
+   * The rule belongs to the adapter rather than here for the ordinary reason:
+   * the next provider's rule will differ, and encoding Shopify's in shared code
+   * would make it everyone's.
+   */
+  holdsScope?(granted: readonly string[], required: string): boolean
+  /**
+   * Validates and normalizes what the creator typed, before it reaches a URL.
+   * An account hint becomes a hostname Fanwise redirects a person to and then
+   * sends a client secret to, so it is checked rather than trusted.
+   */
+  parseAccountHint(raw: string): { ok: true; value: string } | { ok: false; message: string }
+  authorizeUrl(request: OAuthAuthorizeRequest): string
+  /**
+   * Integrity of the callback itself, verified before any parameter is used,
+   * per docs/security.md rule 5.
+   */
+  verifyCallback(query: URLSearchParams): boolean
+  exchange(params: {
+    accountHint: string
+    query: URLSearchParams
+    redirectUri: string
+  }): Promise<OAuthGrant>
 }
 
 /**
@@ -136,9 +315,9 @@ export interface PublishResult {
  * offers it. Absent methods are how the honesty is enforced: a capability
  * claimed without its method fails a unit test.
  *
- * Methods beyond publish arrive with the steps that need them. A5 and A6 bring
- * real publish implementations, B5 brings fetchTransactions, and neither is
- * declared here as a capability until it exists.
+ * Methods beyond publish arrive with the steps that need them. A5 brings the
+ * first real publish implementation, B5 brings fetchTransactions, and neither
+ * is declared here as a capability until it exists.
  */
 export interface ChannelAdapter {
   key: ChannelKey
@@ -147,10 +326,16 @@ export interface ChannelAdapter {
   capabilities: ChannelCapabilities
   /** The rules this channel enforces, as data. See lib/channels/requirements.ts. */
   requirements: readonly RequirementSpec[]
+  /** Work this channel's API cannot do. Empty for a channel that needs none. */
+  manualSteps: readonly ManualStepSpec[]
   buildListing(subject: AdapterSubject): ChannelListingDraft
-  publish?(listing: ChannelListing): Promise<PublishResult>
-  update?(listing: ChannelListing): Promise<PublishResult>
-  unpublish?(listing: ChannelListing): Promise<void>
+  /** Present only on a channel Fanwise can authorize against. */
+  oauth?: ChannelOAuth
+  publish?(context: PublishContext): Promise<PublishResult>
+  update?(context: PublishContext): Promise<PublishResult>
+  /** Moves a provider draft to live. Required when a step gates activation. */
+  activate?(context: PublishContext): Promise<PublishResult>
+  unpublish?(context: PublishContext): Promise<void>
 }
 
 /**
@@ -178,7 +363,8 @@ interface RequirementSpecBase {
 }
 
 /** Fields a rule may address on a draft listing. */
-export type ListingTextField = "title" | "description" | "shortDescription" | "category"
+export type ListingTextField =
+  "title" | "description" | "shortDescription" | "seoTitle" | "seoDescription" | "category"
 export type ListingNumberField = "price"
 
 export interface TextRequirement extends RequirementSpecBase {
@@ -186,6 +372,23 @@ export interface TextRequirement extends RequirementSpecBase {
   field: ListingTextField
   minLength?: number
   maxLength?: number
+  /**
+   * True when an empty value is fine and the bounds apply only to a value that
+   * is set.
+   *
+   * The field this was added for is a meta title. Leaving it blank is not a
+   * mistake — the channel falls back to the listing title, which is usually
+   * what the creator wants — but a 200 character one is a mistake, and it is
+   * the kind the creator cannot see without a counter. Without this flag the
+   * only way to get the counter was to declare a rule that complains about
+   * every listing that has quite reasonably left the field alone, and a
+   * readiness list that is mostly noise is a readiness list nobody reads.
+   *
+   * `custom` could express the same rule, but a custom rule is opaque to
+   * `constraintsFor`, so the editor would show no limit at all and the creator
+   * would learn about the wall by hitting it.
+   */
+  optional?: boolean
 }
 
 export interface NumberRequirement extends RequirementSpecBase {

@@ -42,6 +42,11 @@ The mockups deliberately show a working product. Every number in them is invente
 Before any of this goes public, replace the placeholder numbers or mark them as illustrative
 on the page. Shipping invented usage statistics as fact is not a rounding error.
 
+The built marketing site under `app/(marketing)/` takes the second option: the workspace
+mock, the listing-time table and every channel spec value carry a note saying so. That is a
+disclosure, not a substitute for real figures — when verified numbers exist, they should
+replace these and the notes should go.
+
 ## Editing
 
 These were published as Claude artifacts and can be republished from the same files. Keep

@@ -19,7 +19,20 @@ import type { Database } from "@/lib/supabase/database.types"
 // by the time someone opens it, and the page's own expired-link message is more
 // use to them than a silent bounce to /sign-in. The page and the action both
 // re-check; this list is convenience, not authorization.
-const PUBLIC_PATHS = [
+//
+// The marketing site is public by definition: it is what a visitor sees before
+// there is an account to protect. `/` is on the list because it serves the
+// landing page to a signed-out visitor; the page itself still resolves a signed-in
+// one to their workspace.
+export const PUBLIC_PATHS = [
+  "/",
+  "/about",
+  "/how-it-works",
+  "/marketplaces",
+  "/pricing",
+  "/privacy",
+  "/start",
+  "/terms",
   "/sign-in",
   "/sign-up",
   "/forgot-password",
@@ -28,7 +41,7 @@ const PUBLIC_PATHS = [
   "/api/health",
 ]
 
-function isPublic(pathname: string): boolean {
+export function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
 }
 

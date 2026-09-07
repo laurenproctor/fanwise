@@ -4,7 +4,15 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { createWorkspaceSchema } from "./schemas"
-import { ensureMinimumLength, randomSuffix, slugify, withSuffix } from "@/lib/slug"
+import {
+  RESERVED_WORKSPACE_SLUGS,
+  avoidReserved,
+  ensureMinimumLength,
+  randomSuffix,
+  slugify,
+  withSuffix,
+} from "@/lib/slug"
+import { routes } from "@/lib/routes"
 
 export interface ActionState {
   error: string | null
@@ -32,7 +40,14 @@ export async function createWorkspaceAction(
   } = await supabase.auth.getUser()
   if (!user) redirect("/sign-in")
 
-  const base = ensureMinimumLength(slugify(parsed.data.name), randomSuffix())
+  // A workspace slug is the first path segment, so it can collide with a route
+  // as well as with another workspace. Only the second kind is a unique
+  // violation; the first has to be avoided before the insert.
+  const base = avoidReserved(
+    ensureMinimumLength(slugify(parsed.data.name), randomSuffix()),
+    RESERVED_WORKSPACE_SLUGS,
+    randomSuffix(),
+  )
   let slug = base
 
   for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt += 1) {
@@ -43,7 +58,7 @@ export async function createWorkspaceAction(
 
     if (!error && data) {
       revalidatePath("/", "layout")
-      redirect(`/w/${data.slug}`)
+      redirect(routes.workspace(data.slug))
     }
 
     if (error?.code !== UNIQUE_VIOLATION) {

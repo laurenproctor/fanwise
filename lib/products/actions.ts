@@ -3,13 +3,22 @@
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
-import { ensureMinimumLength, randomSuffix, slugify, withSuffix } from "@/lib/slug"
+import {
+  RESERVED_PRODUCT_SLUGS,
+  avoidReserved,
+  ensureMinimumLength,
+  randomSuffix,
+  slugify,
+  withSuffix,
+} from "@/lib/slug"
+import { routes } from "@/lib/routes"
 import { jobs } from "@/lib/jobs"
 import { deleteAssetCascade } from "./assets"
 import { createUploadUrl, buildStoragePath } from "./storage"
 import { sanitizeFilename } from "./storage"
 import { createProductSchema, updateProductSchema, uploadIntentSchema } from "./schemas"
 import { emptyMetadataFor } from "./metadata"
+import { planImageOrder } from "./image-order"
 
 export interface ActionState {
   error: string | null
@@ -66,7 +75,13 @@ export async function createProductAction(
   }
 
   const { supabase, workspace } = await requireWorkspace(workspaceSlug)
-  const base = ensureMinimumLength(slugify(parsed.data.name), randomSuffix())
+  // A product slug shares its segment with the workspace's own pages, so the
+  // same rule applies one level down.
+  const base = avoidReserved(
+    ensureMinimumLength(slugify(parsed.data.name), randomSuffix()),
+    RESERVED_PRODUCT_SLUGS,
+    randomSuffix(),
+  )
   let slug = base
 
   for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt += 1) {
@@ -83,8 +98,8 @@ export async function createProductAction(
       .single()
 
     if (!error && data) {
-      revalidatePath(`/w/${workspaceSlug}/products`)
-      redirect(`/w/${workspaceSlug}/products/${data.slug}`)
+      revalidatePath(routes.workspace(workspaceSlug))
+      redirect(routes.product(workspaceSlug, data.slug))
     }
 
     if (error?.code !== UNIQUE_VIOLATION) {
@@ -150,7 +165,7 @@ export async function updateProductAction(
     return { error: "Those changes could not be saved. Try again.", savedAt: null }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products`, "layout")
+  revalidatePath(routes.workspace(workspaceSlug), "layout")
   return { error: null, savedAt: Date.now() }
 }
 
@@ -235,7 +250,103 @@ export async function finalizeUploadAction(
 
   await jobs.enqueue("finalize_asset", { workspaceId: workspace.id, assetId })
 
-  revalidatePath(`/w/${workspaceSlug}/products`)
+  revalidatePath(routes.workspace(workspaceSlug))
+  return { error: null }
+}
+
+/**
+ * Writes the order of a product's images, and with it which one is the cover.
+ *
+ * Position is the model. The first image in the list is the cover and the rest
+ * are previews, so there is no separate cover picker to disagree with the
+ * order. That is why this writes `asset_type` as well as `sort_order`, and why
+ * the ordering migration had to narrow A2's immutability trigger to permit the
+ * cover_image <-> preview_image transition.
+ *
+ * The writes go: every asset down to preview with its new position, then the
+ * first one up to cover. Demoting before promoting means a concurrent reader
+ * can see zero covers but never two. Zero is harmless, because the channel
+ * comparator falls back to sort_order and that is already correct by then; two
+ * would make the storefront's lead image a coin toss.
+ *
+ * Not a transaction, which is a real limitation rather than an oversight: the
+ * client has no transaction API, and an interrupted run leaves an order that is
+ * partly written. It is recoverable by dragging again, nothing external has
+ * been told anything, and the alternative is an RPC this step does not need.
+ */
+export async function reorderProductImagesAction(
+  workspaceSlug: string,
+  productId: string,
+  assetIds: string[],
+): Promise<ActionState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  if (assetIds.length === 0) return { error: null }
+
+  // Read through RLS before deciding anything. Scoping the select to this
+  // workspace and product is the authorization step: an id belonging to someone
+  // else simply does not come back, and the planner then refuses the whole
+  // order rather than applying the part that happened to resolve.
+  const { data: assets, error: readError } = await supabase
+    .from("product_assets")
+    .select("id, asset_type")
+    .eq("product_id", productId)
+    .eq("workspace_id", workspace.id)
+    .in("id", assetIds)
+
+  if (readError) {
+    console.error("[assets] could not read images for reorder", readError)
+    return { error: "Those images could not be reordered. Try again." }
+  }
+
+  const plan = planImageOrder(assetIds, assets ?? [])
+  if (!plan.ok) {
+    return {
+      error:
+        plan.reason === "not_reorderable"
+          ? "Only cover and preview images can be reordered."
+          : "Those images have changed. Reload the page and try again.",
+    }
+  }
+
+  // Demote everything to preview with its new position, then promote the first.
+  // Demoting before promoting means a concurrent reader can see zero covers but
+  // never two: zero is harmless, because the channel comparator falls back to
+  // sort_order and that is already correct by this point, while two would make
+  // a storefront's lead image a coin toss.
+  //
+  // Not a transaction, which is a real limitation rather than an oversight. The
+  // client has no transaction API, and an interrupted run leaves an order that
+  // is partly written: recoverable by dragging again, with nothing external
+  // told anything in the meantime.
+  for (const write of plan.writes) {
+    const { error } = await supabase
+      .from("product_assets")
+      .update({ sort_order: write.sortOrder, asset_type: "preview_image" })
+      .eq("id", write.id)
+      .eq("workspace_id", workspace.id)
+
+    if (error) {
+      console.error("[assets] could not write image order", error)
+      return { error: "Those images could not be reordered. Try again." }
+    }
+  }
+
+  const cover = plan.writes.find((write) => write.assetType === "cover_image")
+  if (cover) {
+    const { error: coverError } = await supabase
+      .from("product_assets")
+      .update({ asset_type: "cover_image" })
+      .eq("id", cover.id)
+      .eq("workspace_id", workspace.id)
+
+    if (coverError) {
+      console.error("[assets] could not set the cover image", coverError)
+      return { error: "That order was saved, but the cover image could not be set. Try again." }
+    }
+  }
+
+  revalidatePath(routes.workspace(workspaceSlug), "layout")
   return { error: null }
 }
 
@@ -262,6 +373,6 @@ export async function deleteAssetAction(
     return { error: "That file could not be deleted. Try again." }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products`)
+  revalidatePath(routes.workspace(workspaceSlug))
   return { error: null }
 }

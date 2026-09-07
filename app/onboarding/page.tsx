@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { getCurrentUser, listWorkspaces } from "@/lib/workspaces/queries"
 import { CreateWorkspaceForm } from "./create-workspace-form"
+import { routes } from "@/lib/routes"
 
 export const metadata = { title: "Create a workspace · Fanwise" }
 
@@ -10,7 +11,7 @@ export default async function OnboardingPage() {
   // One workspace per user in V1. Someone who already has one has no business here.
   const workspaces = await listWorkspaces()
   const first = workspaces[0]
-  if (first) redirect(`/w/${first.slug}`)
+  if (first) redirect(routes.workspace(first.slug))
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[460px] flex-col justify-center gap-8 px-6 py-16">

@@ -1,5 +1,6 @@
 import { mockApiAdapter } from "./adapters/mock-api"
 import { mockAssistedAdapter } from "./adapters/mock-assisted"
+import { shopifyAdapter } from "./adapters/shopify"
 import type { ChannelAdapter, ChannelKey } from "./types"
 
 /**
@@ -17,6 +18,7 @@ import type { ChannelAdapter, ChannelKey } from "./types"
 const adapters: Record<ChannelKey, ChannelAdapter> = {
   mock_api: mockApiAdapter,
   mock_assisted: mockAssistedAdapter,
+  shopify: shopifyAdapter,
 }
 
 export function listAdapters(): ChannelAdapter[] {
@@ -51,3 +53,14 @@ export const CAPABILITY_METHODS = [
   { capability: "automaticPublish", method: "publish" },
   { capability: "automaticUpdate", method: "update" },
 ] as const
+
+/**
+ * True when this channel can be authorized against rather than merely recorded.
+ *
+ * The UI reads this to decide whether Connect starts an authorization or simply
+ * creates a row. It is a property of the adapter, not of the integration type:
+ * an api channel with no oauth member is one Fanwise cannot connect to yet.
+ */
+export function supportsOAuth(adapter: ChannelAdapter): boolean {
+  return adapter.oauth !== undefined
+}

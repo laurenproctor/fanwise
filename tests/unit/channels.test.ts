@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { evaluateRequirements } from "@/lib/channels/requirements"
 import { computeReadiness, readinessPercent } from "@/lib/channels/readiness"
 import { buildDraft, evaluate, listingToDraft, snapshotPayload } from "@/lib/channels/listings"
+import { missingScopes } from "@/lib/channels/oauth"
 import { getAdapter, listAdapters } from "@/lib/channels/registry"
 import type {
   AdapterSubject,
@@ -79,6 +80,8 @@ const draft = (overrides: Partial<ChannelListingDraft> = {}): ChannelListingDraf
   title: "Aster Grotesk",
   description: "x".repeat(200),
   shortDescription: "A neo-grotesque for interfaces.",
+  seoTitle: null,
+  seoDescription: null,
   price: 48,
   currency: "USD",
   category: "font",
@@ -116,10 +119,13 @@ describe("requirement evaluation", () => {
     expect(evaluateOne(textSpec, draft({ title: "Aster Gro" }), subject()).satisfied).toBe(true)
   })
 
-  it("fails an empty value and says so plainly", () => {
+  it("fails an empty value, and names the button it blocks", () => {
+    // A blocking requirement says what it blocks rather than describing the
+    // field: the creator is looking at a Publish button that will not move.
+    // The warning wording lives in requirement-messages.test.ts.
     const result = evaluateOne(textSpec, draft({ title: "" }), subject())
     expect(result.satisfied).toBe(false)
-    expect(result.message).toContain("empty")
+    expect(result.message).toBe("Title is required before you can publish your listing.")
   })
 
   it("treats whitespace as empty", () => {
@@ -143,8 +149,10 @@ describe("requirement evaluation", () => {
       min: 0,
     }
     const result = evaluateOne(spec, draft({ price: null }), subject())
+    // The point of this one is that null is not 0. A price of zero satisfies
+    // `min: 0`, so coercion would silently pass an unpriced listing.
     expect(result.satisfied).toBe(false)
-    expect(result.message).toContain("not set")
+    expect(result.message).toBe("Price is required before you can publish your listing.")
   })
 
   it("checks tag count and per-tag length separately", () => {
@@ -358,6 +366,8 @@ describe("listings round trip", () => {
       title: "Stored title",
       description: "stored description",
       short_description: null,
+      seo_title: null,
+      seo_description: null,
       price: "48.00",
       currency: "USD",
       category: "font",
@@ -369,6 +379,8 @@ describe("listings round trip", () => {
       title: "Stored title",
       description: "stored description",
       shortDescription: null,
+      seoTitle: null,
+      seoDescription: null,
       // numeric arrives from Postgres as a string; a requirement comparing it
       // against a minimum would otherwise compare a string to a number.
       price: 48,
@@ -397,5 +409,70 @@ describe("listings round trip", () => {
     expect(payload).toHaveProperty("readiness")
     expect(payload).toHaveProperty("requirements")
     expect((payload.readiness as { ready: boolean }).ready).toBe(false)
+  })
+})
+
+describe("scopes a connection is missing", () => {
+  /*
+    channel_connections.scopes was written at every authorization and read by
+    nothing, which was survivable only while the list never changed. ADR 0004
+    changed it, and Fanwise runs its own OAuth rather than Shopify's managed
+    installation, so nothing prompts a creator on its behalf.
+  */
+
+  it("names what this build asks for and the connection was never granted", () => {
+    // The real shape of the stale connection this was written for: authorized
+    // before ADR 0004, so it holds the product scopes and neither publication
+    // one.
+    const adapter = getAdapter("shopify")
+    expect(missingScopes(adapter, ["write_products"])).toEqual([
+      "read_publications",
+      "write_publications",
+    ])
+  })
+
+  it("is empty when the connection holds everything asked for", () => {
+    const adapter = getAdapter("shopify")
+    expect(missingScopes(adapter, [...adapter.oauth!.scopes])).toEqual([])
+  })
+
+  it("counts a write scope as covering the read half it implies", () => {
+    /*
+      The bug this shipped with, caught by a live connection rather than by a
+      test. Shopify treats write_x as implying read_x and collapses the pair in
+      what it grants back: an authorization for write_products,read_products
+      comes back as write_products alone, and the stored row held exactly one
+      entry.
+
+      Compared literally, read_products reads as missing on a connection that
+      holds it — and reconnecting cannot fix it, because the provider will
+      never return the entry. The creator would be prompted to reconnect
+      forever, which teaches people to ignore the prompt that matters.
+    */
+    const adapter = getAdapter("shopify")
+    expect(missingScopes(adapter, ["write_products", "write_publications"])).toEqual([])
+    // The implication runs one way only. Holding the read half is not holding
+    // the write half, and treating it as such would let a token that cannot
+    // publish look like one that can.
+    expect(missingScopes(adapter, ["read_products", "read_publications"])).toEqual([
+      "write_products",
+      "write_publications",
+    ])
+  })
+
+  it("treats an unrecorded scope list as unknown, not as nothing granted", () => {
+    // Empty means the column was never populated for this row. Reading it as
+    // "granted nothing" would force every such creator through a reconnect to
+    // fix a problem most of them do not have.
+    const adapter = getAdapter("shopify")
+    expect(missingScopes(adapter, [])).toEqual([])
+    expect(missingScopes(adapter, null)).toEqual([])
+  })
+
+  it("says nothing about a channel that has no authorization at all", () => {
+    // An assisted channel is connected by assertion, not by OAuth. It has no
+    // scopes to be missing, and a rule that reported some would put a
+    // reconnect button on a card that cannot be reconnected.
+    expect(missingScopes(getAdapter("mock_assisted"), ["anything"])).toEqual([])
   })
 })

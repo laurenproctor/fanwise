@@ -24,7 +24,7 @@ Current reality, from `docs/channel-feasibility.md`:
 
 | Channel | Type | Publish | Update | Transactions | File upload | Image upload |
 |---|---|---|---|---|---|---|
-| Shopify | api | yes | yes | yes | see note | yes |
+| Shopify | api | yes | yes | yes | **no**, see note | yes |
 | Etsy | api | yes | yes | yes | yes, 5 files at 20 MB | yes |
 | Creative Market | assisted | no | no | no | no | no |
 | Adobe Stock | assisted | no | no | no | no | no |
@@ -32,10 +32,84 @@ Current reality, from `docs/channel-feasibility.md`:
 | Gumroad | assisted | no | no | yes | no | no |
 | Envato | assisted | no | no | yes | no | no |
 
-**Shopify note:** the Admin API creates products but has no API for attaching a
-buyer-downloadable file, and Shopify's own Digital Downloads app exposes none. Resolve
-before step A5. Options: Fanwise hosts delivery, a third-party app with an API, or an
-assisted file step.
+**Shopify note, resolved at A5.** The Admin API creates products but has no API for
+attaching a buyer-downloadable file, and Shopify's own Digital Downloads app exposes none.
+Re-verified 4 September 2026: still true. `docs/decisions/0001` takes the assisted file step,
+so Shopify ships with `digitalFileUpload: false` and one manual step. The full spec is
+`docs/channels/shopify.md`.
+
+## Manual steps
+
+A channel may be able to publish and still be unable to do one necessary thing. Shopify is
+the worked example: it creates the product but cannot receive the file the buyer downloads.
+
+```ts
+interface ManualStepSpec {
+  key: string
+  label: string
+  description: string
+  instructions: readonly string[]
+  required: boolean
+  gatesActivation: boolean
+  needsDeliverable: boolean
+}
+```
+
+Declared in the adapter, like capabilities and for the same reason. The database row records
+only which step, on which listing, and whether a human has done it. A row that also carried
+`required` would be a requirement somebody could edit away.
+
+**`gatesActivation` is the honest version of "not finished yet".** An adapter that declares
+it creates the provider object in a draft state and implements `activate`, which runs once
+every gating step is complete. Nothing can be bought before the step is done, rather than
+being buyable and labelled carefully. A unit test refuses a `gatesActivation` step on an
+adapter with no `activate`, and refuses a channel that publishes, cannot upload the
+deliverable, and asks nobody to.
+
+**Fully published is derived, never stored:** published, with an external id, and no required
+step incomplete. Computed on read in `lib/publishing/manual-steps.ts`. A stored copy could
+disagree with the rows, and the disagreement would be invisible.
+
+The five words a listing may be described by are `unpublished`, `publishing`,
+`published_not_live`, `live` and `failed`. None of them can be read as "for sale" unless it
+is.
+
+## Authorization
+
+An adapter that Fanwise can authorize against declares an `oauth` member. Its absence is what
+the UI reads to decide whether Connect starts an authorization or simply writes a row, so a
+channel with no `oauth` is one Fanwise cannot connect to yet rather than one it pretends to.
+
+```ts
+interface ChannelOAuth {
+  accountHintLabel: string
+  accountHintPlaceholder: string
+  parseAccountHint(raw): { ok: true; value: string } | { ok: false; message: string }
+  authorizeUrl(request): string
+  verifyCallback(query): boolean
+  exchange(params): Promise<OAuthGrant>
+}
+```
+
+`parseAccountHint` is not a formatting convenience. The value becomes a hostname Fanwise
+redirects a person to and then posts a client secret to, so it is validated against a fixed
+pattern before it reaches a URL.
+
+The callback route is generic in the channel key
+(`app/api/channels/[channelKey]/oauth/callback`). A route named after a marketplace would put
+a provider name in the application tree, and the next channel would copy the file rather than
+reuse it.
+
+## Errors
+
+`lib/channels/errors.ts` holds the shared vocabulary; each adapter owns the mapping into it,
+because only the adapter knows what a given status means on that platform. Nothing
+provider-shaped reaches a creator: the normalized message is shown, the raw response is
+persisted on the `publication_jobs` row, and the two never swap places.
+
+`retryable` is the field that earns its keep. Publishing runs in a background job, and a job
+that cannot tell "the shop is briefly down" from "you asked for a scope you were not granted"
+either retries forever or gives up on something that would have worked.
 
 ## Requirements
 
@@ -128,12 +202,20 @@ the second.
    implemented method must be declared. An assisted adapter may never declare
    `automaticPublish` or `automaticUpdate`.
    Declare a capability false when the feature exists but the step that uses it has not
-   arrived. `metrics` and `transactions` are false on both A3 mocks for exactly this reason.
+   arrived. `metrics` and `transactions` are false on both A3 mocks for exactly this reason,
+   and false on Shopify too, which is a real channel that genuinely has both.
+   **Two different reasons produce the same `false`, and the difference matters.** Shopify's
+   `digitalFileUpload` is false because Shopify cannot; its `metrics` is false because
+   Fanwise has not. Only the first is permanent, and only the first is a fact about the
+   provider. Say which one it is in a comment.
 3. Express the submission spec as data, not code, so a new assisted channel is a config file
    rather than a feature.
 4. Requirements before transformations. Knowing what would be rejected is more valuable than
    generating something that will be.
-5. Never add a provider string outside the adapter folder.
+5. Never add a provider string outside the adapter folder. A unit test reads the whole tree
+   for it, case-insensitively: a provider name does not stop being one because it was written
+   `SHOPIFY_CLIENT_ID` in an env schema or "Shopify" in a comment. This is why an adapter
+   parses its own credentials rather than adding fields to `lib/env.ts`.
 
 ## Assisted channels
 

@@ -1,6 +1,7 @@
 # ADR 0001: Shopify digital file delivery
 
-**Status:** accepted, 4 September 2026
+**Status:** accepted, 4 September 2026. **Amended at A5, 4 September 2026** — see the
+amendment at the foot of this file. The decision is unchanged; the mechanism is stronger.
 **Date:** September 2026
 **Blocks:** A2 (asset architecture), A5 (Shopify adapter)
 
@@ -53,6 +54,11 @@ capabilities: {
   drafts: true,
 }
 ```
+
+**As implemented at A5, `metrics` and `transactions` are false.** They exist on Shopify, but
+the steps that use them are B6 and B5, and `docs/channel-adapters.md` requires a capability
+to be declared false until the step using it has arrived. The block above describes the
+eventual shape. See the amendment.
 
 This is the capability matrix working exactly as intended. It is not a workaround.
 
@@ -160,3 +166,74 @@ Any one of these should reopen it:
 - Current Shopify behavior for digital products and whether any first-party API now exists.
 - The Digital Products app's per-file size limit against realistic font and template bundles.
 - Fileflare's API surface and pricing, so option B stays a known quantity if it is needed.
+
+---
+
+# Amendment, A5, 4 September 2026
+
+Two changes on implementation. Neither reverses the decision; the first hardens it and the
+second corrects a capability declaration.
+
+## 1. The product is created as a draft, not live
+
+This document's "What the creator experiences" sketch shows the Shopify product created and
+live, with the file step outstanding, and reports it as "Published, 1 step left". Its own
+normative text says the opposite two paragraphs later:
+
+> A live Shopify product with no deliverable attached is a product that can take money and
+> give nothing back, which is the one outcome worth engineering against.
+
+The sketch engineers against that outcome with a label. A5 engineers against it with the
+provider's own state:
+
+```
+publish()        Shopify product created with status DRAFT
+                 listing.status = published, status_source = verified
+                 manual step attach_digital_file, incomplete
+                 Fanwise reports "Published, not live"
+
+mark attached    productSet with the product identifier, status ACTIVE
+                 manual step complete
+                 Fanwise reports "Live"
+```
+
+The window in which a buyer can pay and receive nothing does not exist, rather than existing
+and being labelled carefully. "Fully published is a derived condition" survives intact and is
+now also true of the thing being described, not only of Fanwise's description of it.
+
+Three consequences worth recording:
+
+- **`drafts: true` becomes load-bearing.** It was previously a capability nothing used, and
+  a capability nothing checks is a capability that can quietly become false.
+- **Activation is a second external write**, so it carries its own idempotency key. It is a
+  set-state operation rather than a create, so it is convergent by nature, but it goes
+  through the same job row and the same guards as everything else.
+- **The cost is one mutation.** That is the entire price of the change.
+
+The creator-facing flow in the sketch is otherwise unchanged: same honesty about why, same
+three steps, same download beside the step that needs it.
+
+## 2. `metrics` and `transactions` ship false
+
+The capability block above declares both true. A5 declares both false, because Fanwise has
+not built the steps that read them — transactions at B5, metrics at B6 — and
+`docs/channel-adapters.md` is explicit that a capability is false while the feature exists on
+the provider but the step using it has not arrived.
+
+The distinction matters and is worth keeping visible in the adapter: `digitalFileUpload` is
+false because **Shopify cannot**, and these two are false because **Fanwise has not**. Only
+the first is permanent.
+
+## Re-verification
+
+This ADR asks for Shopify's digital-product behaviour to be re-checked before A5 regardless.
+Done on 4 September 2026 against shopify.dev and current third-party documentation:
+
+- Shopify still has no first-party API for attaching a buyer-downloadable file, and no
+  native digital-download product type.
+- Shopify's own Digital Downloads app still exposes no public API.
+- Fileflare still documents the REST surface option B would depend on, so option B remains a
+  known quantity if it is ever needed.
+- `2026-07` is the current stable Admin API version and is what the adapter pins.
+
+The premise holds. Option C stands.

@@ -60,7 +60,10 @@ export function constraintsFor(adapter: ChannelAdapter): ChannelConstraints {
         constraints.text[spec.field] = {
           minLength: tightestMin(existing?.minLength, spec.minLength),
           maxLength: tightestMax(existing?.maxLength, spec.maxLength),
-          required: (existing?.required ?? false) || required,
+          // An optional rule never makes a field required, whatever its
+          // severity. Its severity describes how badly a value that is *set*
+          // can be wrong, not whether one has to exist.
+          required: (existing?.required ?? false) || (spec.optional !== true && required),
           allowed: existing?.allowed,
         }
         break

@@ -15,7 +15,8 @@ explicitly requested.
 
 ## Current step
 
-**Step: A4 (manual listing editor, readiness UI) is complete. A5 is next.**
+**Step: A5 (Shopify adapter, OAuth, credentials, publishing) is code complete. Its exit
+test needs a live Shopify connection and has not been run. A6 does not begin until it has.**
 See `docs/roadmap.md`. Implement the current step only. Do not build ahead.
 
 ## Architecture invariants
@@ -188,3 +189,13 @@ with per-channel statuses and an inline rejection fix. Read it before building A
 
 Every figure in the mockups is placeholder except the channel modes and the pricing, which
 are accurate. Do not carry invented usage statistics into anything real.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
