@@ -1121,6 +1121,45 @@ describe("putting the product on a sales channel", () => {
     ).rejects.toThrow(/could not tell which of this store's sales channels is the Online Store/)
   })
 
+  it("finds the Online Store among a real store's channels", async () => {
+    /*
+      The exact payload the development store returned on 7 September 2026,
+      pinned here because the handle this resolution depends on is a convention
+      shopify.dev does not document, and a fixture invented to match the code
+      would prove nothing about it.
+
+      Two things it settles. The handle really is `online_store`. And the
+      single-publication fallback is not what saves this store — there are
+      three, one of them Point of Sale, so without the handle matching, a font
+      would either have been refused or sent somewhere absurd. The refusal
+      branch is not hypothetical on a store shaped like this one.
+    */
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) =>
+        respondTo(body, {
+          status: "ACTIVE",
+          holds: "ACTIVE",
+          publications: [
+            { id: "gid://shopify/Publication/216151654636", handle: "online_store" },
+            { id: "gid://shopify/Publication/216151720172", handle: "shop-72" },
+            { id: "gid://shopify/Publication/216151752940", handle: "pos" },
+          ],
+        }),
+      ),
+    )
+
+    const result = await shopifyAdapter.activate!(
+      context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
+    )
+
+    expect(result.providerResponse).toMatchObject({
+      publication: { id: "gid://shopify/Publication/216151654636", resolvedBy: "handle" },
+    })
+    expect(result.purchasable).toBe(true)
+  })
+
   it("takes the only channel a single-publication store has", async () => {
     // A development store is usually this. There is no judgement to get wrong
     // when there is one place a product can go.

@@ -541,6 +541,21 @@ human-readable identifier for the channel within the shop" — with no statement
 shopify.dev of what the Online Store's handle actually is. `online_store` is a convention
 this adapter relies on and does not trust.
 
+**Answered against the live store, 7 September 2026.** The development store returns three
+publications, and the handle convention holds:
+
+| Publication | Handle | `autoPublish` |
+|---|---|---|
+| `gid://shopify/Publication/216151654636` | `online_store` | false |
+| `gid://shopify/Publication/216151720172` | `shop-72` | false |
+| `gid://shopify/Publication/216151752940` | `pos` | false |
+
+Worth reading twice: there are **three**, so the single-publication fallback is not what saves
+this store, and one of the others is Point of Sale. The handle match is load-bearing here, and
+the refusal branch below is not hypothetical on a store shaped like this. All three read
+`autoPublish: false`, which is the direct explanation for the `publishedAt: null` that started
+this — nothing was ever going to put those products on a channel by itself.
+
 So `resolvePublication` returns one of three outcomes and the third is the point:
 
 | Outcome | When |
