@@ -43,7 +43,7 @@ export function ManualStepCard({
   deliverable: { assetId: string; filename: string } | null
   /** True when completing this step is what takes the product live. */
   activates: boolean
-  onDone: (notice: string | null) => void
+  onDone: (result: { notice: string | null; activating: boolean }) => void
 }) {
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -53,7 +53,7 @@ export function ManualStepCard({
     startTransition(async () => {
       const result = await completeManualStepAction(workspaceSlug, listingId, step.key)
       setError(result.error)
-      if (!result.error) onDone(result.notice)
+      if (!result.error) onDone({ notice: result.notice, activating: result.activating === true })
     })
   }
 
