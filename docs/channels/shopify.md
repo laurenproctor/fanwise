@@ -594,8 +594,14 @@ Three things the run taught that the fake did not:
    which is fine; it is recorded so the next person reading `resourcePublications` does not
    go looking for the bug.
 2. **`onlineStoreUrl` is still null** on a product that is ACTIVE *and* on the Online Store.
-   §13 item 4's decision to store the admin URL is right for a third reason now. The likely
-   cause is the development store's storefront password, which is unverified.
+   §13 item 4's decision to store the admin URL is right for a third reason now. **Cause
+   confirmed, 7 September 2026:** `onlineStore.passwordProtection.enabled` reads `true` on
+   the development store, and Shopify returns no storefront URL while the storefront is
+   password-protected. What it does return is `onlineStorePreviewUrl`
+   (`https://fanwise-2rxa5frl.myshopify.com/products/test-type`), which resolves regardless.
+   Not stored: a preview URL is not a URL a buyer reaches, and the admin URL is the one thing
+   that is true in every state a product can be in. A production store with the password off
+   should populate `onlineStoreUrl`; that remains to be seen on one.
 3. **A rebuild erased `purchasable`.** `rebuildColumns` preserved only `externalState`, so
    regenerating the listing after activation dropped the recorded `true`. Absent reads as
    unknown and unknown keeps the old answer, so the display stayed Live — by luck. Had the
