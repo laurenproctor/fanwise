@@ -601,10 +601,19 @@ async function productSet(context: PublishContext, intent: PublishIntent): Promi
           ...(seoDescription === null ? {} : { description: seoDescription }),
         }
 
+  /*
+   * No handle. It used to be the product slug, on the spec's assumption that
+   * Shopify uniquifies a collision itself. It does that for a handle it
+   * derives; for one it is given, productSet answers HANDLE_NOT_UNIQUE and
+   * creates nothing. The first slug that happened to exist on the store as a
+   * product Fanwise had never seen — "kerf-display", 7 September 2026 —
+   * blocked every publish of that product forever, because the slug does not
+   * change and neither would the answer. Left to Shopify, the handle is
+   * derived from the title on create, suffixed if taken, and kept on update.
+   */
   const input: Record<string, unknown> = {
     title: listing.title ?? subject.product.name,
     descriptionHtml: toDescriptionHtml(listing.description),
-    handle: subject.product.slug,
     productType: toProductType(subject.product.product_type),
     ...(categoryId === null ? {} : { category: categoryId }),
     vendor: subject.product.brand_name ?? undefined,

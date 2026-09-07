@@ -323,6 +323,11 @@ async function execute(
   await finish({
     status: "succeeded",
     provider_response: (result.providerResponse ?? null) as never,
+    // A retry reuses the row, so a success has to clear what the failed
+    // attempt wrote. Left in place, a succeeded job went on saying the channel
+    // had rejected it, which is what the first live retry recorded.
+    normalized_error_code: null,
+    normalized_error_message: null,
   })
 }
 

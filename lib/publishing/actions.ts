@@ -34,6 +34,14 @@ export interface PublishState {
    * for a person and should stay free to change without breaking a condition.
    */
   sending?: boolean
+  /**
+   * True when completing a step started the activation job. The panel keeps
+   * watching until the listing reads live or failed, for the same reason it
+   * watches a send: one refresh at the moment of the click lands before the job
+   * does, and the card then says "not live" about a product that went live
+   * three seconds later.
+   */
+  activating?: boolean
 }
 
 async function requireWorkspace(workspaceSlug: string) {
@@ -371,5 +379,5 @@ export async function completeManualStepAction(
     }
   }
 
-  return { error: null, notice: `Taking the product live on ${adapter.name}.` }
+  return { error: null, notice: `Taking the product live on ${adapter.name}.`, activating: true }
 }

@@ -97,11 +97,40 @@ export function ListingPanel({
   const publishing = cards.some((card) => card.liveness === "publishing")
 
   /*
+   * The listing whose activation is in flight, if any. Set when completing the
+   * last gating step started the job, cleared when the card stops reading
+   * "published, not live" — either it went live or the attempt failed and the
+   * card now carries the error. Found on the first live run: one refresh at the
+   * click landed before the job did, and the card went on saying nobody could
+   * buy a product that had been on sale for a minute.
+   */
+  const [activating, setActivating] = useState<string | null>(null)
+
+  /*
    * Publishing happens in a background job, so the page that queued it does not
    * know when it finished. It asks, briefly. A7 replaces this with real
    * progress, which is where it belongs.
    */
-  useBackgroundRefresh(publishing || sending !== null)
+  useBackgroundRefresh(publishing || sending !== null || activating !== null)
+
+  const activatingCard =
+    activating === null ? undefined : cards.find((card) => card.listingId === activating)
+  if (
+    activating !== null &&
+    (!activatingCard || activatingCard.liveness !== "published_not_live")
+  ) {
+    // Same shape as the send below: resolved from the props that just arrived.
+    setActivating(null)
+  }
+
+  useEffect(() => {
+    if (activating === null) return
+    const timer = setTimeout(() => {
+      setActivating(null)
+      setNotice("Still taking it live. Reload to see where it got to.")
+    }, SEND_WATCH_MS)
+    return () => clearTimeout(timer)
+  }, [activating])
 
   /*
    * Ends the send, on evidence rather than on a timer.
@@ -263,7 +292,13 @@ export function ListingPanel({
                 */}
                 {card.listingId ? (
                   <p className="max-w-prose text-[13px] text-[var(--color-ink-2)]">
-                    {LIVENESS_MEANINGS[card.liveness]}
+                    {card.listingId === activating
+                      ? "Taking the product live. This takes a few seconds."
+                      : card.liveness === "published_not_live" && outstanding.length === 0
+                        ? // Every step is done and it is still not buyable: the
+                          // channel is holding it off sale, not the creator.
+                          "The channel has the product, but it is not on sale there yet."
+                        : LIVENESS_MEANINGS[card.liveness]}
                   </p>
                 ) : null}
               </div>
@@ -323,8 +358,9 @@ export function ListingPanel({
                         step={step}
                         deliverable={card.deliverable}
                         activates={outstanding.length === 1 && !step.completed}
-                        onDone={(message) => {
+                        onDone={({ notice: message, activating: started }) => {
                           setNotice(message)
+                          if (started) setActivating(card.listingId)
                           router.refresh()
                         }}
                       />

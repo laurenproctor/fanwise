@@ -59,7 +59,7 @@ them true now would have the UI offer a sales report that does not exist.
 | `product_type` | `productType` | Coarse Fanwise type, title-cased |
 | `category` | `category` | A Standard Product Taxonomy id, §14 |
 | `brand_name` | `vendor` | Falls back to the workspace name |
-| `slug` | `handle` | Shopify uniquifies a collision itself |
+| `slug` | — | **Not sent, since 7 September 2026.** Shopify uniquifies a handle it derives from the title and refuses one it is given that is already in use, so a slug that existed on the store as a product Fanwise never made blocked every publish. Shopify derives the handle on create and keeps it on update |
 | `cover_image`, then `preview_image` assets | `files` | `FileSetInput`, `contentType: IMAGE`, cover first |
 | `deliverable` asset | **nothing** | No API exists. §6 |
 
