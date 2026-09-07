@@ -5,6 +5,8 @@
   "packageManager": "pnpm@9.12.0",
   "scripts": {
     "dev": "next dev",
+    "jobs:dev": "trigger.dev dev",
+    "jobs:deploy": "trigger.dev deploy",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -20,8 +22,10 @@
     "db:types": "supabase gen types typescript --local > lib/supabase/database.types.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.124.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.115.0",
+    "@trigger.dev/sdk": "4.5.16",
     "next": "^16.3.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -38,6 +42,7 @@
     "eslint-config-next": "^16.3.4",
     "prettier": "^3.9.6",
     "tailwindcss": "^4.3.3",
+    "trigger.dev": "4.5.16",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11"
   }

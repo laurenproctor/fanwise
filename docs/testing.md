@@ -25,6 +25,15 @@ than against the ten:
   nothing. Run against the mock API channel, because A5's exit test needs a live Shopify
   connection that does not exist yet.
 
+**B1's validator is proved twice.** `tests/unit/factuality.test.ts` is the vocabulary: every
+way a model could state a number, a format, a compatibility or a claim the facts do not
+support, and every way a true statement must still pass. `tests/db/ai-generation.test.ts`
+runs the whole path against real Postgres with the model replaced by a scripted provider: a
+fabricated claim is rejected and the listing is untouched; a supported one lands with a
+snapshot and a FactSheet hash. The vendor's request shape is checked in
+`tests/unit/ai-provider.test.ts` with a fetch that answers from a script, so the schema, the
+effort and the cache marker are asserted without a network. No test calls the model.
+
 **A5's idempotency is proved at the database, not in the browser**, in
 `tests/db/publication-idempotency.test.ts`. That suite drives the real job row, the real
 unique constraint and the real runner, and checks the three guards from
@@ -58,7 +67,8 @@ the product heading, usually.
 ## The ten journeys
 
 1. Signup, workspace, product. *(complete at A2)*
-2. Product to AI Shopify listing, approved.
+2. Product to AI Shopify listing, approved. *(composition code complete at B1, unrun against
+   the model; approval is B2)*
 3. Connect Shopify, publish. *(code complete at A5, unverified: needs a live shop)*
 4. Connect Etsy, publish.
 5. Publish to Shopify and Etsy in one action.

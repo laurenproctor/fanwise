@@ -57,6 +57,11 @@ export interface ChannelListingCard {
   manualSteps: ManualStepCardData[]
   /** The last normalized failure, if the most recent attempt failed. */
   lastError: string | null
+  /**
+   * True when composed copy has landed and no one has saved the editor since.
+   * Publish refuses until they have, and the card says so before the click.
+   */
+  awaitingReview: boolean
   deliverable: { assetId: string; filename: string } | null
 }
 
@@ -334,6 +339,16 @@ export function ListingPanel({
                   job row and stay there.
                 */}
                 {card.lastError ? <FormError message={card.lastError} /> : null}
+
+                {card.awaitingReview ? (
+                  <p
+                    className="border-l-2 border-[var(--color-warn)] pl-3 text-[13px] text-[var(--color-ink-2)]"
+                    role="status"
+                  >
+                    Composed copy is waiting for you to read it. Open the listing, then save it to
+                    publish.
+                  </p>
+                ) : null}
 
                 {/*
                   Steps are work outstanding on something that exists. Before

@@ -108,6 +108,25 @@ export const mockAssistedAdapter: ChannelAdapter = {
   // There is still no manual *step* row: a step tracks work outstanding after a
   // successful publication, and nothing here ever publishes.
   manualSteps: [],
+  /*
+   * A marketplace-shaped profile: a reader who found the product by searching
+   * a catalogue of strangers. Generic for the same reason the api mock's is.
+   */
+  merchandising: {
+    promptVersion: "2026-09-07.1",
+    audience: "A buyer searching a marketplace who has never heard of the creator.",
+    voice: "Descriptive and useful. Second person. No hype.",
+    structure:
+      "One paragraph on what it is, one on what is included, one on use. Plain text, no markdown.",
+    fields: {
+      title: "Descriptive, with the product type and one search term a buyer would use.",
+      description: "Between 80 and 250 words, from the facts only.",
+      shortDescription: "One sentence under 160 characters.",
+      seoTitle: "Leave empty.",
+      seoDescription: "Leave empty.",
+      tags: "Ten lowercase search terms a buyer would type.",
+    },
+  },
 
   buildListing({ product }: AdapterSubject): ChannelListingDraft {
     return {

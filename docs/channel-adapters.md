@@ -74,6 +74,19 @@ The five words a listing may be described by are `unpublished`, `publishing`,
 `published_not_live`, `live` and `failed`. None of them can be read as "for sale" unless it
 is.
 
+## Merchandising profile
+
+Since B1 every adapter declares a `merchandising` profile: audience, voice, structure, and
+guidance per output field, each in prose the model can follow, plus a `promptVersion` that
+moves whenever the text does. It is declared in code for the reason capabilities are, and it
+is instruction only: nothing in a profile is a fact about any product, and the factuality
+validator would refuse the copy if the model treated it as one.
+
+`lib/ai/prompt.ts` renders the profile together with the channel's field limits, derived
+from the same requirement specs the evaluator walks, into the stable prefix of the prompt.
+The profile is the same bytes for every product on a channel, which is what lets the
+provider cache it.
+
 ## Authorization
 
 An adapter that Fanwise can authorize against declares an `oauth` member. Its absence is what

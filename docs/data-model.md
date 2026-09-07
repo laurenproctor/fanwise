@@ -287,11 +287,44 @@ rather it went away.
 
 ## B1: AI
 
-**ai_generations** — id, workspace_id, product_id, channel_listing_id, generation_type,
-provider, model, prompt_version, input_hash, factsheet_hash, structured_output, status,
-input_tokens, output_tokens, estimated_cost, created_at
+Built. Migration `20260907180000_ai_generations`.
 
-`factsheet_hash` is what lets a bad listing be traced back to the facts that produced it.
+**ai_generations** — id, workspace_id, product_id, channel_listing_id, generation_type,
+status, requested_by, provider, model, prompt_version, input_hash, factsheet_hash,
+structured_output, violations, input_tokens, output_tokens, cache_read_input_tokens,
+cache_creation_input_tokens, estimated_cost, error_code, error_message, started_at,
+completed_at, applied_at, created_at, updated_at
+
+One row per model call. `factsheet_hash` is what lets a bad listing be traced back to the
+facts that produced it, and `structured_output` is what B2's restore reads.
+
+Status: pending, running, succeeded, failed, **rejected**. The last is the factuality
+validator's verdict and is deliberately not `failed`: the model answered, the answer parsed,
+and the validator refused it because it claimed something the FactSheet does not support.
+That is the product working. `violations` is set only with `rejected`, by check constraint,
+and holds `{kind, value, field}` for each unsupported claim.
+
+Members hold `select` and `insert` only, as on `publication_jobs`: asking is theirs, the
+outcome is the system's. A partial unique index on `channel_listing_id` where the status is
+pending or running allows one generation in flight per listing, so a double click loses at
+the database rather than paying twice.
+
+Both tenant boundaries are composite foreign keys, to `products (id, workspace_id)` and
+`channel_listings (id, workspace_id)`.
+
+**`snapshot_type` gains `generate`.** A generation applied to a listing writes a snapshot
+like a build or a save does, carrying the copy, the readiness verdict, and the generation's
+id, provider, model, prompt version and FactSheet hash.
+
+**On `channel_listings`, two existing columns take on meaning.** `approved_at` is stamped by
+every save from the editor: a person vouching for the text as it stands. `metadata.composedAt`
+is stamped when a generation lands. When the second is newer than the first, Publish refuses.
+`composedAt` is in metadata rather than a column because a rebuild drops it, correctly: the
+adapter's draft replaced the model's and there is nothing left to review.
+
+**Credentials are nowhere near this table.** The runner loads the listing, the product and
+its assets; it never loads a connection or a secret, and the prompt is built from the
+FactSheet and the channel's profile alone.
 
 ## B5: commerce
 

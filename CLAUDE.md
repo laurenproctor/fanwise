@@ -15,9 +15,12 @@ explicitly requested.
 
 ## Current step
 
-**Step: A5 (Shopify adapter, OAuth, credentials, publishing) is code complete. Its exit
-test needs a live Shopify connection and has not been run. A6 does not begin until it has.**
-See `docs/roadmap.md`. Implement the current step only. Do not build ahead.
+**Step: B1 (AI provider abstraction, FactSheet, merchandising profiles, factuality
+validator, generation logs, Trigger.dev) is code complete, started out of order on
+7 September 2026 while A6 and A8 wait on external parties. Its exit needs one composed
+listing against the configured model and one job carried by Trigger.dev, neither yet run
+live. Gate A is not passed.** See `docs/roadmap.md`. Implement the current step only. Do
+not build ahead.
 
 ## Architecture invariants
 

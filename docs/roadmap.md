@@ -1,6 +1,7 @@
 # Roadmap
 
-**Current step: B1, out of order, decided 7 September 2026.** A5 is done and promoted to
+**Current step: B1, out of order, decided 7 September 2026. Code complete the same day;
+its live exit is still owed, see "B1" under Gate B.** A5 is done and promoted to
 `main`; all three exit clauses ran against a live Shopify store. What remains of Gate A is
 blocked on things no code can move: A6 on Etsy's developer app and commercial access, A8 on a
 Creative Market seller login, and the gate's own exit — an outside creator, unassisted — on a
@@ -9,8 +10,9 @@ Trigger.dev) depends on none of those and on nothing after A5, so it starts now.
 not passed.** A6, A7 and A8 resume the moment their blockers clear, and Gate A's exit test is
 still owed before Gate B's is attempted. See "Reordering" below.
 
-Before B1 opens, two decisions in `docs/decisions/0002` are owed answers: 12 (model and
-cost per generation) and 13 (metered or unlimited). And `ANTHROPIC_API_KEY` has to exist.**
+Before B1 opened, two decisions in `docs/decisions/0002` were owed answers: 12 (model and
+cost per generation) and 13 (metered or unlimited). Both were decided on 7 September 2026,
+and the model key is set on the development environment.**
 
 Three gates. Nothing after a gate begins until the gate passes. Update the line above when a
 step completes, and do not work on more than one step at a time.
@@ -282,13 +284,45 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 
 | Step | Content |
 |---|---|
-| B1 | AI provider abstraction, Anthropic, FactSheet, merchandising profiles, factuality validator, generation logs. Adopt Trigger.dev here |
+| B1 | AI provider abstraction, Anthropic, FactSheet, merchandising profiles, factuality validator, generation logs. Adopt Trigger.dev here. **Code complete 7 September 2026**, see below |
 | B2 | Listing review UI: field edit, field regenerate, full regenerate, restore, approve |
 | B2a | Creative Market composed-listing test: the three creators and the measures in `docs/channels/creative-market.md` section 12, run against AI-composed copy on the A8 handoff |
 | B4 | Second assisted channel. Adobe Stock or MyFonts, undecided on purpose, see `docs/channel-feasibility.md` and decision 14 |
 | B5 | `sales_events`, transaction ingestion for Shopify and Etsy, dedupe constraints |
 | B6 | Analytics overview: revenue, units, by channel, by product |
 | B7 | CSV import foundation |
+
+### B1, what was built and what is still owed
+
+Built on 7 September 2026, on the branch `b1-ai-merchandising`:
+
+- `lib/ai`: the provider abstraction, the FactSheet, the prompt, the output schema, the
+  factuality validator, the generation runner, and the review guard. The vendor lives in
+  `lib/ai/providers/anthropic` and a unit test reads the tree to keep its name there, the
+  same way the channel keys are kept inside the adapter layer.
+- `ai_generations`, migration `20260907180000_ai_generations`, with `factsheet_hash` on every
+  row and a partial unique index that allows one generation in flight per listing.
+- A merchandising profile on every adapter, as data, with its own prompt version.
+- Trigger.dev behind `lib/jobs`, selected by `TRIGGER_SECRET_KEY` and otherwise absent.
+  `trigger/jobs.ts` declares one task per job name; a test checks the two lists agree.
+- **Compose with AI** on the listing page. Composed copy lands on the listing and Publish
+  refuses it until a person has saved the editor since. That is B1's stand-in for approval;
+  B2's review screen replaces it.
+
+**B1's exit is two claims, and neither has been run live:**
+
+1. One real product composes for the connected Shopify store against the configured model,
+   the validator passes it, and the cost recorded on the row is within a factor of two of
+   decision 12's estimate. The whole path is proven against a scripted provider in
+   `tests/db/ai-generation.test.ts`; the model has not been called.
+2. One job runs through Trigger.dev rather than the in-process queue. The queue is unit
+   tested against a fake client; no Trigger.dev project has been created and no task has been
+   deployed. `sharp` is declared external in `trigger.config.ts` and that is an assumption
+   until a derivative job runs on a worker.
+
+What B1 deliberately does not do: meter generations (decision 13's free cap belongs to the
+entitlement service at C2), regenerate a single field, or restore an earlier generation.
+Those are B2, and the `ai_generations.structured_output` column is what B2 restores from.
 
 **B3 is vacant on purpose.** Creative Market moved to A8 and the remaining steps keep their
 numbers, because step ids are names here, not positions — `docs/data-model.md`,

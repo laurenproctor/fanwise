@@ -10,6 +10,10 @@ import { ListingImages, type ListingImage } from "@/components/channels/listing-
 import { listingImageSlots } from "@/lib/channels/images"
 import { isReorderable } from "@/lib/products/image-order"
 import { routes } from "@/lib/routes"
+import { ComposePanel } from "@/components/channels/compose-panel"
+import { latestGenerations, summarize } from "@/lib/ai/queries"
+import { isAiConfigured } from "@/lib/ai/providers"
+import { awaitingReview } from "@/lib/ai/review"
 
 export const metadata = { title: "Listing · Fanwise" }
 
@@ -42,6 +46,9 @@ export default async function ListingPage({
   if (!view || !view.adapter || !isChannelKey(view.channel.key)) notFound()
 
   const assets = await listProductAssets(product.id)
+
+  const generations = await latestGenerations(workspace.id, [view.listing.id])
+  const generation = generations.get(view.listing.id)
 
   /*
    * The images in the order the channel would receive them, which is the order
@@ -80,12 +87,29 @@ export default async function ListingPage({
         </h1>
         <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
           {view.adapter.integrationType === "api"
-            ? "Written by hand for this channel. Fanwise can publish it once publishing exists."
-            : "Written by hand for this channel. You will submit it yourself; this channel has no API to publish through."}
+            ? "This channel's own copy for the product. Compose it, or write it by hand, then save it and publish."
+            : "This channel's own copy for the product. Compose it, or write it by hand. You will submit it yourself; this channel has no API to publish through."}
         </p>
       </div>
 
+      <ComposePanel
+        workspaceSlug={slug}
+        listingId={view.listing.id}
+        channelName={view.channel.name}
+        configured={isAiConfigured()}
+        generation={generation ? summarize(generation) : null}
+        awaitingReview={awaitingReview(view.listing)}
+      />
+
+      {/*
+        Keyed on generated_at so the editor remounts when a generation or a
+        rebuild lands. Its draft is local state seeded from `initial`, and a
+        refresh alone would leave the old words on screen under a card that
+        says new ones arrived. A save does not move generated_at, so typing is
+        never thrown away by its own refresh.
+      */}
       <ListingEditor
+        key={view.listing.generated_at ?? "unbuilt"}
         workspaceSlug={slug}
         listingId={view.listing.id}
         channelKey={view.channel.key}

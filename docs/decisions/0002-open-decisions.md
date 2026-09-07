@@ -32,6 +32,7 @@ Keep these here only as pointers. Do not relitigate them from this file.
 | Does Creative Market join Gate A | Yes, as A8, decided 7 September 2026 and reversing the earlier no. It is the only billable channel no approval gates. The reversed argument is kept in full, and A8 cannot run the composed-listing test, which moves to B2a | `docs/roadmap.md`, under Gate A |
 | Model and cost per generation | Sonnet 5 (`claude-sonnet-5`), profile prefix cached, effort low. About $0.01 per listing generation with the cache warm, ~$0.014 cold. Decided 7 September 2026 | this file, item 12 |
 | Generations metered or unlimited | Unlimited on paid, 25 per month on free. At Sonnet 5 rates a heavy paid user costs about $2 of a $9 plan; a free cap of 25 costs about a quarter. Decided 7 September 2026 | this file, item 13 |
+| Is the in-process job queue enough through Gate A | Overtaken: Trigger.dev arrived with B1's reorder, before A7. Selected by `TRIGGER_SECRET_KEY`, in-process otherwise. Decided 7 September 2026 | `docs/architecture.md`, Jobs |
 | Where channel capabilities live | Code, in `lib/channels/registry.ts`. Never an editable row | `docs/data-model.md`, A3 |
 | Listing uniqueness | `(product_id, channel_connection_id)`. Two shops on one marketplace are two listings and two billable units | `docs/data-model.md`, A3 |
 | `channels.billable` | Ships at A3, unused until C1, rather than backfilled across live connections later | `docs/data-model.md`, A3 |
@@ -191,12 +192,10 @@ something non-idempotent.
 
 ### 9. Is the in-process job queue enough through Gate A
 
-Trigger.dev is deliberately deferred to B1. But an in-process queue dies with the serverless
-function, and A7 is the first step with a job long enough for that to matter.
-
-**Recommendation:** keep the deferral, and test A7 against a real deployment early rather
-than locally. If it breaks, pulling Trigger.dev forward is a change behind
-`lib/jobs/index.ts` and nothing else, which is the entire point of that abstraction.
+**Resolved 7 September 2026, by the reorder.** B1 started before A7 and brought Trigger.dev
+with it, so A7 is built on the durable queue rather than migrating to it. The change was
+behind `lib/jobs/index.ts` and nothing else, which was the point of the abstraction. What is
+still owed is a job actually carried by Trigger.dev on a deployment; see B1 in the roadmap.
 
 ### 10. Snapshot retention when a connection is disconnected
 
