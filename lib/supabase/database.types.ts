@@ -159,7 +159,10 @@ export type Database = {
           metadata: Json
           price: number | null
           product_id: string
+          publish_generation: number
           published_at: string | null
+          seo_description: string | null
+          seo_title: string | null
           short_description: string | null
           status: Database["public"]["Enums"]["listing_status"]
           status_source: Database["public"]["Enums"]["listing_status_source"]
@@ -187,7 +190,10 @@ export type Database = {
           metadata?: Json
           price?: number | null
           product_id: string
+          publish_generation?: number
           published_at?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
           short_description?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           status_source?: Database["public"]["Enums"]["listing_status_source"]
@@ -215,7 +221,10 @@ export type Database = {
           metadata?: Json
           price?: number | null
           product_id?: string
+          publish_generation?: number
           published_at?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
           short_description?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           status_source?: Database["public"]["Enums"]["listing_status_source"]
@@ -604,6 +613,7 @@ export type Database = {
           normalized_error_code: string | null
           normalized_error_message: string | null
           provider_response: Json | null
+          publish_generation: number
           started_at: string | null
           status: Database["public"]["Enums"]["publication_job_status"]
           updated_at: string
@@ -620,6 +630,7 @@ export type Database = {
           normalized_error_code?: string | null
           normalized_error_message?: string | null
           provider_response?: Json | null
+          publish_generation?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["publication_job_status"]
           updated_at?: string
@@ -636,6 +647,7 @@ export type Database = {
           normalized_error_code?: string | null
           normalized_error_message?: string | null
           provider_response?: Json | null
+          publish_generation?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["publication_job_status"]
           updated_at?: string

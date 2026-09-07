@@ -19,6 +19,8 @@ const draft: ChannelListingDraft = {
   title: "Aster Grotesk",
   description: "A grotesque in nine weights.",
   shortDescription: null,
+  seoTitle: null,
+  seoDescription: null,
   price: 48,
   currency: "USD",
   category: "font",

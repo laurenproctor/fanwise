@@ -102,6 +102,15 @@ before any public launch, because a custom app does not scale to self-serve sign
 
 ### 4a. How a Shopify product reaches a sales channel
 
+**Written up as ADR 0004, 7 September 2026, and still open.** The register entry stays as the
+index pointer; the options, their costs and the recommendation live in
+`0004-shopify-sales-channel-publication.md`. Two things found since this entry was written
+change the arithmetic rather than the shape: the ask is **two** scopes, `read_publications`
+as well as `write_publications`, because a publication cannot be published to before it is
+enumerated; and Fanwise runs its own OAuth rather than Shopify's managed installation, so
+nothing prompts an existing creator on its behalf and `channel_connections.scopes` is written
+by one line and read by none.
+
 **Found by running A5's exit test on 6 September 2026, and it blocks the last clause.**
 
 `status: ACTIVE` does not make a product purchasable. Both live products read

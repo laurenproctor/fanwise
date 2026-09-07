@@ -27,6 +27,8 @@ const draft: ChannelListingDraft = {
   title: "Aster Grotesk",
   description: "A grotesque in nine weights, drawn for long text.",
   shortDescription: "Nine weights.",
+  seoTitle: null,
+  seoDescription: null,
   price: 48,
   currency: "USD",
   category: "font",
@@ -129,6 +131,7 @@ beforeAll(async () => {
     listingId,
     kind: "publish",
     draft,
+    generation: 0,
   })
   await settle()
 })
@@ -159,6 +162,7 @@ describe("updating a published listing", () => {
       kind: "update",
       draft: edited,
       images: "",
+      generation: 0,
     })
     expect(outcome.kind).toBe("started")
     await settle()
@@ -195,6 +199,7 @@ describe("updating a published listing", () => {
       kind: "update",
       draft: edited,
       images: "",
+      generation: 0,
     })
     expect(outcome.kind).toBe("already_done")
     await settle()
@@ -240,6 +245,7 @@ describe("updating a published listing", () => {
       kind: "update",
       draft: edited,
       images: asset!.id,
+      generation: 0,
     })
     expect(outcome.kind).toBe("started")
     await settle()

@@ -63,12 +63,33 @@ export function toProductType(productType: string): string {
     .join(" ")
 }
 
-/** Shopify's SEO description is truncated hard at 320 characters. */
-export function toSeoDescription(text: string | null): string | null {
+/**
+ * The two SEO fields, truncated where Shopify's own admin truncates them: 70
+ * characters for the page title, 320 for the meta description.
+ *
+ * Truncated rather than rejected, because neither limit is one the Admin API
+ * enforces — an overlong value is accepted and then cut off in a search result,
+ * where the creator will never see it happen. The editor warns at the same two
+ * numbers before it gets this far, so the cut is a floor under a rule the
+ * creator has already been shown, not a silent edit of their writing.
+ */
+function truncate(text: string | null, limit: number): string | null {
   if (!text) return null
   const trimmed = text.trim()
-  if (trimmed.length <= 320) return trimmed
-  return `${trimmed.slice(0, 319).trimEnd()}…`
+  if (trimmed.length === 0) return null
+  if (trimmed.length <= limit) return trimmed
+  return `${trimmed.slice(0, limit - 1).trimEnd()}…`
+}
+
+export const SEO_TITLE_LIMIT = 70
+export const SEO_DESCRIPTION_LIMIT = 320
+
+export function toSeoTitle(text: string | null): string | null {
+  return truncate(text, SEO_TITLE_LIMIT)
+}
+
+export function toSeoDescription(text: string | null): string | null {
+  return truncate(text, SEO_DESCRIPTION_LIMIT)
 }
 
 /** The admin URL for a product, which is stable and works before it is live. */

@@ -14,12 +14,16 @@ import type {
 import { createShopifyClient } from "./client"
 import { userErrors } from "./errors"
 import { shopifyCredentialsSchema, shopifyOAuth } from "./oauth"
+import { CATEGORY_LABELS, defaultCategoryLabel, taxonomyCategoryId } from "./categories"
 import {
+  SEO_DESCRIPTION_LIMIT,
+  SEO_TITLE_LIMIT,
   adminProductUrl,
   toDescriptionHtml,
   toMoney,
   toProductType,
   toSeoDescription,
+  toSeoTitle,
 } from "./transform"
 
 /**
@@ -76,6 +80,41 @@ const requirements: readonly RequirementSpec[] = [
     severity: "error",
     maxCount: 250,
     maxTagLength: 255,
+  },
+  {
+    kind: "enum",
+    key: "category",
+    label: "Category",
+    description:
+      "Shopify's own product taxonomy. It drives the category fields and feeds Shopify builds around a product, and is a different field from the product type.",
+    // A warning, not an error: Shopify creates a product with no category, and
+    // one of these is always seeded from the Fanwise product type, so the rule
+    // only fires on a listing whose category was cleared or set to something
+    // this build no longer recognises.
+    severity: "warning",
+    field: "category",
+    allowed: CATEGORY_LABELS,
+  },
+  {
+    kind: "text",
+    key: "seo_title",
+    label: "Meta title",
+    description: "Shown as the headline in a search result. Falls back to the listing title.",
+    severity: "warning",
+    field: "seoTitle",
+    optional: true,
+    maxLength: SEO_TITLE_LIMIT,
+  },
+  {
+    kind: "text",
+    key: "seo_description",
+    label: "Meta description",
+    description:
+      "Shown under the headline in a search result. Falls back to the short description.",
+    severity: "warning",
+    field: "seoDescription",
+    optional: true,
+    maxLength: SEO_DESCRIPTION_LIMIT,
   },
   {
     kind: "text",
@@ -382,19 +421,51 @@ async function productSet(context: PublishContext, intent: PublishIntent): Promi
   const images = listingImages(subject)
 
   /*
-   * One read, asked for by either question that needs it.
+   * One read, whenever the product is supposed to already exist.
    *
-   * Media needs it to know whether Shopify is short. `preserve` needs it to
-   * know whether the product is on sale. Reading once when either applies
-   * keeps an update to a single round trip in the common case.
+   * Three questions come out of it. Media needs it to know whether Shopify is
+   * short. `preserve` needs it to know whether the product is on sale. And
+   * both of those presume an answer to the third, which nothing used to ask:
+   * whether the product is there at all.
+   *
+   * It used to be skipped when neither of the first two applied, which is how
+   * a product deleted in the Shopify admin stayed invisible to Fanwise. The
+   * listing went on holding an id and an admin URL that returned Not Found,
+   * every write against the identifier failed in a different and less
+   * intelligible way, and there was no path back to a working product. One
+   * extra round trip on an activate is a small price for the listing being
+   * able to say something true.
    */
   let state: ProductState | null = null
-  if (externalId && (images.length > 0 || intent === "preserve")) {
+  if (externalId) {
     state = await client.request({
       query: PRODUCT_STATE,
       variables: { id: externalId },
       schema: productStateSchema,
     })
+
+    /*
+     * A null product from a query that succeeded is Shopify's way of saying
+     * there is no such product. It is not an error, not a 404 and not an empty
+     * media list: the request was fine and the answer is that the object is
+     * gone.
+     *
+     * This is the one signal the runner acts on by changing the listing, which
+     * is why it is raised only from a successful read of a specific id and
+     * never inferred from a failure. A transport error here throws before this
+     * line, and correctly so — "we could not ask" must never be recorded as
+     * "it is not there".
+     */
+    if (!state.product) {
+      throw new ChannelError(
+        normalized(
+          "external_object_missing",
+          "This product no longer exists in Shopify. It looks like it was deleted there, " +
+            "so Fanwise has marked the listing as not published. Publish it again to create a new one.",
+          state,
+        ),
+      )
+    }
   }
 
   /*
@@ -428,15 +499,57 @@ async function productSet(context: PublishContext, intent: PublishIntent): Promi
     status = known
   }
 
+  /*
+   * Category and product type are two fields, not one spelled twice.
+   *
+   * `productType` is free text with no taxonomy behind it, which is why it was
+   * the only one this adapter used to send and why the Category field on every
+   * product Fanwise created was empty. `category` is an id from Shopify's
+   * Standard Product Taxonomy, and it is what Shopify's own category
+   * attributes and product feeds read.
+   *
+   * An unresolvable label sends no category rather than clearing the one
+   * Shopify holds: productSet leaves an omitted field alone, and wiping a
+   * category the creator set in the Shopify admin because a label drifted here
+   * would turn a naming problem into data loss.
+   */
+  const categoryId = taxonomyCategoryId(listing.category)
+
+  /*
+   * Both halves of the SEO input, and both fall back rather than going out
+   * empty.
+   *
+   * A half with nothing behind it is left out of the object rather than sent as
+   * null, and the whole `seo` key is left out when neither half has a value. In
+   * GraphQL an explicit null is an instruction to clear the field, so the
+   * shorter spelling would quietly wipe a page title the creator wrote in the
+   * Shopify admin every time Fanwise sent an update — the same mistake as
+   * clearing a category, in the field a creator is least likely to check.
+   *
+   * Empty is likewise not sent as "". Shopify stores the blank and stops
+   * deriving the field from the product, so a creator who never touched these
+   * would end up with a search result that has no title at all.
+   */
+  const seoTitle = toSeoTitle(listing.seo_title ?? listing.title ?? subject.product.name)
+  const seoDescription = toSeoDescription(listing.seo_description ?? listing.short_description)
+  const seo =
+    seoTitle === null && seoDescription === null
+      ? null
+      : {
+          ...(seoTitle === null ? {} : { title: seoTitle }),
+          ...(seoDescription === null ? {} : { description: seoDescription }),
+        }
+
   const input: Record<string, unknown> = {
     title: listing.title ?? subject.product.name,
     descriptionHtml: toDescriptionHtml(listing.description),
     handle: subject.product.slug,
-    productType: toProductType(listing.category ?? subject.product.product_type),
+    productType: toProductType(subject.product.product_type),
+    ...(categoryId === null ? {} : { category: categoryId }),
     vendor: subject.product.brand_name ?? undefined,
     tags: listing.tags ?? [],
     status,
-    seo: { description: toSeoDescription(listing.short_description) },
+    ...(seo === null ? {} : { seo }),
     productOptions: [{ name: OPTION_NAME, values: [{ name: OPTION_VALUE }] }],
     variants: [
       {
@@ -532,9 +645,19 @@ export const shopifyAdapter: ChannelAdapter = {
       title: product.canonical_title ?? product.name,
       description: product.canonical_description,
       shortDescription: product.short_description,
+      // Null, not a copy of the fields they fall back to. Writing the fallback
+      // into the row would turn "the creator did not override this" into "the
+      // creator chose exactly this", and every later edit to the title would
+      // leave a meta title behind that used to match it and now silently does
+      // not. The adapter resolves the fallback at the moment it sends.
+      seoTitle: null,
+      seoDescription: null,
       price: product.base_price === null ? null : Number(product.base_price),
       currency: product.currency,
-      category: product.product_type,
+      // A Shopify taxonomy label rather than the Fanwise product type. The
+      // column is shared across channels but its meaning is the channel's, and
+      // for Shopify the category is a taxonomy id, not a word.
+      category: defaultCategoryLabel(product.product_type),
       tags: [],
       metadata: {},
     }

@@ -163,6 +163,7 @@ export async function publishListingAction(
     listingId,
     kind: "publish",
     draft,
+    generation: listing.publish_generation,
   })
 
   if (outcome.kind === "error") return { error: outcome.message, notice: null }
@@ -262,6 +263,7 @@ export async function publishChangesAction(
     kind: "update",
     draft,
     images: imagesFingerprint(subject),
+    generation: listing.publish_generation,
   })
 
   if (outcome.kind === "error") return { error: outcome.message, notice: null }
@@ -359,6 +361,7 @@ export async function completeManualStepAction(
     listingId,
     kind: "activate",
     draft: listingToDraft(listing),
+    generation: listing.publish_generation,
   })
 
   if (outcome.kind === "error") {

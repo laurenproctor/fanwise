@@ -52,10 +52,12 @@ them true now would have the UI offer a sales report that does not exist.
 |---|---|---|
 | `canonical_title` or `name` | `title` | Max 255 |
 | `canonical_description` | `descriptionHtml` | Plain text is wrapped in paragraphs, §8 |
-| `short_description` | `seo.description` | Truncated at 320 |
+| `seo_title`, then `title` | `seo.title` | Truncated at 70, §14 |
+| `seo_description`, then `short_description` | `seo.description` | Truncated at 320, §14 |
 | `base_price` | `variants[0].price` | Money, string-encoded |
 | `currency` | — | Not settable per product. The shop's currency wins, §12 |
 | `product_type` | `productType` | Coarse Fanwise type, title-cased |
+| `category` | `category` | A Standard Product Taxonomy id, §14 |
 | `brand_name` | `vendor` | Falls back to the workspace name |
 | `slug` | `handle` | Shopify uniquifies a collision itself |
 | `cover_image`, then `preview_image` assets | `files` | `FileSetInput`, `contentType: IMAGE`, cover first |
@@ -83,6 +85,16 @@ for it.
 | `tags` | ≤ 250 tags, ≤ 255 chars each | error | Hard Shopify limits, rejected above them |
 | `vendor` | set | warning | Falls back to the workspace name, so never blocks |
 | `currency_matches_shop` | listing currency = shop currency | warning | §3. Custom rule |
+| `category` | one of the labels in §14 | warning | Shopify creates a product with no category |
+| `seo_title` | ≤ 70 chars when set | warning | Optional. Empty means "use the title", §14 |
+| `seo_description` | ≤ 320 chars when set | warning | Optional. Empty means "use the short description", §14 |
+
+The last two are the first `optional` text rules in the project. An empty value
+satisfies them, and the bounds apply only to a value that is set: leaving a meta
+title blank is the ordinary case and has a documented fallback, so a rule that
+complained about it would put a permanent warning on almost every listing. They
+are rules rather than nothing at all because the editor derives its character
+counters from the requirement specs, and a field with no rule gets no counter.
 
 `deliverable` is the interesting one. Shopify itself does not require a file, so on a literal
 reading it should be a warning. It is an error because the *channel as Fanwise implements it*
@@ -108,6 +120,19 @@ mutation FanwiseProductSet($identifier: ProductSetIdentifiers, $input: ProductSe
 `identifier` is omitted on the first publish and carries `{ id }` on every subsequent call.
 That is what makes a retry converge rather than duplicate: with an identifier, `productSet`
 is an update.
+
+**Every write against an existing identifier reads the product first**, and the read has
+three questions in it rather than the two it started with. Which images Shopify is holding.
+Whether the product is on sale. And, underneath both, whether the product is there at all.
+
+That third one is why the read is now unconditional. It used to be skipped when the listing
+had no images to repair and a recorded external state to trust, which is how a product
+deleted in the Shopify admin stayed invisible: Fanwise went on holding the id and the admin
+URL, `productSet` failed against a dead identifier in a different and less intelligible way
+each time, and nothing in the product ever said the plain thing. `product: null` from a
+query that succeeded is Shopify confirming the object is gone, and it is normalized to
+`external_object_missing` — a code distinct from `not_found` precisely because the runner
+acts on it by changing the listing. See §15.
 
 An update preserves whether the product is on sale, and it does not infer that from
 absence. `listing.metadata.externalState` is used when it says something; when it says
@@ -177,10 +202,20 @@ Three checks before any external create, in the order `docs/architecture.md` fix
 2. A `publication_jobs` row with this idempotency key already succeeded → return its result.
 3. The key itself is unique in the database, so the second insert loses.
 
-The key for a publish is derived from `(workspace, listing, kind)` and deliberately **not**
-from the listing content: two clicks of Publish on the same listing are the same operation
-whatever was typed between them. An update's key includes a content fingerprint, because two
-different edits are two different operations.
+The key for a publish is derived from `(workspace, listing, kind, generation)` and
+deliberately **not** from the listing content: two clicks of Publish on the same listing are
+the same operation whatever was typed between them. An update's key includes a content
+fingerprint, because two different edits are two different operations.
+
+`generation` is `channel_listings.publish_generation`, and it is the one thing allowed to
+make a second Publish a new operation. It moves only where the provider has confirmed the
+product Fanwise created no longer exists, which means it cannot move on a failure, on a
+timeout, or on a guess. Within a generation the check is exactly as strong as it was.
+
+It is on `publication_jobs` as well, because the runner's second guard asks whether a
+publish for this listing has already succeeded, and the honest version of that question is
+"at this generation". Without it the guard would go on skipping the re-publish the new key
+just made possible.
 
 A failed job is retried on its own row, incrementing `attempt_count`. It is not a new row,
 because it is not a new operation.
@@ -235,8 +270,20 @@ original is recoverable, and is never rendered.
 | 429, or `THROTTLED` | `rate_limited` | yes |
 | `userErrors` non-empty | `validation_rejected` | no |
 | 404 on an identifier | `not_found` | no |
+| `product: null` from a successful state read | `external_object_missing` | no |
 | 5xx | `provider_unavailable` | yes |
 | socket, DNS, timeout | `network` | yes |
+
+The last two rows of the first half are not the same answer said twice, and the
+difference is load-bearing rather than descriptive. `not_found` covers everything a
+404 can mean: a store that has closed, an app that has been uninstalled, a request
+that was never right. `external_object_missing` means one thing only — Shopify was
+reached, was asked about this product id, and answered that there is no such product.
+
+It is the only code the runner responds to by changing the listing, which is why it
+is raised solely from a successful read and never inferred from a failure. Clearing
+a listing's external id on a transient error would publish a second product the next
+time the creator clicked, which is the duplicate §7 exists to prevent.
 
 ## 12. Data written
 
@@ -245,7 +292,8 @@ original is recoverable, and is never rendered.
   `external_account_name` the shop's display name, `metadata` the shop currency and plan.
 - `channel_connection_secrets` — the sealed offline access token, with `key_version`.
 - `channel_listings` — `external_listing_id` is the product GID,
-  `external_url` the admin product URL, `status_source = verified`.
+  `external_url` the admin product URL, `status_source = verified`. `publish_generation`
+  is incremented, and every one of those fields cleared, when a product is found deleted.
 - `publication_jobs` — one row per logical publish, carrying the idempotency key.
 - `listing_manual_steps` — one row, `attach_digital_file`.
 - `listing_snapshots` — one `publish` snapshot per successful publication.
@@ -294,3 +342,121 @@ Nothing below is a guess about intent; each is a shape that only a 2xx can confi
    can name the offending field rather than repeating Shopify's sentence.
 6. Whether an unlisted app install without App Store review grants `write_products` in full,
    which is the alpha path named in `docs/channel-feasibility.md`.
+7. `ProductSetInput.category` with a taxonomy id from §14's table. The ids are checked
+   against Shopify's published taxonomy, not against a 2xx, and a shop pinned to an older
+   taxonomy release is the case that would reject one. What the run has to confirm is which
+   way it fails: a `userErrors` entry naming the field, which the creator can act on, or a
+   silently ignored input, which they cannot.
+8. `seo.title` on `productSet`. `seo.description` has been sent since the first publish and
+   is known to be accepted; the title half has not.
+9. Whether `product(id:)` returns null rather than erroring for an id that was deleted
+   rather than never existing. §15 depends on it, and it is asserted against a recorded
+   fake. A GraphQL error instead of a null would normalize to `unknown` and leave the
+   listing stuck in exactly the way §15 was written to end — visibly, at least, rather than
+   silently.
+
+## 14. Category, product type, and the two SEO fields
+
+Three fields on a Shopify product that Fanwise was not filling, and one of them was not
+being filled because it was being confused with another.
+
+### Category is not product type
+
+Shopify has two fields that look like a category and only one of them is:
+
+| Field | What it is |
+|---|---|
+| `productType` | Free text. No taxonomy, no validation, whatever the merchant types |
+| `category` | An id from Shopify's Standard Product Taxonomy. The field the admin labels **Category** |
+
+The adapter sent only the first, derived from `listing.category`, so every product Fanwise
+created arrived in Shopify with the Category field empty. That is not cosmetic: `category`
+is what drives Shopify's category-specific attributes, its category fields and its product
+feeds.
+
+Both are sent now, from different sources. `productType` comes from the canonical
+`product_type`, title-cased, which is what it always meant. `category` comes from
+`listing.category`, which is now a Shopify taxonomy label rather than a Fanwise slug.
+
+### Why a curated table rather than the taxonomy
+
+The taxonomy has roughly 14,000 categories, almost all of them describing physical objects.
+Offering a creator who sells fonts the whole tree would be worse than offering none of it,
+so `lib/channels/adapters/shopify/categories.ts` holds the leaf set a digital product can
+honestly sit in, and nothing else:
+
+| Fanwise `product_type` | Default label | Taxonomy id |
+|---|---|---|
+| `font` | Fonts | `so-2-5` |
+| `template`, `mockup` | Document Templates | `so-2-4` |
+| `graphic`, `illustration`, `brush`, `three_d` | Digital Artwork | `so-2-3` |
+| `photo` | Stock Photographs & Video Footage | `so-2-6` |
+| `icon` | Computer Icons | `so-2-1` |
+| `theme` | Web Design Software | `so-1-10-10` |
+| `other` | Digital Goods & Currency | `so-2` |
+
+The picker offers those plus Desktop Wallpapers, SVG & Cut Files, Photo Editing Presets &
+LUTs, E-Books, Printables, Sheet Music, Digital Music Downloads, Video Digital Downloads,
+Online Courses and Digital Video Games.
+
+Every id was checked against the published `v2026-05` taxonomy, the release preceding the
+`2026-07` Admin API version this adapter is pinned to, and against `unstable`.
+
+`channel_listings.category` holds the **label**, not the id. The label is what the creator
+picked, what the editor renders and what a snapshot records; the id is a Shopify
+implementation detail with no business in a column shared with every other channel. The
+risk that buys is drift between a label and its id, and a unit test closes it: every label
+the picker offers must resolve, and every product type's default must be a label the picker
+offers.
+
+A label that does not resolve sends **no** `category`, which is not the same as sending
+null. `productSet` leaves an omitted field alone and overwrites a supplied one, so clearing
+the category because a label drifted here would turn a naming problem into data loss on a
+category the creator set in the Shopify admin.
+
+### The SEO pair
+
+`seo` has two halves and the adapter was sending one of them, derived from
+`short_description`. There was no meta title at all, and no way to make the search result
+read differently from the product blurb.
+
+Both are now real listing fields, `seo_title` and `seo_description`, and both are
+**overrides**. Left empty they fall back to the listing title and the short description
+respectively, which is the behaviour that existed before them plus the half that was
+missing.
+
+Empty is sent as absent rather than as `""`. Shopify stores a blank and stops deriving the
+field from the product, so a creator who never touched these would end up with a search
+result that has no title at all.
+
+Truncation is at 70 and 320, the two numbers Shopify's own admin counts to. Neither is
+enforced by the Admin API — an overlong value is accepted and then cut off in a search
+result, where the creator will never see it happen — so the adapter cuts it where they were
+already warned it would be cut.
+
+## 15. A product that is gone
+
+A creator deleted a product in the Shopify admin. Fanwise went on holding its id and its
+admin URL, the URL returned Not Found, and there was no way back.
+
+Everything that made a second click safe worked against them. The publish key was claimed,
+so a fresh Publish collided and reported "already published". The runner's second guard
+found an earlier succeeded publish job and skipped. And no write said anything a creator
+could act on, because each one failed differently against the dead identifier.
+
+The fix has three parts and each is deliberately narrow:
+
+1. **The adapter notices.** §5's pre-write read is unconditional, and `product: null` from a
+   successful read is normalized to `external_object_missing`.
+2. **The listing stops claiming otherwise.** `runPublication` clears `external_listing_id`,
+   `external_url`, `last_sent_fingerprint` and the `externalState` metadata, returns the row
+   to `draft` / `self_reported`, and increments `publish_generation`. `published_at` stays:
+   it is history, and the listing *was* published. The snapshots describing that publication
+   are immutable and are not touched.
+3. **Publish works again**, because §7's generation makes it a genuinely new operation
+   rather than a repeat the key refuses.
+
+**It does not re-create the product.** A product is usually gone because somebody deleted it
+on purpose, and quietly putting it back would overrule that decision with a background job.
+The creator is told what happened, in the card's own error line, and the button is theirs to
+press.

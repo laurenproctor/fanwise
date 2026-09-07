@@ -58,6 +58,10 @@ function evaluateOne(
     case "text": {
       const value = textValue(draft, spec.field)
       if (value.length === 0) {
+        // An optional field left alone is satisfied, not merely forgiven. The
+        // channel has a documented fallback for it, so there is nothing here
+        // for the creator to act on and nothing worth a line in the list.
+        if (spec.optional) return { ...base, satisfied: true }
         return {
           ...base,
           satisfied: false,

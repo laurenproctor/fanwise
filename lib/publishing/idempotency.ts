@@ -13,10 +13,12 @@ import type { ChannelListingDraft } from "@/lib/channels/types"
  *
  * What goes into a key is the whole design, and the two kinds differ on purpose:
  *
- *   publish   (workspace, listing). Deliberately NOT the content. Two clicks of
- *             Publish on one listing are the same operation whatever was typed
- *             in between, so they must collide. This is the key that makes
- *             "a second click creates nothing" true.
+ *   publish   (workspace, listing, generation). Deliberately NOT the content.
+ *             Two clicks of Publish on one listing are the same operation
+ *             whatever was typed in between, so they must collide. This is the
+ *             key that makes "a second click creates nothing" true. The
+ *             generation is the single exception, and it moves only when the
+ *             provider has confirmed the product it created no longer exists.
  *
  *   update    (workspace, listing, content fingerprint, image fingerprint). Two
  *             different edits are two different operations and must not
@@ -27,17 +29,34 @@ import type { ChannelListingDraft } from "@/lib/channels/types"
  *             about; without them that edit would collide with the one before
  *             it and silently never be sent.
  *
- *   activate  (workspace, listing). There is one transition from draft to live.
+ *   activate  (workspace, listing, generation). There is one transition from
+ *             draft to live, per product that exists.
  */
 
 export type PublicationKind = "publish" | "update" | "activate"
 
-export function publishKey(workspaceId: string, listingId: string): string {
-  return `publish:${workspaceId}:${listingId}`
+/**
+ * The generation an external object exists in.
+ *
+ * A publish key is deliberately not derived from content, so two clicks of
+ * Publish collide and only one product is ever created. That holds as long as
+ * the product, once created, goes on existing — and a product deleted in the
+ * provider's own admin breaks it: the key is claimed, so the listing can never
+ * be published again, and the creator is left pointing at a dead URL.
+ *
+ * The generation is the one thing allowed to make a publish a new operation. It
+ * is incremented only where the provider has *confirmed* the object is gone,
+ * never on a failed call and never on a guess, so within one generation the
+ * check is exactly as strong as it was. Rule 1 is not being bent here: this
+ * widens what counts as a distinct operation, it does not weaken the test for
+ * two that are the same.
+ */
+export function publishKey(workspaceId: string, listingId: string, generation: number): string {
+  return `publish:${workspaceId}:${listingId}:${generation}`
 }
 
-export function activateKey(workspaceId: string, listingId: string): string {
-  return `activate:${workspaceId}:${listingId}`
+export function activateKey(workspaceId: string, listingId: string, generation: number): string {
+  return `activate:${workspaceId}:${listingId}:${generation}`
 }
 
 export function updateKey(
@@ -93,6 +112,8 @@ export function fingerprint(draft: ChannelListingDraft): string {
     draft.title ?? "",
     draft.description ?? "",
     draft.shortDescription ?? "",
+    draft.seoTitle ?? "",
+    draft.seoDescription ?? "",
     draft.price ?? "",
     draft.currency,
     draft.category ?? "",
@@ -115,6 +136,13 @@ export type KeyParams =
       workspaceId: string
       listingId: string
       draft: ChannelListingDraft
+      /**
+       * Required rather than defaulted to 0, for the same reason `images` is
+       * required on an update: a caller that forgot it would silently go on
+       * producing the key of a generation that no longer exists, which is the
+       * exact bug the argument was added to fix.
+       */
+      generation: number
     }
   | {
       kind: "update"
@@ -127,9 +155,9 @@ export type KeyParams =
 export function keyFor(params: KeyParams): string {
   switch (params.kind) {
     case "publish":
-      return publishKey(params.workspaceId, params.listingId)
+      return publishKey(params.workspaceId, params.listingId, params.generation)
     case "activate":
-      return activateKey(params.workspaceId, params.listingId)
+      return activateKey(params.workspaceId, params.listingId, params.generation)
     case "update":
       return updateKey(params.workspaceId, params.listingId, params.draft, params.images)
   }
