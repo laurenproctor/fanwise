@@ -251,6 +251,15 @@ Scopes requested: `write_products`, `read_products`, `read_publications`,
 and will force a re-authorization, which is correct: a creator should be asked again when the
 ask changes.
 
+**The app's configuration is the ceiling, not the authorization URL.** A scope requested in
+the authorize request that the app does not declare is dropped in silence: the grant
+succeeds, the redirect is clean, the token comes back short, and nothing fails until the
+first call that needed it. Confirmed on 7 September 2026 by a reconnect that asked for four
+scopes and was granted one. Adding a scope is therefore two steps in order — release a new
+version of the app in the Shopify Dev Dashboard with the scopes updated, *then* reconnect the
+store — and doing only the second produces a reconnect that appears to work and changes
+nothing.
+
 The two publication scopes arrived with ADR 0004 and are a pair rather than a choice:
 `publishablePublish` needs the write half, and finding *which* publication is the Online
 Store needs the read half first, because a publication cannot be published to before it is
