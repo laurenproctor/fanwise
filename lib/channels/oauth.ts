@@ -1,3 +1,4 @@
+import type { ChannelAdapter } from "./types"
 import { randomBytes } from "node:crypto"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { clientEnv } from "@/lib/env"
@@ -121,4 +122,34 @@ export async function consumeAuthorizationState(state: string): Promise<Consumed
 export async function pruneExpiredStates(): Promise<void> {
   const admin = createAdminClient()
   await admin.from("channel_oauth_states").delete().lt("expires_at", new Date().toISOString())
+}
+
+/**
+ * Scopes a connection was never granted, because this build asks for more than
+ * it did when the creator authorized it.
+ *
+ * Provider-neutral on purpose. The adapter declares what it needs and the
+ * connection records what it got; nothing here knows which channel it is
+ * looking at, so the rule holds for Etsy at A6 without being written twice.
+ *
+ * An empty `granted` is treated as "not recorded" rather than "granted
+ * nothing". Connections predate the column being reliably populated, and
+ * forcing a re-authorization on that assumption is the more expensive mistake:
+ * it costs every creator a round trip to fix a problem most of them do not
+ * have. The adapter's own call will fail with a readable message if the token
+ * really is short.
+ */
+export function missingScopes(
+  adapter: Pick<ChannelAdapter, "oauth">,
+  granted: readonly string[] | null,
+): string[] {
+  const oauth = adapter.oauth
+  if (!oauth || !granted || granted.length === 0) return []
+
+  // The adapter's own rule when it has one, membership when it does not. A
+  // provider that collapses implied scopes in what it grants back would
+  // otherwise be reported as permanently short of something it holds.
+  const holds =
+    oauth.holdsScope ?? ((list: readonly string[], scope: string) => list.includes(scope))
+  return oauth.scopes.filter((scope) => !holds(granted, scope))
 }

@@ -235,6 +235,9 @@ export function ListingPanel({
       {cards.map((card) => {
         const busy = pending && actingOn === card.connectionId
         const outstanding = card.manualSteps.filter((step) => !step.completed)
+        // The channel has the product. `failed` is a publish that left nothing
+        // behind, and `publishing` is one that has not confirmed yet.
+        const onChannel = card.liveness === "published_not_live" || card.liveness === "live"
 
         return (
           <section
@@ -297,7 +300,18 @@ export function ListingPanel({
                 */}
                 {card.lastError ? <FormError message={card.lastError} /> : null}
 
-                {outstanding.length === 0 ? (
+                {/*
+                  Steps are work outstanding on something that exists. Before
+                  the channel holds the product there is nothing to attach a
+                  file to, so the steps are not offered — and, more to the
+                  point, the requirement list is. This used to branch on
+                  "any step outstanding", which before a publish is every
+                  step, so an unpublished listing showed a Mark-done button the
+                  server would refuse and hid the one list that named what was
+                  blocking Publish. Both complaints from the first outside run,
+                  and one condition.
+                */}
+                {!onChannel || outstanding.length === 0 ? (
                   <RequirementList results={card.results} />
                 ) : (
                   <div className="grid gap-3">

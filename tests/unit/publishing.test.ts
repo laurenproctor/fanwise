@@ -52,10 +52,13 @@ function row(stepKey: string, completedAt: string | null): ManualStepRow {
   }
 }
 
+type LivenessInput = Pick<ChannelListing, "status" | "external_listing_id" | "metadata">
+
 const published = {
   status: "published",
   external_listing_id: "gid://shopify/Product/900",
-} as Pick<ChannelListing, "status" | "external_listing_id">
+  metadata: {},
+} as LivenessInput
 
 describe("merging steps", () => {
   it("treats a spec with no row as incomplete", () => {
@@ -116,11 +119,18 @@ describe("readiness to activate", () => {
 
 describe("liveness", () => {
   it("is unpublished before anything has been sent", () => {
-    expect(liveness({ status: "draft", external_listing_id: null }, [])).toBe("unpublished")
+    expect(
+      liveness({ status: "draft", external_listing_id: null, metadata: {} } as LivenessInput, []),
+    ).toBe("unpublished")
   })
 
   it("is publishing while a job is in flight", () => {
-    expect(liveness({ status: "publishing", external_listing_id: null }, [])).toBe("publishing")
+    expect(
+      liveness(
+        { status: "publishing", external_listing_id: null, metadata: {} } as LivenessInput,
+        [],
+      ),
+    ).toBe("publishing")
   })
 
   it("is published_not_live while a required step is outstanding", () => {
@@ -145,15 +155,45 @@ describe("liveness", () => {
   it("is never live on a status of published without an external id", () => {
     // A listing marked published that the provider never confirmed is not a
     // published listing, whatever the column says.
-    expect(liveness({ status: "published", external_listing_id: null }, [])).toBe("unpublished")
+    expect(
+      liveness(
+        { status: "published", external_listing_id: null, metadata: {} } as LivenessInput,
+        [],
+      ),
+    ).toBe("unpublished")
   })
 
   it("is failed when the last attempt failed", () => {
-    expect(liveness({ status: "failed", external_listing_id: null }, [])).toBe("failed")
+    expect(
+      liveness({ status: "failed", external_listing_id: null, metadata: {} } as LivenessInput, []),
+    ).toBe("failed")
   })
 
   it("does not become live because an optional step was skipped", () => {
     const states = mergeManualSteps([attachFile, optionalStep], [])
     expect(liveness(published, states)).toBe("published_not_live")
+  })
+
+  it("withholds live when the channel says a buyer cannot reach it", () => {
+    /*
+      The second way of being unreachable, found by A5's exit test. Every
+      required step is done and the provider calls the product active, and a
+      buyer still cannot buy it because it is on no sales channel. Before this,
+      "no steps outstanding" was the whole of the question and the answer was
+      `live`, which promises "available to buy".
+    */
+    const listing = { ...published, metadata: { purchasable: false } } as LivenessInput
+    expect(liveness(listing, [])).toBe("published_not_live")
+  })
+
+  it("treats an unknown purchasability as no opinion, not as a no", () => {
+    // Absent is every listing published before the adapter began establishing
+    // this, and every channel with no such concept. Reading absence as false
+    // would report the entire product as unbuyable to fix one channel.
+    expect(liveness({ ...published, metadata: {} } as LivenessInput, [])).toBe("live")
+    expect(liveness({ ...published, metadata: null } as LivenessInput, [])).toBe("live")
+    expect(liveness({ ...published, metadata: { purchasable: true } } as LivenessInput, [])).toBe(
+      "live",
+    )
   })
 })

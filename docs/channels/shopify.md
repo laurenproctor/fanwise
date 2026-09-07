@@ -176,6 +176,8 @@ publish()            product created with status DRAFT
                      Fanwise reports "Published, not live"
 
 mark attached        productSet identifier:{id} status ACTIVE
+                     publishablePublish onto the Online Store publication
+                     resourcePublicationsCount read back and asserted
                      manual step complete
                      Fanwise reports "Live"
 ```
@@ -244,9 +246,42 @@ Standard Shopify authorization code grant against the shop domain the creator ty
   written to `channel_connection_secrets`. It never reaches `channel_connections`, a log
   line, an error message, or the browser.
 
-Scopes requested: `write_products`, `read_products`. Nothing else. `read_orders` arrives at
-B5 with transaction ingestion and will force a re-authorization, which is correct: a creator
-should be asked again when the ask changes.
+Scopes requested: `write_products`, `read_products`, `read_publications`,
+`write_publications`. Nothing else. `read_orders` arrives at B5 with transaction ingestion
+and will force a re-authorization, which is correct: a creator should be asked again when the
+ask changes.
+
+**The app's configuration is the ceiling, not the authorization URL.** A scope requested in
+the authorize request that the app does not declare is dropped in silence: the grant
+succeeds, the redirect is clean, the token comes back short, and nothing fails until the
+first call that needed it. Confirmed on 7 September 2026 by a reconnect that asked for four
+scopes and was granted one. Adding a scope is therefore two steps in order — release a new
+version of the app in the Shopify Dev Dashboard with the scopes updated, *then* reconnect the
+store — and doing only the second produces a reconnect that appears to work and changes
+nothing.
+
+The two publication scopes arrived with ADR 0004 and are a pair rather than a choice:
+`publishablePublish` needs the write half, and finding *which* publication is the Online
+Store needs the read half first, because a publication cannot be published to before it is
+enumerated and its id is per shop.
+
+**Fanwise drives its own re-authorization**, because it runs its own authorization code grant
+rather than Shopify's managed installation — Shopify's "merchants approve new scopes the next
+time they open the app" does not apply here and nothing prompts anybody on Fanwise's behalf.
+So `channel_connections.scopes`, which had been written at every authorization and read by
+nothing, is now compared against what this build asks for — **not by plain membership**.
+Shopify treats `write_x` as implying `read_x` and collapses the pair in what it grants back:
+the live connection, authorized for `write_products,read_products`, stored exactly one entry,
+`write_products`. Compared literally, `read_products` reads as missing on a connection that
+holds it, and reconnecting cannot fix that because the provider will never return the entry.
+The rule lives on the adapter (`ChannelOAuth.holdsScope`) rather than in shared code, because
+the next provider's will differ. It runs one way only: holding `read_x` is not holding
+`write_x`. A connection that is short gets a
+**Reconnect** on the channels card and a refusal before any call rather than a 403 at the end
+of an activate. Reconnecting upserts on the same account and keeps the connection id, so the
+listings hanging off it are untouched; a stored list that is *empty* means the column was
+never populated for that row and is left alone, because forcing every such creator through a
+reconnect to fix a problem most of them do not have is the more expensive mistake.
 
 ## 10. Rate limits
 
@@ -327,7 +362,11 @@ Nothing below is a guess about intent; each is a shape that only a 2xx can confi
    repaired a product with no image but froze one that had one, so a product created before
    Fanwise sent more than the cover could never receive the rest of its images. Whether the fetch succeeds against a public
    URL inside the TTL remains untested.
-4. `onlineStoreUrl` on a DRAFT product: **answered, 6 September 2026, and not as expected.**
+4. `onlineStoreUrl` on a DRAFT product: **answered 6 September 2026, and closed by ADR 0004
+   on 7 September.** §16 is what the adapter does about it; the note below is what the run
+   found.
+
+   **answered, 6 September 2026, and not as expected.**
    It is null on ACTIVE products too. §12's decision to store the admin URL is right, and for
    a stronger reason than anticipated: there is no storefront URL to store, because
    `status: ACTIVE` does not put a product on a sales channel. Both live products read
@@ -350,10 +389,10 @@ Nothing below is a guess about intent; each is a shape that only a 2xx can confi
 8. `seo.title` on `productSet`. `seo.description` has been sent since the first publish and
    is known to be accepted; the title half has not.
 9. Whether `product(id:)` returns null rather than erroring for an id that was deleted
-   rather than never existing. §15 depends on it, and it is asserted against a recorded
-   fake. A GraphQL error instead of a null would normalize to `unknown` and leave the
-   listing stuck in exactly the way §15 was written to end — visibly, at least, rather than
-   silently.
+   rather than never existing: **answered, 7 September 2026.** Null, with no `errors`
+   entry, for a product deleted in the admin minutes earlier. §16 records the run.
+7. and 8. are likewise **answered, 7 September 2026**: `category` with `so-2-5` and
+   `seo.title` were both accepted and read back from a live product. §16.
 
 ## 14. Category, product type, and the two SEO fields
 
@@ -460,3 +499,158 @@ The fix has three parts and each is deliberately narrow:
 on purpose, and quietly putting it back would overrule that decision with a background job.
 The creator is told what happened, in the card's own error line, and the button is theirs to
 press.
+
+## 16. The sales channel
+
+ADR 0004. **`status: ACTIVE` does not make a product purchasable**, and A5's exit test found
+three products that proved it: active, `publishedAt: null`, on no sales channel, no
+storefront page, no buyer able to reach them. Status and channel publication are separate
+facts on Shopify, `productSet` sets only the first, and Fanwise was reporting the result as
+"Live".
+
+`activate` now does both, in this order:
+
+```
+productSet identifier:{id} status ACTIVE      the status half, and it converges
+publications                                  which channel is the Online Store
+publishablePublish id input:[{publicationId}] the placement half
+  → resourcePublicationsCount asserted        the answer, not the absence of errors
+```
+
+The status write goes first deliberately. `productSet` with an identifier is an update, so a
+retry after a failed placement costs nothing and changes nothing. If the placement then
+fails, the product is ACTIVE and unreachable — which the listing now describes accurately
+instead of describing as live.
+
+**The count is what decides, not the empty `userErrors`.** A publication the product could
+not be added to, for a reason Shopify expresses as something other than a userError, would
+otherwise be reported to the creator as "Live". The whole of this section exists because a
+mutation reported success about a fact nobody checked.
+
+### Which publication, and when the adapter refuses
+
+Harder than it should be. On `2026-07` both obvious identifiers are deprecated:
+
+| Field | State |
+|---|---|
+| `Publication.name` | deprecated |
+| `Publication.app` | deprecated |
+
+What is left is `Publication.channels` and `Channel.handle`, documented as "a unique,
+human-readable identifier for the channel within the shop" — with no statement anywhere on
+shopify.dev of what the Online Store's handle actually is. `online_store` is a convention
+this adapter relies on and does not trust.
+
+**Answered against the live store, 7 September 2026.** The development store returns three
+publications, and the handle convention holds:
+
+| Publication | Handle | `autoPublish` |
+|---|---|---|
+| `gid://shopify/Publication/216151654636` | `online_store` | false |
+| `gid://shopify/Publication/216151720172` | `shop-72` | false |
+| `gid://shopify/Publication/216151752940` | `pos` | false |
+
+Worth reading twice: there are **three**, so the single-publication fallback is not what saves
+this store, and one of the others is Point of Sale. The handle match is load-bearing here, and
+the refusal branch below is not hypothetical on a store shaped like this. All three read
+`autoPublish: false`, which is the direct explanation for the `publishedAt: null` that started
+this — nothing was ever going to put those products on a channel by itself.
+
+So `resolvePublication` returns one of three outcomes and the third is the point:
+
+| Outcome | When |
+|---|---|
+| matched | exactly one publication's channel handle looks like the Online Store |
+| only | the shop has exactly one publication, so there is nothing to be ambiguous about |
+| **refused** | neither — several channels and no match, or more than one match |
+
+A refusal is a `validation_rejected` telling the creator to publish it in Shopify themselves.
+The alternative is putting a font on Point of Sale, or into a wholesale catalog with its own
+price list, because a handle this adapter guessed at did not match — on a channel the creator
+may not know they have. An error someone can act on beats a product quietly appearing
+somewhere nobody asked for.
+
+`autoPublish` is read and recorded on the job row, and deliberately **not** acted on. It
+would be reasonable to skip the publish call for a publication that auto-publishes, and it is
+not skipped: it is the merchant's setting, it can change between one publish and the next,
+and publishing something already published is the cheaper of the two ways to be wrong.
+
+### Run against the live store, 7 September 2026
+
+`Test Type` (`gid://shopify/Product/9409212186860`), a product created for the purpose. In
+one sitting, through the UI: publish created it as a DRAFT with category `so-2-5`, both SEO
+overrides, price, `requiresShipping: false` and the cover image; marking the file step done
+fired `activate`, which set ACTIVE, resolved `…654636` **by handle** with `pos` and
+`shop-72` present as wrong answers, called `publishablePublish`, and read back a count of 1.
+The job row records `resolvedBy: "handle"`. Fanwise reported **Live**, and Shopify agreed:
+`publishedAt` set, on the Online Store, not on Point of Sale.
+
+Three things the run taught that the fake did not:
+
+1. **The product landed on two publications, and Fanwise put it on one.** The second is
+   `216151687404`, "Microsoft Copilot" — a channel app on the store that auto-publishes new
+   products through its own catalog. It did not appear in the `publications` query and
+   `resourcePublicationsCount` does not count it. Fanwise neither caused it nor can see it,
+   which is fine; it is recorded so the next person reading `resourcePublications` does not
+   go looking for the bug.
+2. **`onlineStoreUrl` is still null** on a product that is ACTIVE *and* on the Online Store.
+   §13 item 4's decision to store the admin URL is right for a third reason now. The likely
+   cause is the development store's storefront password, which is unverified.
+3. **A rebuild erased `purchasable`.** `rebuildColumns` preserved only `externalState`, so
+   regenerating the listing after activation dropped the recorded `true`. Absent reads as
+   unknown and unknown keeps the old answer, so the display stayed Live — by luck. Had the
+   value been `false`, the same rebuild would have promoted a product on no channel to
+   "available to buy". Fixed the same day: both keys are publication-owned and survive.
+
+**Run a second time, same day, on the same listing after its product was deleted.** The
+creator deleted `9409212186860` in the Shopify admin, edited the listing so there was
+something to send, and clicked Publish changes:
+
+```
+17:33:58  update   failed     external_object_missing    raw: {"product": null}
+17:34:13  publish  succeeded  generation 1  →  gid://shopify/Product/9409237975276
+17:39:29  activate succeeded  generation 1  →  ACTIVE, on Online Store, count 1
+```
+
+That is §15 end to end: Shopify returns `null` rather than an error for a deleted id (§13
+item 9, answered), the runner withdraws the listing's claim and moves the generation, the new
+publish key is not the claimed one, and the fresh product carried the category and both SEO
+overrides. The re-created product went live on the Online Store by handle, exactly as the
+first had.
+
+It also found a fourth thing, fixed the same hour: the reset had left the manual steps alone,
+so the new draft inherited a file step marked done on the deleted product, read "no steps
+outstanding, not purchasable", and offered nothing to click — activate has no trigger except a
+step being marked done. The reset now reopens the steps; a file attached to a product that no
+longer exists is not attached.
+
+**A limitation to state plainly.** A deletion is noticed only when Fanwise next writes.
+There is no "check the channel" action, so a product deleted in Shopify goes on reading Live
+until the creator sends something. That is deliberate at A5 — a status poll is A7's
+orchestration work, not a patch here — and it means the honesty of the Live badge is bounded
+by the last write, which the spec should say rather than imply.
+
+A rebuild also regenerates the SEO overrides to null, exactly as it does the title and
+description, and the update that followed sent the fallbacks. That is a rebuild doing what a
+rebuild does, not a defect; it is noted because the run's "asfd" became "Test Type" and the
+first reading of that was a lost write.
+
+### What the listing records
+
+`PublishResult.purchasable`, persisted to `channel_listings.metadata.purchasable`, and read
+by `liveness`. Three values and all three are meant:
+
+| Value | Meaning |
+|---|---|
+| `true` | the channel confirmed the product sits on at least one publication |
+| `false` | it does not, so `liveness` withholds `live` |
+| absent | nothing established it — every listing published before this, and every channel with no such concept |
+
+Absent is **not** false. Rendering it as false would report every listing on every other
+channel as unbuyable in order to fix this one.
+
+It is separate from `externalState` because `externalState` cannot answer it. That field
+records the provider's own status, and it has to: `update()` reads it back to decide whether
+to send ACTIVE or DRAFT, which is what stops an ordinary edit taking a live product off sale.
+One field cannot mean both "the object is active" and "a buyer can reach it" on a provider
+where those come apart, and this is a provider where they do.

@@ -372,6 +372,28 @@ async function forgetExternalObject(
       listingId: listing.id,
       error,
     })
+    return
+  }
+
+  /*
+   * The steps go back too. A step is work done on the product that existed,
+   * and that product is gone: the file was attached to something the channel
+   * has since deleted. Left as complete, the re-published product reads "no steps
+   * outstanding" with `purchasable: false` — Published, not live, and nothing
+   * on the card to do about it, because the only trigger for activate is a
+   * step being marked done. Found on the first live run of this path.
+   */
+  const { error: stepsError } = await admin
+    .from("listing_manual_steps")
+    .update({ completed_at: null, completed_by: null })
+    .eq("channel_listing_id", listing.id)
+    .eq("workspace_id", workspaceId)
+
+  if (stepsError) {
+    console.error("[publishing] could not reopen manual steps for a missing external object", {
+      listingId: listing.id,
+      error: stepsError,
+    })
   }
 }
 
@@ -393,6 +415,16 @@ async function recordSuccess(params: {
     // Read back by the adapter's update() so an edit does not silently take a
     // live product off sale, or put a draft one on it.
     externalState: result.externalState,
+    /*
+     * Whether a buyer can reach it, which is not what externalState answers.
+     * Written only when the adapter established it: an absent key means
+     * unknown, and liveness treats unknown as "no opinion" rather than as no.
+     * Overwriting a known answer with null on a later write that did not check
+     * would lose the one fact the UI is not allowed to guess at.
+     */
+    ...(result.purchasable === undefined || result.purchasable === null
+      ? {}
+      : { purchasable: result.purchasable }),
   }
 
   /*

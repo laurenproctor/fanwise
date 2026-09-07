@@ -5,6 +5,7 @@ import { findAdapter } from "@/lib/channels/registry"
 import { CapabilityList } from "@/components/channels/capability-list"
 import { ConnectButton } from "@/components/channels/connect-button"
 import { countPublishedByConnection } from "@/lib/channels/queries"
+import { missingScopes } from "@/lib/channels/oauth"
 
 export const metadata = { title: "Channels · Fanwise" }
 
@@ -114,6 +115,16 @@ export default async function ChannelsPage({
                   connectionId={connection?.id ?? null}
                   accountName={connection?.external_account_name ?? null}
                   publishedCount={connection ? (publishedByConnection.get(connection.id) ?? 0) : 0}
+                  /*
+                    Whether this build asks for more than the creator granted.
+                    Computed from the adapter's declared scopes and the ones
+                    recorded at authorization, so adding a scope surfaces a
+                    reconnect here rather than as a permission failure at the
+                    end of a publish.
+                  */
+                  needsReauthorization={
+                    connection ? missingScopes(adapter, connection.scopes).length > 0 : false
+                  }
                   disabled={channel.status !== "available"}
                   /*
                     Only the two strings the form needs. `adapter.oauth` holds

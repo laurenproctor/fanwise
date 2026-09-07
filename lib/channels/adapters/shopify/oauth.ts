@@ -3,7 +3,7 @@ import { z } from "zod"
 import { ChannelError, normalized } from "@/lib/channels/errors"
 import type { ChannelOAuth, OAuthAuthorizeRequest, OAuthGrant } from "@/lib/channels/types"
 import { createShopifyClient } from "./client"
-import { SCOPES, shopifyConfig } from "./config"
+import { SCOPES, holdsScope, shopifyConfig } from "./config"
 import { fail, httpError, transportError } from "./errors"
 
 /**
@@ -149,6 +149,8 @@ async function exchangeCode(params: {
 }
 
 export const shopifyOAuth: ChannelOAuth = {
+  scopes: SCOPES,
+  holdsScope,
   accountHintLabel: "Your Shopify store domain",
   accountHintPlaceholder: "aster-type.myshopify.com",
 
