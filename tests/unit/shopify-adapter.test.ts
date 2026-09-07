@@ -470,6 +470,25 @@ describe("the product category", () => {
     expect(productSetVariables(bodies).input).not.toHaveProperty("category")
   })
 
+  it("never sends a handle, so a slug already on the store cannot block a publish", async () => {
+    /*
+      Shopify uniquifies a handle it derives and refuses one it is given that
+      is in use. The product slug used to be sent, and the first slug that
+      already existed on a store as a product Fanwise had never seen blocked
+      that product's publish permanently: the slug does not change, so neither
+      did the answer. Live store, 7 September 2026.
+    */
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body)),
+    )
+
+    await shopifyAdapter.publish!(context())
+
+    expect(productSetVariables(bodies).input).not.toHaveProperty("handle")
+  })
+
   it("seeds a new listing with the category its product type belongs in", () => {
     const draft = shopifyAdapter.buildListing(subject())
     expect(draft.category).toBe("Fonts")
