@@ -372,6 +372,28 @@ async function forgetExternalObject(
       listingId: listing.id,
       error,
     })
+    return
+  }
+
+  /*
+   * The steps go back too. A step is work done on the product that existed,
+   * and that product is gone: the file was attached to something the channel
+   * has since deleted. Left as complete, the re-published product reads "no steps
+   * outstanding" with `purchasable: false` — Published, not live, and nothing
+   * on the card to do about it, because the only trigger for activate is a
+   * step being marked done. Found on the first live run of this path.
+   */
+  const { error: stepsError } = await admin
+    .from("listing_manual_steps")
+    .update({ completed_at: null, completed_by: null })
+    .eq("channel_listing_id", listing.id)
+    .eq("workspace_id", workspaceId)
+
+  if (stepsError) {
+    console.error("[publishing] could not reopen manual steps for a missing external object", {
+      listingId: listing.id,
+      error: stepsError,
+    })
   }
 }
 
