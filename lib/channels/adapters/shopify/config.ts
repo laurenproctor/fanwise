@@ -86,10 +86,34 @@ export const SCOPES = [
  * is probably fine, and forcing a re-authorization on a guess is the more
  * expensive mistake.
  */
+/**
+ * Whether a granted list covers one required scope.
+ *
+ * Not plain membership, and assuming it was is a bug this shipped with. Shopify
+ * treats `write_x` as implying `read_x` and **collapses the pair in what it
+ * grants back**: authorize for `write_products,read_products` and the token
+ * response says `write_products`, alone. The live connection proved it — one
+ * entry in `channel_connections.scopes` for an authorization that asked for
+ * two.
+ *
+ * A literal comparison therefore reports `read_products` missing on a
+ * connection that holds it, forever. The creator reconnects, the prompt does
+ * not clear, and they reconnect again. A nag that cannot be satisfied is worse
+ * than no nag: it teaches people to ignore the one that matters.
+ */
+function holds(granted: readonly string[], required: string): boolean {
+  if (granted.includes(required)) return true
+  const readScope = /^read_(.+)$/.exec(required)
+  return readScope !== null && granted.includes(`write_${readScope[1]}`)
+}
+
 export function staleScopes(granted: readonly string[]): string[] {
   if (granted.length === 0) return []
-  return SCOPES.filter((scope) => !granted.includes(scope))
+  return SCOPES.filter((scope) => !holds(granted, scope))
 }
+
+/** The same rule, for the shared scope comparison. See ChannelOAuth.holdsScope. */
+export const holdsScope = holds
 
 let cached: ShopifyConfig | null = null
 

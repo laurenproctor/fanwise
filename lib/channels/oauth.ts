@@ -143,7 +143,13 @@ export function missingScopes(
   adapter: Pick<ChannelAdapter, "oauth">,
   granted: readonly string[] | null,
 ): string[] {
-  const required = adapter.oauth?.scopes
-  if (!required || !granted || granted.length === 0) return []
-  return required.filter((scope) => !granted.includes(scope))
+  const oauth = adapter.oauth
+  if (!oauth || !granted || granted.length === 0) return []
+
+  // The adapter's own rule when it has one, membership when it does not. A
+  // provider that collapses implied scopes in what it grants back would
+  // otherwise be reported as permanently short of something it holds.
+  const holds =
+    oauth.holdsScope ?? ((list: readonly string[], scope: string) => list.includes(scope))
+  return oauth.scopes.filter((scope) => !holds(granted, scope))
 }

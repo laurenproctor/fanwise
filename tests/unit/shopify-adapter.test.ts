@@ -1159,7 +1159,10 @@ describe("putting the product on a sales channel", () => {
     const stale = context()
     const connection = {
       ...stale.connection,
-      scopes: ["write_products", "read_products"],
+      // What the live connection actually held: Shopify collapses read_products
+      // into write_products in what it grants back, so a connection authorized
+      // before ADR 0004 stores exactly this one entry.
+      scopes: ["write_products"],
     } as ChannelConnection
 
     await expect(

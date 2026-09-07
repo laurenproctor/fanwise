@@ -421,15 +421,43 @@ describe("scopes a connection is missing", () => {
   */
 
   it("names what this build asks for and the connection was never granted", () => {
+    // The real shape of the stale connection this was written for: authorized
+    // before ADR 0004, so it holds the product scopes and neither publication
+    // one.
     const adapter = getAdapter("shopify")
-    const required = adapter.oauth!.scopes
-    const granted = required.slice(0, 1)
-    expect(missingScopes(adapter, granted)).toEqual([...required.slice(1)])
+    expect(missingScopes(adapter, ["write_products"])).toEqual([
+      "read_publications",
+      "write_publications",
+    ])
   })
 
   it("is empty when the connection holds everything asked for", () => {
     const adapter = getAdapter("shopify")
     expect(missingScopes(adapter, [...adapter.oauth!.scopes])).toEqual([])
+  })
+
+  it("counts a write scope as covering the read half it implies", () => {
+    /*
+      The bug this shipped with, caught by a live connection rather than by a
+      test. Shopify treats write_x as implying read_x and collapses the pair in
+      what it grants back: an authorization for write_products,read_products
+      comes back as write_products alone, and the stored row held exactly one
+      entry.
+
+      Compared literally, read_products reads as missing on a connection that
+      holds it — and reconnecting cannot fix it, because the provider will
+      never return the entry. The creator would be prompted to reconnect
+      forever, which teaches people to ignore the prompt that matters.
+    */
+    const adapter = getAdapter("shopify")
+    expect(missingScopes(adapter, ["write_products", "write_publications"])).toEqual([])
+    // The implication runs one way only. Holding the read half is not holding
+    // the write half, and treating it as such would let a token that cannot
+    // publish look like one that can.
+    expect(missingScopes(adapter, ["read_products", "read_publications"])).toEqual([
+      "write_products",
+      "write_publications",
+    ])
   })
 
   it("treats an unrecorded scope list as unknown, not as nothing granted", () => {

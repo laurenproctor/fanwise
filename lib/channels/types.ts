@@ -274,6 +274,21 @@ export interface ChannelOAuth {
    */
   scopes: readonly string[]
   /**
+   * Whether a granted list covers one required scope.
+   *
+   * Optional, and the default is plain membership. It exists because plain
+   * membership is wrong on at least one provider and shared code has no way to
+   * know which: Shopify treats `write_x` as implying `read_x` and grants back
+   * only the write half, so a literal comparison reports a scope missing on a
+   * connection that holds it — permanently, since reconnecting cannot add an
+   * entry the provider will not return.
+   *
+   * The rule belongs to the adapter rather than here for the ordinary reason:
+   * the next provider's rule will differ, and encoding Shopify's in shared code
+   * would make it everyone's.
+   */
+  holdsScope?(granted: readonly string[], required: string): boolean
+  /**
    * Validates and normalizes what the creator typed, before it reaches a URL.
    * An account hint becomes a hostname Fanwise redirects a person to and then
    * sends a client secret to, so it is checked rather than trusted.

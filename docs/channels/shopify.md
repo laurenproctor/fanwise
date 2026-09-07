@@ -260,7 +260,14 @@ enumerated and its id is per shop.
 rather than Shopify's managed installation — Shopify's "merchants approve new scopes the next
 time they open the app" does not apply here and nothing prompts anybody on Fanwise's behalf.
 So `channel_connections.scopes`, which had been written at every authorization and read by
-nothing, is now compared against what this build asks for. A connection that is short gets a
+nothing, is now compared against what this build asks for — **not by plain membership**.
+Shopify treats `write_x` as implying `read_x` and collapses the pair in what it grants back:
+the live connection, authorized for `write_products,read_products`, stored exactly one entry,
+`write_products`. Compared literally, `read_products` reads as missing on a connection that
+holds it, and reconnecting cannot fix that because the provider will never return the entry.
+The rule lives on the adapter (`ChannelOAuth.holdsScope`) rather than in shared code, because
+the next provider's will differ. It runs one way only: holding `read_x` is not holding
+`write_x`. A connection that is short gets a
 **Reconnect** on the channels card and a refusal before any call rather than a 403 at the end
 of an activate. Reconnecting upserts on the same account and keeps the connection id, so the
 listings hanging off it are untouched; a stored list that is *empty* means the column was
