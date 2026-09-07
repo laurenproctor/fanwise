@@ -29,7 +29,7 @@ Keep these here only as pointers. Do not relitigate them from this file.
 |---|---|---|
 | Shopify digital delivery | Assisted file step. Not Fanwise-hosted, not a third-party app | `docs/decisions/0001` |
 | Who owns the Shopify buyer relationship | Nobody at Fanwise. Option C means no buyer email ever reaches us | `docs/decisions/0001`, consequence |
-| Does Creative Market join Gate A | No. It stays at B3; A3's assisted mock proves the capability matrix instead | `docs/roadmap.md`, under Gate A |
+| Does Creative Market join Gate A | Yes, as A8, decided 7 September 2026 and reversing the earlier no. It is the only billable channel no approval gates. The reversed argument is kept in full, and A8 cannot run the composed-listing test, which moves to B2a | `docs/roadmap.md`, under Gate A |
 | Where channel capabilities live | Code, in `lib/channels/registry.ts`. Never an editable row | `docs/data-model.md`, A3 |
 | Listing uniqueness | `(product_id, channel_connection_id)`. Two shops on one marketplace are two listings and two billable units | `docs/data-model.md`, A3 |
 | `channels.billable` | Ships at A3, unused until C1, rather than backfilled across live connections later | `docs/data-model.md`, A3 |
@@ -79,10 +79,16 @@ de-risk Gate A's revenue story.
 
 `docs/channels/creative-market.md` section 13 lists ten questions marked **[verify]** that
 can only be settled by logging in: title limits, description rules, the tag and subcategory
-trees, whether they parse the zip to build the buyer-facing manifest. B3 is blocked on a
+trees, whether they parse the zip to build the buyer-facing manifest. A8 is blocked on a
 login, and the login is free.
 
-**Recommendation:** do it well before B3, and record the answers in that file as they land.
+This moved up in urgency on 7 September 2026. Creative Market used to be B3, a whole gate
+away; it is now A8 and inside the gate that closes the loop, so a login nobody has done sits
+between Fanwise and Gate A. It is also the cheapest item on this page: no application, no
+review, no waiting on anyone.
+
+**Recommendation:** do it now, before A8 opens rather than during it, and record the answers
+in that file as they land.
 
 ---
 
@@ -365,15 +371,35 @@ unresolved gap between the mockups and the written model.
 `CLAUDE.md` grants the marketing mockups authority over pricing and channel modes. That makes
 them the de-facto answer to decisions they were never meant to settle.
 
-1. **Framer is listed "Live"** on the pricing page and **cut** in
-   `docs/channel-feasibility.md`. One of the two is wrong.
+1. ~~**Framer is listed "Live"** on the pricing page and **cut** in
+   `docs/channel-feasibility.md`. One of the two is wrong.~~ **Resolved 7 September 2026.**
+   The feasibility doc won, because it is the artefact with the research behind it: Framer
+   sells a remix link rather than a file, so the canonical-product thesis does not reach it,
+   and it is cut along with Webflow, Canva and Figma for the same structural reason. Framer
+   is gone from `design/marketing/pricing.html` in both places it appeared — the external
+   marketplace list and the "what counts as a marketplace" answer. Adobe Stock takes its slot
+   in the list, marked Planned, which is also the channel that displaced it at B4.
 2. **Creative Market appears as a $6 external marketplace**, which silently pre-answers
    decision 16 in favour of flat pricing.
 3. **The free plan exists nowhere in `docs/billing.md`**, which pre-answers decision 18.
 
+**Etsy and Creative Market stay marked "Live" on that page, and that is deliberate.** Neither
+is built — Etsy is A6 and Creative Market is A8, both unstarted — so the label is false today
+and will be true at Gate A exit. The mockup depicts the product at launch, and the marketing
+site is its own deployment that ships after the gates rather than a route in this app, so it
+never renders while the claim is wrong. Framer was different in kind: no amount of shipping
+makes it true. Do not "correct" Etsy or Creative Market to Planned on the strength of item 1.
+
+Envato is the weakest survivor on that list. It sits under **External marketplaces** marked
+Planned, while the feasibility table rates it "V2 for analytics only" — no item creation, FTP
+for audio and video alone. A creator reading that page would expect to publish to it. Not
+changed here, because it is a smaller claim than Framer's and it is entangled with decision
+16: whether an analytics-only connection is worth $6 at all.
+
 **Recommendation:** decide 16 and 18 deliberately, then correct whichever artefact lost, and
 narrow `CLAUDE.md`'s grant so the mockups are authoritative for **visual system and channel
-modes** rather than for commercial policy.
+modes** rather than for commercial policy. Item 1 is the precedent for how that correction
+goes: the artefact with the research behind it wins.
 
 ---
 

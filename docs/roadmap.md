@@ -1,9 +1,11 @@
 # Roadmap
 
-**Current step: A5. Publishing, updating and image repair are verified against a live Shopify
-store, and idempotency is proven by test. One exit clause remains unrun, and running the rest
-uncovered a blocker for it: an ACTIVE Shopify product is not on a sales channel and nobody can
-buy it. See the note below.**
+**Current step: A5 is done, 7 September 2026, and promoted to `main`. All three exit clauses
+have run against a live Shopify store: a real product publishes, a second click creates
+nothing, and the product is ACTIVE *and* on the Online Store sales channel with the placement
+read back rather than assumed. A6 (Etsy) is next and does not begin until Etsy's developer
+app and commercial access are approved; neither is gated on code. See the note below for what
+the run found and fixed.**
 
 Three gates. Nothing after a gate begins until the gate passes. Update the line above when a
 step completes, and do not work on more than one step at a time.
@@ -41,7 +43,7 @@ Etsy commercial access as a live risk from A6 onward, not as a surprise discover
 
 ## Gate A: the loop closes
 
-One real product, published to two channels, by a person who is not you.
+One real product, syndicated to three channels, by a person who is not you.
 
 | Step | Content | Exit test | Status |
 |---|---|---|---|
@@ -50,12 +52,19 @@ One real product, published to two channels, by a person who is not you.
 | A2 | Canonical product, product types, assets, storage, checksums, image derivative service | A complete product exists with correct derivatives for two image specs, no channel connected | done |
 | A3 | Channel registry, connections, listings, adapter contract, capability matrix, requirements engine, two mock adapters, one `api`-shaped and one `assisted`-shaped | One product yields two independent mock listings, the assisted mock implements no `publish`, and the UI offers none. No marketplace string in the product domain | done |
 | A4 | Manual listing editor, no AI. Readiness UI | A user hand-writes a listing per channel and sees deterministic readiness | done |
-| A5 | Shopify: OAuth, adapter, publish, idempotency, error normalization, digital delivery decision | Real product publishes, second click creates nothing, the file is actually deliverable to a buyer | code done, two exit clauses **verified**, buyer download **blocked**: the product is not purchasable |
+| A5 | Shopify: OAuth, adapter, publish, idempotency, error normalization, digital delivery decision | Real product publishes, second click creates nothing, the file is actually deliverable to a buyer | **done**, 7 September 2026. Ran in full against the live store, twice — the second time on a product deleted underneath it. `docs/channels/shopify.md` §16 |
 | A6 | Etsy: OAuth, adapter, draft, images, digital file, activate, idempotency | Real product publishes and is purchasable | |
 | A7 | Publish Everywhere orchestration, jobs, progress, retry, activity log | One action, two live URLs, one failure recovered without duplicates | |
+| A8 | Creative Market syndication: category and license schema, package build, image derivatives, guided submission handoff, mark submitted, URL capture. See `docs/channels/creative-market.md` | A creator carries one real product through the handoff to a live Creative Market listing without composing anything outside Fanwise, the URL is captured, and every row reads `status_source = self_reported`. No surface anywhere offers Publish for this channel | |
 
 **Gate A passes when** an outside creator, unassisted, takes one of their real products from
-empty workspace to two live listings, and leaves them up.
+empty workspace to three listings, and leaves them up: Shopify and Etsy live and verified by
+Fanwise, Creative Market self-reported and verified by opening the captured URL by hand.
+
+That last clause is a difference in kind, not a weaker version of the same check. Fanwise
+cannot know a Creative Market listing is live, because Creative Market exposes nothing to
+ask. The gate is a human test, so a human opens the URL. What Fanwise must never do is write
+a row that a later part of the system would read as verified.
 
 **A5's exit test is two thirds run.** The three clauses are: a real product publishes, a
 second click creates nothing, and the file is actually deliverable to a buyer. Two are
@@ -178,30 +187,71 @@ the adapter had been confusing it with, and the meta title. See §14.
 
 What remains for A5, in order:
 
-1. **Decide how a product reaches a sales channel.** Written up as
-   `docs/decisions/0004-shopify-sales-channel-publication.md`, which costs both options and
-   recommends one; the decision itself is still owed. Either Fanwise publishes it, which means
+1. **Decide how a product reaches a sales channel.** **Decided 7 September 2026: option A,
+   Fanwise publishes it.** See `docs/decisions/0004-shopify-sales-channel-publication.md` and
+   `docs/channels/shopify.md` §16. `activate` now sets ACTIVE and then calls
+   `publishablePublish`, asserting the resulting publication count rather than trusting an
+   empty `userErrors`. The two publication scopes force a re-authorization of every existing
+   connection, which the channels card now offers as a **Reconnect** that keeps the listings.
+   **Run against the live store the same day**, after the store was reconnected with the new
+   scopes: `docs/channels/shopify.md` §16. The original framing follows. Either Fanwise publishes it, which means
    adding a publications scope and re-authorising every connection, or it does not, which
    means the creator does it in the Shopify admin and it becomes a manual step with the same
    standing as attaching the file. Until this is decided, "live" cannot honestly be shown.
 2. **Correct what `liveness` claims** in whichever direction step 1 settles. A product that
-   is on no sales channel must not be reported as available to buy.
+   is on no sales channel must not be reported as available to buy. **Done, 7 September
+   2026.** `PublishResult.purchasable` carries the fact, `channel_listings.metadata` stores
+   it, and `liveness` returns `published_not_live` when it is explicitly false. Absent stays
+   unknown and keeps the old answer, so no other channel is newly reported as unbuyable.
 3. **Then place a test order and download the file as a buyer**, which is the clause that has
    never been attempted and cannot be attempted before step 1.
 
 The image half of the old "worth doing in the same sitting" note is done: republishing
 confirmed the supporting images arrive.
 
-**No third channel joins Gate A.** Creative Market was considered for it, on the argument
-that the pricing model is not real until a billable channel exists, and that at Gate A exit
-the only billable channel is Etsy, whose approval is not ours to grant. It stays at B3
-anyway. The thing Creative Market would prove early is the capability matrix, not the
-revenue, and A3's assisted mock adapter proves that for free: an adapter with no `publish`
-method, a UI that consequently offers no publish button, and `status_source` that can only
-ever be `self_reported`. Building a real assisted channel to learn the same lesson adds a
-marketplace to the gate that closes the loop, which is the one thing the gate is shaped to
-avoid. The Etsy dependency is a real risk and is answered where it lives, in the external
-dependency table above, not by widening Gate A.
+**Creative Market joins Gate A at A8. This reverses an earlier decision, on 7 September
+2026.** The reversed text is kept below rather than deleted, because the argument against is
+still the strongest thing anyone will say about A8 and whoever builds it should read it.
+
+The earlier position was: *no third channel joins Gate A. The thing Creative Market would
+prove early is the capability matrix, not the revenue, and A3's assisted mock adapter proves
+that for free — an adapter with no `publish` method, a UI that consequently offers no publish
+button, and `status_source` that can only ever be `self_reported`. Building a real assisted
+channel to learn the same lesson adds a marketplace to the gate that closes the loop, which
+is the one thing the gate is shaped to avoid.*
+
+What changed is the reading of the risk, not the reading of the mock. Both billable channels
+in Gate A were things Fanwise could not obtain by working: Etsy commercial access has no
+published SLA, and A5's remaining exit clause turned out to be blocked on a sales-channel
+decision rather than on code. Creative Market is the one channel in the plan that no
+approval gates at all — no API key, no OAuth app, no commercial review — and it is billable
+at $6 under the pricing model. Putting it in Gate A means the gate can close on one
+dependency Fanwise controls end to end, and the argument the earlier text dismissed, that
+the pricing model is not real until a billable channel exists, is the one that now carries.
+
+Two costs, stated plainly rather than argued away:
+
+- **A8 sits before the AI steps, so it cannot run Creative Market's own test.** Section 2 of
+  `docs/channels/creative-market.md` frames the hypothesis as whether a creator accepts a
+  *Fanwise-composed* listing substantially unchanged — "if they rewrite everything, Fanwise
+  is a file converter." At A8 the copy is hand-written in the A4 editor, so the creator is
+  accepting their own words and the test proves nothing about composition. A8's exit test is
+  therefore about the mechanics only: the package, the handoff, the capture, the honesty of
+  `status_source`. The three-creator composed-listing test stays in Gate B, after B1 and B2,
+  and section 12 of the channel spec is where it lives.
+- **Gate A gets wider, which is what the earlier text was protecting against.** That
+  objection was right and is not answered, only accepted.
+
+A8 is blocked on a live Creative Market seller login, which is free and which nobody has
+done. Section 13 of the channel spec lists ten questions marked **[verify]** that can only be
+settled from inside a real shop. Get the account before A8 opens, not during it.
+
+**A7 still says two live URLs, and that is not an oversight.** Publish Everywhere orchestrates
+the channels that can be published to, and Creative Market is not one of them — it declares
+`automaticPublish: false` and implements no `publish` method, so the orchestrator has nothing
+to call. A8 arrives after A7 and does not widen A7's exit test. What A8 does put in front of
+Publish Everywhere is a connected channel the action must visibly skip rather than silently
+omit, which is the capability-matrix case A3's assisted mock was built to rehearse.
 
 ## Gate B: the abstraction holds and the money comes back
 
@@ -209,11 +259,21 @@ dependency table above, not by widening Gate A.
 |---|---|
 | B1 | AI provider abstraction, Anthropic, FactSheet, merchandising profiles, factuality validator, generation logs. Adopt Trigger.dev here |
 | B2 | Listing review UI: field edit, field regenerate, full regenerate, restore, approve |
-| B3 | Creative Market assisted: package build, handoff, mark submitted, URL capture. See `docs/channels/creative-market.md` |
-| B4 | Second assisted channel. Adobe Stock preferred over Framer, see `docs/channel-feasibility.md` |
+| B2a | Creative Market composed-listing test: the three creators and the measures in `docs/channels/creative-market.md` section 12, run against AI-composed copy on the A8 handoff |
+| B4 | Second assisted channel. Adobe Stock or MyFonts, undecided on purpose, see `docs/channel-feasibility.md` and decision 14 |
 | B5 | `sales_events`, transaction ingestion for Shopify and Etsy, dedupe constraints |
 | B6 | Analytics overview: revenue, units, by channel, by product |
 | B7 | CSV import foundation |
+
+**B3 is vacant on purpose.** Creative Market moved to A8 and the remaining steps keep their
+numbers, because step ids are names here, not positions — `docs/data-model.md`,
+`docs/channels/shopify.md`, `docs/decisions/0001` and `CLAUDE.md` all refer to B1, B4, B5 and
+B6 by id, and renumbering to close a gap would silently invalidate every one of those
+references. Do not reuse B3 for something else.
+
+B2a is the half of the old B3 that could not move: the creator test that only means anything
+once AI composes the listing. It is lettered rather than numbered for the same reason the gap
+stays, and it is a test rather than a build step, which is why it carries no code scope.
 
 ## Gate C: a stranger can pay
 
