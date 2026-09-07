@@ -30,6 +30,8 @@ Keep these here only as pointers. Do not relitigate them from this file.
 | Shopify digital delivery | Assisted file step. Not Fanwise-hosted, not a third-party app | `docs/decisions/0001` |
 | Who owns the Shopify buyer relationship | Nobody at Fanwise. Option C means no buyer email ever reaches us | `docs/decisions/0001`, consequence |
 | Does Creative Market join Gate A | Yes, as A8, decided 7 September 2026 and reversing the earlier no. It is the only billable channel no approval gates. The reversed argument is kept in full, and A8 cannot run the composed-listing test, which moves to B2a | `docs/roadmap.md`, under Gate A |
+| Model and cost per generation | Sonnet 5 (`claude-sonnet-5`), profile prefix cached, effort low. About $0.01 per listing generation with the cache warm, ~$0.014 cold. Decided 7 September 2026 | this file, item 12 |
+| Generations metered or unlimited | Unlimited on paid, 25 per month on free. At Sonnet 5 rates a heavy paid user costs about $2 of a $9 plan; a free cap of 25 costs about a quarter. Decided 7 September 2026 | this file, item 13 |
 | Where channel capabilities live | Code, in `lib/channels/registry.ts`. Never an editable row | `docs/data-model.md`, A3 |
 | Listing uniqueness | `(product_id, channel_connection_id)`. Two shops on one marketplace are two listings and two billable units | `docs/data-model.md`, A3 |
 | `channels.billable` | Ships at A3, unused until C1, rather than backfilled across live connections later | `docs/data-model.md`, A3 |
@@ -263,16 +265,52 @@ recovery flow against local Supabase, where the template does load.
 
 ### 12. Model choice and cost per generation
 
-Anthropic is decided. Which model, and what a generation costs, is not, and it feeds the free
-tier's "limited AI listing generations" promise.
+**Decided 7 September 2026: Sonnet 5, `claude-sonnet-5`.** Decided together with 13, as the
+recommendation asked.
+
+The comparison that decided it, at first-party API rates as of June 2026 and a listing
+generation of roughly 3,000 input tokens (profile, FactSheet, rules, product facts) and 800
+output (title, description, short description, tags, both meta fields):
+
+| Model | Input / 1M | Output / 1M | Per generation, cache warm | Per 1,000 |
+|---|---|---|---|---|
+| Haiku 4.5 | $1 | $5 | ~$0.005 | ~$5 |
+| **Sonnet 5** | $2 | $10 | **~$0.010** | **~$10** |
+| Opus 5 | $5 | $25 | ~$0.027 | ~$27 |
+| Fable 5.1 | $10 | $50 | ~$0.054 | ~$54 |
+
+"Cache warm" assumes the merchandising profile and rules — about two thirds of the input —
+sit in a cached prefix, which reads at roughly a tenth of the input rate. That is the shape
+B1 should build to from the first request, not an optimisation for later: the profile is
+the same bytes on every generation, and it is the part that makes the cost above true.
+
+Why not Opus 5: the more capable writer, and the honest question is whether the difference
+is visible *after* the factuality validator has removed anything not in the FactSheet. The
+expectation is no; it is a measurement, and B1's generation logs are the eval set for it.
+The provider abstraction makes the switch a configuration change if the measurement says
+otherwise. Why not Haiku: cheaper still, but on the older thinking API, and the saving is
+half a cent a generation against a plan priced at $9. Why not Fable 5.1: wrong shape — its
+data-retention requirement is a constraint listing copy should not take on, and it costs
+five times as much.
+
+Effort: `low`. Structured copy under a validator does not repay deliberation, and it is the
+first knob to turn if real usage comes in above the estimate. `ANTHROPIC_API_KEY` is set on
+the development environment.
 
 ### 13. Are generations metered or unlimited
 
-The entitlement service needs a number. The pricing page promises "AI-generated marketplace
-listings" with no cap on paid and "limited" on free.
+**Decided 7 September 2026: unlimited on paid, 25 per month on free.**
 
-**Recommendation:** decide both together with 12, since the cost per generation determines
-what a defensible limit looks like.
+The number falls out of 12. A heavy paid user regenerating 200 listings a month costs about
+$2 on Sonnet 5 — 22% of the $9 base — so the pricing page's promise of no cap on paid is
+safe without a guardrail. On Opus 5 the same user would cost $5.40, 60% of base, and a paid
+cap would have been necessary; that is the second reason 12 went the way it did.
+
+A free cap of 25 costs about a quarter per free workspace per month, which is a real product
+to try and a number nobody has to apologise for. The entitlement service gates on the count,
+never on a plan name string, per `CLAUDE.md`. The cap is a starting value, not a principle:
+it is expected to move once B1's logs show what a generation actually costs rather than what
+this page estimates.
 
 ### 14. B4's second assisted channel
 
