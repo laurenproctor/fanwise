@@ -26,7 +26,7 @@ Current reality, from `docs/channel-feasibility.md`:
 |---|---|---|---|---|---|---|
 | Shopify | api | yes | yes | yes | **no**, see note | yes |
 | WooCommerce | api | yes | yes | yes | **no**, by decision, see `docs/channels/woocommerce.md` §6 | yes |
-| Etsy | api | yes | yes | yes | yes, 5 files at 20 MB | yes |
+| Etsy | api | yes | yes | yes | **yes**, 5 files at 20 MB, built at A6 | yes |
 | Creative Market | assisted | no | no | no | no | no |
 | Adobe Stock | assisted | no | no | no | no | no |
 | MyFonts | assisted | no | no | no | no | no |

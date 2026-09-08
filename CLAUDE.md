@@ -15,10 +15,11 @@ explicitly requested.
 
 ## Current step
 
-**Step: B8 (WooCommerce channel) is code complete on 8 September 2026, added out of order at
-the founder's request. Its exit needs a live WooCommerce store: connect, publish a draft, attach
-the file, activate, and confirm the product is buyable. B1 and B2 are on `main`. Gate A is not
-passed; A6 and A8 resume when their blockers clear.** See `docs/roadmap.md`. Implement the current step only. Do
+**Step: A6 (Etsy: OAuth with PKCE, adapter, images, the digital file, activate, idempotency)
+is code complete on 8 September 2026, the day Etsy's approvals landed. Its exit needs a live
+shop: connect, publish, and confirm the listing is purchasable; five request-shape questions
+in `docs/channels/etsy.md` §13 can only be settled there. B1, B2 and B8 are on `main`. Gate A
+is not passed; A8 resumes when a Creative Market login exists.** See `docs/roadmap.md`. Implement the current step only. Do
 not build ahead.
 
 ## Architecture invariants

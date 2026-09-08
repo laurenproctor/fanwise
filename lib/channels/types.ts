@@ -21,7 +21,7 @@ export type SnapshotType = Database["public"]["Enums"]["snapshot_type"]
  * component that wants to special-case a marketplace has to name a key, and a
  * unit test fails the moment a key appears outside lib/channels/adapters.
  */
-export const CHANNEL_KEYS = ["mock_api", "mock_assisted", "shopify", "woocommerce"] as const
+export const CHANNEL_KEYS = ["mock_api", "mock_assisted", "shopify", "woocommerce", "etsy"] as const
 export type ChannelKey = (typeof CHANNEL_KEYS)[number]
 export const channelKeySchema = z.enum(CHANNEL_KEYS)
 
@@ -243,6 +243,12 @@ export interface OAuthAuthorizeRequest {
    * hands the credential to the browser.
    */
   grantUri: string
+  /**
+   * The S256 challenge for a provider that requires PKCE. Present only when
+   * the adapter declares `pkce`; the verifier it was derived from stays on
+   * the state row and reaches `exchange`.
+   */
+  codeChallenge?: string
 }
 
 /**
@@ -336,6 +342,12 @@ export interface ChannelOAuth {
    * never called for such a channel.
    */
   grant?: ChannelGrant
+  /**
+   * True when the provider's OAuth requires PKCE. The shared flow mints the
+   * verifier, keeps it on the state row, hands the challenge to
+   * `authorizeUrl` and the verifier to `exchange`.
+   */
+  pkce?: boolean
   authorizeUrl(request: OAuthAuthorizeRequest): string
   /**
    * Integrity of the callback itself, verified before any parameter is used,
@@ -346,6 +358,8 @@ export interface ChannelOAuth {
     accountHint: string
     query: URLSearchParams
     redirectUri: string
+    /** The PKCE verifier minted when the flow started, for a `pkce` adapter. */
+    codeVerifier?: string
   }): Promise<OAuthGrant>
 }
 
