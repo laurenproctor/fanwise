@@ -8,7 +8,7 @@ import { expect, test } from "@playwright/test"
  */
 const PAGES = [
   ["/", "Create once."],
-  ["/marketplaces", "Six shops. Six rulebooks. One of yours."],
+  ["/marketplaces", "Seven shops. Seven rulebooks. One of yours."],
   ["/how-it-works", "One master listing in. Six correct listings out."],
   ["/pricing", "Simple pricing for wherever you sell."],
   ["/about", "The product record belongs to the person who made the product."],

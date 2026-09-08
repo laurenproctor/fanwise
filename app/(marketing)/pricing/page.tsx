@@ -58,7 +58,7 @@ const FAQ = [
   },
   {
     q: "Does my own store count as a marketplace?",
-    a: "One owned storefront is included with Fanwise. External marketplaces are $6 each.",
+    a: "One owned storefront, Shopify or WooCommerce, is included with Fanwise. External marketplaces are $6 each.",
   },
   {
     q: "What if I stop selling on a marketplace?",
@@ -151,6 +151,12 @@ export default function PricingPage() {
                 <div className="fw-channels__list">
                   <div className="fw-channels__row">
                     Shopify
+                    <span className="fw-channels__state fw-channels__state--included">
+                      Included
+                    </span>
+                  </div>
+                  <div className="fw-channels__row">
+                    WooCommerce
                     <span className="fw-channels__state fw-channels__state--included">
                       Included
                     </span>

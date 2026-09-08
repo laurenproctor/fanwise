@@ -7,8 +7,11 @@
  * accurate, and both are stated in `docs/channel-feasibility.md` and
  * `docs/billing.md` respectively.
  *
- * Shopify appears here as the included storefront and is deliberately not
- * $6/mo: one owned storefront carries no channel charge.
+ * Shopify and WooCommerce appear here as storefronts and are deliberately not
+ * $6/mo: one owned storefront carries no channel charge. Whether a creator
+ * with both pays for the second is decision 23 in `docs/decisions/0002`, still
+ * open, which is why the copy says "one owned storefront" and names both as
+ * the choice rather than promising both.
  */
 export type Shop = {
   name: string
@@ -37,6 +40,20 @@ export const SHOPS: Shop[] = [
     review: "Instant",
     handles:
       "Fanwise keeps your storefront and every marketplace copy in step: change the master, and the store updates with the drafts.",
+  },
+  {
+    name: "WooCommerce",
+    badge: "Storefront · Included",
+    kind: "storefront",
+    blurb:
+      "Your own WordPress shop, with native downloadable products. Fanwise publishes the draft, you attach the file once, and it goes on sale with the file verified.",
+    preview: "Your theme's image sizes",
+    title: "200 chars",
+    tags: "Unlimited product tags",
+    copy: "Full rich text",
+    review: "Instant",
+    handles:
+      "Fanwise connects with your store's own approval screen, no plugin and no app to install, and keeps the shop in step with the master listing.",
   },
   {
     name: "Etsy",
