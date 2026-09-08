@@ -5,6 +5,12 @@ Verified against Creative Market seller documentation, September 2026. Items mar
 **[verify]** could not be confirmed from published docs and need checking against a live
 shop.
 
+On 7 September 2026 the upload step of the Shop Owner Application form was observed
+directly, which settled several markers below and contradicted others. Two caveats apply to
+everything sourced from it: it is the application form, not the product editor inside a
+live shop, and the two may differ; and no category was selected, so the License Pricing
+block was collapsed and the font price shape in section 4 remains unobserved.
+
 ---
 
 ## 1. Why this channel first
@@ -136,11 +142,14 @@ should let the creator pick the subcategory in Creative Market and record what t
 | Category | `product.product_type` | Mapping table, creator confirms | Locked first. Drives everything below. |
 | Product name | `product.canonical_title` | AI rewrite to CM profile | No published character limit **[verify]**. House rule: 60 chars, no shop name, no promo language, must read sensibly off-platform. |
 | Description | `product.canonical_description` | AI rewrite, then markdown restriction | Minimum 10 words. See section 6. |
-| Tags | `product.metadata` + AI | 5 to 10, deduplicated | Free-form. No controlled list, no published cap **[verify]**. Reject near-duplicates and tags not evidenced by the FactSheet. |
+| Tags | `product.metadata` + AI | 5 to 10, deduplicated | Minimum 1, observed. The field is labelled "Search tags", which implies a suggested or controlled vocabulary rather than free text; whether unknown tags are accepted is **[verify]**. No published cap **[verify]**. Reject near-duplicates and tags not evidenced by the FactSheet. |
 | Price per license | `product.base_price` | Floor check per section 4 | Never emit a price below the floor. If the canonical price is lower, flag it as an error, do not silently raise it. |
 | Product file | `product_assets` where `asset_type = deliverable` | Package build, section 7 | |
 | Screenshots | `product_assets` where `asset_type in (preview_image, specimen)` | Derivative build, section 8 | |
 | Attachments | `product_assets` where `asset_type in (documentation, license)` | Pass through into the zip | Optional. README, PDF, TXT. |
+| Generative AI disclosure | canonical product, field owed | Pass through | Required Yes or No: "was this product or one of its key features primarily created using generative AI tools". This is a fact about the product, so it lives on `products` and in the FactSheet, never on the listing and never composed by AI. Open decision 24 in `docs/decisions/0002`. |
+| Video URL | none in v1 | | Optional. Counts toward the media minimum in section 8. Not modelled in v1. |
+| Search engine listing | `channel_listings.seo_title`, `seo_description` | Pass through | Optional custom title, description and URL slug. The generation output already produces both; the handoff can offer them as an optional step. |
 
 ---
 
@@ -149,6 +158,13 @@ should let the creator pick the subcategory in Creative Market and record what t
 Creative Market accepts a narrow markdown subset, and nothing else. The transform must
 **strip** anything outside it rather than passing it through, because unsupported syntax
 renders as literal characters on the product page.
+
+The observed editor is a rich-text control with four toolbar actions: bold, italic,
+bulleted list, and one more that appears to be a horizontal rule **[verify]**. That lines up
+with the permitted subset below, so the transform stands. It does change the handoff: markdown
+pasted into a rich-text editor lands as literal asterisks. The description copy button must
+place formatted text on the clipboard, with the plain rendering as the text fallback, and
+whether the editor preserves pasted formatting is **[verify]**.
 
 Permitted:
 
@@ -196,16 +212,19 @@ misrepresent what is delivered.
 
 | Property | Value |
 |---|---|
-| Minimum count | 1 per the editor; the PDP quality guide says most categories want at least 2. Fanwise should require **3**. |
+| Minimum count | 2 media assets, observed, where a video URL counts as one. Fanwise should require **3** images. |
 | Maximum count | 100 |
 | Minimum dimensions | 910 × 607 px |
 | Recommended | 1820 × 1214 px |
 | Maximum | 3640 × 10920 px |
 | Aspect | 3:2 implied by the recommended size, never stated as a rule |
 | Formats | JPG, PNG, GIF |
-| File size | Under 5 MB recommended, no published hard cap |
+| File size | 10 MB hard maximum, observed. Under 5 MB remains the recommendation |
 
 **Build target: 1820 × 1214 JPG, quality tuned to land under 5 MB.**
+
+The editor also accepts an optional video URL alongside the images. Fanwise does not model
+it in v1, and the image minimum above is counted on images alone.
 
 Cover image designation, focal point and crop controls are **[verify]** and the relevant
 FAQ is login-gated. Observed behavior suggests the first screenshot becomes the thumbnail
@@ -238,7 +257,10 @@ error   description_markdown_safe  No syntax outside the permitted subset surviv
 error   images_min                 At least 3 derivatives built
 error   image_dimensions           Every image at least 910 x 607, at most 3640 x 10920
 error   image_format               JPG, PNG or GIF only
+error   image_size_max             Any image over 10 MB
 error   price_floor                Every license price at or above its floor
+error   ai_disclosure_set          The generative AI disclosure is answered on the product
+error   tags_min                   At least 1 tag
 warning image_size                 Any image over 5 MB
 warning tag_count                  Fewer than 5 or more than 10 tags
 warning tag_quality                Near-duplicate tags, or tags unsupported by the FactSheet
@@ -255,6 +277,11 @@ Readiness percentage is errors resolved over errors total. No AI scoring anywher
 Ordered to match Creative Market's own editor sequence exactly, so the creator moves top to
 bottom in both windows without hunting. Their documented order is: category, files, name,
 description, screenshots, prices, tags, set Live, Save all Changes.
+
+The observed application form is laid out in two columns rather than one sequence: category,
+title, preview images, description and the AI disclosure down the left; product upload,
+license pricing and tags down the right. Whether the live editor uses the same layout is
+**[verify]**, and the handoff order should follow whichever the seller actually sees.
 
 ```
 CREATIVE MARKET SUBMISSION            Aster Grotesk
@@ -291,7 +318,11 @@ CREATIVE MARKET SUBMISSION            Aster Grotesk
      grotesque, sans serif, variable font, editorial,
      display, type family, modern sans, headline      [copy]
 
-  8  Set the product Live, then Save all Changes.
+  8  Generative AI disclosure
+     Answer: No
+     Taken from the product record. Change it there, not here.
+
+  9  Set the product Live, then Save all Changes.
 
   ─────────────────────────────────────────────────
   Done?   [ Mark submitted ]   Listing URL [___________]
@@ -301,6 +332,8 @@ Design rules that make this work:
 
 - Each copy button holds a "copied" state until the next one is used, so the creator can see
   their position in the sequence.
+- The description copy button writes formatted text to the clipboard, not markdown, because
+  the target is a rich-text editor. See section 6.
 - Downloads are inline at the step that needs them, not collected at the top.
 - Nothing here says "publish" or implies Fanwise did anything on Creative Market.
 - The final step captures the listing URL. That URL is what links the live listing back to
@@ -372,7 +405,8 @@ the spec above.
 
 1. Title character limit.
 2. Description maximum length, and whether links, prices or contact details are rejected.
-3. Tag minimum, maximum, and per-tag character limit.
+3. Tag maximum and per-tag character limit. The minimum is settled at 1. Also whether the
+   "Search tags" control accepts a tag that is not already in its vocabulary.
 4. The full subcategory tree, and whether more than one category can be selected.
 5. Maximum price and permitted increments.
 6. Whether individual license tiers can be disabled per product.
@@ -382,5 +416,10 @@ the spec above.
    whether the seller types the Product Specs by hand.
 9. Folder structure conventions inside the zip that experienced sellers follow.
 10. Whether the Bulk Editor accepts anything that could serve as a structured import path.
+11. Whether the product editor inside a live shop matches the application form observed on
+    7 September 2026: same fields, same two-column layout, same limits.
+12. What the fourth toolbar control in the description editor is, and whether the editor
+    preserves formatting pasted from the clipboard.
+13. The License Pricing block with Fonts selected, to confirm the section 4 price shape.
 
 Record the answers in this file as they are settled, and drop the **[verify]** markers.

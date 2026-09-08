@@ -93,6 +93,12 @@ review, no waiting on anyone.
 **Recommendation:** do it now, before A8 opens rather than during it, and record the answers
 in that file as they land.
 
+Partly overtaken on 7 September 2026: the upload step of the Shop Owner Application form was
+observed without a shop login. It settled the tag minimum, the image hard cap and the image
+minimum, and it surfaced a required generative AI disclosure the spec had not seen (item 24).
+Section 13 of the spec now carries thirteen questions, three of them new, and the login is
+still the only way to settle the rest.
+
 ---
 
 ## Before A5, Shopify
@@ -257,6 +263,28 @@ config. Resend or Postmark, chosen for deliverability on transactional mail rath
 price; the volume through Gate A is trivial either way. Until then, a dev project runs with
 `enable_confirmations` off and no custom template, and `pnpm test:e2e` continues to prove the
 recovery flow against local Supabase, where the template does load.
+
+### 24. Where the generative AI disclosure lives
+
+Discovered on 7 September 2026 from Creative Market's upload form. Every product must answer,
+yes or no, whether it or one of its key features was primarily created with generative AI
+tools. The answer is required and the spec at `docs/channels/creative-market.md` did not
+know the field existed.
+
+This is a factual claim about the product, not a channel preference, and other marketplaces
+are adding the same question. That rules out two easy homes. It cannot live on
+`channel_listings`, because the same product would be asked the same question once per
+channel and could answer differently. It cannot be composed by AI, because invariant 5 says AI
+never introduces a fact absent from the FactSheet, and this is exactly such a fact.
+
+**Recommendation:** a nullable boolean on `products`, set by the creator in the product
+editor, surfaced in the FactSheet as a stated fact, and required by the Creative Market
+readiness check (`ai_disclosure_set`) rather than by the product schema, so products headed
+only to channels that do not ask are not blocked. Null means unanswered, never no. The
+migration lands with A8, since that is the first channel that needs it. Whether the wording
+should be Creative Market's or a neutral Fanwise one that adapters map onto each channel's
+question is the part still owed, and the neutral wording is the one consistent with adapters
+being adapters.
 
 ---
 
