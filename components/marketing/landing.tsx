@@ -6,7 +6,6 @@ import { MarketplacePicker } from "./marketplace-picker"
 import { ScrollReveal } from "./scroll-reveal"
 import { FANWISE_DEFINITION } from "./site-footer"
 import { SiteNav } from "./site-nav"
-import { ThemeScript } from "./theme-toggle"
 import { marketingRoutes } from "@/lib/routes"
 
 const NAV = [
@@ -213,7 +212,6 @@ const STUDIO_FEATURES = [
 export function Landing() {
   return (
     <div className="fw fw-ground">
-      <ThemeScript />
       <ScrollReveal />
 
       <div className="fw-shell">

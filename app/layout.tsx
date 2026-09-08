@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Archivo, Instrument_Sans, JetBrains_Mono } from "next/font/google"
 import { StrayFileDropGuard } from "@/components/ui/stray-file-drop-guard"
+import { ThemeScript } from "@/components/ui/theme-toggle"
 import "./globals.css"
 
 // Self-hosted at build time by next/font, so there is no render-blocking request
@@ -36,8 +37,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${archivo.variable} ${instrumentSans.variable} ${jetbrainsMono.variable}`}
     >
+      <head>
+        <ThemeScript />
+      </head>
       <body className="font-body antialiased">
         {/*
           Above children, and at the root rather than on the pages that accept

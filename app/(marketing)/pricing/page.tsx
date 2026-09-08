@@ -6,7 +6,6 @@ import { PricingCalculator } from "@/components/marketing/pricing-calculator"
 import { ScrollReveal } from "@/components/marketing/scroll-reveal"
 import { SiteFooter } from "@/components/marketing/site-footer"
 import { SiteNav } from "@/components/marketing/site-nav"
-import { ThemeScript } from "@/components/marketing/theme-toggle"
 import { marketingRoutes } from "@/lib/routes"
 
 export const metadata: Metadata = {
@@ -92,7 +91,6 @@ const EXTERNAL = ["Etsy", "Creative Market", "Envato Market", "Gumroad", "Adobe 
 export default function PricingPage() {
   return (
     <div className="fw fw-page">
-      <ThemeScript />
       <ScrollReveal />
 
       <div className="fw-wrap">

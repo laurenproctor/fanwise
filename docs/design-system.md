@@ -2,9 +2,10 @@
 
 Extracted from `design/marketing/`. Those files are the source; this is the reference.
 
-Two surfaces, deliberately different. The marketing site commits to a dark, atmospheric
-world. The product application is light, dense and quiet, because people work in it all day.
-Both use the same typefaces and the same accent, which is what makes them one brand.
+Two surfaces, deliberately related. The marketing site establishes a dark, atmospheric world.
+The product application is dense and quiet, with light and dark modes drawn from the same
+marketing palettes. Both use the same typefaces, accent and button language, which is what makes
+them one brand.
 
 ## Typefaces
 
@@ -106,7 +107,8 @@ rounded container on a light grey ground.
 ## In the app
 
 `app/globals.css` defines these as Tailwind v4 `@theme` tokens. Style through tokens, never
-literals, so the palette is one file to change.
+literal colours, so the palette is one file to change. The `data-theme` value on the document
+switches the application between the light marketing palette and the dark product palette.
 
 ## What to avoid
 

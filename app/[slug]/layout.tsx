@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation"
 import { signOutAction } from "@/lib/workspaces/actions"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
 import { routes } from "@/lib/routes"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
 
 /**
  * The tenancy boundary for every workspace-scoped surface.
@@ -52,6 +53,7 @@ export default async function WorkspaceLayout({
               Settings
             </Link>
           </nav>
+          <ThemeToggle />
           <form action={signOutAction}>
             <button
               type="submit"

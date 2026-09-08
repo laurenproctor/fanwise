@@ -3,7 +3,6 @@ import "./marketing.css"
 import { ScrollReveal } from "./scroll-reveal"
 import { SiteFooter } from "./site-footer"
 import { SiteNav, type NavLink } from "./site-nav"
-import { ThemeScript } from "./theme-toggle"
 
 /**
  * The light interior pages: Marketplaces, How It Works, Pricing, About, Terms,
@@ -32,7 +31,6 @@ export function MarketingPage({
 }) {
   return (
     <div className={legal ? "fw fw-page fw-legal" : "fw fw-page"}>
-      <ThemeScript />
       {reveal ? <ScrollReveal /> : null}
       <div className="fw-wrap">
         <SiteNav {...nav} />

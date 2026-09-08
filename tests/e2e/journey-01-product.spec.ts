@@ -15,7 +15,19 @@ test("a creator signs up, gets a workspace, and creates a product", async ({ pag
   // The empty state says something useful rather than showing a bare table.
   await expect(page.getByText("Nothing here yet")).toBeVisible()
 
+  // Every workspace route inherits the same remembered theme from its shared
+  // shell. Exercise it before moving from the catalog into the product flow.
+  const beforeTheme = await page.evaluate(() => document.documentElement.dataset.theme)
+  const afterTheme = beforeTheme === "dark" ? "light" : "dark"
+  await page.getByRole("button", { name: `Switch to ${afterTheme} mode` }).click()
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+    .toBe(afterTheme)
+
   await page.getByRole("link", { name: "Create your first product" }).click()
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+    .toBe(afterTheme)
   await page.getByLabel("Product name").fill("Aster Grotesk")
   await page.getByLabel("Product type").selectOption("font")
   await page.getByRole("button", { name: "Create product" }).click()

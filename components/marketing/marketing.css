@@ -101,6 +101,20 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* The landing slab joins the product palette when the shared dark mode is on. */
+:root[data-theme="dark"] .fw {
+  --fw-slab: var(--color-navy);
+  --fw-slab-ground: var(--color-void);
+  --fw-slab-ink: var(--color-on-dark);
+  --fw-slab-ink-2: var(--color-on-dark-2);
+  --fw-slab-ink-3: var(--color-on-dark-5);
+  --fw-slab-rule: var(--fw-rule-dark);
+  --fw-slab-track: var(--color-panel-2);
+  --fw-slab-ok: var(--color-ok-dark);
+  --fw-ink-hover: #ffffff;
+  --fw-rule-hover: var(--fw-rule-dark-strong);
+}
+
 /*
  * Preflight already zeroes heading and paragraph margins, sets border-box, and
  * resets `a` to `color: inherit; text-decoration: inherit` — so only the rules
@@ -421,38 +435,6 @@
 .fw-nav__signin--hero {
   font-size: 14px;
   padding: 10px 12px;
-}
-
-/* --------------------------------------------------------- theme toggle -- */
-
-.fw-theme-toggle {
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  border: 1px solid #d8d4cb;
-  color: var(--fw-ink);
-  transition: border-color 0.15s;
-}
-
-.fw-theme-toggle:hover {
-  border-color: var(--fw-ink);
-}
-
-.fw-theme-toggle--dark {
-  border-color: rgba(200, 218, 255, 0.25);
-  color: var(--fw-on-dark);
-}
-
-.fw-theme-toggle--dark:hover {
-  border-color: rgba(200, 218, 255, 0.6);
-}
-
-.fw-theme-toggle svg {
-  display: block;
 }
 
 /* ---------------------------------------------------------------- footer -- */

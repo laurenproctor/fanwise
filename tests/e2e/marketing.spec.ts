@@ -107,15 +107,15 @@ test("every Get started on the site reaches the account form", async ({ page }) 
 
 test("the light and dark view survives a navigation", async ({ page }) => {
   // Applied by a blocking inline script, so the page must not arrive in the
-  // wrong theme and flip after hydration.
+  // wrong theme and flip after hydration. Real tokens preserve image colours;
+  // the old document-level invert filter did not.
   await page.goto("/about")
-  await page.locator(".fw-theme-toggle").click()
-  await expect
-    .poll(() => page.evaluate(() => document.documentElement.style.filter))
-    .toBe("invert(1) hue-rotate(180deg)")
+  await page.evaluate(() => localStorage.setItem("fw-theme", "light"))
+  await page.reload()
+  await page.getByRole("button", { name: "Switch to dark mode" }).click()
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark")
 
   await page.goto("/terms")
-  expect(await page.evaluate(() => document.documentElement.style.filter)).toBe(
-    "invert(1) hue-rotate(180deg)",
-  )
+  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark")
+  expect(await page.evaluate(() => document.documentElement.style.filter)).toBe("")
 })
