@@ -100,6 +100,7 @@ const DERIVED: {
 
 const RAIL = [
   ["Shopify", "Storefront"],
+  ["WooCommerce", "Storefront"],
   ["Etsy", "Automatic"],
   ["Creative Market", "Assisted"],
   ["Gumroad", "Assisted"],

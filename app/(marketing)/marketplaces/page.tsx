@@ -7,7 +7,7 @@ import { marketingRoutes } from "@/lib/routes"
 export const metadata: Metadata = {
   title: "Fanwise Marketplaces",
   description:
-    "Six shops, six rulebooks. Connect the marketplaces you sell on for $6 each a month; your Shopify storefront is included.",
+    "Seven shops, seven rulebooks. Connect the marketplaces you sell on for $6 each a month; one owned storefront, Shopify or WooCommerce, is included.",
 }
 
 const NAV = [
@@ -41,10 +41,10 @@ export default function MarketplacesPage() {
     <MarketingPage nav={{ links: NAV }} footer={FOOTER}>
       <header className="fw-page__header fw-page__header--tight">
         <span className="fw-eyebrow">Marketplaces</span>
-        <h1 className="fw-h1">Six shops. Six rulebooks. One of yours.</h1>
+        <h1 className="fw-h1">Seven shops. Seven rulebooks. One of yours.</h1>
         <p className="fw-lede">
           Every marketplace below is a first-class destination in Fanwise. Connect the ones you sell
-          on for $6 each a month; your Shopify storefront is included.
+          on for $6 each a month; one owned storefront, Shopify or WooCommerce, is included.
         </p>
       </header>
 
@@ -127,7 +127,7 @@ export default function MarketplacesPage() {
 
       <CtaPanel
         title="Connect the shops you already sell on."
-        body="$9 a month, plus $6 for each marketplace. Your storefront is included."
+        body="$9 a month, plus $6 for each marketplace. Your own storefront, Shopify or WooCommerce, is included."
         action={{ label: "Get started", href: marketingRoutes.signUp }}
       />
     </MarketingPage>
