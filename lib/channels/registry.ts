@@ -1,6 +1,7 @@
 import { mockApiAdapter } from "./adapters/mock-api"
 import { mockAssistedAdapter } from "./adapters/mock-assisted"
 import { shopifyAdapter } from "./adapters/shopify"
+import { woocommerceAdapter } from "./adapters/woocommerce"
 import type { ChannelAdapter, ChannelKey } from "./types"
 
 /**
@@ -19,6 +20,7 @@ const adapters: Record<ChannelKey, ChannelAdapter> = {
   mock_api: mockApiAdapter,
   mock_assisted: mockAssistedAdapter,
   shopify: shopifyAdapter,
+  woocommerce: woocommerceAdapter,
 }
 
 export function listAdapters(): ChannelAdapter[] {

@@ -9,7 +9,7 @@ import { buildDraft, draftToColumns, evaluate, rebuildColumns, snapshotPayload }
 import { listingImages } from "./images"
 import { findAdapter } from "./registry"
 import { updateListingSchema } from "./schemas"
-import { callbackUrl, createAuthorizationState } from "./oauth"
+import { callbackUrl, createAuthorizationState, grantUrl } from "./oauth"
 import type { AdapterSubject, ChannelListingDraft } from "./types"
 
 export interface ActionState {
@@ -168,6 +168,7 @@ export async function beginAuthorizationAction(
         state,
         accountHint: parsed.value,
         redirectUri: callbackUrl(channelKey),
+        grantUri: grantUrl(channelKey),
       }),
     }
   } catch (error) {

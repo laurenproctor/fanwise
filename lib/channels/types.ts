@@ -21,7 +21,7 @@ export type SnapshotType = Database["public"]["Enums"]["snapshot_type"]
  * component that wants to special-case a marketplace has to name a key, and a
  * unit test fails the moment a key appears outside lib/channels/adapters.
  */
-export const CHANNEL_KEYS = ["mock_api", "mock_assisted", "shopify"] as const
+export const CHANNEL_KEYS = ["mock_api", "mock_assisted", "shopify", "woocommerce"] as const
 export type ChannelKey = (typeof CHANNEL_KEYS)[number]
 export const channelKeySchema = z.enum(CHANNEL_KEYS)
 
@@ -237,6 +237,42 @@ export interface OAuthAuthorizeRequest {
   state: string
   accountHint: string
   redirectUri: string
+  /**
+   * Where a provider that delivers the credential server-to-server should post
+   * it. Built by Fanwise like the redirect URI, and ignored by a provider that
+   * hands the credential to the browser.
+   */
+  grantUri: string
+}
+
+/**
+ * A credential that arrives by a separate POST rather than in the redirect.
+ *
+ * Some providers do not put anything secret in the browser: the store posts
+ * the keys to a server endpoint and sends the person back with a yes or a no.
+ * An adapter that declares this completes the connection from that POST, and
+ * the browser callback only reports. The generic routes branch on its
+ * presence; nothing else in the tree knows which providers work this way.
+ */
+export interface ChannelGrant {
+  /**
+   * Reads the provider's POST body. Returns null for anything that is not a
+   * well-formed grant, and never throws on a stranger's input.
+   */
+  parse(
+    body: unknown,
+  ): { state: string; credentials: Record<string, unknown>; scopes: string[] } | null
+  /**
+   * Proves the credential works against the account the flow started for,
+   * and reads what the connection should carry. A credential that does not
+   * work against that account is refused: the state proves someone approved
+   * *something*, and this proves it was the store the creator named.
+   */
+  verify(params: {
+    accountHint: string
+    credentials: Record<string, unknown>
+    scopes: string[]
+  }): Promise<OAuthGrant>
 }
 
 /**
@@ -294,6 +330,12 @@ export interface ChannelOAuth {
    * sends a client secret to, so it is checked rather than trusted.
    */
   parseAccountHint(raw: string): { ok: true; value: string } | { ok: false; message: string }
+  /**
+   * Present when the provider posts the credential to a server endpoint. The
+   * callback then verifies the browser's return and reports; `exchange` is
+   * never called for such a channel.
+   */
+  grant?: ChannelGrant
   authorizeUrl(request: OAuthAuthorizeRequest): string
   /**
    * Integrity of the callback itself, verified before any parameter is used,

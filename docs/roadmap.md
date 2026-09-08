@@ -291,6 +291,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B5 | `sales_events`, transaction ingestion for Shopify and Etsy, dedupe constraints |
 | B6 | Analytics overview: revenue, units, by channel, by product |
 | B7 | CSV import foundation |
+| B8 | WooCommerce: store authorization, adapter, draft, images, activate with the file verified, idempotency. See `docs/channels/woocommerce.md`. Added 8 September 2026 at the founder's request; **code complete the same day**, exit unrun |
 
 ### B1, what was built and what is still owed
 

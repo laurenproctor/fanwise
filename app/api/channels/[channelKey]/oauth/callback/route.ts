@@ -7,6 +7,7 @@ import {
   appOrigin,
   callbackUrl,
   consumeAuthorizationState,
+  peekAuthorizationState,
   pruneExpiredStates,
 } from "@/lib/channels/oauth"
 import { findAdapter } from "@/lib/channels/registry"
@@ -75,8 +76,17 @@ export async function GET(
     return back(null, "That connection could not be verified. Start again.")
   }
 
-  // 2. Consume the state. One winner, decided by the database.
   const state = query.get("state")
+
+  /*
+   * A channel whose credential arrives by a separate POST completes in the
+   * grant route, and this return is a report: did the POST land? The state is
+   * peeked, not consumed, because the POST may still be on its way and it is
+   * the one that has to consume. Nothing here writes a connection.
+   */
+  if (adapter.oauth.grant) return reportGrant(adapter, channelKey, state)
+
+  // 2. Consume the state. One winner, decided by the database.
   const consumed = state ? await consumeAuthorizationState(state) : null
   if (!consumed) {
     return back(null, "That connection link has expired or was already used. Start again.")
@@ -154,5 +164,64 @@ export async function GET(
     return back(workspaceSlug, normalized.message)
   }
 
+  return back(workspaceSlug)
+}
+
+/**
+ * The browser's return for a channel that completes server-to-server.
+ *
+ * Three answers. The connection is there: done. The state is still unconsumed
+ * and unexpired: the store has not posted yet, which happens when its POST
+ * trails the redirect, so the person is told to give it a moment. Anything
+ * else: the POST was refused or never came, and the honest word is to start
+ * again.
+ */
+async function reportGrant(
+  adapter: NonNullable<ReturnType<typeof findAdapter>>,
+  channelKey: string,
+  state: string | null,
+): Promise<NextResponse> {
+  const peeked = state ? await peekAuthorizationState(state) : null
+  if (!peeked) {
+    return back(null, "That connection link has expired or was already used. Start again.")
+  }
+
+  const admin = createAdminClient()
+  const { data: workspace } = await admin
+    .from("workspaces")
+    .select("slug")
+    .eq("id", peeked.workspaceId)
+    .maybeSingle()
+  const workspaceSlug = workspace?.slug ?? null
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user || user.id !== peeked.userId) {
+    return back(workspaceSlug, "Sign in as the person who started that connection, then try again.")
+  }
+
+  if (!peeked.consumedAt) {
+    return back(
+      workspaceSlug,
+      `${adapter.name} has not confirmed the connection yet. Give it a moment and refresh this page.`,
+    )
+  }
+
+  const { data: connection } = await admin
+    .from("channel_connections")
+    .select("id")
+    .eq("workspace_id", peeked.workspaceId)
+    .eq("channel_id", peeked.channelId)
+    .eq("status", "active")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!connection) {
+    console.warn("[oauth] grant consumed but no connection recorded", { channelKey })
+    return back(workspaceSlug, `${adapter.name} did not complete the connection. Start again.`)
+  }
   return back(workspaceSlug)
 }
