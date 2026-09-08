@@ -371,6 +371,29 @@ question about what survives a disconnection, and decide before C1 rather than a
 then the UI says the connection cannot be disconnected and why, rather than offering a button
 whose only outcome is the refusal.
 
+### 23. Is a second owned storefront included
+
+Raised on 8 September 2026 by the WooCommerce assessment in `docs/channel-feasibility.md`.
+
+The pricing model includes **one** owned storefront at no channel charge and names Shopify.
+WooCommerce is also an owned storefront: the creator's own site, their own buyers, no
+marketplace taking a cut. A creator with both is the case the model does not describe.
+
+Two readings:
+
+- **"Owned storefront" is a kind.** Every owned storefront is included; only marketplaces
+  bill. Simple to explain, and `channels.billable` is already a property of the channel row.
+  Costs the $6 on every creator who runs a Shopify and a WordPress shop, which is rare.
+- **"One" means one.** The first owned storefront is included and the second bills at $6 like
+  a marketplace. Truer to the sentence on the pricing page, and it turns `billable` from a
+  channel property into a count against connections, which is the entitlement service's
+  shape at C2 anyway.
+
+**Recommendation:** the first reading, because the pricing page's argument is that Fanwise
+charges for reach into marketplaces and not for the creator's own shop, and a second own shop
+is still the creator's own shop. Decide before WooCommerce is scheduled, and write the answer
+into `docs/billing.md` rule 4 either way.
+
 ### 16. Assisted versus automatic pricing
 
 **The largest open commercial decision.** Charging $6 for a channel Fanwise cannot publish to
