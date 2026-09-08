@@ -8,9 +8,11 @@ from a primary source.
 
 ## The short version
 
-**Two channels can ever be automatic.** Shopify and Etsy are the only platforms in this set
-with a public API that lets a third party create a listing on a seller's behalf. Everything
-else is a preparation problem, not an integration problem.
+**Three channels can ever be automatic.** Shopify, Etsy and WooCommerce are the only
+platforms in this set with a public API that lets a third party create a listing on a
+seller's behalf. WooCommerce was added to this document on 8 September 2026, after the first
+two were built or filed for; see its section under Tier 1. Everything else is a preparation
+problem, not an integration problem.
 
 Three findings change the plan:
 
@@ -54,6 +56,54 @@ through the Dev Dashboard. App Store review has no published SLA, but a merchant
 install an unlisted app without review, which is the right path for alpha.
 
 Rate limits are cost-based: 100 points per second on Standard, up to 2,000 on Enterprise.
+
+### WooCommerce — full API, native digital products, one hard problem
+
+Assessed 8 September 2026 against the REST API v3 reference and WooCommerce's own
+downloadable-product documentation. Not on the roadmap; recorded here so the decision to add
+it is made deliberately.
+
+**It fits the adapter contract better than Shopify does.** `POST /wc/v3/products` takes
+title, description, price, images by URL, categories, tags, slug and a `status` of `draft` or
+`publish`, so `drafts: true` comes for free. Digital products are native: `virtual`,
+`downloadable`, a `downloads` array of name and file URL, a download limit and an expiry.
+Shopify has none of that, which is why ADR 0001 exists. `GET /orders` carries line items,
+totals, dates and status, which is B5's ingestion.
+
+**Authorization is a real flow.** `/wc-auth/v1/authorize` sends the creator to their own
+store with an app name, a scope, a user reference, a return URL and a callback URL; the store
+posts `consumer_key` and `consumer_secret` to the callback and redirects the creator back. It
+maps onto `ChannelOAuth` with one difference: the keys arrive by a separate POST rather than
+in the redirect, so the callback route needs a second entry point. The flow requires the
+store to be on HTTPS with pretty permalinks enabled, which is typical hosting and worth
+checking on a real one.
+
+**The hard problem is where the file lives.** `downloads[].file` must be a URL the store can
+already serve, and the WooCommerce API has no upload for it. Three ways through:
+
+- **Fanwise hosts the download URL.** ADR 0001 ruled this out for Shopify and the reasons
+  hold: Fanwise becomes the delivery infrastructure for every buyer.
+- **Upload to the WordPress media library** through the WordPress REST API and point the
+  download at the result. This works, and it is wrong: files in the media library are
+  publicly reachable by anyone with the URL, which WooCommerce's own documentation says
+  plainly. Its protected folder, `woocommerce_uploads`, is written only by the admin's
+  product-file upload. Fanwise would be publishing the deliverable to a public address. It
+  would also need a WordPress Application Password, a second credential the WooCommerce
+  authorization flow does not grant.
+- **An assisted file step**, as Shopify has today. The creator attaches the file in the
+  WooCommerce admin, which puts it in the protected folder, and marks the step done. The
+  manual-step machinery from A5 carries over unchanged.
+
+So the channel takes Shopify's shape: automatic everything, assisted file, `digitalFileUpload:
+false` for the second reason on this page — Fanwise will not, rather than the provider
+cannot. **[verify]** the public-URL finding against a real store before building, because if
+it is wrong WooCommerce becomes the first fully automatic channel in the set.
+
+**Billing is a decision, not a detail.** The pricing model includes one owned storefront and
+names Shopify. WooCommerce is also an owned storefront. See `docs/decisions/0002`, item 23.
+
+Rate limits are not documented; the API is the store's own WordPress, so the ceiling is the
+creator's hosting. Pagination is ten per page by default with `X-WP-Total` headers.
 
 ### Etsy — full API, with three real risks
 
@@ -257,6 +307,7 @@ customer, the way in is their fonts and graphics, not their Framer templates.
 |---|---|---|---|---|
 | Shopify | Automatic | API, file delivery needs a decision | API + webhooks | **V1** |
 | Etsy | Automatic | Full API | API | **V1** |
+| WooCommerce | Automatic | API, file step assisted unless the media-library finding is wrong | API | **Not scheduled**, assessed 8 Sep 2026. Decide billing first |
 | Creative Market | Assisted | Manual, no automation permitted | None | **V1** |
 | Adobe Stock | Assisted | SFTP + 5,000-row CSV, manual submit | None | **V2, highest leverage** |
 | MyFonts | Assisted | Portal only, exact specs | CSV download | **V2, if fonts are the wedge** |
