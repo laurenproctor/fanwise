@@ -308,6 +308,42 @@ export interface ChannelOAuth {
 }
 
 /**
+ * How a channel wants to be written for.
+ *
+ * Declared per adapter, in code, like capabilities and requirements and for the
+ * same reason: it describes the channel, and a channel description that could
+ * be edited in a row is one the prompt could be talked out of. lib/ai reads
+ * this and never a provider name; the profile is the only channel-shaped thing
+ * that reaches a model, and it is merchandising instruction, never facts.
+ *
+ * docs/ai-merchandising.md is the source: do not write the canonical
+ * description four times. One product, one FactSheet, one profile per channel.
+ *
+ * `promptVersion` moves whenever the text does. It is written to every
+ * generation row so a listing can be traced to the instructions that produced
+ * it, which matters the first time a profile change makes copy worse.
+ */
+export interface MerchandisingProfile {
+  /** Bumped by hand whenever any text below changes. */
+  promptVersion: string
+  /** Who buys here and how they arrive: search, browsing, a brand they know. */
+  audience: string
+  /** The register the copy should take. */
+  voice: string
+  /** How the description should be shaped, in prose the model can follow. */
+  structure: string
+  /** Guidance per output field, beyond the limits the requirements already state. */
+  fields: {
+    title: string
+    description: string
+    shortDescription: string
+    seoTitle: string
+    seoDescription: string
+    tags: string
+  }
+}
+
+/**
  * The adapter contract.
  *
  * The optional methods are the point. An assisted channel does not implement
@@ -328,6 +364,8 @@ export interface ChannelAdapter {
   requirements: readonly RequirementSpec[]
   /** Work this channel's API cannot do. Empty for a channel that needs none. */
   manualSteps: readonly ManualStepSpec[]
+  /** How copy for this channel should read. Read by lib/ai. Step B1. */
+  merchandising: MerchandisingProfile
   buildListing(subject: AdapterSubject): ChannelListingDraft
   /** Present only on a channel Fanwise can authorize against. */
   oauth?: ChannelOAuth

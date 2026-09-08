@@ -12,6 +12,7 @@ import { isReorderable } from "@/lib/products/image-order"
 import { ProductForm } from "./product-form"
 import { AssetManager } from "./asset-manager"
 import { routes } from "@/lib/routes"
+import { awaitingReview } from "@/lib/ai/review"
 
 export const metadata = { title: "Product · Fanwise" }
 
@@ -138,6 +139,7 @@ export default async function ProductPage({
         // Only a failure that is still the latest word. A message from an
         // attempt that has since been superseded is a message about the past.
         lastError: lastJob?.status === "failed" ? (lastJob.normalized_error_message ?? null) : null,
+        awaitingReview: view ? awaitingReview(view.listing) : false,
         deliverable: deliverable
           ? { assetId: deliverable.id, filename: deliverable.filename }
           : null,

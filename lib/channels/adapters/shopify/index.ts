@@ -1,3 +1,4 @@
+import { shopifyMerchandising } from "./merchandising"
 import { z } from "zod"
 import { ChannelError, normalized } from "@/lib/channels/errors"
 import { listingImages } from "@/lib/channels/images"
@@ -770,6 +771,7 @@ export const shopifyAdapter: ChannelAdapter = {
   },
   requirements,
   manualSteps,
+  merchandising: shopifyMerchandising,
   oauth: shopifyOAuth,
 
   buildListing({ product }: AdapterSubject): ChannelListingDraft {

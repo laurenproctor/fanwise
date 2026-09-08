@@ -10,6 +10,7 @@ import type { AdapterSubject, Channel, ChannelListing } from "@/lib/channels/typ
 import type { Product, ProductAsset } from "@/lib/products/types"
 import { imagesFingerprint } from "@/lib/channels/images"
 import { mergeManualSteps, readyToActivate } from "./manual-steps"
+import { awaitingReview, REVIEW_REQUIRED_MESSAGE } from "@/lib/ai/review"
 import { startPublication } from "./start"
 
 /**
@@ -165,6 +166,11 @@ export async function publishListingAction(
     }
   }
 
+  // docs/ai-merchandising.md: no first generation reaches a marketplace
+  // without explicit approval. At B1 the approval is a person saving the
+  // editor after the copy landed; lib/ai/review.ts holds the comparison.
+  if (awaitingReview(listing)) return { error: REVIEW_REQUIRED_MESSAGE, notice: null }
+
   const outcome = await startPublication({
     supabase,
     workspaceId: workspace.id,
@@ -263,6 +269,10 @@ export async function publishChangesAction(
       notice: null,
     }
   }
+
+  // Same rule as publish. An update sends the composed copy to a live product,
+  // which is the more expensive place for an unreviewed sentence to land.
+  if (awaitingReview(listing)) return { error: REVIEW_REQUIRED_MESSAGE, notice: null }
 
   const outcome = await startPublication({
     supabase,

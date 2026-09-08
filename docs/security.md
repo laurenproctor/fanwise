@@ -149,6 +149,25 @@ deployment whose template has not been updated degrades rather than breaks. **A 
 does not inherit `config.toml`, so the template has to be set on the project itself, and the
 `/auth/confirm` URL added to its redirect allowlist.**
 
+## AI prompts
+
+Built at B1, in `lib/ai`. The model receives two things: the FactSheet, derived from the
+product and its assets, and the channel's merchandising profile, declared in the adapter.
+Nothing from the environment, from `channel_connections` or from `channel_connection_secrets`
+is loaded by the generation runner, so a credential cannot reach a prompt by accident: the
+runner has no path to one.
+
+The vendor's key is parsed in `lib/ai/providers`, lazily, like the credentials keyring. An
+error from the vendor reaches the row as a normalized code and a sentence; the server log
+gets the error's class name and HTTP status and nothing more, because an HTTP error can
+carry the request that produced it and the request carried the key. Nothing in `lib/ai`
+logs a prompt or a response body.
+
+Composed copy cannot reach a marketplace unread. Applying a generation stamps
+`metadata.composedAt`; saving the editor stamps `approved_at`; Publish and Publish changes
+refuse while the first is newer than the second. Rule 7 applies: the refusal is in the
+action, not in whether the button rendered.
+
 ## The three things that never bend
 
 RLS, idempotency checks, and the factuality validator. If a feature appears to require

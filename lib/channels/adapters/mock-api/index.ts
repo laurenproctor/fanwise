@@ -101,6 +101,26 @@ export const mockApiAdapter: ChannelAdapter = {
   requirements,
   // Nothing is left for a human to do here: this channel takes the file itself.
   manualSteps: [],
+  /*
+   * A storefront-shaped profile, so the generation path has an api channel to
+   * run against without a network. Generic on purpose: this channel is a
+   * fixture, and a profile with opinions would be testing the opinions.
+   */
+  merchandising: {
+    promptVersion: "2026-09-07.1",
+    audience: "A buyer on a small owned storefront who already knows the brand.",
+    voice: "Plain, direct, second person. No hype.",
+    structure:
+      "Two or three short paragraphs: what it is, what the buyer gets, what it is for. Plain text.",
+    fields: {
+      title: "The product name and its type.",
+      description: "Between 80 and 250 words, from the facts only.",
+      shortDescription: "One sentence under 160 characters.",
+      seoTitle: "Leave empty.",
+      seoDescription: "Leave empty.",
+      tags: "Five to ten lowercase tags.",
+    },
+  },
 
   buildListing({ product }: AdapterSubject): ChannelListingDraft {
     return {
