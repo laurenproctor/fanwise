@@ -54,7 +54,11 @@ queue is not ours.
 
 ### 1. The three app registrations
 
-**Status:** in progress as of 4 September 2026, none confirmed submitted.
+**Status:** all three approved as of 8 September 2026. Shopify by 5 September, Etsy's
+developer app and commercial access by 8 September. Submission dates were not recorded for
+any of them. A6 is unblocked; the keystring and shared secret go in `.env.local` as
+`ETSY_CLIENT_ID` and `ETSY_CLIENT_SECRET`, and the callback URL has to be registered on the
+app exactly as `.env.example` states.
 
 Etsy developer app, Etsy commercial access, Shopify Partner account. None blocks A3 or A4,
 which are mock-only. The Shopify Partner account gates **A5's exit test**, and it is

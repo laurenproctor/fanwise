@@ -21,16 +21,17 @@ step completes, and do not work on more than one step at a time.
 
 | Dependency | Needed by | Submitted | Approved |
 |---|---|---|---|
-| Etsy developer app | A6 | in progress | |
-| Etsy commercial access | A6 | in progress | |
+| Etsy developer app | A6 | date unrecorded | by 8 Sep 2026 |
+| Etsy commercial access | A6 | date unrecorded | by 8 Sep 2026 |
 | Shopify Partner account | A5 | yes, date unrecorded | by 5 Sep 2026 |
 
 Etsy commercial access has no published SLA and applicants report waiting weeks. It is the
 single most likely thing to delay the roadmap, and it costs nothing to file today.
 
-**Shopify is done. Etsy is not, as of 5 September 2026.** A0 was marked done on the
-strength of its four checks passing, but filing these was part of A0's scope and was never
-done.
+**Both are done, as of 8 September 2026.** Etsy's approval arrived that day and, like
+Shopify's, its submission date went unrecorded; the row says so rather than inventing one.
+A0 was marked done on the strength of its four checks passing, but filing these was part of
+A0's scope and was never done.
 
 The Shopify row is filled in from evidence rather than from memory: client id and secret are
 set, OAuth has completed against a real development store, and a product has published to it.
