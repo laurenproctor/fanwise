@@ -10,6 +10,7 @@ import { listingImages } from "./images"
 import { findAdapter } from "./registry"
 import { updateListingSchema } from "./schemas"
 import { callbackUrl, createAuthorizationState, grantUrl } from "./oauth"
+import { codeChallenge, generateCodeVerifier } from "./pkce"
 import type { AdapterSubject, ChannelListingDraft } from "./types"
 
 export interface ActionState {
@@ -155,11 +156,16 @@ export async function beginAuthorizationAction(
   }
 
   try {
+    // A PKCE verifier is minted here and written with the state, so the
+    // challenge in the URL and the verifier at the exchange are one pair and
+    // the browser carries neither secret.
+    const codeVerifier = adapter.oauth.pkce ? generateCodeVerifier() : undefined
     const state = await createAuthorizationState({
       workspaceId: workspace.id,
       channelId: channel.id,
       userId: user.id,
       accountHint: parsed.value,
+      ...(codeVerifier ? { codeVerifier } : {}),
     })
 
     return {
@@ -169,6 +175,7 @@ export async function beginAuthorizationAction(
         accountHint: parsed.value,
         redirectUri: callbackUrl(channelKey),
         grantUri: grantUrl(channelKey),
+        ...(codeVerifier ? { codeChallenge: codeChallenge(codeVerifier) } : {}),
       }),
     }
   } catch (error) {

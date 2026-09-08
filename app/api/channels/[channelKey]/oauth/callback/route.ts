@@ -121,6 +121,7 @@ export async function GET(
       accountHint: consumed.accountHint ?? "",
       query,
       redirectUri: callbackUrl(channelKey),
+      ...(consumed.codeVerifier ? { codeVerifier: consumed.codeVerifier } : {}),
     })
 
     const { data: connection, error: connectionError } = await admin

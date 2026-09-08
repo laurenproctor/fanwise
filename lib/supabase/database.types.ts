@@ -379,6 +379,7 @@ export type Database = {
       channel_oauth_states: {
         Row: {
           channel_id: string
+          code_verifier: string | null
           consumed_at: string | null
           created_at: string
           expires_at: string
@@ -389,6 +390,7 @@ export type Database = {
         }
         Insert: {
           channel_id: string
+          code_verifier?: string | null
           consumed_at?: string | null
           created_at?: string
           expires_at: string
@@ -399,6 +401,7 @@ export type Database = {
         }
         Update: {
           channel_id?: string
+          code_verifier?: string | null
           consumed_at?: string | null
           created_at?: string
           expires_at?: string

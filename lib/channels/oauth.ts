@@ -56,6 +56,8 @@ export async function createAuthorizationState(params: {
   channelId: string
   userId: string
   accountHint: string
+  /** For a PKCE provider. Kept on the row, never in the browser. */
+  codeVerifier?: string
 }): Promise<string> {
   // 32 bytes. The state is the only thing standing between a forged callback
   // and a connection, so it is generated the same way a session token would be.
@@ -68,6 +70,7 @@ export async function createAuthorizationState(params: {
     channel_id: params.channelId,
     user_id: params.userId,
     external_account_hint: params.accountHint,
+    code_verifier: params.codeVerifier ?? null,
     expires_at: new Date(Date.now() + TTL_MS).toISOString(),
   })
 
@@ -80,6 +83,7 @@ export interface ConsumedState {
   channelId: string
   userId: string
   accountHint: string | null
+  codeVerifier: string | null
 }
 
 /**
@@ -103,7 +107,7 @@ export async function consumeAuthorizationState(state: string): Promise<Consumed
     .eq("state", state)
     .is("consumed_at", null)
     .gt("expires_at", new Date().toISOString())
-    .select("workspace_id, channel_id, user_id, external_account_hint")
+    .select("workspace_id, channel_id, user_id, external_account_hint, code_verifier")
     .maybeSingle()
 
   if (error || !data) return null
@@ -113,6 +117,7 @@ export async function consumeAuthorizationState(state: string): Promise<Consumed
     channelId: data.channel_id,
     userId: data.user_id,
     accountHint: data.external_account_hint,
+    codeVerifier: data.code_verifier,
   }
 }
 
@@ -141,6 +146,8 @@ export async function peekAuthorizationState(
     channelId: data.channel_id,
     userId: data.user_id,
     accountHint: data.external_account_hint,
+    // A peek is a report, not an exchange; the verifier stays on the row.
+    codeVerifier: null,
     consumedAt: data.consumed_at,
   }
 }
