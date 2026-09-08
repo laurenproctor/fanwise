@@ -71,18 +71,21 @@ Auto-publishing a first generation would be the fastest way to destroy trust in 
 | Regenerate a field | Regenerate beside each field | One generation row with `field` set, the same prefix and validator, one column written |
 | Regenerate the whole | Compose again | As at B1 |
 | Restore | Earlier drafts, under the compose panel | Puts an accepted generation's `structured_output` back, whole or one field, as the signed-in user, with a `restore` snapshot. No model is called |
-| Approve | Approve listing, beside Save | Stamps `approved_at` on the stored row |
+| Approve | Publish itself | When composed copy is waiting, the button reads "Review and publish" and the click stamps `approved_at` before the send |
 
-Applying or restoring a generation stamps `metadata.composedAt`; approving stamps
-`approved_at`; Publish and Publish changes refuse while the first is newer than the second,
-and the listing card says so before the click. A save is deliberately not an approval, which
-it was at B1 for want of the button: a creator can save an edit to composed copy and still be
-asked to read the whole before it ships.
+Applying or restoring a generation stamps `metadata.composedAt`; publishing stamps
+`approved_at` when the first is newer. The listing card says composed copy is waiting and
+that publishing counts as approval, and the button says what it is doing. A save is not an
+approval, which it was at B1 for want of anything better.
 
-Regenerate and Approve both act on the row, so the editor holds them back while the screen
-holds unsaved words. A regeneration lands by remounting the editor, which would discard an
-edit in progress, and an approval of the row while the screen showed something else would be
-an approval of something else.
+**A separate Approve button was built and dropped on the same day.** Two clicks that both
+meant "I have looked at this" was one too many, and a button always pressed right before
+another button is ceremony. The rule the paragraph above states is kept in substance: nothing
+composed ships without the person who ships it choosing to, and the record shows when they
+did.
+
+Regenerate acts on the row, so the editor holds it back while the screen holds unsaved words:
+a regeneration lands by remounting the editor, which would discard an edit in progress.
 
 A field is regenerated from the facts and the profile alone, not from the rest of the listing.
 The other fields may be the creator's own words, which may state things the FactSheet does

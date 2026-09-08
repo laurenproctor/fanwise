@@ -15,7 +15,7 @@ explicitly requested.
 
 ## Current step
 
-**Step: B2 (listing review: field regenerate, restore, approve) is code complete on
+**Step: B2 (listing review: field regenerate, restore, publish as approval) is code complete on
 8 September 2026. Its exit is the review loop run in the browser against the model, which has
 not happened. B1 is on `main`. Gate A is not passed; A6 and A8 resume when their blockers
 clear.** See `docs/roadmap.md`. Implement the current step only. Do

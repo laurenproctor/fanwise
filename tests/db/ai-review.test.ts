@@ -251,7 +251,12 @@ describe("restoring", () => {
   })
 })
 
-describe("approving", () => {
+/**
+ * approveListing is what the publish actions call when composed copy is
+ * waiting: the click is the approval. Tested through the function the actions
+ * share, because the actions need a session and this suite does not have one.
+ */
+describe("approving, as the publish click does", () => {
   it("is what clears the review, and a save is not", async () => {
     const before = await listingRow()
     expect(awaitingReview(before)).toBe(true)

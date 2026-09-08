@@ -336,14 +336,16 @@ Those are B2, and the `ai_generations.structured_output` column is what B2 resto
 ### B2, what was built and what is still owed
 
 Built on the listing page, which was already the place a listing is read: Regenerate beside
-every field, Approve listing beside Save, and Earlier drafts with Restore under the compose
-panel. A field generation is the same row, prefix and validator as a whole one, narrowed to
-one key; a restore is the signed-in user putting an accepted row's copy back, with its own
-snapshot type; approval is its own stamp, and a save no longer makes one.
+every field, and Earlier drafts with Restore under the compose panel. A field generation is
+the same row, prefix and validator as a whole one, narrowed to one key; a restore is the
+signed-in user putting an accepted row's copy back, with its own snapshot type. Approval is
+the Publish click: when composed copy is waiting the button reads "Review and publish" and
+the click stamps `approved_at` before the send. A separate Approve button was built and
+dropped the same day as ceremony.
 
 **B2's exit test** is the review loop on a real product: compose, regenerate one field, edit
-another by hand, restore the earlier draft, approve, and publish, with Publish refusing at
-every point before the approval. The whole loop is proven against a scripted provider in
+another by hand, restore the earlier draft, and publish, with the card saying composed copy
+is waiting until the publish that approves it. The whole loop is proven against a scripted provider in
 `tests/db/ai-review.test.ts`; it has not been run in the browser against the model. Journey 2
 in `docs/testing.md` is that run.
 

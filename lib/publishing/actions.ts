@@ -10,7 +10,8 @@ import type { AdapterSubject, Channel, ChannelListing } from "@/lib/channels/typ
 import type { Product, ProductAsset } from "@/lib/products/types"
 import { imagesFingerprint } from "@/lib/channels/images"
 import { mergeManualSteps, readyToActivate } from "./manual-steps"
-import { awaitingReview, REVIEW_REQUIRED_MESSAGE } from "@/lib/ai/review"
+import { awaitingReview } from "@/lib/ai/review"
+import { approveListing } from "@/lib/ai/approve"
 import { startPublication } from "./start"
 
 /**
@@ -167,9 +168,13 @@ export async function publishListingAction(
   }
 
   // docs/ai-merchandising.md: no first generation reaches a marketplace
-  // without explicit approval. At B1 the approval is a person saving the
-  // editor after the copy landed; lib/ai/review.ts holds the comparison.
-  if (awaitingReview(listing)) return { error: REVIEW_REQUIRED_MESSAGE, notice: null }
+  // without a person saying so. The person is saying so now: this click is
+  // the approval, and it is stamped before the send so the record shows who
+  // vouched for the copy that went. The button said "Review and publish".
+  if (awaitingReview(listing)) {
+    const approved = await approveListing({ supabase, workspaceId: workspace.id, listingId })
+    if (approved.kind === "error") return { error: approved.message, notice: null }
+  }
 
   const outcome = await startPublication({
     supabase,
@@ -270,9 +275,11 @@ export async function publishChangesAction(
     }
   }
 
-  // Same rule as publish. An update sends the composed copy to a live product,
-  // which is the more expensive place for an unreviewed sentence to land.
-  if (awaitingReview(listing)) return { error: REVIEW_REQUIRED_MESSAGE, notice: null }
+  // Same as publish: the click is the approval, stamped before the send.
+  if (awaitingReview(listing)) {
+    const approved = await approveListing({ supabase, workspaceId: workspace.id, listingId })
+    if (approved.kind === "error") return { error: approved.message, notice: null }
+  }
 
   const outcome = await startPublication({
     supabase,

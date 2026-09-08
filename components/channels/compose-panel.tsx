@@ -131,8 +131,8 @@ export function ComposePanel({
           className="border-l-2 border-[var(--color-warn)] pl-3 text-[13px] text-[var(--color-ink-2)]"
           role="status"
         >
-          Composed copy is below. Read it, change what you like, save, then approve it. Publishing
-          waits until you have.
+          Composed copy is below. Read it, change what you like, and save. Publishing it is your
+          approval.
         </p>
       ) : null}
 

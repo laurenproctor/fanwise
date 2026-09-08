@@ -10,7 +10,7 @@ import {
   updateListingAction,
   type SaveState,
 } from "@/lib/channels/actions"
-import { approveListingAction, regenerateFieldAction } from "@/lib/ai/actions"
+import { regenerateFieldAction } from "@/lib/ai/actions"
 import type { ListingField } from "@/lib/ai/output"
 import { evaluate } from "@/lib/channels/listings"
 import { getAdapter } from "@/lib/channels/registry"
@@ -30,10 +30,9 @@ import { TagInput } from "./tag-input"
  * reaches the snapshot.
  *
  * A4 proved a person can write a listing per channel with no AI in the way.
- * B2 put the review beside it: every field can be regenerated on its own, and
- * the listing is approved by a button that is not Save. Saving records words;
- * approving vouches for them. A creator can do the first many times before
- * doing the second once.
+ * B2 put the review beside it: every field can be regenerated on its own.
+ * Approval has no button here; Publish is the approval, and the card says so
+ * when composed copy is waiting.
  */
 
 function Submit() {
@@ -173,9 +172,6 @@ export interface ReviewProps {
   aiConfigured: boolean
   /** The field a generation is in flight for, "listing" for the whole, or null. */
   inFlight: ListingField | "listing" | null
-  /** True when composed copy has landed and nobody has approved since. */
-  awaitingReview: boolean
-  approvedAt: string | null
 }
 
 export function ListingEditor({
@@ -215,8 +211,8 @@ export function ListingEditor({
    * Whether the screen holds words the row does not. Compared field by field
    * against what the page rendered, which is the row: a save remounts nothing,
    * so `initial` stays the last-loaded row and `savedAt` says whether the
-   * current words reached it. Regenerate and Approve both act on the row, and
-   * both are held back while this is true.
+   * current words reached it. Regenerate acts on the row, and is held back
+   * while this is true.
    */
   const dirty = useMemo(() => {
     const keys: (keyof ChannelListingDraft)[] = [
@@ -239,17 +235,6 @@ export function ListingEditor({
     setReviewNotice(null)
     startReview(async () => {
       const result = await regenerateFieldAction(workspaceSlug, listingId, field)
-      if (result.error) setPullError(result.error)
-      else setReviewNotice(result.notice)
-      router.refresh()
-    })
-  }
-
-  function approve() {
-    setPullError(null)
-    setReviewNotice(null)
-    startReview(async () => {
-      const result = await approveListingAction(workspaceSlug, listingId)
       if (result.error) setPullError(result.error)
       else setReviewNotice(result.notice)
       router.refresh()
@@ -506,31 +491,8 @@ export function ListingEditor({
           />
         </div>
 
-        {/*
-          Two buttons, two claims. Save records the words; Approve vouches for
-          them. Approve acts on the row, so it waits for a save: approving
-          text the screen shows and the row does not hold would approve
-          something else.
-        */}
         <div className="flex flex-wrap items-center gap-4">
           <Submit />
-          {review.aiConfigured || review.awaitingReview ? (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={approve}
-              disabled={reviewing || unsaved || !review.awaitingReview}
-              title={
-                unsaved
-                  ? "Save your changes first."
-                  : review.awaitingReview
-                    ? undefined
-                    : "Nothing is waiting for approval."
-              }
-            >
-              {reviewing ? "Working…" : "Approve listing"}
-            </Button>
-          ) : null}
           {state.savedAt && !state.error ? (
             <span className="label-mono text-[var(--color-ok)]" role="status">
               Saved
@@ -540,9 +502,6 @@ export function ListingEditor({
             <span className="label-mono text-[var(--color-ink-3)]" role="status">
               {reviewNotice}
             </span>
-          ) : null}
-          {!review.awaitingReview && review.approvedAt ? (
-            <span className="label-mono text-[var(--color-ok)]">Approved</span>
           ) : null}
         </div>
       </form>

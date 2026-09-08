@@ -8,7 +8,6 @@ import { findAdapter } from "@/lib/channels/registry"
 import { isAiConfigured } from "./providers"
 import { startGeneration } from "./start"
 import { restoreGeneration } from "./restore"
-import { approveListing } from "./approve"
 import { listingFieldSchema, LISTING_FIELD_LABELS } from "./output"
 
 /**
@@ -174,30 +173,7 @@ export async function restoreGenerationAction(
     error: null,
     notice:
       outcome.field === null
-        ? "Restored. Read it, then approve."
-        : `Restored the ${LISTING_FIELD_LABELS[listingFieldSchema.parse(outcome.field)].toLowerCase()}. Read it, then approve.`,
+        ? "Restored. Read it before you publish."
+        : `Restored the ${LISTING_FIELD_LABELS[listingFieldSchema.parse(outcome.field)].toLowerCase()}. Read it before you publish.`,
   }
-}
-
-/**
- * Approves the stored listing. Step B2.
- *
- * The explicit approval docs/ai-merchandising.md requires before composed
- * copy reaches a marketplace. It approves what the row holds, which is why
- * the editor offers it only with nothing unsaved.
- */
-export async function approveListingAction(
-  workspaceSlug: string,
-  listingId: string,
-): Promise<ReviewState> {
-  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
-
-  const loaded = await loadForAction(supabase, workspace.id, listingId)
-  if (loaded.error) return { error: loaded.error, notice: null }
-
-  const outcome = await approveListing({ supabase, workspaceId: workspace.id, listingId })
-  if (outcome.kind === "error") return { error: outcome.message, notice: null }
-
-  revalidatePath(routes.product(workspaceSlug, loaded.productSlug), "layout")
-  return { error: null, notice: "Approved. It can be published now." }
 }

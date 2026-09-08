@@ -16,6 +16,8 @@ const config = [
   {
     ignores: [
       ".next/**",
+      // The Trigger.dev worker's build cache. Bundled vendor code, not ours.
+      ".trigger/**",
       "node_modules/**",
       "supabase/.temp/**",
       "design/**",

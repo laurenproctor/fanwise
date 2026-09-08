@@ -68,8 +68,8 @@ the product heading, usually.
 
 1. Signup, workspace, product. *(complete at A2)*
 2. Product to AI Shopify listing, approved. *(composition ran live at B1; the review loop
-   with field regenerate, restore and approve is code complete at B2 and proven in
-   `tests/db/ai-review.test.ts`, unrun in the browser)*
+   with field regenerate and restore is code complete at B2 and proven in
+   `tests/db/ai-review.test.ts`; approval is the publish click; unrun in the browser)*
 3. Connect Shopify, publish. *(code complete at A5, unverified: needs a live shop)*
 4. Connect Etsy, publish.
 5. Publish to Shopify and Etsy in one action.

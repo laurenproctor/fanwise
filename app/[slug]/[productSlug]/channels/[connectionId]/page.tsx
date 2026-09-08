@@ -100,8 +100,8 @@ export default async function ListingPage({
         </h1>
         <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
           {view.adapter.integrationType === "api"
-            ? "This channel's own copy for the product. Compose it or write it by hand, regenerate any field, save, approve, publish."
-            : "This channel's own copy for the product. Compose it or write it by hand, regenerate any field, save, approve. You will submit it yourself; this channel has no API to publish through."}
+            ? "This channel's own copy for the product. Compose it or write it by hand, regenerate any field, save, publish."
+            : "This channel's own copy for the product. Compose it or write it by hand, regenerate any field, save. You will submit it yourself; this channel has no API to publish through."}
         </p>
       </div>
 
@@ -148,12 +148,7 @@ export default async function ListingPage({
           shortDescription: product.short_description ?? "",
           price: product.base_price === null ? "" : String(product.base_price),
         }}
-        review={{
-          aiConfigured: configured,
-          inFlight,
-          awaitingReview: waiting,
-          approvedAt: view.listing.approved_at,
-        }}
+        review={{ aiConfigured: configured, inFlight }}
       />
 
       <ListingImages

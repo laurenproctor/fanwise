@@ -58,8 +58,8 @@ export interface ChannelListingCard {
   /** The last normalized failure, if the most recent attempt failed. */
   lastError: string | null
   /**
-   * True when composed copy has landed and no one has saved the editor since.
-   * Publish refuses until they have, and the card says so before the click.
+   * True when composed copy has landed and no one has approved it since.
+   * Publish does not refuse; it is the approval, and the button says so.
    */
   awaitingReview: boolean
   deliverable: { assetId: string; filename: string } | null
@@ -345,8 +345,8 @@ export function ListingPanel({
                     className="border-l-2 border-[var(--color-warn)] pl-3 text-[13px] text-[var(--color-ink-2)]"
                     role="status"
                   >
-                    Composed copy is waiting for you to read it. Open the listing, then approve it
-                    to publish.
+                    This listing holds composed copy nobody has read yet. Open it first; publishing
+                    counts as your approval.
                   </p>
                 ) : null}
 
@@ -423,7 +423,11 @@ export function ListingPanel({
                       onClick={() => publish(card.connectionId, card.listingId!)}
                       disabled={pending || !card.readiness?.ready}
                     >
-                      {busy ? "Publishing…" : "Publish"}
+                      {busy
+                        ? "Publishing…"
+                        : card.awaitingReview
+                          ? "Review and publish"
+                          : "Publish"}
                     </Button>
                   ) : null}
 
@@ -438,7 +442,11 @@ export function ListingPanel({
                       onClick={() => publishChanges(card.connectionId, card.listingId!)}
                       disabled={pending || !card.readiness?.ready}
                     >
-                      {busy ? "Sending…" : "Publish changes"}
+                      {busy
+                        ? "Sending…"
+                        : card.awaitingReview
+                          ? "Review and publish changes"
+                          : "Publish changes"}
                     </Button>
                   ) : null}
 

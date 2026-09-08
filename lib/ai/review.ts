@@ -4,11 +4,13 @@ import type { ChannelListing } from "@/lib/channels/types"
  * Whether a listing holds composed copy nobody has looked at.
  *
  * docs/ai-merchandising.md: no first generation reaches a marketplace without
- * explicit approval. Applying or restoring a generation stamps
- * `metadata.composedAt`; the Approve button (lib/ai/approve.ts) stamps
- * `approved_at`. When the first is newer than the second, Publish refuses. At
- * B1, before the button existed, a save did the stamping; B2 separated the two
- * so a creator can save an edit and still be asked to read the whole.
+ * a person saying so. Applying or restoring a generation stamps
+ * `metadata.composedAt`; publishing stamps `approved_at` (lib/ai/approve.ts)
+ * when the first is newer, because the click to publish is the person saying
+ * so. The comparison here decides whether the button reads "Review and
+ * publish" and whether the click stamps. At B1 a save did the stamping and
+ * Publish refused; B2 tried a separate Approve button and dropped it the same
+ * day as ceremony: two clicks that both meant "I have looked at this".
  *
  * `composedAt` lives in metadata rather than a column because a rebuild drops
  * it, correctly: the adapter's draft replaced the model's, so there is nothing
@@ -29,6 +31,3 @@ export function awaitingReview(listing: Pick<ChannelListing, "metadata" | "appro
   if (!listing.approved_at) return true
   return new Date(listing.approved_at).getTime() < new Date(composed).getTime()
 }
-
-export const REVIEW_REQUIRED_MESSAGE =
-  "This listing was composed and has not been approved. Open it, read it, and approve it before publishing."

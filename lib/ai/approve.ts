@@ -9,9 +9,9 @@ import type { Database } from "@/lib/supabase/database.types"
  * last landed; nothing else changes, and the snapshot history already holds
  * the text being approved from the save that put it there.
  *
- * Runs as the signed-in user, through RLS. It approves what is stored, which
- * is why the editor offers it only when nothing is unsaved: approving text the
- * screen shows and the row does not hold would be approving something else.
+ * Runs as the signed-in user, through RLS. Called by the publish actions when
+ * composed copy is waiting, because the click to publish is the approval; it
+ * has no button of its own.
  */
 
 export type ApproveOutcome =
