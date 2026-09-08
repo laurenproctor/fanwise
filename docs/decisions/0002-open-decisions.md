@@ -112,21 +112,19 @@ before any public launch, because a custom app does not scale to self-serve sign
 
 ### 7. Partial-failure vocabulary
 
-Two channels, one succeeds, one fails. Is the product "published", "partially published", or
-neither? Combined with ADR 0001's derived "fully published" condition, there are now three
-states that are not a status enum.
-
-**Recommendation:** decide the words before the UI exists. `CLAUDE.md` already insists the
-vocabulary is consistent across code, UI and docs, and this is the first place it genuinely
-strains.
+**Drafted as ADR 0005, 8 September 2026, and still open.** The proposal: a product is never
+"published", a listing is; no product-level status word exists and "partially published" is
+banned; a Publish Everywhere run reports *sent*, *failed* or *skipped* per channel, with a
+reason on every skip, and its headline is a count. The argument and the alternatives live in
+`0005-partial-failure-and-retry.md`.
 
 ### 8. Retry policy
 
-Which normalized error codes are retryable, how many attempts, what backoff.
-
-**Recommendation:** one table, owned by `lib/publishing`, not a judgement made per adapter.
-An adapter that decides its own retry policy is an adapter that will eventually retry
-something non-idempotent.
+**Drafted as ADR 0005, 8 September 2026, and still open.** What the draft found: the policy
+already exists, copied into all three adapter clients, and nothing above the adapter retries
+at all. The proposal: one table in two tiers, three in-call attempts within seconds and three
+automatic re-attempts over twenty-one minutes, a create that is never retried after a lost
+response, and a stamp on every created object so a retry can find an orphan.
 
 ### 10. Snapshot retention when a connection is disconnected
 
