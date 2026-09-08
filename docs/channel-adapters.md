@@ -25,6 +25,7 @@ Current reality, from `docs/channel-feasibility.md`:
 | Channel | Type | Publish | Update | Transactions | File upload | Image upload |
 |---|---|---|---|---|---|---|
 | Shopify | api | yes | yes | yes | **no**, see note | yes |
+| WooCommerce | api | yes | yes | yes | **no**, by decision, see `docs/channels/woocommerce.md` §6 | yes |
 | Etsy | api | yes | yes | yes | yes, 5 files at 20 MB | yes |
 | Creative Market | assisted | no | no | no | no | no |
 | Adobe Stock | assisted | no | no | no | no | no |
@@ -92,6 +93,12 @@ provider cache it.
 An adapter that Fanwise can authorize against declares an `oauth` member. Its absence is what
 the UI reads to decide whether Connect starts an authorization or simply writes a row, so a
 channel with no `oauth` is one Fanwise cannot connect to yet rather than one it pretends to.
+
+Some providers never hand the credential to the browser: the store posts it to a server
+endpoint and sends the person back with a yes or a no. Such an adapter declares `oauth.grant`
+with `parse` and `verify`, the generic grant route (`app/api/channels/[channelKey]/oauth/grant`)
+completes the connection from the POST, and the callback only reports. `exchange` is never
+called for such a channel. WooCommerce is the first.
 
 ```ts
 interface ChannelOAuth {

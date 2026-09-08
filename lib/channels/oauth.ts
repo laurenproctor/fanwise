@@ -46,6 +46,11 @@ export function callbackUrl(channelKey: string): string {
   return `${appOrigin()}/api/channels/${channelKey}/oauth/callback`
 }
 
+/** Where a provider that delivers the credential server-to-server posts it. */
+export function grantUrl(channelKey: string): string {
+  return `${appOrigin()}/api/channels/${channelKey}/oauth/grant`
+}
+
 export async function createAuthorizationState(params: {
   workspaceId: string
   channelId: string
@@ -108,6 +113,35 @@ export async function consumeAuthorizationState(state: string): Promise<Consumed
     channelId: data.channel_id,
     userId: data.user_id,
     accountHint: data.external_account_hint,
+  }
+}
+
+/**
+ * Reads a state without consuming it.
+ *
+ * For a channel whose credential arrives by a separate POST, the browser's
+ * return is a report rather than a completion, and consuming the state there
+ * would leave the POST, which may arrive a moment later, with nothing to
+ * consume. Expiry is still enforced; a peek at an expired state is null.
+ */
+export async function peekAuthorizationState(
+  state: string,
+): Promise<(ConsumedState & { consumedAt: string | null }) | null> {
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from("channel_oauth_states")
+    .select("workspace_id, channel_id, user_id, external_account_hint, consumed_at")
+    .eq("state", state)
+    .gt("expires_at", new Date().toISOString())
+    .maybeSingle()
+
+  if (error || !data) return null
+  return {
+    workspaceId: data.workspace_id,
+    channelId: data.channel_id,
+    userId: data.user_id,
+    accountHint: data.external_account_hint,
+    consumedAt: data.consumed_at,
   }
 }
 

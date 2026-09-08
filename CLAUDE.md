@@ -15,10 +15,10 @@ explicitly requested.
 
 ## Current step
 
-**Step: B2 (listing review: field regenerate, restore, publish as approval) is code complete on
-8 September 2026. Its exit is the review loop run in the browser against the model, which has
-not happened. B1 is on `main`. Gate A is not passed; A6 and A8 resume when their blockers
-clear.** See `docs/roadmap.md`. Implement the current step only. Do
+**Step: B8 (WooCommerce channel) is code complete on 8 September 2026, added out of order at
+the founder's request. Its exit needs a live WooCommerce store: connect, publish a draft, attach
+the file, activate, and confirm the product is buyable. B1 and B2 are on `main`. Gate A is not
+passed; A6 and A8 resume when their blockers clear.** See `docs/roadmap.md`. Implement the current step only. Do
 not build ahead.
 
 ## Architecture invariants
