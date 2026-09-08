@@ -7,6 +7,8 @@ import { routes } from "@/lib/routes"
 import { findAdapter } from "@/lib/channels/registry"
 import { isAiConfigured } from "./providers"
 import { startGeneration } from "./start"
+import { restoreGeneration } from "./restore"
+import { listingFieldSchema, LISTING_FIELD_LABELS } from "./output"
 
 /**
  * Composing, from the creator's side.
@@ -42,9 +44,59 @@ async function requireWorkspace(workspaceSlug: string) {
   return { supabase, user, workspace }
 }
 
+/** The listing, its channel's adapter and its product slug, or a message. */
+async function loadForAction(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceId: string,
+  listingId: string,
+) {
+  const { data: listing, error } = await supabase
+    .from("channel_listings")
+    .select("id, product_id, channel:channels(key), product:products(slug)")
+    .eq("id", listingId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!listing) return { error: "That listing could not be found." as const }
+
+  const channel = (listing as { channel: { key: string } | null }).channel
+  const product = (listing as { product: { slug: string } | null }).product
+  const adapter = channel ? findAdapter(channel.key) : null
+  if (!adapter || !product) return { error: "That channel is not available." as const }
+
+  return { error: null, listing, adapter, productSlug: product.slug }
+}
+
 export async function composeListingAction(
   workspaceSlug: string,
   listingId: string,
+): Promise<ComposeState> {
+  return regenerate(workspaceSlug, listingId, undefined)
+}
+
+/**
+ * Regenerates one field. Step B2.
+ *
+ * The same path as composing the whole listing, narrowed: one generation row
+ * with the field on it, one job, the same validator on the one value that
+ * comes back. The field name arrives from the browser and is parsed before it
+ * reaches a row.
+ */
+export async function regenerateFieldAction(
+  workspaceSlug: string,
+  listingId: string,
+  field: string,
+): Promise<ComposeState> {
+  const parsed = listingFieldSchema.safeParse(field)
+  if (!parsed.success) return { error: "That field cannot be regenerated.", notice: null }
+  return regenerate(workspaceSlug, listingId, parsed.data)
+}
+
+async function regenerate(
+  workspaceSlug: string,
+  listingId: string,
+  field: ReturnType<typeof listingFieldSchema.parse> | undefined,
 ): Promise<ComposeState> {
   // Refused before a row exists, so a deployment with no model configured does
   // not accumulate pending generations nothing will ever run.
@@ -54,20 +106,9 @@ export async function composeListingAction(
 
   const { supabase, user, workspace } = await requireWorkspace(workspaceSlug)
 
-  const { data: listing, error: readError } = await supabase
-    .from("channel_listings")
-    .select("id, product_id, channel:channels(key), product:products(slug)")
-    .eq("id", listingId)
-    .eq("workspace_id", workspace.id)
-    .maybeSingle()
-
-  if (readError) throw readError
-  if (!listing) return { error: "That listing could not be found.", notice: null }
-
-  const channel = (listing as { channel: { key: string } | null }).channel
-  const product = (listing as { product: { slug: string } | null }).product
-  const adapter = channel ? findAdapter(channel.key) : null
-  if (!adapter || !product) return { error: "That channel is not available.", notice: null }
+  const loaded = await loadForAction(supabase, workspace.id, listingId)
+  if (loaded.error) return { error: loaded.error, notice: null }
+  const { listing, adapter, productSlug } = loaded
 
   const outcome = await startGeneration({
     supabase,
@@ -75,9 +116,12 @@ export async function composeListingAction(
     productId: listing.product_id,
     listingId,
     userId: user.id,
+    ...(field === undefined ? {} : { field }),
   })
 
-  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
+  revalidatePath(routes.product(workspaceSlug, productSlug), "layout")
+
+  const what = field === undefined ? "listing" : LISTING_FIELD_LABELS[field].toLowerCase()
 
   switch (outcome.kind) {
     case "error":
@@ -87,8 +131,49 @@ export async function composeListingAction(
     default:
       return {
         error: null,
-        notice: `Composing for ${adapter.name}.`,
+        notice:
+          field === undefined
+            ? `Composing for ${adapter.name}.`
+            : `Composing a new ${what} for ${adapter.name}.`,
         composing: true,
       }
+  }
+}
+
+export interface ReviewState {
+  error: string | null
+  notice: string | null
+}
+
+/**
+ * Puts an earlier generation's copy back on the listing. Step B2.
+ *
+ * No model, no job: the copy already exists on the generation row and passed
+ * the validator when it was made. Runs as the signed-in user through RLS, and
+ * the restored copy waits for approval like a fresh generation would.
+ */
+export async function restoreGenerationAction(
+  workspaceSlug: string,
+  listingId: string,
+  generationId: string,
+): Promise<ReviewState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const loaded = await loadForAction(supabase, workspace.id, listingId)
+  if (loaded.error) return { error: loaded.error, notice: null }
+
+  const outcome = await restoreGeneration({ supabase, workspaceId: workspace.id, generationId })
+  if (outcome.kind === "error") return { error: outcome.message, notice: null }
+  if (outcome.listingId !== listingId) {
+    return { error: "That generation belongs to another listing.", notice: null }
+  }
+
+  revalidatePath(routes.product(workspaceSlug, loaded.productSlug), "layout")
+  return {
+    error: null,
+    notice:
+      outcome.field === null
+        ? "Restored. Read it before you publish."
+        : `Restored the ${LISTING_FIELD_LABELS[listingFieldSchema.parse(outcome.field)].toLowerCase()}. Read it before you publish.`,
   }
 }

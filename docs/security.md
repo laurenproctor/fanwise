@@ -163,10 +163,10 @@ gets the error's class name and HTTP status and nothing more, because an HTTP er
 carry the request that produced it and the request carried the key. Nothing in `lib/ai`
 logs a prompt or a response body.
 
-Composed copy cannot reach a marketplace unread. Applying a generation stamps
-`metadata.composedAt`; saving the editor stamps `approved_at`; Publish and Publish changes
-refuse while the first is newer than the second. Rule 7 applies: the refusal is in the
-action, not in whether the button rendered.
+Composed copy does not reach a marketplace without a person choosing to send it. Applying or
+restoring a generation stamps `metadata.composedAt`; the publish that follows stamps
+`approved_at`, in the action, before the send. Rule 7 applies: the stamp is in the action,
+not in whether the button said "Review and publish".
 
 ## The three things that never bend
 

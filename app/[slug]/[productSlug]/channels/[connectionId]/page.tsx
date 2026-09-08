@@ -11,7 +11,8 @@ import { listingImageSlots } from "@/lib/channels/images"
 import { isReorderable } from "@/lib/products/image-order"
 import { routes } from "@/lib/routes"
 import { ComposePanel } from "@/components/channels/compose-panel"
-import { latestGenerations, summarize } from "@/lib/ai/queries"
+import { listGenerations, summarize } from "@/lib/ai/queries"
+import { listingFieldSchema } from "@/lib/ai/output"
 import { isAiConfigured } from "@/lib/ai/providers"
 import { awaitingReview } from "@/lib/ai/review"
 
@@ -47,8 +48,20 @@ export default async function ListingPage({
 
   const assets = await listProductAssets(product.id)
 
-  const generations = await latestGenerations(workspace.id, [view.listing.id])
-  const generation = generations.get(view.listing.id)
+  const history = (await listGenerations(workspace.id, view.listing.id)).map(summarize)
+  const generation = history[0] ?? null
+  const inFlightGeneration =
+    generation && (generation.status === "pending" || generation.status === "running")
+      ? generation
+      : null
+  const inFlight =
+    inFlightGeneration === null
+      ? null
+      : inFlightGeneration.field === null
+        ? ("listing" as const)
+        : listingFieldSchema.parse(inFlightGeneration.field)
+  const configured = isAiConfigured()
+  const waiting = awaitingReview(view.listing)
 
   /*
    * The images in the order the channel would receive them, which is the order
@@ -87,8 +100,8 @@ export default async function ListingPage({
         </h1>
         <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
           {view.adapter.integrationType === "api"
-            ? "This channel's own copy for the product. Compose it, or write it by hand, then save it and publish."
-            : "This channel's own copy for the product. Compose it, or write it by hand. You will submit it yourself; this channel has no API to publish through."}
+            ? "This channel's own copy for the product. Compose it or write it by hand, regenerate any field, save, publish."
+            : "This channel's own copy for the product. Compose it or write it by hand, regenerate any field, save. You will submit it yourself; this channel has no API to publish through."}
         </p>
       </div>
 
@@ -96,9 +109,10 @@ export default async function ListingPage({
         workspaceSlug={slug}
         listingId={view.listing.id}
         channelName={view.channel.name}
-        configured={isAiConfigured()}
-        generation={generation ? summarize(generation) : null}
-        awaitingReview={awaitingReview(view.listing)}
+        configured={configured}
+        generation={generation}
+        history={history}
+        awaitingReview={waiting}
       />
 
       {/*
@@ -134,6 +148,7 @@ export default async function ListingPage({
           shortDescription: product.short_description ?? "",
           price: product.base_price === null ? "" : String(product.base_price),
         }}
+        review={{ aiConfigured: configured, inFlight }}
       />
 
       <ListingImages

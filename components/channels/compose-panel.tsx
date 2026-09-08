@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
-import { composeListingAction } from "@/lib/ai/actions"
+import { composeListingAction, restoreGenerationAction } from "@/lib/ai/actions"
+import { LISTING_FIELD_LABELS, listingFieldSchema } from "@/lib/ai/output"
 import { useBackgroundRefresh } from "@/lib/use-background-refresh"
 import type { GenerationSummary } from "@/lib/ai/queries"
 
@@ -27,7 +28,9 @@ export interface ComposePanelProps {
   /** False when the deployment has no model configured. The button is not offered. */
   configured: boolean
   generation: GenerationSummary | null
-  /** True when composed copy is waiting for a person to read and save it. */
+  /** Every generation for this listing, newest first. Step B2. */
+  history: GenerationSummary[]
+  /** True when composed copy is waiting for a person to read and approve it. */
   awaitingReview: boolean
 }
 
@@ -48,11 +51,25 @@ export function ComposePanel({
   channelName,
   configured,
   generation,
+  history,
   awaitingReview,
 }: ComposePanelProps) {
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [restoring, setRestoring] = useState<string | null>(null)
+
+  function restore(generationId: string) {
+    setError(null)
+    setNotice(null)
+    setRestoring(generationId)
+    start(async () => {
+      const result = await restoreGenerationAction(workspaceSlug, listingId, generationId)
+      if (result.error) setError(result.error)
+      else setNotice(result.notice)
+      setRestoring(null)
+    })
+  }
 
   const inFlight = generation?.status === "pending" || generation?.status === "running"
   useBackgroundRefresh(inFlight)
@@ -114,11 +131,89 @@ export function ComposePanel({
           className="border-l-2 border-[var(--color-warn)] pl-3 text-[13px] text-[var(--color-ink-2)]"
           role="status"
         >
-          Composed copy is below. Read it, change what you like, and save. Publishing waits until
-          you have.
+          Composed copy is below. Read it, change what you like, and save. Publishing it is your
+          approval.
         </p>
       ) : null}
+
+      {history.length > 1 ? (
+        <History
+          history={history}
+          restoring={restoring}
+          busy={pending || inFlight}
+          onRestore={restore}
+        />
+      ) : null}
     </section>
+  )
+}
+
+function fieldLabel(field: string | null): string {
+  if (field === null) return "Whole listing"
+  const parsed = listingFieldSchema.safeParse(field)
+  return parsed.success ? LISTING_FIELD_LABELS[parsed.data] : field
+}
+
+const STATUS_WORD: Record<GenerationSummary["status"], string> = {
+  pending: "Queued",
+  running: "Composing",
+  succeeded: "Composed",
+  rejected: "Refused",
+  failed: "Failed",
+}
+
+/**
+ * Earlier drafts, and the way back to one.
+ *
+ * Every generation is listed, including the refused ones, because a refusal
+ * names what was claimed and that is worth reading beside the drafts that
+ * passed. Only an accepted one can be restored; the copy on a refused row was
+ * never allowed on the listing and restoring it would be the one door the
+ * validator does not guard.
+ */
+function History({
+  history,
+  restoring,
+  busy,
+  onRestore,
+}: {
+  history: GenerationSummary[]
+  restoring: string | null
+  busy: boolean
+  onRestore: (id: string) => void
+}) {
+  return (
+    <div className="flex flex-col gap-2 border-t border-[var(--color-rule)] pt-4">
+      <span className="label-mono">Earlier drafts</span>
+      <ul className="flex flex-col divide-y divide-[var(--color-rule-2)]">
+        {history.map((item, index) => (
+          <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+            <span className="flex flex-wrap items-baseline gap-3 text-[13px]">
+              <span className="tabular font-mono text-[11px] text-[var(--color-ink-3)]">
+                {when(item.completedAt ?? item.createdAt)}
+              </span>
+              <span>{fieldLabel(item.field)}</span>
+              <span className="text-[var(--color-ink-3)]">{STATUS_WORD[item.status]}</span>
+              {item.status === "rejected" && item.message ? (
+                <span className="max-w-prose text-[12px] text-[var(--color-ink-2)]">
+                  {item.message}
+                </span>
+              ) : null}
+            </span>
+            {item.restorable && index !== 0 ? (
+              <button
+                type="button"
+                onClick={() => onRestore(item.id)}
+                disabled={busy}
+                className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-ink-3)] underline underline-offset-4 hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {restoring === item.id ? "Restoring…" : "Restore"}
+              </button>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

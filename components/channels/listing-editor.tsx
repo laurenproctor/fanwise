@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState, useTransition } from "react"
 import { useFormStatus } from "react-dom"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import {
@@ -9,6 +10,8 @@ import {
   updateListingAction,
   type SaveState,
 } from "@/lib/channels/actions"
+import { regenerateFieldAction } from "@/lib/ai/actions"
+import type { ListingField } from "@/lib/ai/output"
 import { evaluate } from "@/lib/channels/listings"
 import { getAdapter } from "@/lib/channels/registry"
 import { constraintsFor, type TextConstraint } from "@/lib/channels/constraints"
@@ -26,8 +29,10 @@ import { TagInput } from "./tag-input"
  * feedback only; the server recomputes and it is the server's verdict that
  * reaches the snapshot.
  *
- * No AI anywhere in this file. A4 is the step that proves a person can write a
- * listing per channel and see exactly what each one would reject.
+ * A4 proved a person can write a listing per channel with no AI in the way.
+ * B2 put the review beside it: every field can be regenerated on its own.
+ * Approval has no button here; Publish is the approval, and the card says so
+ * when composed copy is waiting.
  */
 
 function Submit() {
@@ -57,6 +62,43 @@ function Counter({ value, constraint }: { value: string; constraint?: TextConstr
       {under ? ` (${constraint.minLength} minimum)` : ""}
       {over ? ` (${length - constraint.maxLength!} over)` : ""}
     </span>
+  )
+}
+
+/**
+ * Regenerate one field with the model.
+ *
+ * Offered only while nothing is unsaved. A regeneration lands by remounting
+ * the editor on the new row, and a remount discards local edits; asking the
+ * creator to save first is cheaper than losing a paragraph they were in the
+ * middle of.
+ */
+function RegenerateButton({
+  field,
+  label,
+  onRegenerate,
+  disabled,
+  busy,
+  reason,
+}: {
+  field: ListingField
+  label: string
+  onRegenerate: (field: ListingField) => void
+  disabled: boolean
+  busy: boolean
+  reason: string | null
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onRegenerate(field)}
+      disabled={disabled}
+      aria-label={`Regenerate ${label.toLowerCase()}`}
+      title={reason ?? undefined}
+      className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-ink-3)] underline underline-offset-4 hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {busy ? "Composing…" : "Regenerate"}
+    </button>
   )
 }
 
@@ -125,6 +167,13 @@ export interface CanonicalSource {
   price: string
 }
 
+export interface ReviewProps {
+  /** False when no model is configured: no Regenerate buttons are offered. */
+  aiConfigured: boolean
+  /** The field a generation is in flight for, "listing" for the whole, or null. */
+  inFlight: ListingField | "listing" | null
+}
+
 export function ListingEditor({
   workspaceSlug,
   listingId,
@@ -132,6 +181,7 @@ export function ListingEditor({
   subject,
   initial,
   canonical,
+  review,
 }: {
   workspaceSlug: string
   listingId: string
@@ -139,19 +189,79 @@ export function ListingEditor({
   subject: AdapterSubject
   initial: ChannelListingDraft
   canonical: CanonicalSource
+  review: ReviewProps
 }) {
   const adapter = getAdapter(channelKey)
   const constraints = useMemo(() => constraintsFor(adapter), [adapter])
+  const router = useRouter()
 
   const [draft, setDraft] = useState<ChannelListingDraft>(initial)
   const [pulling, startPull] = useTransition()
   const [pullError, setPullError] = useState<string | null>(null)
+  const [reviewing, startReview] = useTransition()
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null)
 
   const action = updateListingAction.bind(null, workspaceSlug, listingId)
   const [state, formAction] = useActionState<SaveState, FormData>(action, {
     error: null,
     savedAt: null,
   })
+
+  /*
+   * Whether the screen holds words the row does not. Compared field by field
+   * against what the page rendered, which is the row: a save remounts nothing,
+   * so `initial` stays the last-loaded row and `savedAt` says whether the
+   * current words reached it. Regenerate acts on the row, and is held back
+   * while this is true.
+   */
+  const dirty = useMemo(() => {
+    const keys: (keyof ChannelListingDraft)[] = [
+      "title",
+      "description",
+      "shortDescription",
+      "seoTitle",
+      "seoDescription",
+      "price",
+      "currency",
+      "category",
+    ]
+    if (keys.some((key) => (draft[key] ?? null) !== (initial[key] ?? null))) return true
+    return draft.tags.join("\u0000") !== initial.tags.join("\u0000")
+  }, [draft, initial])
+  const unsaved = dirty && state.savedAt === null
+
+  function regenerate(field: ListingField) {
+    setPullError(null)
+    setReviewNotice(null)
+    startReview(async () => {
+      const result = await regenerateFieldAction(workspaceSlug, listingId, field)
+      if (result.error) setPullError(result.error)
+      else setReviewNotice(result.notice)
+      router.refresh()
+    })
+  }
+
+  const regenerating = review.inFlight !== null || reviewing
+  const holdReason = unsaved
+    ? "Save your changes first; a regeneration replaces what is on screen."
+    : review.inFlight !== null
+      ? "A generation is already on its way."
+      : null
+
+  /** The Regenerate control for one field, or nothing when there is no model. */
+  function regen(field: ListingField, label: string) {
+    if (!review.aiConfigured) return null
+    return (
+      <RegenerateButton
+        field={field}
+        label={label}
+        onRegenerate={regenerate}
+        disabled={regenerating || unsaved}
+        busy={review.inFlight === field}
+        reason={holdReason}
+      />
+    )
+  }
 
   // The same function the server calls. Recomputed on every keystroke, which is
   // affordable precisely because requirements are pure and synchronous.
@@ -193,6 +303,7 @@ export function ListingEditor({
           aside={
             <>
               <Counter value={draft.title ?? ""} constraint={constraints.text.title} />
+              {regen("title", "Title")}
               <PullButton field="Title" onPull={() => pull("title")} disabled={pulling} />
             </>
           }
@@ -212,6 +323,7 @@ export function ListingEditor({
           aside={
             <>
               <Counter value={draft.description ?? ""} constraint={constraints.text.description} />
+              {regen("description", "Description")}
               <PullButton
                 field="Description"
                 onPull={() => pull("description")}
@@ -239,6 +351,7 @@ export function ListingEditor({
                 value={draft.shortDescription ?? ""}
                 constraint={constraints.text.shortDescription}
               />
+              {regen("shortDescription", "Short description")}
               <PullButton
                 field="Short description"
                 onPull={() => pull("shortDescription")}
@@ -266,7 +379,12 @@ export function ListingEditor({
         <FieldShell
           id="listing-seo-title"
           label="Meta title"
-          aside={<Counter value={draft.seoTitle ?? ""} constraint={constraints.text.seoTitle} />}
+          aside={
+            <>
+              <Counter value={draft.seoTitle ?? ""} constraint={constraints.text.seoTitle} />
+              {regen("seoTitle", "Meta title")}
+            </>
+          }
         >
           <input
             id="listing-seo-title"
@@ -282,10 +400,13 @@ export function ListingEditor({
           id="listing-seo-description"
           label="Meta description"
           aside={
-            <Counter
-              value={draft.seoDescription ?? ""}
-              constraint={constraints.text.seoDescription}
-            />
+            <>
+              <Counter
+                value={draft.seoDescription ?? ""}
+                constraint={constraints.text.seoDescription}
+              />
+              {regen("seoDescription", "Meta description")}
+            </>
           }
         >
           <textarea
@@ -356,20 +477,30 @@ export function ListingEditor({
           )}
         </FieldShell>
 
-        <TagInput
-          name="tags"
-          defaultValue={initial.tags}
-          minCount={constraints.tags?.minCount}
-          maxCount={constraints.tags?.maxCount}
-          maxTagLength={constraints.tags?.maxTagLength}
-          onChange={(tags) => set("tags", tags)}
-        />
+        <div className="flex flex-col gap-2">
+          {review.aiConfigured ? (
+            <div className="flex justify-end">{regen("tags", "Tags")}</div>
+          ) : null}
+          <TagInput
+            name="tags"
+            defaultValue={initial.tags}
+            minCount={constraints.tags?.minCount}
+            maxCount={constraints.tags?.maxCount}
+            maxTagLength={constraints.tags?.maxTagLength}
+            onChange={(tags) => set("tags", tags)}
+          />
+        </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <Submit />
           {state.savedAt && !state.error ? (
             <span className="label-mono text-[var(--color-ok)]" role="status">
               Saved
+            </span>
+          ) : null}
+          {reviewNotice ? (
+            <span className="label-mono text-[var(--color-ink-3)]" role="status">
+              {reviewNotice}
             </span>
           ) : null}
         </div>

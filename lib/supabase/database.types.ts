@@ -46,6 +46,7 @@ export type Database = {
           error_message: string | null
           estimated_cost: number | null
           factsheet_hash: string | null
+          field: string | null
           generation_type: Database["public"]["Enums"]["ai_generation_type"]
           id: string
           input_hash: string | null
@@ -74,6 +75,7 @@ export type Database = {
           error_message?: string | null
           estimated_cost?: number | null
           factsheet_hash?: string | null
+          field?: string | null
           generation_type?: Database["public"]["Enums"]["ai_generation_type"]
           id?: string
           input_hash?: string | null
@@ -102,6 +104,7 @@ export type Database = {
           error_message?: string | null
           estimated_cost?: number | null
           factsheet_hash?: string | null
+          field?: string | null
           generation_type?: Database["public"]["Enums"]["ai_generation_type"]
           id?: string
           input_hash?: string | null
@@ -872,7 +875,7 @@ export type Database = {
         | "succeeded"
         | "failed"
         | "rejected"
-      ai_generation_type: "listing"
+      ai_generation_type: "listing" | "field"
       asset_state: "pending" | "ready" | "failed"
       asset_type:
         | "deliverable"
@@ -919,7 +922,13 @@ export type Database = {
         | "other"
       publication_job_kind: "publish" | "update" | "activate"
       publication_job_status: "pending" | "running" | "succeeded" | "failed"
-      snapshot_type: "build" | "publish" | "update" | "unpublish" | "generate"
+      snapshot_type:
+        | "build"
+        | "publish"
+        | "update"
+        | "unpublish"
+        | "generate"
+        | "restore"
       workspace_role: "owner" | "admin" | "editor" | "viewer"
     }
     CompositeTypes: {
@@ -1615,7 +1624,7 @@ export const Constants = {
         "failed",
         "rejected",
       ],
-      ai_generation_type: ["listing"],
+      ai_generation_type: ["listing", "field"],
       asset_state: ["pending", "ready", "failed"],
       asset_type: [
         "deliverable",
@@ -1666,7 +1675,14 @@ export const Constants = {
       ],
       publication_job_kind: ["publish", "update", "activate"],
       publication_job_status: ["pending", "running", "succeeded", "failed"],
-      snapshot_type: ["build", "publish", "update", "unpublish", "generate"],
+      snapshot_type: [
+        "build",
+        "publish",
+        "update",
+        "unpublish",
+        "generate",
+        "restore",
+      ],
       workspace_role: ["owner", "admin", "editor", "viewer"],
     },
   },

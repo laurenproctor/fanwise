@@ -63,11 +63,37 @@ generation, and approving.
 
 Auto-publishing a first generation would be the fastest way to destroy trust in the product.
 
-**At B1, before the review screen exists, approval is a save.** Applying a generation stamps
-`metadata.composedAt` on the listing; saving the editor stamps `approved_at`; Publish and
-Publish changes refuse while the first is newer than the second, and the listing card says so
-before the click. It is the smallest thing that keeps the sentence above true, and B2
-replaces it rather than building on it.
+**Built at B2, on 8 September 2026**, on the listing page rather than a screen of its own:
+
+| Action | Where | What it does |
+|---|---|---|
+| Edit a field | the editor, since A4 | Save writes the words. It no longer approves them |
+| Regenerate a field | Regenerate beside each field | One generation row with `field` set, the same prefix and validator, one column written |
+| Regenerate the whole | Compose again | As at B1 |
+| Restore | Earlier drafts, under the compose panel | Puts an accepted generation's `structured_output` back, whole or one field, as the signed-in user, with a `restore` snapshot. No model is called |
+| Approve | Publish itself | When composed copy is waiting, the button reads "Review and publish" and the click stamps `approved_at` before the send |
+
+Applying or restoring a generation stamps `metadata.composedAt`; publishing stamps
+`approved_at` when the first is newer. The listing card says composed copy is waiting and
+that publishing counts as approval, and the button says what it is doing. A save is not an
+approval, which it was at B1 for want of anything better.
+
+**A separate Approve button was built and dropped on the same day.** Two clicks that both
+meant "I have looked at this" was one too many, and a button always pressed right before
+another button is ceremony. The rule the paragraph above states is kept in substance: nothing
+composed ships without the person who ships it choosing to, and the record shows when they
+did.
+
+Regenerate acts on the row, so the editor holds it back while the screen holds unsaved words:
+a regeneration lands by remounting the editor, which would discard an edit in progress.
+
+A field is regenerated from the facts and the profile alone, not from the rest of the listing.
+The other fields may be the creator's own words, which may state things the FactSheet does
+not; a model that copied a hand-written count into a new title would then be refused for
+repeating something the creator vouched for.
+
+Only an accepted generation can be restored. The copy on a refused row was never allowed on
+the listing, and restoring it would be the one door the validator does not guard.
 
 ## What B1 built
 

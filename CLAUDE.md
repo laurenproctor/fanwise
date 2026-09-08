@@ -15,11 +15,10 @@ explicitly requested.
 
 ## Current step
 
-**Step: B1 (AI provider abstraction, FactSheet, merchandising profiles, factuality
-validator, generation logs, Trigger.dev) is done, started out of order on 7 September 2026
-while A6 and A8 wait on external parties. Both exit clauses ran live the same day: a composed
-listing against the configured model, published and live on the dev store, and a job carried
-by Trigger.dev. Gate A is not passed, and B2 does not begin until B1 is on `main`.** See `docs/roadmap.md`. Implement the current step only. Do
+**Step: B2 (listing review: field regenerate, restore, publish as approval) is code complete on
+8 September 2026. Its exit is the review loop run in the browser against the model, which has
+not happened. B1 is on `main`. Gate A is not passed; A6 and A8 resume when their blockers
+clear.** See `docs/roadmap.md`. Implement the current step only. Do
 not build ahead.
 
 ## Architecture invariants

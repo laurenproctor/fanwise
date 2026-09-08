@@ -322,6 +322,23 @@ is stamped when a generation lands. When the second is newer than the first, Pub
 `composedAt` is in metadata rather than a column because a rebuild drops it, correctly: the
 adapter's draft replaced the model's and there is nothing left to review.
 
+### B2: one field, and the way back
+
+Migrations `20260908010000_field_generations_and_restore` and
+`20260908010001_field_generations_check`.
+
+`generation_type` gains `field`, and `ai_generations.field` names which one, in the listing
+output's own key names (`title`, `shortDescription`, `seoTitle` and so on) rather than column
+names, because a row is read back into that shape and never joined on the value. A check
+constraint ties the two: `field` is present exactly when the type is `field`. It lives one
+migration after the enum value because Postgres cannot reference a value in the transaction
+that added it.
+
+`snapshot_type` gains `restore`. A restore is not a generation: no model was called, and a
+history that recorded it as one would answer "what changed before revenue moved" with a call
+that never happened. The payload's `restore` key names the generation put back and, for a
+field generation, the field.
+
 **Credentials are nowhere near this table.** The runner loads the listing, the product and
 its assets; it never loads a connection or a secret, and the prompt is built from the
 FactSheet and the channel's profile alone.
