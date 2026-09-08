@@ -455,15 +455,14 @@ export async function updateListingAction(
   }
 
   /*
-   * A save is a person vouching for the text as it stands, whoever wrote it.
-   * `approved_at` records that, and lib/ai/review.ts compares it against the
-   * moment a generation landed to decide whether Publish may proceed. Until
-   * B2's review screen exists, this is the approval docs/ai-merchandising.md
-   * requires before composed copy reaches a marketplace.
+   * A save is not an approval. At B1 it was, for want of a review screen; B2
+   * gave approval its own action (lib/ai/approve.ts), so a creator can save
+   * an edit to composed copy and still be asked to read the whole before it
+   * ships. `approved_at` is untouched here.
    */
   const { error: updateError } = await supabase
     .from("channel_listings")
-    .update({ ...draftToColumns(draft), approved_at: new Date().toISOString() })
+    .update(draftToColumns(draft))
     .eq("id", listingId)
     .eq("workspace_id", workspace.id)
 

@@ -1,15 +1,21 @@
 import { createAdminClient } from "@/lib/supabase/admin"
-import { evaluate, listingToDraft, snapshotPayload } from "@/lib/channels/listings"
-import { listingImages } from "@/lib/channels/images"
 import { findAdapter } from "@/lib/channels/registry"
 import type { AdapterSubject, ChannelListing } from "@/lib/channels/types"
 import type { Product, ProductAsset } from "@/lib/products/types"
+import { applyCopy, outputToColumns } from "./apply"
 import { buildFactSheet, factSheetHash } from "./factsheet"
 import { describeViolations, validateFactuality } from "./factuality"
-import { LISTING_OUTPUT_JSON_SCHEMA, listingOutputSchema } from "./output"
+import {
+  LISTING_OUTPUT_JSON_SCHEMA,
+  fieldOutputJsonSchema,
+  fieldOutputSchema,
+  listingFieldSchema,
+  listingOutputSchema,
+  onlyField,
+  type ListingOutput,
+} from "./output"
 import { buildPrompt } from "./prompt"
 import { getProvider } from "./providers"
-import { COMPOSED_AT_KEY } from "./review"
 import { AiError, normalizeAiError, type AiProvider } from "./types"
 
 /**
@@ -66,7 +72,7 @@ export async function runGeneration(
     .eq("id", generationId)
     .eq("workspace_id", workspaceId)
     .eq("status", "pending")
-    .select("id, product_id, channel_listing_id")
+    .select("id, product_id, channel_listing_id, generation_type, field")
     .maybeSingle()
 
   if (claimError) {
@@ -104,7 +110,12 @@ async function execute(
   admin: ReturnType<typeof createAdminClient>,
   workspaceId: string,
   generationId: string,
-  claimed: { product_id: string; channel_listing_id: string },
+  claimed: {
+    product_id: string
+    channel_listing_id: string
+    generation_type: "listing" | "field"
+    field: string | null
+  },
   deps: RunGenerationDeps,
   finish: (fields: Record<string, unknown>) => PromiseLike<unknown>,
 ): Promise<void> {
@@ -164,7 +175,12 @@ async function execute(
   const assets = (assetRows ?? []) as ProductAsset[]
   const sheet = buildFactSheet(product as Product, assets)
   const sheetHash = factSheetHash(sheet)
-  const prompt = buildPrompt(adapter, sheet)
+
+  // One field or the whole listing. The prefix is the same either way; only
+  // the ask and the schema narrow.
+  const field = claimed.generation_type === "field" ? listingFieldSchema.parse(claimed.field) : null
+  const prompt = buildPrompt(adapter, sheet, field ?? undefined)
+  const outputSchema = field === null ? LISTING_OUTPUT_JSON_SCHEMA : fieldOutputJsonSchema(field)
 
   // Recorded before the call, so a call that never returns still leaves a row
   // that says what it was asked.
@@ -193,7 +209,7 @@ async function execute(
     response = await provider.generate({
       system: prompt.system,
       user: prompt.user,
-      outputSchema: LISTING_OUTPUT_JSON_SCHEMA,
+      outputSchema,
       maxOutputTokens: MAX_OUTPUT_TOKENS,
     })
   } catch (error) {
@@ -218,7 +234,10 @@ async function execute(
     estimated_cost: response.estimatedCost,
   }
 
-  const parsed = listingOutputSchema.safeParse(response.output)
+  const parsed =
+    field === null
+      ? listingOutputSchema.safeParse(response.output)
+      : fieldOutputSchema(field).safeParse(response.output)
   if (!parsed.success) {
     await finish({
       status: "failed",
@@ -228,9 +247,16 @@ async function execute(
     })
     return
   }
-  const output = parsed.data
+  const output = parsed.data as Partial<ListingOutput>
 
-  const verdict = validateFactuality(output, sheet)
+  // A field is validated on its own. The other fields were validated when
+  // they were produced, or were written by the creator, and are not the
+  // model's to answer for here.
+  const toValidate =
+    field === null
+      ? (output as ListingOutput)
+      : onlyField(field, output[field] as string | string[])
+  const verdict = validateFactuality(toValidate, sheet)
   if (!verdict.ok) {
     await finish({
       status: "rejected",
@@ -241,14 +267,6 @@ async function execute(
       error_message: describeViolations(verdict.violations),
     })
     return
-  }
-
-  const now = new Date().toISOString()
-  const blank = (value: string) => (value.trim().length === 0 ? null : value.trim())
-
-  const metadata = {
-    ...((listing.metadata as Record<string, unknown>) ?? {}),
-    [COMPOSED_AT_KEY]: now,
   }
 
   const subject: AdapterSubject = { product: product as Product, assets }
@@ -267,33 +285,36 @@ async function execute(
    */
   const fresh = adapter.buildListing(subject)
   const priceFill =
-    listing.price === null && fresh.price !== null
+    field === null && listing.price === null && fresh.price !== null
       ? { price: fresh.price, currency: fresh.currency }
       : {}
   const categoryFill =
-    listing.category === null && fresh.category !== null ? { category: fresh.category } : {}
+    field === null && listing.category === null && fresh.category !== null
+      ? { category: fresh.category }
+      : {}
 
-  const { data: updated, error: updateError } = await admin
-    .from("channel_listings")
-    .update({
-      title: blank(output.title),
-      description: blank(output.description),
-      short_description: blank(output.shortDescription),
-      seo_title: blank(output.seoTitle),
-      seo_description: blank(output.seoDescription),
-      tags: output.tags,
-      ...priceFill,
-      ...categoryFill,
-      generated_at: now,
-      metadata: metadata as never,
-    })
-    .eq("id", listing.id)
-    .eq("workspace_id", workspaceId)
-    .select("*")
-    .single()
+  const applied = await applyCopy({
+    client: admin,
+    workspaceId,
+    listing,
+    channel,
+    adapter,
+    subject,
+    columns: { ...outputToColumns(output), ...priceFill, ...categoryFill },
+    snapshot: {
+      type: "generate",
+      record: {
+        id: generationId,
+        field,
+        provider: response.provider,
+        model: response.model,
+        promptVersion: prompt.promptVersion,
+        factsheetHash: sheetHash,
+      },
+    },
+  })
 
-  if (updateError || !updated) {
-    console.error("[ai] could not apply generation", { generationId, error: updateError })
+  if (!applied.ok) {
     await finish({
       status: "failed",
       ...usageFields,
@@ -304,40 +325,10 @@ async function execute(
     return
   }
 
-  const draft = listingToDraft(updated as ChannelListing)
-  const evaluation = evaluate(adapter, draft, subject)
-
-  // Invariant 4, applied to a generation: the copy that landed, the verdict it
-  // received, and which generation produced it.
-  const { error: snapshotError } = await admin.from("listing_snapshots").insert({
-    workspace_id: workspaceId,
-    channel_listing_id: listing.id,
-    product_id: listing.product_id,
-    channel_id: channel.id,
-    snapshot_type: "generate",
-    payload: {
-      ...snapshotPayload(draft, evaluation, listingImages(subject)),
-      generation: {
-        id: generationId,
-        provider: response.provider,
-        model: response.model,
-        promptVersion: prompt.promptVersion,
-        factsheetHash: sheetHash,
-        at: now,
-      },
-    } as never,
-  })
-
-  if (snapshotError) {
-    // A gap in the history, not a broken generation. The listing holds the copy
-    // either way, and the ai_generations row still records what produced it.
-    console.error("[ai] snapshot insert failed", snapshotError)
-  }
-
   await finish({
     status: "succeeded",
     ...usageFields,
     structured_output: output,
-    applied_at: now,
+    applied_at: applied.at,
   })
 }

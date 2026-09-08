@@ -41,8 +41,12 @@ export async function latestGenerations(
 export interface GenerationSummary {
   id: string
   status: AiGeneration["status"]
+  /** Whole listing, or one field. */
+  field: string | null
   /** The creator-facing sentence for a failed or rejected generation. */
   message: string | null
+  /** True when the copy exists on the row and can be put back. */
+  restorable: boolean
   completedAt: string | null
   createdAt: string
 }
@@ -51,8 +55,34 @@ export function summarize(row: AiGeneration): GenerationSummary {
   return {
     id: row.id,
     status: row.status,
+    field: row.generation_type === "field" ? row.field : null,
     message: row.status === "failed" || row.status === "rejected" ? row.error_message : null,
+    restorable: row.status === "succeeded" && row.structured_output !== null,
     completedAt: row.completed_at,
     createdAt: row.created_at,
   }
+}
+
+/**
+ * Every generation for one listing, newest first. The review screen's history.
+ *
+ * Bounded, because a listing composed two hundred times is a listing whose
+ * two-hundredth draft nobody is going to restore.
+ */
+export async function listGenerations(
+  workspaceId: string,
+  listingId: string,
+  limit = 20,
+): Promise<AiGeneration[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("ai_generations")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("channel_listing_id", listingId)
+    .order("created_at", { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return data ?? []
 }

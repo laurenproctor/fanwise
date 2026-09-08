@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current step: B1, out of order, decided 7 September 2026. Code complete the same day;
-its live exit is still owed, see "B1" under Gate B.** A5 is done and promoted to
+**Current step: B2, the listing review, code complete 8 September 2026 on the branch
+`b2-listing-review`; see "B2" under Gate B. B1 is on `main`.** A5 is done and promoted to
 `main`; all three exit clauses ran against a live Shopify store. What remains of Gate A is
 blocked on things no code can move: A6 on Etsy's developer app and commercial access, A8 on a
 Creative Market seller login, and the gate's own exit — an outside creator, unassisted — on a
@@ -285,7 +285,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | Step | Content |
 |---|---|
 | B1 | AI provider abstraction, Anthropic, FactSheet, merchandising profiles, factuality validator, generation logs. Adopt Trigger.dev here. **Code complete 7 September 2026**, see below |
-| B2 | Listing review UI: field edit, field regenerate, full regenerate, restore, approve |
+| B2 | Listing review UI: field edit, field regenerate, full regenerate, restore, approve. **Code complete 8 September 2026**, see below |
 | B2a | Creative Market composed-listing test: the three creators and the measures in `docs/channels/creative-market.md` section 12, run against AI-composed copy on the A8 handoff |
 | B4 | Second assisted channel. Adobe Stock or MyFonts, undecided on purpose, see `docs/channel-feasibility.md` and decision 14 |
 | B5 | `sales_events`, transaction ingestion for Shopify and Etsy, dedupe constraints |
@@ -332,6 +332,20 @@ code landed:**
 What B1 deliberately does not do: meter generations (decision 13's free cap belongs to the
 entitlement service at C2), regenerate a single field, or restore an earlier generation.
 Those are B2, and the `ai_generations.structured_output` column is what B2 restores from.
+
+### B2, what was built and what is still owed
+
+Built on the listing page, which was already the place a listing is read: Regenerate beside
+every field, Approve listing beside Save, and Earlier drafts with Restore under the compose
+panel. A field generation is the same row, prefix and validator as a whole one, narrowed to
+one key; a restore is the signed-in user putting an accepted row's copy back, with its own
+snapshot type; approval is its own stamp, and a save no longer makes one.
+
+**B2's exit test** is the review loop on a real product: compose, regenerate one field, edit
+another by hand, restore the earlier draft, approve, and publish, with Publish refusing at
+every point before the approval. The whole loop is proven against a scripted provider in
+`tests/db/ai-review.test.ts`; it has not been run in the browser against the model. Journey 2
+in `docs/testing.md` is that run.
 
 **B3 is vacant on purpose.** Creative Market moved to A8 and the remaining steps keep their
 numbers, because step ids are names here, not positions — `docs/data-model.md`,

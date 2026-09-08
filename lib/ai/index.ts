@@ -2,8 +2,22 @@ export { buildFactSheet, factSheetHash, renderFactSheet, canonicalJson } from ".
 export type { FactSheet, FactDetails } from "./factsheet"
 export { validateFactuality, describeViolations } from "./factuality"
 export type { FactualityResult, Violation, ViolationKind } from "./factuality"
-export { listingOutputSchema, LISTING_OUTPUT_JSON_SCHEMA } from "./output"
-export type { ListingOutput } from "./output"
+export {
+  listingOutputSchema,
+  LISTING_OUTPUT_JSON_SCHEMA,
+  LISTING_FIELDS,
+  LISTING_FIELD_LABELS,
+  listingFieldSchema,
+  fieldOutputSchema,
+  fieldOutputJsonSchema,
+  onlyField,
+} from "./output"
+export type { ListingOutput, ListingField } from "./output"
+export { applyCopy, outputToColumns, outputFor } from "./apply"
+export { restoreGeneration } from "./restore"
+export type { RestoreOutcome } from "./restore"
+export { approveListing } from "./approve"
+export type { ApproveOutcome } from "./approve"
 export { buildPrompt, renderProfile, RULES_VERSION } from "./prompt"
 export type { BuiltPrompt } from "./prompt"
 export { awaitingReview, composedAt, COMPOSED_AT_KEY, REVIEW_REQUIRED_MESSAGE } from "./review"

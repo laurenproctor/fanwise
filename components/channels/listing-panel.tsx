@@ -345,8 +345,8 @@ export function ListingPanel({
                     className="border-l-2 border-[var(--color-warn)] pl-3 text-[13px] text-[var(--color-ink-2)]"
                     role="status"
                   >
-                    Composed copy is waiting for you to read it. Open the listing, then save it to
-                    publish.
+                    Composed copy is waiting for you to read it. Open the listing, then approve it
+                    to publish.
                   </p>
                 ) : null}
 

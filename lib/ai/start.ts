@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import { jobs } from "@/lib/jobs"
 import type { JobQueue } from "@/lib/jobs"
+import type { ListingField } from "./output"
 
 /**
  * Asking for a generation, as the signed-in user.
@@ -31,10 +32,12 @@ export async function startGeneration(params: {
   productId: string
   listingId: string
   userId: string
+  /** One field rather than the whole listing. Step B2. */
+  field?: ListingField
   /** Test seam. Production hands off to the configured queue. */
   queue?: JobQueue
 }): Promise<StartGenerationOutcome> {
-  const { supabase, workspaceId, productId, listingId, userId, queue = jobs } = params
+  const { supabase, workspaceId, productId, listingId, userId, field, queue = jobs } = params
 
   const { data, error } = await supabase
     .from("ai_generations")
@@ -43,7 +46,8 @@ export async function startGeneration(params: {
       product_id: productId,
       channel_listing_id: listingId,
       requested_by: userId,
-      generation_type: "listing",
+      generation_type: field === undefined ? "listing" : "field",
+      field: field ?? null,
       status: "pending",
     })
     .select("id")

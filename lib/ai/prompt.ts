@@ -3,6 +3,7 @@ import { constraintsFor } from "@/lib/channels/constraints"
 import type { ChannelAdapter, MerchandisingProfile } from "@/lib/channels/types"
 import { renderFactSheet, type FactSheet } from "./factsheet"
 import type { PromptBlock } from "./types"
+import { LISTING_FIELD_LABELS, type ListingField } from "./output"
 
 /**
  * The prompt, and the shape that makes decision 12's price true.
@@ -101,18 +102,40 @@ Channel limits, which the channel enforces:
 ${renderLimits(adapter)}`
 }
 
-export function buildPrompt(adapter: ChannelAdapter, sheet: FactSheet): BuiltPrompt {
+/**
+ * The same prefix, a narrower ask. Step B2.
+ *
+ * A field generation shares the rules and profile blocks byte for byte, so it
+ * reads the same cached prefix a whole-listing generation wrote. Only the user
+ * turn differs: the facts, and one field to write.
+ *
+ * Deliberately not given the rest of the listing as context. The other fields
+ * may be the creator's own words, and those may state things the FactSheet
+ * does not; a model that copied a hand-written glyph count into a new title
+ * would then be refused for repeating something the creator vouched for. The
+ * facts are the only source, for a field as for a listing.
+ */
+export function buildPrompt(
+  adapter: ChannelAdapter,
+  sheet: FactSheet,
+  field?: ListingField,
+): BuiltPrompt {
   const system: PromptBlock[] = [
     { text: RULES },
     { text: renderProfile(adapter), cacheBoundary: true },
   ]
+
+  const ask =
+    field === undefined
+      ? "Compose the listing now, following the channel profile in your instructions. State only what the verified facts state. Respond with the JSON object and nothing else."
+      : `Write only the ${LISTING_FIELD_LABELS[field].toLowerCase()} (the "${field}" key), following the channel profile's guidance for that field. State only what the verified facts state. Respond with a JSON object holding that one key and nothing else.`
 
   const user = `=== VERIFIED PRODUCT FACTS ===
 ${renderFactSheet(sheet)}
 === END OF VERIFIED PRODUCT FACTS ===
 
 === MERCHANDISING INSTRUCTIONS ===
-Compose the listing now, following the channel profile in your instructions. State only what the verified facts state. Respond with the JSON object and nothing else.`
+${ask}`
 
   const hash = createHash("sha256")
   for (const block of system) hash.update(block.text).update("\n---\n")

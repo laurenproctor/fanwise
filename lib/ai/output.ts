@@ -65,3 +65,64 @@ export const LISTING_OUTPUT_JSON_SCHEMA: Record<string, unknown> = {
     tags: { type: "array", items: { type: "string" }, description: "Lowercase tags." },
   },
 }
+
+/**
+ * The fields a generation may target one at a time. Step B2.
+ *
+ * The keys of the listing output, not the column names: a field generation is
+ * read back into the same shape as a whole one, and the runner is the only
+ * thing that knows which column a key lands in.
+ */
+export const LISTING_FIELDS = [
+  "title",
+  "description",
+  "shortDescription",
+  "seoTitle",
+  "seoDescription",
+  "tags",
+] as const satisfies readonly (keyof ListingOutput)[]
+
+export type ListingField = (typeof LISTING_FIELDS)[number]
+
+export const listingFieldSchema = z.enum(LISTING_FIELDS)
+
+export const LISTING_FIELD_LABELS: Record<ListingField, string> = {
+  title: "Title",
+  description: "Description",
+  shortDescription: "Short description",
+  seoTitle: "Meta title",
+  seoDescription: "Meta description",
+  tags: "Tags",
+}
+
+/**
+ * What a single-field generation must produce: the one value, under the key
+ * the whole-listing output uses for it, so the same validator runs unchanged
+ * on a listing that holds only that field.
+ */
+export function fieldOutputSchema(field: ListingField) {
+  return listingOutputSchema.pick({ [field]: true } as Record<ListingField, true>)
+}
+
+export function fieldOutputJsonSchema(field: ListingField): Record<string, unknown> {
+  const properties = LISTING_OUTPUT_JSON_SCHEMA.properties as Record<string, unknown>
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: [field],
+    properties: { [field]: properties[field] },
+  }
+}
+
+/** A whole-listing shape holding only one field, for the validator. */
+export function onlyField(field: ListingField, value: string | string[]): ListingOutput {
+  return {
+    title: "",
+    description: "",
+    shortDescription: "",
+    seoTitle: "",
+    seoDescription: "",
+    tags: [],
+    [field]: value,
+  } as ListingOutput
+}
