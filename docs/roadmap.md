@@ -323,9 +323,11 @@ code landed:**
 2. One job runs through Trigger.dev rather than the in-process queue. **Ran.** A
    `generate_listing` run on the Dev environment of a real project, picked up by a local
    worker, succeeded in nine seconds and settled the row exactly as the in-process queue
-   had. What is still an assumption: `sharp` as a build external, until a derivative job
-   runs on a worker, and a deployed worker at all, since Dev runs on the developer's
-   machine.
+   had. A `finalize_asset` run followed on an upload, and a `build_derivative` run
+   triggered by hand rendered an 800 by 600 JPEG through `sharp` on the worker in under
+   two seconds, so the build external holds. What is still an assumption is a deployed
+   worker at all, since the Dev environment runs on the developer's machine; that is
+   `pnpm jobs:deploy` against a Prod key, and it has not been run.
 
 What B1 deliberately does not do: meter generations (decision 13's free cap belongs to the
 entitlement service at C2), regenerate a single field, or restore an earlier generation.
