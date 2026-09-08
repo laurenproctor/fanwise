@@ -309,16 +309,23 @@ Built on 7 September 2026, on the branch `b1-ai-merchandising`:
   refuses it until a person has saved the editor since. That is B1's stand-in for approval;
   B2's review screen replaces it.
 
-**B1's exit is two claims, and neither has been run live:**
+**B1's exit is two claims, and both ran live on 7 September 2026, on the same day the
+code landed:**
 
 1. One real product composes for the connected Shopify store against the configured model,
    the validator passes it, and the cost recorded on the row is within a factor of two of
-   decision 12's estimate. The whole path is proven against a scripted provider in
-   `tests/db/ai-generation.test.ts`; the model has not been called.
-2. One job runs through Trigger.dev rather than the in-process queue. The queue is unit
-   tested against a fake client; no Trigger.dev project has been created and no task has been
-   deployed. `sharp` is declared external in `trigger.config.ts` and that is an assumption
-   until a derivative job runs on a worker.
+   decision 12's estimate. **Ran.** Three generations on the hosted dev project: 568 to 900
+   uncached input tokens, an 1,800-token cached prefix written each time, and $0.008 to
+   $0.014 per generation against the $0.010 to $0.014 estimate. The first composed product,
+   `Kerf Display`, was saved, published and taken live on the dev store the same afternoon.
+   Every row so far reads zero cache *reads*, because none was within five minutes of the
+   one before; two generations inside the window is the measurement still to take.
+2. One job runs through Trigger.dev rather than the in-process queue. **Ran.** A
+   `generate_listing` run on the Dev environment of a real project, picked up by a local
+   worker, succeeded in nine seconds and settled the row exactly as the in-process queue
+   had. What is still an assumption: `sharp` as a build external, until a derivative job
+   runs on a worker, and a deployed worker at all, since Dev runs on the developer's
+   machine.
 
 What B1 deliberately does not do: meter generations (decision 13's free cap belongs to the
 entitlement service at C2), regenerate a single field, or restore an earlier generation.

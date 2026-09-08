@@ -16,10 +16,10 @@ explicitly requested.
 ## Current step
 
 **Step: B1 (AI provider abstraction, FactSheet, merchandising profiles, factuality
-validator, generation logs, Trigger.dev) is code complete, started out of order on
-7 September 2026 while A6 and A8 wait on external parties. Its exit needs one composed
-listing against the configured model and one job carried by Trigger.dev, neither yet run
-live. Gate A is not passed.** See `docs/roadmap.md`. Implement the current step only. Do
+validator, generation logs, Trigger.dev) is done, started out of order on 7 September 2026
+while A6 and A8 wait on external parties. Both exit clauses ran live the same day: a composed
+listing against the configured model, published and live on the dev store, and a job carried
+by Trigger.dev. Gate A is not passed, and B2 does not begin until B1 is on `main`.** See `docs/roadmap.md`. Implement the current step only. Do
 not build ahead.
 
 ## Architecture invariants
