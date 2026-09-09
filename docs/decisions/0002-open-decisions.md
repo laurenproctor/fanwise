@@ -90,6 +90,25 @@ minimum, and it surfaced a required generative AI disclosure the spec had not se
 Section 13 of the spec now carries thirteen questions, three of them new, and the login is
 still the only way to settle the rest.
 
+### 25. Get a live WooCommerce store
+
+B8 is code complete and its exit has not run. It needs a WordPress site with WooCommerce
+active, on HTTPS with pretty permalinks, which is any managed WordPress host and an
+afternoon. Nothing to apply for and nobody to wait on, so it sits in this section as a
+prerequisite rather than as someone else's queue.
+
+Five questions in `docs/channels/woocommerce.md` §13 can only be settled there, and two of
+them decide code: the order of the store's POST and its redirect, which the callback route
+currently tolerates in either order, and whether an admin-attached file shows in the API's
+`downloads` array, which is what `activate` checks before it lets a product go live. If the
+second is wrong the draft gate is a false refusal and B8 is not done.
+
+The same store unblocks A7 on its own: a second live channel to orchestrate against Shopify,
+without waiting on Etsy's exit.
+
+**Recommendation:** get it now. After the Creative Market login it is the cheapest item on
+this page, and unlike that login it moves two steps.
+
 ---
 
 ## Shopify, before any public launch
@@ -348,9 +367,13 @@ into `docs/billing.md` rule 4 either way.
 **Overtaken in part on 8 September 2026.** WooCommerce was scheduled and built as B8 before
 this was decided, and its migration (`20260908090000_woocommerce_channel`) took the first
 reading: `billable = false`, with a comment saying the decision is still open and that
-flipping it is one migration. Nothing bills before C1 either way. What is still owed is the
-sentence in `docs/billing.md` rule 4, which says "the owned storefront", singular, and now
-describes two rows.
+flipping it is one migration. Nothing bills before C1 either way. `docs/billing.md` rule 4
+and the pricing paragraph in `CLAUDE.md` were rewritten the same day to name both rows and
+this decision, so no document now describes one row where there are two. What is still owed
+is the decision itself, and its deadline moved: not before B8, which has passed, but before
+the pricing page is public, alongside 16 and 18. That page already lists WooCommerce as
+Included, which is the first reading answered by accident, the way contradictions 2 and 3
+below were.
 
 ### 16. Assisted versus automatic pricing
 

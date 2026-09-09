@@ -2,8 +2,10 @@
 
 The second owned storefront, and the first channel with native digital products. Written
 against the WooCommerce REST API `wc/v3` and the store authorization endpoint `wc-auth/v1`,
-8 September 2026. Items marked **[verify]** could not be confirmed from the published
-reference and need checking against a live store.
+8 September 2026, and built as B8 the same day. Items marked **[verify]** could not be
+confirmed from the published reference and need checking against a live store. The roadmap's
+B8 section records what was built and what the exit still owes; the store itself is decision
+25 in `docs/decisions/0002`.
 
 The assessment that preceded this is in `docs/channel-feasibility.md`. Read it first for the
 one hard problem, which this spec inherits rather than solves: **the file**.
