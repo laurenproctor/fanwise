@@ -49,6 +49,7 @@ Keep these here only as pointers. Do not relitigate them from this file.
 | Credentials key rotation plan | Written 4 September 2026, before the first token was stored. `key_version` selects the key a row opens with; rotation is a migration, not a guess | `docs/decisions/0003` |
 | `listing_manual_steps` | Landed at A5 with Shopify, migration `20260904190000_shopify_publishing`, and described in the data model | `docs/data-model.md` |
 | `next dev` writes into `CLAUDE.md` | Committed, 5 September 2026. The block is part of the file, so a dev run no longer dirties the tree | `CLAUDE.md`, the `nextjs-agent-rules` block |
+| Who sends Fanwise's email | Resend, over SMTP from a verified subdomain. Wired in `supabase/config.toml` and applied by `pnpm auth:push`, which refuses to run until the four `SMTP_*` values are set. Decided 9 September 2026 | `docs/decisions/0006` |
 
 ---
 
@@ -153,51 +154,6 @@ product.
 
 **Recommendation:** start the conversation during A5. A creator who has agreed in principle
 two steps early is a very different prospect from one approached the week the gate is ready.
-
-### 20. Who sends Fanwise's email
-
-Discovered on 5 September 2026, pushing `config.toml` to a hosted Supabase project:
-
-> Email template modification is not available for free tier projects using the default email
-> provider. Please upgrade your plan or configure a custom SMTP provider.
-
-Two consequences, and the second is the one that matters.
-
-Signup on a hosted project defaults to requiring email confirmation, and the built-in sender
-is rate limited to a handful of messages an hour. The first few signups on a fresh project
-fail with "Too many attempts", which is our own normalization of a rate limit nobody has hit
-locally, because local runs with `enable_confirmations = false`.
-
-The real problem is the recovery template. `supabase/templates/recovery.html` exists because
-the stock template returns a PKCE code that only works in the browser that asked for the
-reset — someone who requests a reset on a laptop and opens the mail on their phone gets an
-invalid link, and recovery is exactly the flow where that happens. That template cannot be
-installed on the default provider. So a deployment on the built-in sender silently reverts to
-the stock template and reacquires the bug the custom one was written to fix. Nothing errors.
-Password recovery simply half-works, on the flow least likely to be exercised before a real
-person needs it.
-
-This is grouped at Gate A exit rather than later because that gate puts an outside creator on
-a deployed instance. That is the first moment the built-in sender stops being adequate.
-
-**Recommendation:** configure custom SMTP before anyone outside the team touches a deployed
-project, and treat the provider as part of the environment rather than a detail of the auth
-config. Resend or Postmark, chosen for deliverability on transactional mail rather than
-price; the volume through Gate A is trivial either way. Until then, a dev project runs with
-`enable_confirmations` off and no custom template, and `pnpm test:e2e` continues to prove the
-recovery flow against local Supabase, where the template does load.
-
-**Wired on 9 September 2026, not yet on.** `supabase/config.toml` carries a
-`[remotes.production]` block: the live site URL and redirect allowlist, and an SMTP section
-whose host, user, password and From address are `env()` references to `SMTP_HOST`,
-`SMTP_USER`, `SMTP_PASS` and `SMTP_ADMIN_EMAIL`. Those four are listed blank in
-`.env.example`, and the app never reads them. `pnpm auth:push` loads them from `.env.local`
-and applies the file to the hosted project, installing the custom recovery template in the
-same push. It refuses to run while any of the four is blank, because a half-filled block
-would enable SMTP with an empty host and stop every auth email. What remains is the provider
-choice above, a verified sending domain, and the four values. Until then the hosted project
-is on the built-in sender, with the site URL and allowlist set by hand in the dashboard on
-8 September 2026.
 
 ### 24. Where the generative AI disclosure lives
 

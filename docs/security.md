@@ -112,8 +112,8 @@ deployment whose template has not been updated degrades rather than breaks. **A 
 does not inherit `config.toml` on its own. `pnpm auth:push` applies it, including the
 `[remotes.production]` overrides that set the live site URL, the redirect allowlist and the
 SMTP provider, and installs this template in the same push. Supabase's built-in sender rejects
-custom templates, so the push is refused until the four `SMTP_*` variables are set; decision
-20 in `docs/decisions/0002-open-decisions.md` is the account.**
+custom templates, so the push is refused until the four `SMTP_*` variables are set. The
+provider is Resend, and `docs/decisions/0006-transactional-email.md` is the account.**
 
 ## Password recovery
 
@@ -152,8 +152,8 @@ deployment whose template has not been updated degrades rather than breaks. **A 
 does not inherit `config.toml` on its own. `pnpm auth:push` applies it, including the
 `[remotes.production]` overrides that set the live site URL, the redirect allowlist and the
 SMTP provider, and installs this template in the same push. Supabase's built-in sender rejects
-custom templates, so the push is refused until the four `SMTP_*` variables are set; decision
-20 in `docs/decisions/0002-open-decisions.md` is the account.**
+custom templates, so the push is refused until the four `SMTP_*` variables are set. The
+provider is Resend, and `docs/decisions/0006-transactional-email.md` is the account.**
 
 ## AI prompts
 
