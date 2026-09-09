@@ -1,6 +1,15 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import { clientEnv } from "@/lib/env"
+import {
+  applicationPolicy,
+  createNonce,
+  cspReportUri,
+  environmentFrom,
+  isStaticMarketingRoute,
+  marketingPolicy,
+  marketingReportOnlyPolicy,
+} from "@/lib/security/headers"
 import type { Database } from "@/lib/supabase/database.types"
 
 /**
@@ -13,6 +22,14 @@ import type { Database } from "@/lib/supabase/database.types"
  * The redirect below is a convenience, not authorization. Every protected route
  * re-checks the user server-side; "the proxy redirected them" is not a security
  * boundary, per docs/security.md rule 7.
+ *
+ * It is also where the Content-Security-Policy is decided, because a nonce has
+ * to be minted per request and handed to Next before the page renders. Next
+ * reads it from the request's Content-Security-Policy header and stamps it on
+ * every script it emits, so nothing in a layout has to read headers() and
+ * nothing becomes dynamic that was not already. The prerendered marketing
+ * routes cannot carry a nonce and get the policy without a script rule; see
+ * lib/security/headers.ts and ADR 0007.
  */
 
 // `/reset-password` is public because the recovery session may already be gone
@@ -46,8 +63,37 @@ export function isPublic(pathname: string): boolean {
 }
 
 export default async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request })
   const env = clientEnv()
+  const environment = environmentFrom(process.env)
+  const policyInput = { environment, supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL }
+  const marketing = isStaticMarketingRoute(request.nextUrl.pathname)
+  const nonce = marketing ? null : createNonce()
+  const policy = nonce ? applicationPolicy({ ...policyInput, nonce }) : marketingPolicy(policyInput)
+
+  // The request headers Next renders against. Rebuilt whenever the cookie
+  // store changes, because the Supabase client mutates the request's cookies
+  // and Next has to see the rotated values.
+  const forward = () => {
+    const headers = new Headers(request.headers)
+    if (nonce) headers.set("content-security-policy", policy)
+    return NextResponse.next({ request: { headers } })
+  }
+
+  const decorate = (response: NextResponse) => {
+    response.headers.set("Content-Security-Policy", policy)
+    if (marketing) {
+      response.headers.set(
+        "Content-Security-Policy-Report-Only",
+        marketingReportOnlyPolicy({
+          ...policyInput,
+          reportUri: cspReportUri(process.env.SENTRY_DSN),
+        }),
+      )
+    }
+    return response
+  }
+
+  let response = forward()
 
   const supabase = createServerClient<Database>(
     env.NEXT_PUBLIC_SUPABASE_URL,
@@ -57,7 +103,7 @@ export default async function proxy(request: NextRequest) {
         getAll: () => request.cookies.getAll(),
         setAll: (items) => {
           items.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({ request })
+          response = forward()
           items.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
         },
       },
@@ -74,16 +120,16 @@ export default async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = "/sign-in"
     url.search = ""
-    return NextResponse.redirect(url)
+    return decorate(NextResponse.redirect(url))
   }
 
-  return response
+  return decorate(response)
 }
 
 export const config = {
   matcher: [
     // Everything except Next internals and static assets. The negative lookahead
-    // keeps the auth round-trip off image and font requests.
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
+    // keeps the auth round-trip off image, font and script-file requests.
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?|js)$).*)",
   ],
 }
