@@ -187,6 +187,18 @@ price; the volume through Gate A is trivial either way. Until then, a dev projec
 `enable_confirmations` off and no custom template, and `pnpm test:e2e` continues to prove the
 recovery flow against local Supabase, where the template does load.
 
+**Wired on 9 September 2026, not yet on.** `supabase/config.toml` carries a
+`[remotes.production]` block: the live site URL and redirect allowlist, and an SMTP section
+whose host, user, password and From address are `env()` references to `SMTP_HOST`,
+`SMTP_USER`, `SMTP_PASS` and `SMTP_ADMIN_EMAIL`. Those four are listed blank in
+`.env.example`, and the app never reads them. `pnpm auth:push` loads them from `.env.local`
+and applies the file to the hosted project, installing the custom recovery template in the
+same push. It refuses to run while any of the four is blank, because a half-filled block
+would enable SMTP with an empty host and stop every auth email. What remains is the provider
+choice above, a verified sending domain, and the four values. Until then the hosted project
+is on the built-in sender, with the site URL and allowlist set by hand in the dashboard on
+8 September 2026.
+
 ### 24. Where the generative AI disclosure lives
 
 Discovered on 7 September 2026 from Creative Market's upload form. Every product must answer,

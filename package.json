@@ -19,7 +19,8 @@
     "test:e2e": "playwright test",
     "db:start": "supabase start",
     "db:reset": "supabase db reset",
-    "db:types": "supabase gen types typescript --local > lib/supabase/database.types.ts"
+    "db:types": "supabase gen types typescript --local > lib/supabase/database.types.ts",
+    "auth:push": "bash scripts/push-auth-config.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.124.0",

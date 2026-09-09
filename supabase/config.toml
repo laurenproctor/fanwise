@@ -52,3 +52,40 @@ content_path = "./supabase/templates/recovery.html"
 [analytics]
 enabled = true
 port = 54427
+
+# --- Hosted project overrides -----------------------------------------------
+# Everything above describes the local stack. `supabase config push` applies
+# this file to a hosted project, and the block below is what changes when the
+# target is production. The CLI selects it by matching `project_id` against the
+# ref it is pushing to. A local `supabase start` never reads it, and the env()
+# references below stay unresolved locally without error (checked against CLI
+# 2.101.0, the version CI pins).
+#
+# Push with `pnpm auth:push`, never `supabase config push` by hand. The script
+# refuses to run until every SMTP variable is set, because pushing this block
+# half-filled would enable SMTP with an empty host and stop every auth email,
+# and Supabase's built-in provider rejects the custom recovery template anyway
+# (decision 20 in docs/decisions/0002-open-decisions.md).
+[remotes.production]
+project_id = "whepzmlbhhuxjswezall"
+
+[remotes.production.auth]
+site_url = "https://fanwise.vercel.app"
+additional_redirect_urls = ["https://fanwise.vercel.app/**"]
+
+# Wired, not yet on. Turning it on is: pick a provider (Resend or Postmark,
+# per decision 20), put its four values in .env.local, run `pnpm auth:push`.
+# The push installs the custom recovery template in the same call, which is
+# what makes cross-device password reset work on the hosted project.
+#
+# The port is pinned rather than read from the environment because env()
+# substitutes strings and this field is an integer. 587 is STARTTLS, which both
+# recommended providers use; a provider that wants 465 needs this line edited.
+[remotes.production.auth.email.smtp]
+enabled = true
+host = "env(SMTP_HOST)"
+port = 587
+user = "env(SMTP_USER)"
+pass = "env(SMTP_PASS)"
+admin_email = "env(SMTP_ADMIN_EMAIL)"
+sender_name = "Fanwise"

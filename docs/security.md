@@ -109,8 +109,11 @@ returns a PKCE code, which only works in the browser that asked for the reset: a
 requests a reset on a laptop and opens the mail on their phone gets an invalid link, and
 recovery is exactly the flow where that happens. `/auth/confirm` still accepts a code, so a
 deployment whose template has not been updated degrades rather than breaks. **A hosted project
-does not inherit `config.toml`, so the template has to be set on the project itself, and the
-`/auth/confirm` URL added to its redirect allowlist.**
+does not inherit `config.toml` on its own. `pnpm auth:push` applies it, including the
+`[remotes.production]` overrides that set the live site URL, the redirect allowlist and the
+SMTP provider, and installs this template in the same push. Supabase's built-in sender rejects
+custom templates, so the push is refused until the four `SMTP_*` variables are set; decision
+20 in `docs/decisions/0002-open-decisions.md` is the account.**
 
 ## Password recovery
 
@@ -146,8 +149,11 @@ returns a PKCE code, which only works in the browser that asked for the reset: a
 requests a reset on a laptop and opens the mail on their phone gets an invalid link, and
 recovery is exactly the flow where that happens. `/auth/confirm` still accepts a code, so a
 deployment whose template has not been updated degrades rather than breaks. **A hosted project
-does not inherit `config.toml`, so the template has to be set on the project itself, and the
-`/auth/confirm` URL added to its redirect allowlist.**
+does not inherit `config.toml` on its own. `pnpm auth:push` applies it, including the
+`[remotes.production]` overrides that set the live site URL, the redirect allowlist and the
+SMTP provider, and installs this template in the same push. Supabase's built-in sender rejects
+custom templates, so the push is refused until the four `SMTP_*` variables are set; decision
+20 in `docs/decisions/0002-open-decisions.md` is the account.**
 
 ## AI prompts
 
