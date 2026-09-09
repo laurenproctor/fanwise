@@ -19,9 +19,10 @@ import {
  * to the provider; a channel without one writes a row. The mocks are the second
  * kind and are the only ones left.
  *
- * Disconnecting is destructive and irreversible from here, so it confirms. At
- * C1 it also becomes a billing event, and the confirmation copy will need to say
- * so, because a click that changes an invoice should say that it does.
+ * Disconnecting is destructive and irreversible from here, so it confirms.
+ * Since C1 it is also a billing event, and the confirmation says so when the
+ * channel bills, because a click that changes an invoice should say that it
+ * does.
  */
 
 export interface OAuthPrompt {
@@ -39,6 +40,7 @@ export function ConnectButton({
   publishedCount,
   oauth,
   needsReauthorization,
+  billable,
 }: {
   workspaceSlug: string
   channelKey: string
@@ -71,6 +73,11 @@ export function ConnectButton({
    * connection id, so the listings hanging off it are untouched.
    */
   needsReauthorization?: boolean
+  /**
+   * Whether this channel is charged per connection. Read from the channel
+   * row, never decided here: the copy below changes, the behaviour does not.
+   */
+  billable?: boolean
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -217,6 +224,9 @@ export function ConnectButton({
           <p className="text-[13px] text-[var(--color-ink-2)]">
             Disconnecting {channelName} removes its listings from Fanwise. Anything already
             published stays on {channelName}.
+            {billable
+              ? " You have paid for this channel through the end of the current billing period, and it comes off the next invoice."
+              : ""}
           </p>
           <div className="flex gap-2">
             <Button onClick={disconnect} disabled={pending}>

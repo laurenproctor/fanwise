@@ -168,6 +168,28 @@ restoring a generation stamps `metadata.composedAt`; the publish that follows st
 `approved_at`, in the action, before the send. Rule 7 applies: the stamp is in the action,
 not in whether the button said "Review and publish".
 
+## Billing webhooks
+
+Built at C1, in `app/api/billing/webhook/route.ts` and `lib/billing`. Nobody is signed in
+and nothing in the request is trusted. The order is the security of the route:
+
+1. the raw body is read as text, because the signature covers the bytes and a
+   parsed-then-reserialized body does not verify
+2. the gateway verifies the signature before any field is read (rule 5); a body with no
+   signature, or one signed with another secret, is a 400 and nothing is touched
+3. the event is recorded by the provider's own id in `billing_webhook_events`, so a
+   redelivery collides at the database rather than being re-applied
+4. only then is the event applied, through the service role, scoped to the workspace the
+   subscription names in metadata or, failing that, the workspace whose customer id matches.
+   A subscription that matches neither is ignored: nothing here creates a billing row from a
+   stranger's event
+
+The provider's secret key and webhook secret are parsed in `lib/billing/providers`, lazily,
+like every other vendor's. Nothing in `lib/billing` logs a provider response body; the ledger
+keeps a provider's original refusal, which is a subscription item and never a credential.
+The idempotency keys the sync job sends are persisted on the ledger row before the call,
+one per attempt, so a retry can never be a second write.
+
 ## The three things that never bend
 
 RLS, idempotency checks, and the factuality validator. If a feature appears to require

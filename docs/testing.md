@@ -34,6 +34,15 @@ snapshot and a FactSheet hash. The vendor's request shape is checked in
 `tests/unit/ai-provider.test.ts` with a fetch that answers from a script, so the schema, the
 effort and the cache marker are asserted without a network. No test calls the model.
 
+**C1's billing is proved in two halves that meet at the ledger.** `tests/unit/billing.test.ts`
+is the rules — the arithmetic, the proration decision, the trial arithmetic — and the webhook
+path with a body signed the way the vendor signs one, so the signature check under test is
+the real one. `tests/db/billing.test.ts` is the part no unit test can reach: that a
+connection row and its billing event are one transaction, that the ledger and the billing
+row are readable by members and writable by nobody in the browser, and that the sync job
+sets the right quantity with the right proration and the right key, on success and on each
+kind of failure. No test calls the provider.
+
 **A5's idempotency is proved at the database, not in the browser**, in
 `tests/db/publication-idempotency.test.ts`. That suite drives the real job row, the real
 unique constraint and the real runner, and checks the three guards from
@@ -79,7 +88,10 @@ the product heading, usually.
 9. **Workspace A attempts Workspace B access, denied.** *(covered at A1, in the browser at
    `tests/e2e/journey-09-tenancy.spec.ts` and at the database in `tests/db/tenancy.test.ts`;
    extended to the A3 tables in `tests/db/channel-tenancy.test.ts`)*
-10. Trial to subscription.
+10. Trial to subscription. *(code complete at C1; the settings page shows the trial and the
+    two checkouts, and `tests/db/billing.test.ts` proves the ledger, the tenancy and the sync
+    job against real Postgres with the provider scripted. Unrun in the browser: it needs a
+    provider account in test mode)*
 
 Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, the product
 is broken in the way that matters most.

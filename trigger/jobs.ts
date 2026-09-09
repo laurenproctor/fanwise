@@ -47,3 +47,12 @@ export const generateListing = task({
   retry: { maxAttempts: 1 },
   run: async (payload: JobPayloads["generate_listing"]) => handlers.generate_listing(payload),
 })
+
+export const syncBilling = task({
+  id: "sync_billing",
+  // Safe to retry: the job sets an absolute quantity and every attempt at a
+  // ledger row carries its own persisted key. A retryable provider failure
+  // is rethrown by the handler precisely so this fires.
+  retry: { maxAttempts: 3, minTimeoutInMs: 5_000, factor: 2 },
+  run: async (payload: JobPayloads["sync_billing"]) => handlers.sync_billing(payload),
+})

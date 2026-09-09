@@ -126,6 +126,7 @@ export default async function ChannelsPage({
                     connection ? missingScopes(adapter, connection.scopes).length > 0 : false
                   }
                   disabled={channel.status !== "available"}
+                  billable={channel.billable}
                   /*
                     Only the two strings the form needs. `adapter.oauth` holds
                     functions and a client secret's worth of behaviour; passing

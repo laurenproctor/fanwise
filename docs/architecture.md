@@ -103,6 +103,15 @@ The Trigger.dev queue, adopted at B1, is selected in `lib/jobs/index.ts` when
 `trigger/jobs.ts`. Both call the same handlers in `lib/jobs/handlers.ts`, so a job does not
 know which queue carried it, and nothing outside `lib/jobs/index.ts` knows which is in use.
 
+## Billing
+
+`lib/billing` owns the gateway contract, the pricing rules, the sync job and the webhook
+processor. Which vendor is configured is decided in `lib/billing/providers` by which key is
+present, and the vendor's name appears nowhere else: a unit test reads the tree for it. A
+connection row and its billing event are one transaction by trigger, and the sync job
+carries the ledger to the provider with an absolute quantity and one persisted key per
+attempt. See `docs/billing.md` for the rules and the mechanism.
+
 ## AI
 
 `lib/ai` owns the provider abstraction, the FactSheet, the prompt, the factuality validator

@@ -1,10 +1,19 @@
 import { notFound, redirect } from "next/navigation"
 import { getCurrentUser, getWorkspaceBySlug, listWorkspaceMembers } from "@/lib/workspaces/queries"
+import { getBillingOverview, listBillingLedger } from "@/lib/billing/queries"
+import { BillingPanel } from "@/components/billing/billing-panel"
+import { BillingLedger } from "@/components/billing/billing-ledger"
 import { routes } from "@/lib/routes"
 
 export const metadata = { title: "Settings · Fanwise" }
 
-export default async function SettingsPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function SettingsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ billing?: string }>
+}) {
   const user = await getCurrentUser()
   if (!user) redirect("/sign-in")
 
@@ -12,7 +21,12 @@ export default async function SettingsPage({ params }: { params: Promise<{ slug:
   const workspace = await getWorkspaceBySlug(slug)
   if (!workspace) notFound()
 
-  const members = await listWorkspaceMembers(workspace.id)
+  const [members, billing, ledger, { billing: billingNotice }] = await Promise.all([
+    listWorkspaceMembers(workspace.id),
+    getBillingOverview(workspace),
+    listBillingLedger(workspace.id),
+    searchParams,
+  ])
 
   return (
     <div className="flex flex-col gap-10">
@@ -22,8 +36,24 @@ export default async function SettingsPage({ params }: { params: Promise<{ slug:
           {workspace.name}
         </h1>
         <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
-          Who can reach this workspace, and where it lives. Every workspace is isolated from every
-          other one.
+          Who can reach this workspace, where it lives, and what it costs. Every workspace is
+          isolated from every other one.
+        </p>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="label-mono">Billing</h2>
+        <BillingPanel
+          workspaceSlug={workspace.slug}
+          state={billing.state}
+          billableConnections={billing.billableConnections}
+          notice={billingNotice ?? null}
+        />
+        <BillingLedger entries={ledger} />
+        <p className="text-[13px] text-[var(--color-ink-3)]">
+          Connecting a marketplace adds it to the next invoice, prorated for the rest of the period.
+          Disconnecting one keeps it through the end of the period you have paid for and takes it
+          off the invoice after that. Nothing is refunded mid-period.
         </p>
       </section>
 

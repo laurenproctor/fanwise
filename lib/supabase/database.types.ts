@@ -146,6 +146,99 @@ export type Database = {
           },
         ]
       }
+      billing_events: {
+        Row: {
+          applied_at: string | null
+          attempt_count: number
+          billable: boolean
+          channel_connection_id: string
+          channel_id: string
+          created_at: string
+          id: string
+          idempotency_key: string
+          kind: Database["public"]["Enums"]["billing_event_kind"]
+          normalized_error_code: string | null
+          normalized_error_message: string | null
+          provider_response: Json | null
+          status: Database["public"]["Enums"]["billing_event_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          applied_at?: string | null
+          attempt_count?: number
+          billable: boolean
+          channel_connection_id: string
+          channel_id: string
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          kind: Database["public"]["Enums"]["billing_event_kind"]
+          normalized_error_code?: string | null
+          normalized_error_message?: string | null
+          provider_response?: Json | null
+          status?: Database["public"]["Enums"]["billing_event_status"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          applied_at?: string | null
+          attempt_count?: number
+          billable?: boolean
+          channel_connection_id?: string
+          channel_id?: string
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          kind?: Database["public"]["Enums"]["billing_event_kind"]
+          normalized_error_code?: string | null
+          normalized_error_message?: string | null
+          provider_response?: Json | null
+          status?: Database["public"]["Enums"]["billing_event_status"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_events_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_webhook_events: {
+        Row: {
+          error: string | null
+          id: string
+          processed_at: string | null
+          received_at: string
+          type: string
+        }
+        Insert: {
+          error?: string | null
+          id: string
+          processed_at?: string | null
+          received_at?: string
+          type: string
+        }
+        Update: {
+          error?: string | null
+          id?: string
+          processed_at?: string | null
+          received_at?: string
+          type?: string
+        }
+        Relationships: []
+      }
       channel_connection_secrets: {
         Row: {
           channel_connection_id: string
@@ -785,6 +878,71 @@ export type Database = {
           },
         ]
       }
+      workspace_billing: {
+        Row: {
+          base_item_id: string | null
+          billing_interval: string | null
+          cancel_at_period_end: boolean
+          channel_item_id: string | null
+          channel_quantity: number
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          external_customer_id: string | null
+          external_subscription_id: string | null
+          period_peak_quantity: number
+          subscription_status:
+            | Database["public"]["Enums"]["subscription_status"]
+            | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          base_item_id?: string | null
+          billing_interval?: string | null
+          cancel_at_period_end?: boolean
+          channel_item_id?: string | null
+          channel_quantity?: number
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          external_customer_id?: string | null
+          external_subscription_id?: string | null
+          period_peak_quantity?: number
+          subscription_status?:
+            | Database["public"]["Enums"]["subscription_status"]
+            | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          base_item_id?: string | null
+          billing_interval?: string | null
+          cancel_at_period_end?: boolean
+          channel_item_id?: string | null
+          channel_quantity?: number
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          external_customer_id?: string | null
+          external_subscription_id?: string | null
+          period_peak_quantity?: number
+          subscription_status?:
+            | Database["public"]["Enums"]["subscription_status"]
+            | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_billing_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_members: {
         Row: {
           created_at: string
@@ -893,6 +1051,8 @@ export type Database = {
         | "screenshot"
         | "promotional"
         | "other"
+      billing_event_kind: "channel_connected" | "channel_disconnected"
+      billing_event_status: "pending" | "applied" | "skipped" | "failed"
       channel_integration_type: "api" | "assisted"
       channel_status: "available" | "coming_soon" | "unavailable"
       connection_status: "active" | "expired" | "revoked" | "error"
@@ -932,6 +1092,15 @@ export type Database = {
         | "unpublish"
         | "generate"
         | "restore"
+      subscription_status:
+        | "incomplete"
+        | "incomplete_expired"
+        | "trialing"
+        | "active"
+        | "past_due"
+        | "canceled"
+        | "unpaid"
+        | "paused"
       workspace_role: "owner" | "admin" | "editor" | "viewer"
     }
     CompositeTypes: {
@@ -1643,6 +1812,8 @@ export const Constants = {
         "promotional",
         "other",
       ],
+      billing_event_kind: ["channel_connected", "channel_disconnected"],
+      billing_event_status: ["pending", "applied", "skipped", "failed"],
       channel_integration_type: ["api", "assisted"],
       channel_status: ["available", "coming_soon", "unavailable"],
       connection_status: ["active", "expired", "revoked", "error"],
@@ -1685,6 +1856,16 @@ export const Constants = {
         "unpublish",
         "generate",
         "restore",
+      ],
+      subscription_status: [
+        "incomplete",
+        "incomplete_expired",
+        "trialing",
+        "active",
+        "past_due",
+        "canceled",
+        "unpaid",
+        "paused",
       ],
       workspace_role: ["owner", "admin", "editor", "viewer"],
     },

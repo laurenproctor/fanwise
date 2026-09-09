@@ -5,6 +5,7 @@ import { storeConnectionCredentials } from "@/lib/credentials"
 import { consumeAuthorizationState, pruneExpiredStates } from "@/lib/channels/oauth"
 import { findAdapter } from "@/lib/channels/registry"
 import { normalizeUnknown } from "@/lib/channels/errors"
+import { jobs } from "@/lib/jobs"
 
 /**
  * The grant endpoint, for every channel whose provider posts the credential.
@@ -86,6 +87,8 @@ export async function POST(
       connectionId: connection.id,
       credentials: verified.credentials,
     })
+
+    await jobs.enqueue("sync_billing", { workspaceId: consumed.workspaceId })
   } catch (error) {
     // The body of this request held the store's keys. Only the normalized
     // code is logged, and only a sentence goes back.
