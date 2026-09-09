@@ -22,8 +22,8 @@ than against the ten:
 - `journey-04-listing-editor.spec.ts` (A4): a person hand-writes a listing per channel and
   watches deterministic readiness resolve, with no AI involved.
 - `journey-05-publish.spec.ts` (A5): a product publishes, and clicking Publish again creates
-  nothing. Run against the mock API channel, because A5's exit test needs a live Shopify
-  connection that does not exist yet.
+  nothing. Run against the mock API channel, because the e2e suite has no live Shopify
+  connection; A5's exit ran by hand against the live store, see `docs/roadmap.md`.
 
 **B1's validator is proved twice.** `tests/unit/factuality.test.ts` is the vocabulary: every
 way a model could state a number, a format, a compatibility or a claim the facts do not
@@ -71,7 +71,9 @@ the product heading, usually.
    with field regenerate and restore is code complete at B2 and proven in
    `tests/db/ai-review.test.ts`; approval is the publish click; unrun in the browser)*
 3. Connect Shopify, publish. *(code complete at A5, unverified: needs a live shop)*
-4. Connect Etsy, publish.
+4. Connect Etsy, publish. *(code complete at A6, unverified: needs a live shop. The OAuth
+   flow and the adapter are covered in `tests/unit/etsy-oauth.test.ts` and
+   `tests/unit/etsy-adapter.test.ts`)*
 5. Publish to Shopify and Etsy in one action.
 6. Publication failure, correction, retry, no duplicate.
 7. Generate a Creative Market submission package.
@@ -83,6 +85,11 @@ the product heading, usually.
 
 Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, the product
 is broken in the way that matters most.
+
+**WooCommerce is not one of the ten** because it arrived at B8, after the list was written.
+Its exit is in `docs/channels/woocommerce.md` and needs a live store; the authorization
+handshake and the adapter are covered in `tests/unit/woocommerce-oauth.test.ts` and
+`tests/unit/woocommerce-adapter.test.ts`.
 
 **Password recovery is not one of the ten**, because it is not a step on the path from empty
 workspace to live listing. It is covered anyway, in two halves that meet at the token:

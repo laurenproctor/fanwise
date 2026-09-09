@@ -1,18 +1,20 @@
 # Roadmap
 
-**Current step: B2, the listing review, code complete 8 September 2026 on the branch
-`b2-listing-review`; see "B2" under Gate B. B1 is on `main`.** A5 is done and promoted to
-`main`; all three exit clauses ran against a live Shopify store. What remains of Gate A is
-blocked on things no code can move: A6 on Etsy's developer app and commercial access, A8 on a
-Creative Market seller login, and the gate's own exit — an outside creator, unassisted — on a
-real portfolio to hand them. B1 (AI provider abstraction, FactSheet, factuality validator,
-Trigger.dev) depends on none of those and on nothing after A5, so it starts now. **Gate A is
-not passed.** A6, A7 and A8 resume the moment their blockers clear, and Gate A's exit test is
-still owed before Gate B's is attempted. See "Reordering" below.
+**Current step: A6, Etsy, code complete 8 September 2026 and on `main`; its exit needs a
+live shop, and five request-shape questions in `docs/channels/etsy.md` §13 wait on the same
+thing. B1, B2 and B8 are also on `main`, each code complete with its exit unrun; see their
+sections under Gate B.** A5 is done; all three exit clauses ran against a live Shopify store.
+What remains of Gate A is blocked on things no code can move: A6's exit on a live Etsy shop,
+A7 on a second live channel to orchestrate (which is A6's exit), A8 on a Creative Market
+seller login, and the gate's own exit — an outside creator, unassisted — on a real portfolio
+to hand them. **Gate A is not passed.** Gate A's exit test is still owed before Gate B's is
+attempted. See "Reordering" below.
 
 Before B1 opened, two decisions in `docs/decisions/0002` were owed answers: 12 (model and
 cost per generation) and 13 (metered or unlimited). Both were decided on 7 September 2026,
-and the model key is set on the development environment.**
+and the model key is set on the development environment.
+
+---
 
 Three gates. Nothing after a gate begins until the gate passes. Update the line above when a
 step completes, and do not work on more than one step at a time.

@@ -44,6 +44,11 @@ Keep these here only as pointers. Do not relitigate them from this file.
 | Re-verify ADR 0001 before A5 | Done, 4 September 2026. Shopify still has no digital-file API, so the ADR stands unchanged | this file |
 | Reconnect gaming | A connection bills for a minimum of one full period | `CLAUDE.md`, pricing |
 | V1 roles | Owner only. The enum holds four, the UI exposes one | `docs/data-model.md`, A1 |
+| The three app registrations | All approved by 8 September 2026: Shopify by 5 September, Etsy's developer app and commercial access by 8 September. Submission dates went unrecorded | `docs/roadmap.md`, dependency table |
+| How a Shopify product reaches a sales channel | Option A, Fanwise publishes it. `activate` sets ACTIVE then calls `publishablePublish`; two publication scopes, and Reconnect keeps the listings. Decided 7 September 2026, ran live the same day | `docs/decisions/0004`, `docs/channels/shopify.md` §16 |
+| Credentials key rotation plan | Written 4 September 2026, before the first token was stored. `key_version` selects the key a row opens with; rotation is a migration, not a guess | `docs/decisions/0003` |
+| `listing_manual_steps` | Landed at A5 with Shopify, migration `20260904190000_shopify_publishing`, and described in the data model | `docs/data-model.md` |
+| `next dev` writes into `CLAUDE.md` | Committed, 5 September 2026. The block is part of the file, so a dev run no longer dirties the tree | `CLAUDE.md`, the `nextjs-agent-rules` block |
 
 ---
 
@@ -51,24 +56,6 @@ Keep these here only as pointers. Do not relitigate them from this file.
 
 These cost nothing to start and cannot be hurried once started. They are first because the
 queue is not ours.
-
-### 1. The three app registrations
-
-**Status:** all three approved as of 8 September 2026. Shopify by 5 September, Etsy's
-developer app and commercial access by 8 September. Submission dates were not recorded for
-any of them. A6 is unblocked; the keystring and shared secret go in `.env.local` as
-`ETSY_CLIENT_ID` and `ETSY_CLIENT_SECRET`, and the callback URL has to be registered on the
-app exactly as `.env.example` states.
-
-Etsy developer app, Etsy commercial access, Shopify Partner account. None blocks A3 or A4,
-which are mock-only. The Shopify Partner account gates **A5's exit test**, and it is
-self-serve and free, so it is minutes of work rather than a queue. Etsy commercial access is
-different: discretionary, no published SLA, applicants report waiting weeks, and it gates
-A6.
-
-**Recommendation:** treat Etsy commercial access as the single largest schedule risk in
-Gate A and file it before anything else. Record real submission dates in the roadmap's
-dependency table as each goes in.
 
 ### 2. Email Gumroad about their product API
 
@@ -105,7 +92,7 @@ still the only way to settle the rest.
 
 ---
 
-## Before A5, Shopify
+## Shopify, before any public launch
 
 ### 4. Shopify app type: public or custom
 
@@ -118,65 +105,6 @@ and a much shorter path to a working publish.
 **Recommendation:** custom app for Gate A. The alpha is a handful of creators, review is a
 queue Fanwise does not control, and the OAuth code is nearly identical either way. Revisit
 before any public launch, because a custom app does not scale to self-serve signup.
-
-### 4a. How a Shopify product reaches a sales channel
-
-**Written up as ADR 0004, 7 September 2026, and still open.** The register entry stays as the
-index pointer; the options, their costs and the recommendation live in
-`0004-shopify-sales-channel-publication.md`. Two things found since this entry was written
-change the arithmetic rather than the shape: the ask is **two** scopes, `read_publications`
-as well as `write_publications`, because a publication cannot be published to before it is
-enumerated; and Fanwise runs its own OAuth rather than Shopify's managed installation, so
-nothing prompts an existing creator on its behalf and `channel_connections.scopes` is written
-by one line and read by none.
-
-**Found by running A5's exit test on 6 September 2026, and it blocks the last clause.**
-
-`status: ACTIVE` does not make a product purchasable. Both live products read
-`publishedAt: null` and `onlineStoreUrl: null`: they are active and on no sales channel, so
-no storefront page exists and no buyer can reach them. `activate()` sets status and nothing
-else, which is all `productSet` can do.
-
-Two ways to answer it, and they are not close in cost.
-
-**Fanwise publishes to the channel.** Needs `publishablePublish` and a publications scope
-this app does not request. Adding a scope re-authorises every existing connection, so it is
-not a silent change even at three connections. It is the answer that makes **Publish
-Everywhere** mean what it says.
-
-**The creator publishes it.** Becomes a manual step beside `attach_digital_file`, with the
-same standing: Fanwise says what to do, the creator asserts it is done, and `status_source`
-stays honest about who confirmed it. Cheap, and consistent with ADR 0001's shape for things
-Shopify will not let an app do — except that Shopify *will* let an app do this one, so the
-manual step would be a choice rather than a limit.
-
-**Recommendation:** the manual step for Gate A, the scope afterwards. Gate A is about closing
-the loop with a handful of creators, and a re-authorisation of every connection is a poor
-thing to spend that on; the step is reversible into the scope later, and the reverse is not
-true. Whichever is chosen, `liveness` must stop reporting `live` as "available to buy" for a
-product on no sales channel — that half is not optional and does not wait for this decision.
-
-### 5. The credentials encryption key rotation plan
-
-`docs/security.md` says the rotation plan is written **before** the first real credential is
-stored, not after. A5 is where that clock runs out.
-
-The schema is ready: `channel_connection_secrets` carries `key_version` precisely so rotation
-is a migration rather than a guess. What is missing is the written procedure — how a new key
-is introduced, how rows are re-sealed, and what happens to a connection whose key version is
-retired.
-
-**Recommendation:** write it as `0003` before the first token is stored.
-
-### 6. `listing_manual_steps`
-
-ADR 0001 introduces this table and `docs/data-model.md` does not describe it. It carries the
-outstanding `attach_digital_file` step that makes "fully published" a derived condition
-rather than a status value.
-
-**Recommendation:** land it at A5 with Shopify rather than at A3, and add it to the data
-model in the same PR. It is Shopify's problem first, and A3 should not have built a table it
-could not test.
 
 ---
 
@@ -199,13 +127,6 @@ Which normalized error codes are retryable, how many attempts, what backoff.
 **Recommendation:** one table, owned by `lib/publishing`, not a judgement made per adapter.
 An adapter that decides its own retry policy is an adapter that will eventually retry
 something non-idempotent.
-
-### 9. Is the in-process job queue enough through Gate A
-
-**Resolved 7 September 2026, by the reorder.** B1 started before A7 and brought Trigger.dev
-with it, so A7 is built on the durable queue rather than migrating to it. The change was
-behind `lib/jobs/index.ts` and nothing else, which was the point of the abstraction. What is
-still owed is a job actually carried by Trigger.dev on a deployment; see B1 in the roadmap.
 
 ### 10. Snapshot retention when a connection is disconnected
 
@@ -426,6 +347,13 @@ charges for reach into marketplaces and not for the creator's own shop, and a se
 is still the creator's own shop. Decide before WooCommerce is scheduled, and write the answer
 into `docs/billing.md` rule 4 either way.
 
+**Overtaken in part on 8 September 2026.** WooCommerce was scheduled and built as B8 before
+this was decided, and its migration (`20260908090000_woocommerce_channel`) took the first
+reading: `billable = false`, with a comment saying the decision is still open and that
+flipping it is one migration. Nothing bills before C1 either way. What is still owed is the
+sentence in `docs/billing.md` rule 4, which says "the owned storefront", singular, and now
+describes two rows.
+
 ### 16. Assisted versus automatic pricing
 
 **The largest open commercial decision.** Charging $6 for a channel Fanwise cannot publish to
@@ -476,8 +404,8 @@ them the de-facto answer to decisions they were never meant to settle.
 3. **The free plan exists nowhere in `docs/billing.md`**, which pre-answers decision 18.
 
 **Etsy and Creative Market stay marked "Live" on that page, and that is deliberate.** Neither
-is built — Etsy is A6 and Creative Market is A8, both unstarted — so the label is false today
-and will be true at Gate A exit. The mockup depicts the product at launch, and the marketing
+is live — Etsy is A6, code complete with its exit unrun, and Creative Market is A8, unstarted —
+so the label is false today and will be true at Gate A exit. The mockup depicts the product at launch, and the marketing
 site is its own deployment that ships after the gates rather than a route in this app, so it
 never renders while the claim is wrong. Framer was different in kind: no amount of shipping
 makes it true. Do not "correct" Etsy or Creative Market to Planned on the strength of item 1.
@@ -492,19 +420,3 @@ changed here, because it is a smaller claim than Framer's and it is entangled wi
 narrow `CLAUDE.md`'s grant so the mockups are authoritative for **visual system and channel
 modes** rather than for commercial policy. Item 1 is the precedent for how that correction
 goes: the artefact with the research behind it wins.
-
----
-
-## Housekeeping
-
-### 19. `next dev` writes into `CLAUDE.md`
-
-Running the dev server appends a `<!-- BEGIN:nextjs-agent-rules -->` block to `CLAUDE.md`,
-telling agents to read `node_modules/next/dist/docs/` before writing code. It is regenerated
-by `next dev` every time it is removed.
-
-It has been reverted rather than committed, because an instruction file should not change as
-a side effect of starting a server.
-
-**Recommendation:** decide once whether to commit the block or suppress it. An uncommitted
-change that reappears on every dev run is noise in every future diff.
