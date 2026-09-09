@@ -158,6 +158,17 @@ check.
 Requirements on the store: HTTPS, and pretty permalinks. Without permalinks the REST routes
 answer 404 `rest_no_route`, which is normalized to a sentence that says so.
 
+Requirements on Fanwise, learned on 9 September 2026 from the first live attempt: **a public
+HTTPS address.** The store refuses the authorization page outright when `callback_url` is
+not `https://`, printing "The callback_url needs to be over SSL" on its own screen before
+the creator sees an approve button. And an HTTPS callback is not enough if it is not
+reachable: the keys arrive by a POST from the store's server to `callback_url`, so a Fanwise
+on `localhost` never receives them, however the URL is spelled. Shopify and Etsy return
+through the creator's browser and worked from a local dev server; this is the first channel
+that does not. Set `NEXT_PUBLIC_APP_URL` to a public HTTPS origin, which means the hosted
+deployment or a tunnel to the dev server, before pressing Connect. `.env.example` says the
+same, beside the other channels' redirect URIs.
+
 **[verify]** the order of the POST and the redirect on a current WooCommerce, and whether
 `user_id` is echoed unchanged when it is a 43-character base64url string.
 
@@ -198,3 +209,9 @@ consumerSecret }`, sealed.
 4. Whether sideloading a Supabase signed URL completes inside the URL's lifetime on typical
    hosting. Shopify's did.
 5. Billing: `docs/decisions/0002` item 23.
+
+Partly settled on 9 September 2026, before the first connection: `houseofproctor.com`
+answers `GET /wp-json/wc/v3/` with the full route index and no credentials, so a store's
+permalinks and WooCommerce activity can be checked from a browser before Connect is pressed.
+Item 3 asks about the root index's `name`, which that read did not cover. The first Connect,
+from a local dev server, never reached the approve screen; §9 records why.
