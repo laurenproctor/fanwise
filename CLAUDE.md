@@ -6,8 +6,8 @@ Fanwise is a canonical digital-product operating system for creators who sell th
 product across multiple storefronts and marketplaces.
 
 Marketplace integrations are adapters around the Fanwise domain model. Never redesign the
-core product model around an external marketplace. Shopify and Etsy are initial
-destinations, not architectural authorities.
+core product model around an external marketplace. Shopify, Etsy and WooCommerce are
+initial destinations, not architectural authorities.
 
 Publishing is the initial wedge. Do not implement marketplace intelligence, automated
 optimization, browser automation, physical commerce, or unrelated SaaS features unless
@@ -18,9 +18,10 @@ explicitly requested.
 **Step: A6 (Etsy: OAuth with PKCE, adapter, images, the digital file, activate, idempotency)
 is code complete on 8 September 2026, the day Etsy's approvals landed. Its exit needs a live
 shop: connect, publish, and confirm the listing is purchasable; five request-shape questions
-in `docs/channels/etsy.md` §13 can only be settled there. B1, B2 and B8 are on `main`. Gate A
-is not passed; A8 resumes when a Creative Market login exists.** See `docs/roadmap.md`. Implement the current step only. Do
-not build ahead.
+in `docs/channels/etsy.md` §13 can only be settled there. B1, B2 and B8 are on `main`; B8's
+exit needs a live WooCommerce store, which needs no approval. Gate A is not passed; A8
+resumes when a Creative Market login exists.** See `docs/roadmap.md`. Implement the current
+step only. Do not build ahead.
 
 ## Architecture invariants
 
@@ -100,7 +101,9 @@ not Item. The central action is **Publish Everywhere**.
 ## Pricing model
 
 $9 per month base, plus $6 per connected external marketplace. One owned storefront
-(Shopify) is included at no channel charge. Annual billing is ten months for twelve.
+(Shopify) is included at no channel charge. WooCommerce, the second owned storefront, is
+seeded as included too; whether a second owned storefront should bill is decision 23 in
+`docs/decisions/0002`, still open. Annual billing is ten months for twelve.
 
 Billing consequences, which are not optional:
 
@@ -136,11 +139,12 @@ idempotency keys, revenue aggregation.
 Database: RLS, tenancy, membership, cascades, external ID uniqueness, transaction
 deduplication, snapshot immutability.
 
-Integration: mock Shopify, Etsy, Anthropic and Stripe. Cover OAuth token handling, product
-creation, upload, publish, retry, transaction ingestion, AI failure.
+Integration: mock Shopify, Etsy, WooCommerce, Anthropic and Stripe. Cover OAuth token
+handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
+AI failure.
 
-E2E: the ten journeys in `docs/testing.md`. Journey 9 (workspace A cannot reach workspace
-B) must never be skipped.
+E2E: the eleven journeys in `docs/testing.md`. Journey 9 (workspace A cannot reach
+workspace B) must never be skipped.
 
 ## Definition of done
 
