@@ -27,7 +27,7 @@ step completes, and do not work on more than one step at a time.
 | Etsy developer app | A6 | date unrecorded | by 8 Sep 2026 |
 | Etsy commercial access | A6 | date unrecorded | by 8 Sep 2026 |
 | Shopify Partner account | A5 | yes, date unrecorded | by 5 Sep 2026 |
-| WooCommerce test store | B8 exit, and A7 if it runs before Etsy's | nothing to file | n/a: any WordPress host on HTTPS with pretty permalinks |
+| WooCommerce test store | B8 exit, and A7 if it runs before Etsy's | nothing to file | exists, 9 Sep 2026: `houseofproctor.com`, permalinks on. Fanwise needs a public HTTPS origin to meet it |
 
 The WooCommerce row is not an application. It is in this table because it is the one thing
 B8's exit waits on, and because it is the cheapest unblock the roadmap has: no developer
@@ -405,9 +405,12 @@ read orders (`transactions: false` until B5), or bill (nothing bills before C1, 
 reads included either way).
 
 **B8's exit test has not run.** It needs a WooCommerce store on HTTPS with pretty
-permalinks, which is any WordPress host and no approval: connect from the store's own
-authorization screen, publish a draft, attach the file in the admin, mark the step done, and
-confirm that `activate` sees the download and the product is buyable. The five questions in
+permalinks, which is any WordPress host and no approval, and a Fanwise at a public HTTPS
+address, because the store posts the keys server to server and a local dev server cannot
+receive them (spec §9, learned 9 September 2026). The store exists as of that day; the run
+is on the hosted deployment: connect from the store's own authorization screen, publish a
+draft, attach the file in the admin, mark the step done, and confirm that `activate` sees
+the download and the product is buyable. The five questions in
 §13 of the spec, including the order of the store's POST and its redirect, can only be
 settled there. Journey 11 in `docs/testing.md` is that run.
 

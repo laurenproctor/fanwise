@@ -109,6 +109,14 @@ without waiting on Etsy's exit.
 **Recommendation:** get it now. After the Creative Market login it is the cheapest item on
 this page, and unlike that login it moves two steps.
 
+**Partly settled on 9 September 2026.** The store exists: `houseofproctor.com`, WooCommerce
+active, pretty permalinks on, the `wc/v3` route index readable without credentials. The first
+Connect, from a local dev server, failed on the store's own screen with "The callback_url
+needs to be over SSL", and that uncovered a requirement on Fanwise's side the spec had not
+stated: a public HTTPS origin, because the keys arrive by a server-to-server POST that no
+`localhost` can receive. §9 of the spec and `.env.example` now say so. The run moves to the
+hosted deployment, on a domain being bought for it. What is still owed is the run itself.
+
 ---
 
 ## Shopify, before any public launch
