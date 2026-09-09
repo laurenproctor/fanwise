@@ -1,5 +1,6 @@
 import { ChannelError, normalized } from "@/lib/channels/errors"
 import type { NormalizedError } from "@/lib/channels/errors"
+import type { OutboundError } from "@/lib/net/outbound"
 
 /**
  * WooCommerce's ways of saying no, into the one vocabulary Fanwise has.
@@ -106,9 +107,43 @@ export function transportError(error: unknown): NormalizedError {
     "network",
     `Fanwise could not reach ${CHANNEL}. This will be retried automatically.`,
     error instanceof Error
-      ? { name: error.name, message: error.message }
+      ? {
+          name: error.name,
+          message: error.message,
+          ...("kind" in error ? { kind: error.kind } : {}),
+        }
       : { value: String(error) },
   )
+}
+
+/**
+ * The outbound boundary would not send the request, or would not accept the
+ * answer. None of these is the store's fault in the moment, so none is
+ * retried, and none of them repeats an address or a header: the boundary's
+ * own message names the host and the kind and nothing else.
+ */
+export function refusedByBoundary(error: OutboundError): NormalizedError {
+  const raw = { name: error.name, kind: error.kind, message: error.message }
+  switch (error.kind) {
+    case "redirect":
+      return normalized(
+        "unknown",
+        `That ${CHANNEL} store sends requests on to a different address. Reconnect it using the address it sends them to.`,
+        raw,
+      )
+    case "body_too_large":
+      return normalized(
+        "unknown",
+        `${CHANNEL} answered with more data than Fanwise accepts. Nothing was confirmed, so the listing has not been marked published.`,
+        raw,
+      )
+    default:
+      return normalized(
+        "unknown",
+        `That ${CHANNEL} store's address does not point at a public https site, so Fanwise will not send its keys there. Reconnect the store using its public address.`,
+        raw,
+      )
+  }
 }
 
 export function fail(error: NormalizedError): never {
