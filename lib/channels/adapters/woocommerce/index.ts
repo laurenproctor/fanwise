@@ -11,7 +11,7 @@ import type {
   PublishResult,
   RequirementSpec,
 } from "@/lib/channels/types"
-import { createWooClient, type WooClient } from "./client"
+import type { WooClient } from "./client"
 import { productMissing } from "./errors"
 import { woocommerceMerchandising } from "./merchandising"
 import { woocommerceCredentialsSchema, woocommerceOAuth } from "./oauth"
@@ -193,6 +193,12 @@ async function clientFor(
   }
 
   const storeUrl = storeBase(account)
+  // Loaded here rather than at the top of the file. The adapter object is
+  // read in the browser by the listing editor, for its requirements and its
+  // name; the client reaches lib/net, which reaches node:net and node:dns,
+  // and a browser bundle has no such modules. Only a server ever gets this
+  // far, and it is the only place a store is talked to from this file.
+  const { createWooClient } = await import("./client")
   return { storeUrl, client: createWooClient({ storeUrl, ...credentials }) }
 }
 

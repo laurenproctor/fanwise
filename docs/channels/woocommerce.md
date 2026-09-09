@@ -155,6 +155,8 @@ Two routes, both generic in the channel key:
 signature to verify, and the credential is proven in the grant route, which is the stronger
 check.
 
+Every request to the store leaves through the outbound boundary, §14.
+
 Requirements on the store: HTTPS, and pretty permalinks. Without permalinks the REST routes
 answer 404 `rest_no_route`, which is normalized to a sentence that says so.
 
@@ -215,3 +217,48 @@ answers `GET /wp-json/wc/v3/` with the full route index and no credentials, so a
 permalinks and WooCommerce activity can be checked from a browser before Connect is pressed.
 Item 3 asks about the root index's `name`, which that read did not cover. The first Connect,
 from a local dev server, never reached the approve screen; §9 records why.
+
+## 14. The outbound boundary
+
+The store address is the one thing in this adapter a creator typed, and Fanwise then sends
+the store's keys to it from a server that can reach things a browser cannot. Since the
+security hardening of 9 September 2026 every request the client makes goes through
+`lib/net/outbound`, which is provider-neutral and knows nothing about WooCommerce:
+
+- **HTTPS only, no credentials in the URL, no port but 443**, and a hostname that is a
+  public DNS name (two labels at least, no `.local`, `.internal`, `.localhost` or
+  `.arpa`) or a public address literal.
+- **The name is resolved by the boundary**, once, and every address it yields is checked
+  against the loopback, private, link-local, carrier-NAT, multicast, reserved,
+  documentation and cloud-metadata ranges, IPv4 and IPv6, including the IPv4-mapped and
+  NAT64 spellings. One bad address among several refuses the request.
+- **The socket is opened to the address that was checked.** The transport is `node:https`
+  with a `lookup` that answers the pinned address and nothing else, so a DNS record that
+  changes between the check and the connect (rebinding) changes nothing. TLS still
+  verifies the certificate against the hostname.
+- **No redirect is followed.** A 3xx is refused, so the keys are never re-sent to a
+  different origin. A store that redirects (`www.` to bare, say) has to be connected at
+  the address it redirects to, and the message says so.
+- **Deadlines and a cap.** Ten seconds to connect, sixty seconds for the whole exchange
+  on this channel (the boundary's own default is thirty; a product create makes WordPress
+  sideload every image inside the request), and five megabytes of body.
+
+What a creator sees when the boundary refuses is one of three sentences in
+`lib/channels/adapters/woocommerce/errors.ts`, and none of them is retried: the address is
+what it is. A timeout or a socket error is `network`, retried three times as before.
+
+**What changed for a valid store: nothing.** A public store answering directly on 443 is
+served exactly as before. What changed for an invalid one: a redirecting store used to be
+followed silently, including to `http://`, and now is not.
+
+The client is loaded on demand, from `clientFor()` and from the grant's `verify()`, never at
+the top of the adapter. The listing editor reads every adapter in the browser for its
+requirement specs and its name, so the adapter modules are in the client graph; the client
+reaches `node:net` and `node:dns`, which a browser has no version of. `next.config.ts`
+aliases those, and `node:https`, to `lib/net/browser-stub.ts` under the `browser` condition
+only, an inert module that throws if anything ever calls it. The server bundle gets the real
+modules.
+
+The store's own behaviour is out of scope here. It sideloads image URLs Fanwise hands it,
+which are Supabase signed URLs; that is the store fetching, not Fanwise.
+

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { resetStore, scriptStore } from "./outbound-support"
 
 vi.mock("@/lib/credentials", () => ({
   readConnectionCredentials: vi.fn(async () => ({
@@ -198,7 +199,7 @@ const write = (calls: Call[], method: string) =>
   calls.find((c) => c.method === method && /\/products(\/\d+)?$/.test(c.url))
 
 afterEach(() => {
-  vi.unstubAllGlobals()
+  resetStore()
 })
 
 describe("declaration", () => {
@@ -232,7 +233,7 @@ describe("declaration", () => {
 describe("publish", () => {
   it("creates a draft digital product with images, tags by id, and no slug", async () => {
     const calls: Call[] = []
-    vi.stubGlobal("fetch", store(calls, { existingTags: ["sans"] }))
+    scriptStore(store(calls, { existingTags: ["sans"] }))
 
     const result = await woocommerceAdapter.publish!(context())
 
@@ -261,7 +262,7 @@ describe("publish", () => {
 
   it("does not read the store before a create", async () => {
     const calls: Call[] = []
-    vi.stubGlobal("fetch", store(calls))
+    scriptStore(store(calls))
     await woocommerceAdapter.publish!(context())
     expect(calls.some((c) => c.method === "GET")).toBe(false)
   })
@@ -270,7 +271,7 @@ describe("publish", () => {
 describe("update", () => {
   it("reads first, preserves a live product's status, and omits images the store already holds", async () => {
     const calls: Call[] = []
-    vi.stubGlobal("fetch", store(calls, { held: { status: "publish", images: [{ id: 1 }] } }))
+    scriptStore(store(calls, { held: { status: "publish", images: [{ id: 1 }] } }))
 
     const result = await woocommerceAdapter.update!(
       context({ listing: listing({ external_listing_id: "900", metadata: {} }) }),
@@ -286,14 +287,14 @@ describe("update", () => {
 
   it("resends images when the store holds fewer than the listing sends", async () => {
     const calls: Call[] = []
-    vi.stubGlobal("fetch", store(calls, { held: { status: "draft", images: [] } }))
+    scriptStore(store(calls, { held: { status: "draft", images: [] } }))
     await woocommerceAdapter.update!(context({ listing: listing({ external_listing_id: "900" }) }))
     expect(write(calls, "PUT")!.body).toHaveProperty("images")
   })
 
   it("raises external_object_missing when the store says the product is gone", async () => {
     const calls: Call[] = []
-    vi.stubGlobal("fetch", store(calls, { missing: true }))
+    scriptStore(store(calls, { missing: true }))
     await expect(
       woocommerceAdapter.update!(context({ listing: listing({ external_listing_id: "900" }) })),
     ).rejects.toMatchObject({ normalized: { code: "external_object_missing" } })
@@ -304,7 +305,7 @@ describe("update", () => {
 describe("activate", () => {
   it("refuses while no download file is on the product", async () => {
     const calls: Call[] = []
-    vi.stubGlobal("fetch", store(calls, { held: { downloads: [] } }))
+    scriptStore(store(calls, { held: { downloads: [] } }))
     await expect(
       woocommerceAdapter.activate!(context({ listing: listing({ external_listing_id: "900" }) })),
     ).rejects.toMatchObject({ normalized: { code: "validation_rejected" } })
@@ -313,8 +314,7 @@ describe("activate", () => {
 
   it("publishes once the file is there and reports the product purchasable", async () => {
     const calls: Call[] = []
-    vi.stubGlobal(
-      "fetch",
+    scriptStore(
       store(calls, {
         held: {
           downloads: [
@@ -338,8 +338,7 @@ describe("activate", () => {
 
 describe("errors", () => {
   it("normalizes a rejected key pair without the store's words", async () => {
-    vi.stubGlobal(
-      "fetch",
+    scriptStore(
       vi.fn(async () =>
         json(
           { code: "woocommerce_rest_cannot_create", message: "Sorry, you are not allowed." },
@@ -353,8 +352,7 @@ describe("errors", () => {
   })
 
   it("normalizes a missing REST route to a sentence about permalinks", async () => {
-    vi.stubGlobal(
-      "fetch",
+    scriptStore(
       vi.fn(async () =>
         json({ code: "rest_no_route", message: "No route was found", data: { status: 404 } }, 404),
       ),
@@ -365,8 +363,7 @@ describe("errors", () => {
   })
 
   it("names the parameter a 400 objects to", async () => {
-    vi.stubGlobal(
-      "fetch",
+    scriptStore(
       vi.fn(async (input: string | URL | Request) => {
         if (String(input).endsWith("/products/tags")) return json({ id: 1, name: "x" }, 201)
         return json(
