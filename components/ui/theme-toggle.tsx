@@ -93,8 +93,11 @@ export function ThemeToggle({ variant = "light" }: { variant?: "light" | "dark" 
   )
 }
 
-/** Apply the saved or system preference before the first paint. */
-export function ThemeScript() {
-  const source = `(function(){try{var v=localStorage.getItem(${JSON.stringify(THEME_KEY)});var t=v==="dark"||v==="flip"?"dark":v==="light"||v==="base"?"light":window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t}catch(e){}})()`
-  return <script dangerouslySetInnerHTML={{ __html: source }} />
-}
+/**
+ * The before-first-paint theme initialiser lives in public/theme.js, loaded by
+ * the root layout as a same-origin script. It used to be inline here; an
+ * inline script needs a per-request nonce under the Content-Security-Policy,
+ * and the root layout cannot read one without making every page dynamic.
+ * THEME_KEY and the two legacy values above are what that file reads, and
+ * tests/unit/security-headers.test.ts keeps the two in step.
+ */

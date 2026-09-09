@@ -351,3 +351,22 @@ discount_amount, refund_amount, net_revenue, currency, occurred_at, synced_at, m
 
 Unique constraint on (channel_id, external_transaction_id) so re-ingestion cannot double
 count.
+
+## B8: WooCommerce
+
+Built. Migration `20260908090000_woocommerce_channel`.
+
+One row in `channels`: key `woocommerce`, `integration_type = api`, `billable = false`. No
+new table. The authorization flow reuses `channel_oauth_states`; the store posts the consumer
+key and secret to the grant route, and they are sealed into `channel_connection_secrets` as
+`{ consumerKey, consumerSecret }` like any other credential.
+
+What the existing columns hold for this channel: `external_account_id` is the normalized
+store address, host or host/path with no scheme; `external_account_name` is the site name;
+`metadata.currency` is the store currency, read at grant time and compared by the
+`currency_matches_store` requirement; `scopes` is `["read_write"]`. On the listing,
+`external_listing_id` is the numeric product id as a string and `external_url` the admin edit
+URL, which resolves before the product is live.
+
+`billable = false` takes decision 23's recommended reading, and the migration says so in a
+comment. Flipping it is one migration, and nothing bills before C1 either way.

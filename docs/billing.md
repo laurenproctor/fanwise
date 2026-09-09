@@ -28,8 +28,11 @@ name.
    is what the pricing page promises.
 3. A connection bills for a **minimum of one full period**, so connect-disconnect cycling
    around the boundary gains nothing.
-4. The owned storefront is billable: false. Every other channel is billable: true. This is a
-   property of the channel row, not a condition in a component.
+4. An owned storefront is billable: false, and every marketplace is billable: true. This is
+   a property of the channel row, not a condition in a component. Two rows are owned
+   storefronts, Shopify and WooCommerce, and both are seeded included. Whether a second
+   owned storefront should bill is decision 23 in `docs/decisions/0002`, still open;
+   flipping the WooCommerce row is one migration.
 5. Assisted versus automatic pricing is **an open decision**. Charging the same $6 for a
    channel Fanwise cannot publish to is harder to defend. Resolve before the pricing page is
    public.

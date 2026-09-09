@@ -140,6 +140,10 @@ them now, and record the submission dates in `docs/roadmap.md`.
 1. **Etsy** developer app, then request commercial access. Applicants report waiting weeks.
 2. **Shopify** Partner account and a Dev Dashboard app.
 
+WooCommerce needs neither. Its exit test needs a WordPress site with WooCommerce active, on
+HTTPS with pretty permalinks, which you can host yourself; see decision 25 in
+`docs/decisions/0002`.
+
 ## Working with Claude Code
 
 Read `CLAUDE.md` first. One step per branch, one PR per step, and the step is named at the

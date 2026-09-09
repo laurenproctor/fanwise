@@ -5,10 +5,11 @@ live shop, and five request-shape questions in `docs/channels/etsy.md` §13 wait
 thing. B1, B2 and B8 are also on `main`, each code complete with its exit unrun; see their
 sections under Gate B.** A5 is done; all three exit clauses ran against a live Shopify store.
 What remains of Gate A is blocked on things no code can move: A6's exit on a live Etsy shop,
-A7 on a second live channel to orchestrate (which is A6's exit), A8 on a Creative Market
-seller login, and the gate's own exit — an outside creator, unassisted — on a real portfolio
-to hand them. **Gate A is not passed.** Gate A's exit test is still owed before Gate B's is
-attempted. See "Reordering" below.
+A7 on a second live channel to orchestrate (which is A6's exit, or B8's: a WooCommerce store
+needs no approval, only a WordPress host), A8 on a Creative Market seller login, and the
+gate's own exit — an outside creator, unassisted — on a real portfolio to hand them.
+**Gate A is not passed.** Gate A's exit test is still owed before Gate B's is attempted. See
+"Reordering" below.
 
 Before B1 opened, two decisions in `docs/decisions/0002` were owed answers: 12 (model and
 cost per generation) and 13 (metered or unlimited). Both were decided on 7 September 2026,
@@ -26,6 +27,12 @@ step completes, and do not work on more than one step at a time.
 | Etsy developer app | A6 | date unrecorded | by 8 Sep 2026 |
 | Etsy commercial access | A6 | date unrecorded | by 8 Sep 2026 |
 | Shopify Partner account | A5 | yes, date unrecorded | by 5 Sep 2026 |
+| WooCommerce test store | B8 exit, and A7 if it runs before Etsy's | nothing to file | exists, 9 Sep 2026: `houseofproctor.com`, permalinks on. Fanwise needs a public HTTPS origin to meet it |
+
+The WooCommerce row is not an application. It is in this table because it is the one thing
+B8's exit waits on, and because it is the cheapest unblock the roadmap has: no developer
+account, no review, no partner program. Decision 25 in `docs/decisions/0002` says what to
+check once it exists.
 
 Etsy commercial access has no published SLA and applicants report waiting weeks. It is the
 single most likely thing to delay the roadmap, and it costs nothing to file today.
@@ -263,6 +270,14 @@ to call. A8 arrives after A7 and does not widen A7's exit test. What A8 does put
 Publish Everywhere is a connected channel the action must visibly skip rather than silently
 omit, which is the capability-matrix case A3's assisted mock was built to rehearse.
 
+**WooCommerce is the third channel Publish Everywhere can call**, since B8 landed on `main`
+on 8 September 2026, and it changes A7's blocker rather than its exit. The exit still reads
+two live URLs. What has changed is that the second live channel no longer has to be Etsy: a
+WooCommerce store needs no approval, so A7 can be proven on Shopify and WooCommerce while
+A6's exit waits on its shop, and Etsy joins as a third when it lands. One thing A7 must
+decide with WooCommerce connected: `activate` refusing a product with no file attached is the
+creator's step still owed, not a provider failure, and the progress surface has to say which.
+
 ## Reordering, 7 September 2026
 
 "Nothing after a gate begins until the gate passes" is the rule at the top of this file, and
@@ -291,10 +306,10 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B2 | Listing review UI: field edit, field regenerate, full regenerate, restore, approve. **Code complete 8 September 2026**, see below |
 | B2a | Creative Market composed-listing test: the three creators and the measures in `docs/channels/creative-market.md` section 12, run against AI-composed copy on the A8 handoff |
 | B4 | Second assisted channel. Adobe Stock or MyFonts, undecided on purpose, see `docs/channel-feasibility.md` and decision 14 |
-| B5 | `sales_events`, transaction ingestion for Shopify and Etsy, dedupe constraints |
+| B5 | `sales_events`, transaction ingestion for Shopify, Etsy and WooCommerce, dedupe constraints |
 | B6 | Analytics overview: revenue, units, by channel, by product |
 | B7 | CSV import foundation |
-| B8 | WooCommerce: store authorization, adapter, draft, images, activate with the file verified, idempotency. See `docs/channels/woocommerce.md`. Added 8 September 2026 at the founder's request; **code complete the same day**, exit unrun |
+| B8 | WooCommerce: store authorization, adapter, draft, images, activate with the file verified, idempotency. See `docs/channels/woocommerce.md`. Added 8 September 2026 at the founder's request; **code complete the same day**, exit unrun, see below |
 
 ### B1, what was built and what is still owed
 
@@ -352,6 +367,64 @@ another by hand, restore the earlier draft, and publish, with the card saying co
 is waiting until the publish that approves it. The whole loop is proven against a scripted provider in
 `tests/db/ai-review.test.ts`; it has not been run in the browser against the model. Journey 2
 in `docs/testing.md` is that run.
+
+### B8, what was built and what is still owed
+
+Added on 8 September 2026 at the founder's request and built the same day on the branch
+`woocommerce-channel`, in a worktree because another session held the working tree. It is an
+exception to "nothing after a gate begins until the gate passes" on the same reasoning as
+B1's reorder: the channel depends on A3's contract and A5's publishing machinery, both done,
+and on nothing after. The assessment that preceded it is in `docs/channel-feasibility.md`;
+the spec is `docs/channels/woocommerce.md`.
+
+What WooCommerce is to the plan, in one sentence: the second owned storefront, the third
+channel Fanwise can publish to, and the first whose product read carries the file, so the
+manual step can be checked rather than believed.
+
+Built:
+
+- `lib/channels/adapters/woocommerce`: capabilities, the authorization flow, the product
+  write, the description transform, the error map and the merchandising profile. No provider
+  name leaves the folder.
+- **The grant route**, `app/api/channels/[channelKey]/oauth/grant`, generic in the channel
+  key. The store posts the consumer key and secret server to server rather than returning a
+  code, so this route completes the connection and the callback only reports. WooCommerce is
+  the first adapter to declare `oauth.grant`; `docs/channel-adapters.md` has the contract and
+  `docs/security.md` the order of checks.
+- Migration `20260908090000_woocommerce_channel`: one catalog row, `billable = false`, taking
+  decision 23's recommended reading with a comment saying the decision is open. Applied to
+  the hosted dev project. No new table.
+- The draft gate. `publish` creates `status: draft`; `activate` reads the product back and
+  refuses, naming the admin screen, until `downloads` holds a file. Only then does it set
+  `status: publish`, and `purchasable` is true only when the read-back says so.
+- `tests/unit/woocommerce-oauth.test.ts` and `tests/unit/woocommerce-adapter.test.ts`.
+
+What it deliberately does not do: upload the file (`digitalFileUpload: false` by decision,
+§6 of the spec, because the one API path that can puts the deliverable at a public address),
+read orders (`transactions: false` until B5), or bill (nothing bills before C1, and the row
+reads included either way).
+
+**B8's exit test has not run.** It needs a WooCommerce store on HTTPS with pretty
+permalinks, which is any WordPress host and no approval, and a Fanwise at a public HTTPS
+address, because the store posts the keys server to server and a local dev server cannot
+receive them (spec §9, learned 9 September 2026). The store exists as of that day; the run
+is on the hosted deployment: connect from the store's own authorization screen, publish a
+draft, attach the file in the admin, mark the step done, and confirm that `activate` sees
+the download and the product is buyable. The five questions in
+§13 of the spec, including the order of the store's POST and its redirect, can only be
+settled there. Journey 11 in `docs/testing.md` is that run.
+
+What B8 changes elsewhere in this file:
+
+- **A7** gains a third channel to orchestrate and a second way to unblock. Its exit is two
+  live URLs from one action, and a live WooCommerce store is easier to obtain than a live
+  Etsy shop. Either pair satisfies it.
+- **B5** ingests three channels, not two. `GET /orders` on the store carries what
+  `sales_events` needs; the adapter declares `transactions: false` until B5 builds it.
+- **C1** and **C2** inherit decision 23, whether the second owned storefront is included. The
+  row is seeded included, and `docs/billing.md` rule 4 now says so and names the decision.
+- **Gate A does not widen.** WooCommerce is not in the gate's exit test and does not need to
+  be: the gate proves the loop closes, and it closes on Shopify, Etsy and Creative Market.
 
 **B3 is vacant on purpose.** Creative Market moved to A8 and the remaining steps keep their
 numbers, because step ids are names here, not positions — `docs/data-model.md`,

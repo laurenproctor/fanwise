@@ -75,6 +75,19 @@ to.
 A failed exchange returns a normalized sentence and nothing else. The thrown value may hold a
 provider response body, and the request that produced it held a client secret.
 
+**The grant route is the same argument with the steps reordered by the provider.** Some
+stores never put the credential in the browser: WooCommerce posts the consumer key and
+secret to `app/api/channels/[channelKey]/oauth/grant`, server to server, and sends the person
+back to the callback with only a yes or a no. Nobody is signed in on that POST and nothing in
+it is trusted, so the order there is: the adapter parses the body, and anything malformed is
+a 400 that touches no state; the state is consumed exactly once, so a replayed POST has
+nothing to consume; the adapter proves the keys against the store the state row names, by
+calling that store, so keys for some other store are refused; and only then is the connection
+written and the credential sealed. There is no provider signature to verify, and the
+proof-by-call is the stronger check. The callback for such a channel peeks at the state
+rather than consuming it, because the POST may trail the redirect, and reports without ever
+seeing a secret.
+
 ## Password recovery
 
 The flow is `/forgot-password` to `/auth/confirm` to `/reset-password`, and the three
