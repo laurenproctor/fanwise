@@ -122,8 +122,15 @@ returns a PKCE code, which only works in the browser that asked for the reset: a
 requests a reset on a laptop and opens the mail on their phone gets an invalid link, and
 recovery is exactly the flow where that happens. `/auth/confirm` still accepts a code, so a
 deployment whose template has not been updated degrades rather than breaks. **A hosted project
-does not inherit `config.toml`, so the template has to be set on the project itself, and the
-`/auth/confirm` URL added to its redirect allowlist.**
+does not inherit `config.toml` on its own. `pnpm auth:push` applies it, including the
+`[remotes.production]` overrides that set the live site URL, the redirect allowlist and the
+SMTP provider, and installs this template in the same push. It is a hosted mutation and is
+held to the same boundary as a migration: an approved commit on `main`, a temporary detached
+worktree that is the only thing linked and is unlinked on every exit, the project reference
+as an argument, and the CLI's own diff prompt as the final approval. Supabase's built-in
+sender rejects custom templates, so the push is refused until the four `SMTP_*` variables
+are set. The provider is Resend, and `docs/decisions/0008-transactional-email.md` is the
+account.**
 
 ## Password recovery
 
@@ -159,8 +166,15 @@ returns a PKCE code, which only works in the browser that asked for the reset: a
 requests a reset on a laptop and opens the mail on their phone gets an invalid link, and
 recovery is exactly the flow where that happens. `/auth/confirm` still accepts a code, so a
 deployment whose template has not been updated degrades rather than breaks. **A hosted project
-does not inherit `config.toml`, so the template has to be set on the project itself, and the
-`/auth/confirm` URL added to its redirect allowlist.**
+does not inherit `config.toml` on its own. `pnpm auth:push` applies it, including the
+`[remotes.production]` overrides that set the live site URL, the redirect allowlist and the
+SMTP provider, and installs this template in the same push. It is a hosted mutation and is
+held to the same boundary as a migration: an approved commit on `main`, a temporary detached
+worktree that is the only thing linked and is unlinked on every exit, the project reference
+as an argument, and the CLI's own diff prompt as the final approval. Supabase's built-in
+sender rejects custom templates, so the push is refused until the four `SMTP_*` variables
+are set. The provider is Resend, and `docs/decisions/0008-transactional-email.md` is the
+account.**
 
 ## AI prompts
 
