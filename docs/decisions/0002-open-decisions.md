@@ -49,7 +49,7 @@ Keep these here only as pointers. Do not relitigate them from this file.
 | Credentials key rotation plan | Written 4 September 2026, before the first token was stored. `key_version` selects the key a row opens with; rotation is a migration, not a guess | `docs/decisions/0003` |
 | `listing_manual_steps` | Landed at A5 with Shopify, migration `20260904190000_shopify_publishing`, and described in the data model | `docs/data-model.md` |
 | `next dev` writes into `CLAUDE.md` | Committed, 5 September 2026. The block is part of the file, so a dev run no longer dirties the tree | `CLAUDE.md`, the `nextjs-agent-rules` block |
-| Who sends Fanwise's email | Resend, over SMTP from a verified subdomain. Wired in `supabase/config.toml` and applied by `pnpm auth:push`, which refuses to run until the four `SMTP_*` values are set. Decided 9 September 2026 | `docs/decisions/0006` |
+| Who sends Fanwise's email | Resend, over SMTP from a verified subdomain. Wired in `supabase/config.toml` and applied by `pnpm auth:push` from a temporary deployment worktree at an approved commit, which refuses to run until the four `SMTP_*` values are set. Decided 9 September 2026 | `docs/decisions/0008` |
 
 ---
 
