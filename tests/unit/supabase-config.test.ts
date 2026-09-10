@@ -32,6 +32,24 @@ function section(contents: string, header: string): string {
   return next === -1 ? rest : rest.slice(0, next)
 }
 
+/**
+ * The major version the hosted project runs. Read from the project itself on
+ * 10 September 2026 (server_version 17.6). When Supabase upgrades the project,
+ * update this and the [db] block together; until then a drift between the two
+ * means migrations are exercised locally and in CI on a version the hosted
+ * database does not run.
+ */
+const HOSTED_POSTGRES_MAJOR = 17
+
+describe("supabase/config.toml database version", () => {
+  const contents = readFileSync(join(ROOT, "supabase", "config.toml"), "utf8")
+
+  it("declares the major version the hosted project runs", () => {
+    const db = section(contents, "[db]")
+    expect(db).toMatch(new RegExp(`^major_version = ${HOSTED_POSTGRES_MAJOR}$`, "m"))
+  })
+})
+
 describe("supabase/config.toml production overrides", () => {
   const contents = readFileSync(join(ROOT, "supabase", "config.toml"), "utf8")
 
