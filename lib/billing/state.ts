@@ -77,3 +77,22 @@ export function billingState(params: {
   }
   return { kind: "trial_ended" }
 }
+
+/**
+ * Whether the workspace has actually paid through a current billing period.
+ *
+ * Narrower than "subscribed" on purpose. A subscription can be live and
+ * unpaid: on a provider-side trial, past due, unpaid, incomplete, or paused.
+ * Only an active subscription whose current period has not yet ended has
+ * been paid for, and only then is it true to tell a creator that a channel
+ * they are disconnecting was paid for through the end of the period. With no
+ * provider configured, no subscription, or a trial on Fanwise's side, nothing
+ * has been paid and nothing may say so.
+ */
+export function paidThroughCurrentPeriod(state: BillingState, now: Date = new Date()): boolean {
+  if (state.kind !== "subscribed") return false
+  if (state.status !== "active") return false
+  if (!state.currentPeriodEnd) return false
+  const end = new Date(state.currentPeriodEnd)
+  return !Number.isNaN(end.getTime()) && end > now
+}

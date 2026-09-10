@@ -40,7 +40,7 @@ export function ConnectButton({
   publishedCount,
   oauth,
   needsReauthorization,
-  billable,
+  paidThroughPeriod,
 }: {
   workspaceSlug: string
   channelKey: string
@@ -74,10 +74,14 @@ export function ConnectButton({
    */
   needsReauthorization?: boolean
   /**
-   * Whether this channel is charged per connection. Read from the channel
-   * row, never decided here: the copy below changes, the behaviour does not.
+   * Whether this workspace has paid for this channel through a current
+   * billing period: the channel bills, and the workspace holds an active,
+   * paid subscription whose period has not ended. Decided on the server from
+   * the billing state, never here, and never from the channel row alone: a
+   * channel that would bill is not one that has been paid for. The copy
+   * below changes, the behaviour does not.
    */
-  billable?: boolean
+  paidThroughPeriod?: boolean
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -222,11 +226,7 @@ export function ConnectButton({
       ) : confirming ? (
         <div className="grid gap-2">
           <p className="text-[13px] text-[var(--color-ink-2)]">
-            Disconnecting {channelName} removes its listings from Fanwise. Anything already
-            published stays on {channelName}.
-            {billable
-              ? " You have paid for this channel through the end of the current billing period, and it comes off the next invoice."
-              : ""}
+            {disconnectMessage(channelName, paidThroughPeriod === true)}
           </p>
           <div className="flex gap-2">
             <Button onClick={disconnect} disabled={pending}>
@@ -245,4 +245,17 @@ export function ConnectButton({
       <FormError message={error} />
     </div>
   )
+}
+
+/**
+ * What the confirmation says. The billing sentence is appended only when the
+ * workspace has genuinely paid for the channel through a current period; on
+ * an unconfigured deployment, a trial, or an unpaid subscription it is absent,
+ * because a sentence about an invoice that does not exist is a false one.
+ */
+export function disconnectMessage(channelName: string, paidThroughPeriod: boolean): string {
+  const base = `Disconnecting ${channelName} removes its listings from Fanwise. Anything already published stays on ${channelName}.`
+  return paidThroughPeriod
+    ? `${base} You have paid for this channel through the end of the current billing period, and it comes off the next invoice.`
+    : base
 }
