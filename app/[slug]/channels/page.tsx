@@ -6,6 +6,8 @@ import { CapabilityList } from "@/components/channels/capability-list"
 import { ConnectButton } from "@/components/channels/connect-button"
 import { countPublishedByConnection } from "@/lib/channels/queries"
 import { missingScopes } from "@/lib/channels/oauth"
+import { getBillingOverview } from "@/lib/billing/queries"
+import { paidThroughCurrentPeriod } from "@/lib/billing/state"
 
 export const metadata = { title: "Channels · Fanwise" }
 
@@ -30,7 +32,7 @@ export default async function ChannelsPage({
   const workspace = await getWorkspaceBySlug(slug)
   if (!workspace) notFound()
 
-  const [channels, connections, publishedByConnection] = await Promise.all([
+  const [channels, connections, publishedByConnection, paidThroughPeriod] = await Promise.all([
     listChannels(),
     listConnections(workspace.id),
     /*
@@ -39,6 +41,16 @@ export default async function ChannelsPage({
       that would only ever be refused.
     */
     countPublishedByConnection(workspace.id),
+    /*
+      Whether the workspace has paid for its billable channels through the
+      current period, for the disconnect confirmation. A billing read that
+      fails (a half-configured provider, say) must not take the channels page
+      down with it, and "not paid" is the safe reading of a failure: it
+      withholds a sentence rather than inventing one.
+    */
+    getBillingOverview(workspace)
+      .then((overview) => paidThroughCurrentPeriod(overview.state))
+      .catch(() => false),
   ])
 
   const connectionByChannelId = new Map(connections.map((c) => [c.channel.id, c.connection]))
@@ -126,6 +138,13 @@ export default async function ChannelsPage({
                     connection ? missingScopes(adapter, connection.scopes).length > 0 : false
                   }
                   disabled={channel.status !== "available"}
+                  /*
+                    True only when the channel bills and the workspace has an
+                    active, paid subscription with a current period. Read from
+                    billing, so an unconfigured deployment or a trial never
+                    tells a creator they paid for something.
+                  */
+                  paidThroughPeriod={channel.billable && paidThroughPeriod}
                   /*
                     Only the two strings the form needs. `adapter.oauth` holds
                     functions and a client secret's worth of behaviour; passing

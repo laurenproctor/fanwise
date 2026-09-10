@@ -370,3 +370,40 @@ URL, which resolves before the product is live.
 
 `billable = false` takes decision 23's recommended reading, and the migration says so in a
 comment. Flipping it is one migration, and nothing bills before C1 either way.
+
+## C1: billing
+
+Built. Migration `20260908200000_billing`.
+
+**workspace_billing** — workspace_id (pk), external_customer_id, external_subscription_id,
+subscription_status, billing_interval, base_item_id, channel_item_id, channel_quantity,
+period_peak_quantity, current_period_start, current_period_end, cancel_at_period_end,
+created_at, updated_at
+
+One row per workspace, a mirror of what the payment provider holds. Readable by members,
+writable by nobody in the browser: every write is the server's account of an external fact,
+from a webhook or the checkout action, through the service role. `period_peak_quantity` is
+the one piece of Fanwise's own state on it: the highest channel quantity billed this period,
+which is how a reconnection inside a paid period is not charged twice.
+
+**billing_events** — id, workspace_id, channel_connection_id, channel_id, kind, billable,
+idempotency_key, status, attempt_count, applied_at, provider_response,
+normalized_error_code, normalized_error_message, created_at, updated_at
+
+The ledger. Written by the trigger `record_channel_billing_event()` on every insert and
+delete of `channel_connections`, in the same transaction, which is `docs/billing.md` rule 1
+made structural. `channel_connection_id` is deliberately not a foreign key: the disconnection
+is recorded as the row is deleted, and the ledger outlives what it describes. `billable` is
+captured from the channel at the moment of the event so a later change to which channels
+bill does not rewrite history. The idempotency key is NOT NULL and unique, per invariant 3.
+
+The trigger is `security definer` because authenticated holds no insert on the ledger and
+should not. On delete it checks the workspace still exists: Postgres removes a parent before
+cascading onto its children, so a connection deleted by a workspace deletion arrives with
+nothing to reference, and that case is skipped rather than failed.
+
+**billing_webhook_events** — id (the provider's event id), type, received_at,
+processed_at, error
+
+No grant to anon or authenticated, RLS on with zero policies. A redelivered event collides
+on the key; one recorded but never finished is applied again, one finished is acknowledged.

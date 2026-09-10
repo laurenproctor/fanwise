@@ -19,9 +19,10 @@ import {
  * to the provider; a channel without one writes a row. The mocks are the second
  * kind and are the only ones left.
  *
- * Disconnecting is destructive and irreversible from here, so it confirms. At
- * C1 it also becomes a billing event, and the confirmation copy will need to say
- * so, because a click that changes an invoice should say that it does.
+ * Disconnecting is destructive and irreversible from here, so it confirms.
+ * Since C1 it is also a billing event, and the confirmation says so when the
+ * channel bills, because a click that changes an invoice should say that it
+ * does.
  */
 
 export interface OAuthPrompt {
@@ -39,6 +40,7 @@ export function ConnectButton({
   publishedCount,
   oauth,
   needsReauthorization,
+  paidThroughPeriod,
 }: {
   workspaceSlug: string
   channelKey: string
@@ -71,6 +73,15 @@ export function ConnectButton({
    * connection id, so the listings hanging off it are untouched.
    */
   needsReauthorization?: boolean
+  /**
+   * Whether this workspace has paid for this channel through a current
+   * billing period: the channel bills, and the workspace holds an active,
+   * paid subscription whose period has not ended. Decided on the server from
+   * the billing state, never here, and never from the channel row alone: a
+   * channel that would bill is not one that has been paid for. The copy
+   * below changes, the behaviour does not.
+   */
+  paidThroughPeriod?: boolean
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -215,8 +226,7 @@ export function ConnectButton({
       ) : confirming ? (
         <div className="grid gap-2">
           <p className="text-[13px] text-[var(--color-ink-2)]">
-            Disconnecting {channelName} removes its listings from Fanwise. Anything already
-            published stays on {channelName}.
+            {disconnectMessage(channelName, paidThroughPeriod === true)}
           </p>
           <div className="flex gap-2">
             <Button onClick={disconnect} disabled={pending}>
@@ -235,4 +245,17 @@ export function ConnectButton({
       <FormError message={error} />
     </div>
   )
+}
+
+/**
+ * What the confirmation says. The billing sentence is appended only when the
+ * workspace has genuinely paid for the channel through a current period; on
+ * an unconfigured deployment, a trial, or an unpaid subscription it is absent,
+ * because a sentence about an invoice that does not exist is a false one.
+ */
+export function disconnectMessage(channelName: string, paidThroughPeriod: boolean): string {
+  const base = `Disconnecting ${channelName} removes its listings from Fanwise. Anything already published stays on ${channelName}.`
+  return paidThroughPeriod
+    ? `${base} You have paid for this channel through the end of the current billing period, and it comes off the next invoice.`
+    : base
 }

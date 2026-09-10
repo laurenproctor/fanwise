@@ -363,6 +363,10 @@ can be.
 **This must be settled before the pricing page is public.** See the contradictions section
 below: the published mockup has already answered it by accident.
 
+C1 charges one channel price, 8 September 2026, because the ledger and the sync job do not
+care which; a second price is a second subscription item and a second column in the provider
+config, not a schema change. Still open.
+
 ### 17. Storage ceiling
 
 "Unlimited catalog subject to fair use" needs a real number in the entitlement service. The
@@ -380,6 +384,13 @@ card required.
 
 Those are different products with different implementations, and this is the largest
 unresolved gap between the mockups and the written model.
+
+**C1 built on an assumption rather than waiting, 8 September 2026, and the assumption is
+shaped to lose cheaply.** The trial is fourteen days from workspace creation, kept on
+Fanwise's side: no provider object exists until the creator subscribes, so neither answer
+here needs a migration. A trial is a change to `TRIAL_DAYS`; a free plan is the entitlement
+service at C2 gating on product count, channel count and the generation cap decision 13
+already set. Still open.
 
 ---
 

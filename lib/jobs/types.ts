@@ -13,7 +13,12 @@ import type { ImageSpec } from "@/lib/products/derivatives"
  */
 
 export type JobName =
-  "noop" | "finalize_asset" | "build_derivative" | "publish_listing" | "generate_listing"
+  | "noop"
+  | "finalize_asset"
+  | "build_derivative"
+  | "publish_listing"
+  | "generate_listing"
+  | "sync_billing"
 
 export interface JobPayloads {
   noop: { message: string }
@@ -42,6 +47,14 @@ export interface JobPayloads {
    * hash of what it actually saw.
    */
   generate_listing: { workspaceId: string; generationId: string }
+  /**
+   * Carry the billing ledger to the payment provider. Step C1.
+   *
+   * The workspace id only. The job reads the pending ledger rows and the
+   * connections that exist when it runs, and sets an absolute quantity, so a
+   * job that runs late or twice sets the same number.
+   */
+  sync_billing: { workspaceId: string }
 }
 
 /**
@@ -56,6 +69,7 @@ export const JOB_NAMES = [
   "build_derivative",
   "publish_listing",
   "generate_listing",
+  "sync_billing",
 ] as const satisfies readonly JobName[]
 
 export interface EnqueueOptions {

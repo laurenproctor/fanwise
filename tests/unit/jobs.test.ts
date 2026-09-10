@@ -14,6 +14,7 @@ const stubs = {
   build_derivative: async () => {},
   publish_listing: async () => {},
   generate_listing: async () => {},
+  sync_billing: async () => {},
 } satisfies Omit<JobHandlers, "noop">
 
 describe("job queue", () => {

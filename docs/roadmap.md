@@ -440,10 +440,47 @@ stays, and it is a test rather than a build step, which is why it carries no cod
 
 | Step | Content |
 |---|---|
-| C1 | Stripe: base subscription, per-channel quantity, connect and disconnect billing events, proration, trial, portal |
+| C1 | Stripe: base subscription, per-channel quantity, connect and disconnect billing events, proration, trial, portal. **Code complete 8 September 2026**, see below |
 | C2 | Entitlement service gating on channel count and type |
 | C3 | Onboarding, empty states, activation instrumentation |
 | C4 | Hardening: auth, RLS, tokens, secrets, storage, rate limits, webhooks, accessibility, responsive, full E2E |
+
+### Reordering, 8 September 2026, the second
+
+C1 opened while Gate A's exit and B8's exit both wait on live shops, at the founder's request
+and knowing it is ahead of the rule at the top of this file. The reasoning is the same as the
+first reordering's: billing depends on `channel_connections` and `channels.billable`, both
+done since A3, and on nothing after; the things ahead of it are blocked on other people. What
+is accepted, not argued away: a billable channel that has never billed anyone is still the
+honest description of the product until C1's exit runs.
+
+### C1, what was built and what is still owed
+
+Built on the branch `c1-stripe-billing`:
+
+- `lib/billing`: the gateway contract, the rules, the state, the sync job, the webhook
+  processor, the queries and the two actions. The vendor lives in `lib/billing/providers/stripe`
+  and a unit test keeps its name there.
+- Migration `20260908200000_billing`: `workspace_billing`, `billing_events`,
+  `billing_webhook_events`, and the trigger that makes a connection row and its billing event
+  one transaction. See `docs/data-model.md`, C1.
+- The `sync_billing` job, enqueued after every connection write and every subscription
+  webhook. Absolute quantities, one persisted key per attempt.
+- The settings page: trial, two checkouts, the subscription as the provider holds it, the
+  portal, and the ledger. The disconnect confirmation says it is a billing event when it is.
+
+Two assumptions C1 made rather than waited on, both reversible without a migration:
+
+1. **The trial is fourteen days, on Fanwise's side.** Decision 18 (trial or free plan) stays
+   open; either answer changes `TRIAL_DAYS` and the entitlement service at C2.
+2. **One channel price.** Decision 16 (assisted versus automatic) stays open; a second price
+   is a second subscription item and a second config column.
+
+**C1's exit test has not run.** It needs a provider account in test mode: a checkout that
+creates the subscription with the connected channels on it, a connect that lands as a
+prorated line, a disconnect that produces no credit, a reconnect inside the period that
+charges nothing, a period roll that resets the peak, and a portal cancellation that reaches
+the row. Journey 10 in `docs/testing.md`.
 
 ## The marketing site
 

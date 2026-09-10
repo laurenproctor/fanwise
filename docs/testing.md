@@ -84,7 +84,10 @@ the product heading, usually.
 9. **Workspace A attempts Workspace B access, denied.** *(covered at A1, in the browser at
    `tests/e2e/journey-09-tenancy.spec.ts` and at the database in `tests/db/tenancy.test.ts`;
    extended to the A3 tables in `tests/db/channel-tenancy.test.ts`)*
-10. Trial to subscription.
+10. Trial to subscription. *(code complete at C1; the settings page shows the trial and the
+    two checkouts, and `tests/db/billing.test.ts` proves the ledger, the tenancy and the sync
+    job against real Postgres with the provider scripted. Unrun in the browser: it needs a
+    provider account in test mode)*
 11. Connect WooCommerce, publish a draft, attach the file, activate. *(code complete at B8,
     unverified: needs a live store. The authorization handshake and the adapter are covered
     in `tests/unit/woocommerce-oauth.test.ts` and `tests/unit/woocommerce-adapter.test.ts`)*

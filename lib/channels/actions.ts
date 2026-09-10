@@ -11,6 +11,7 @@ import { findAdapter } from "./registry"
 import { updateListingSchema } from "./schemas"
 import { callbackUrl, createAuthorizationState, grantUrl } from "./oauth"
 import { codeChallenge, generateCodeVerifier } from "./pkce"
+import { jobs } from "@/lib/jobs"
 import type { AdapterSubject, ChannelListingDraft } from "./types"
 
 export interface ActionState {
@@ -61,9 +62,10 @@ async function requireWorkspace(workspaceSlug: string) {
  * beginAuthorizationAction and the callback route, which write the same
  * connection row plus a sealed credential.
  *
- * At C1 this becomes a billing event in the same transaction as the row, per
- * docs/billing.md rule 1. It is not one yet, and pretending otherwise by
- * writing a placeholder would be building ahead.
+ * Since C1 the insert is a billing event in the same transaction as the row,
+ * per docs/billing.md rule 1: a trigger on channel_connections writes the
+ * ledger row, so this function cannot forget to. What it does after the write
+ * is ask the sync job to carry the ledger to the provider.
  */
 export async function connectChannelAction(
   workspaceSlug: string,
@@ -110,6 +112,8 @@ export async function connectChannelAction(
     console.error("[channels] connect failed", error)
     return { error: "That channel could not be connected. Try again." }
   }
+
+  await jobs.enqueue("sync_billing", { workspaceId: workspace.id })
 
   revalidatePath(routes.channels(workspaceSlug))
   return { error: null }
@@ -241,6 +245,9 @@ export async function disconnectChannelAction(
     console.error("[channels] disconnect failed", error)
     return { error: "That channel could not be disconnected. Try again." }
   }
+
+  // The delete wrote the ledger row through the trigger; this carries it.
+  await jobs.enqueue("sync_billing", { workspaceId: workspace.id })
 
   revalidatePath(routes.channels(workspaceSlug))
   return { error: null }
