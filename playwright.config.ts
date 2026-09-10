@@ -66,6 +66,20 @@ function localSupabaseEnv(): Record<string, string> {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey,
     SUPABASE_SERVICE_ROLE_KEY: serviceKey,
     NEXT_PUBLIC_APP_URL: BASE_URL,
+    // The job queue, pinned to the in-process one for the same reason the
+    // database is pinned to the local stack. lib/jobs selects the Trigger.dev
+    // queue whenever TRIGGER_SECRET_KEY is set, and a checkout's .env.local
+    // usually sets it. Left alone, every upload and every channel connection
+    // the suite makes is sent to the cloud queue, where the developer's worker
+    // runs it with the developer's own environment, which points at the hosted
+    // project. Before the billing tables existed there, those runs failed on
+    // the first read; once they exist, a sync_billing run would find its table
+    // and write. An empty value wins over .env.local (a real environment
+    // variable always does in Next) and lib/jobs treats empty as unset, so
+    // the suite runs its jobs in the same process, against the local stack,
+    // whatever the checkout's file says.
+    TRIGGER_SECRET_KEY: "",
+    TRIGGER_PROJECT_REF: "",
   }
 }
 
