@@ -252,6 +252,13 @@ create trigger record_channel_billing_event
   after insert or delete on public.channel_connections
   for each row execute function public.record_channel_billing_event();
 
+-- Trigger-only, so no role needs to execute it: Postgres checks EXECUTE at
+-- CREATE TRIGGER, not when the trigger fires. Stated rather than left to the
+-- default, per docs/decisions/0006-explicit-function-privileges.md. The
+-- service role keeps execute through the A5 default privilege, and the
+-- catalog test in tests/db/function-privileges.test.ts holds this line.
+revoke all on function public.record_channel_billing_event() from public, anon, authenticated;
+
 -- ---------------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------------
