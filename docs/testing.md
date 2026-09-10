@@ -11,19 +11,20 @@ deduplication, snapshot immutability. `pnpm test:db`, against a live local Supab
 (`supabase start`). See `docs/security.md` for the denial shape each verb produces; asserting
 the wrong one is how this suite passes while proving nothing.
 
-**Integration** — mocked Shopify, Etsy, Anthropic and Stripe. OAuth token handling, product
-creation, upload, publish, retry, transaction ingestion, AI failure.
+**Integration** — mocked Shopify, Etsy, WooCommerce, Anthropic and Stripe. OAuth token
+handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
+AI failure.
 
-**E2E** — the ten journeys below, plus two step exit tests against the mock channels rather
-than against the ten:
+**E2E** — the eleven journeys below, plus two step exit tests against the mock channels
+rather than against the eleven:
 
 - `journey-03-channels.spec.ts` (A3): one product, two independent listings, and no publish
   affordance anywhere on the assisted channel.
 - `journey-04-listing-editor.spec.ts` (A4): a person hand-writes a listing per channel and
   watches deterministic readiness resolve, with no AI involved.
 - `journey-05-publish.spec.ts` (A5): a product publishes, and clicking Publish again creates
-  nothing. Run against the mock API channel, because A5's exit test needs a live Shopify
-  connection that does not exist yet.
+  nothing. Run against the mock API channel, because the e2e suite has no live Shopify
+  connection; A5's exit ran by hand against the live store, see `docs/roadmap.md`.
 
 **B1's validator is proved twice.** `tests/unit/factuality.test.ts` is the vocabulary: every
 way a model could state a number, a format, a compatibility or a claim the facts do not
@@ -33,15 +34,6 @@ fabricated claim is rejected and the listing is untouched; a supported one lands
 snapshot and a FactSheet hash. The vendor's request shape is checked in
 `tests/unit/ai-provider.test.ts` with a fetch that answers from a script, so the schema, the
 effort and the cache marker are asserted without a network. No test calls the model.
-
-**C1's billing is proved in two halves that meet at the ledger.** `tests/unit/billing.test.ts`
-is the rules — the arithmetic, the proration decision, the trial arithmetic — and the webhook
-path with a body signed the way the vendor signs one, so the signature check under test is
-the real one. `tests/db/billing.test.ts` is the part no unit test can reach: that a
-connection row and its billing event are one transaction, that the ledger and the billing
-row are readable by members and writable by nobody in the browser, and that the sync job
-sets the right quantity with the right proration and the right key, on success and on each
-kind of failure. No test calls the provider.
 
 **A5's idempotency is proved at the database, not in the browser**, in
 `tests/db/publication-idempotency.test.ts`. That suite drives the real job row, the real
@@ -73,15 +65,19 @@ content arrives, so `waitForURL` can return while the loading boundary is still 
 and a locator that counts elements then finds none. Follow it with a wait on real content —
 the product heading, usually.
 
-## The ten journeys
+## The eleven journeys
 
 1. Signup, workspace, product. *(complete at A2)*
 2. Product to AI Shopify listing, approved. *(composition ran live at B1; the review loop
    with field regenerate and restore is code complete at B2 and proven in
    `tests/db/ai-review.test.ts`; approval is the publish click; unrun in the browser)*
 3. Connect Shopify, publish. *(code complete at A5, unverified: needs a live shop)*
-4. Connect Etsy, publish.
-5. Publish to Shopify and Etsy in one action.
+4. Connect Etsy, publish. *(code complete at A6, unverified: needs a live shop. The OAuth
+   flow and the adapter are covered in `tests/unit/etsy-oauth.test.ts` and
+   `tests/unit/etsy-adapter.test.ts`)*
+5. Publish to Shopify and Etsy in one action. *(A7's exit needs any two live channels;
+   WooCommerce, once connected, is a third the action includes, and can stand in for Etsy
+   while A6's exit waits on a shop)*
 6. Publication failure, correction, retry, no duplicate.
 7. Generate a Creative Market submission package.
 8. Analytics shows an ingested sale.
@@ -92,11 +88,21 @@ the product heading, usually.
     two checkouts, and `tests/db/billing.test.ts` proves the ledger, the tenancy and the sync
     job against real Postgres with the provider scripted. Unrun in the browser: it needs a
     provider account in test mode)*
+11. Connect WooCommerce, publish a draft, attach the file, activate. *(code complete at B8,
+    unverified: needs a live store. The authorization handshake and the adapter are covered
+    in `tests/unit/woocommerce-oauth.test.ts` and `tests/unit/woocommerce-adapter.test.ts`)*
 
 Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, the product
 is broken in the way that matters most.
 
-**Password recovery is not one of the ten**, because it is not a step on the path from empty
+**Journey 11 was added on 8 September 2026**, after the list was written, because
+WooCommerce arrived at B8. It is not a copy of journey 3 with a different store. The ten were
+written before a channel existed whose provider could confirm the manual step, and that
+confirmation is what the journey exists to see: `activate` refusing until the file is on the
+product, and a product that goes live only afterwards. The count in `CLAUDE.md` moved with
+it.
+
+**Password recovery is not one of the eleven**, because it is not a step on the path from empty
 workspace to live listing. It is covered anyway, in two halves that meet at the token:
 `tests/db/password-recovery.test.ts` makes the same calls the confirm route makes, against the
 real auth server, and proves the link is single use; `tests/e2e/password-recovery.spec.ts`

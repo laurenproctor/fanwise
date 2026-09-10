@@ -60,8 +60,9 @@ Rate limits are cost-based: 100 points per second on Standard, up to 2,000 on En
 ### WooCommerce — full API, native digital products, one hard problem
 
 Assessed 8 September 2026 against the REST API v3 reference and WooCommerce's own
-downloadable-product documentation. Not on the roadmap; recorded here so the decision to add
-it is made deliberately.
+downloadable-product documentation, and scheduled as B8 the same day at the founder's
+request. The assessment is kept as written; the spec is `docs/channels/woocommerce.md` and
+the roadmap's B8 section records what was built and what the exit still owes.
 
 **It fits the adapter contract better than Shopify does.** `POST /wc/v3/products` takes
 title, description, price, images by URL, categories, tags, slug and a `status` of `draft` or
@@ -97,7 +98,9 @@ already serve, and the WooCommerce API has no upload for it. Three ways through:
 So the channel takes Shopify's shape: automatic everything, assisted file, `digitalFileUpload:
 false` for the second reason on this page — Fanwise will not, rather than the provider
 cannot. **[verify]** the public-URL finding against a real store before building, because if
-it is wrong WooCommerce becomes the first fully automatic channel in the set.
+it is wrong WooCommerce becomes the first fully automatic channel in the set. B8 built on the
+finding unverified; the exit test on a live store is where it gets checked, and if it is
+wrong the change is `digitalFileUpload: true` and a media-library upload, not a redesign.
 
 **Billing is a decision, not a detail.** The pricing model includes one owned storefront and
 names Shopify. WooCommerce is also an owned storefront. See `docs/decisions/0002`, item 23.
@@ -307,7 +310,7 @@ customer, the way in is their fonts and graphics, not their Framer templates.
 |---|---|---|---|---|
 | Shopify | Automatic | API, file delivery needs a decision | API + webhooks | **V1** |
 | Etsy | Automatic | Full API | API | **V1** |
-| WooCommerce | Automatic | API, file step assisted unless the media-library finding is wrong | API | **Not scheduled**, assessed 8 Sep 2026. Decide billing first |
+| WooCommerce | Automatic | API, file step assisted, and `activate` verifies the file is on the product | API | **V1**, B8, code complete 8 Sep 2026, exit needs a live store. Billing is decision 23 |
 | Creative Market | Assisted | Manual, no automation permitted | None | **V1** |
 | Adobe Stock | Assisted | SFTP + 5,000-row CSV, manual submit | None | **V2, highest leverage** |
 | MyFonts | Assisted | Portal only, exact specs | CSV download | **V2, if fonts are the wedge** |

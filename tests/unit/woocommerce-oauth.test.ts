@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
+import { resetStore, scriptStore } from "./outbound-support"
 import { woocommerceGrant, woocommerceOAuth } from "@/lib/channels/adapters/woocommerce/oauth"
 import { parseStoreUrl } from "@/lib/channels/adapters/woocommerce/transform"
 import { ChannelError } from "@/lib/channels/errors"
@@ -109,8 +110,7 @@ describe("the posted grant", () => {
 
   it("proves the keys against the named store and reads its currency", async () => {
     const calls: { url: string; auth: string | undefined }[] = []
-    vi.stubGlobal(
-      "fetch",
+    scriptStore(
       vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         const url = String(input)
         calls.push({ url, auth: (init?.headers as Record<string, string>)?.Authorization })
@@ -143,13 +143,12 @@ describe("the posted grant", () => {
       expect(grant.expiresAt).toBeNull()
       expect(grant.credentials).toEqual({ consumerKey: "ck_test", consumerSecret: "cs_test" })
     } finally {
-      vi.unstubAllGlobals()
+      resetStore()
     }
   })
 
   it("refuses keys the store rejects, without repeating the store's words", async () => {
-    vi.stubGlobal(
-      "fetch",
+    scriptStore(
       vi.fn(
         async () =>
           new Response(
@@ -173,13 +172,13 @@ describe("the posted grant", () => {
         }),
       ).rejects.toMatchObject({ normalized: { code: "credentials_invalid" } })
     } finally {
-      vi.unstubAllGlobals()
+      resetStore()
     }
   })
 
   it("refuses a read-only grant before touching the store", async () => {
     const fetchSpy = vi.fn()
-    vi.stubGlobal("fetch", fetchSpy)
+    scriptStore(fetchSpy)
     try {
       await expect(
         woocommerceGrant.verify({
@@ -190,7 +189,7 @@ describe("the posted grant", () => {
       ).rejects.toBeInstanceOf(ChannelError)
       expect(fetchSpy).not.toHaveBeenCalled()
     } finally {
-      vi.unstubAllGlobals()
+      resetStore()
     }
   })
 })

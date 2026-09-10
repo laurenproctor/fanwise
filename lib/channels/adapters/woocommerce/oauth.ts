@@ -6,7 +6,6 @@ import type {
   OAuthAuthorizeRequest,
   OAuthGrant,
 } from "@/lib/channels/types"
-import { createWooClient } from "./client"
 import { APP_NAME, SCOPES } from "./config"
 import { parseStoreUrl, storeBase } from "./transform"
 
@@ -94,6 +93,9 @@ export const woocommerceGrant: ChannelGrant = {
       )
     }
 
+    // On demand, for the reason given in index.ts: this file is part of the
+    // adapter the browser reads, and the client is not browser code.
+    const { createWooClient } = await import("./client")
     const client = createWooClient({
       storeUrl: storeBase(store.value),
       consumerKey: parsedCredentials.data.consumerKey,

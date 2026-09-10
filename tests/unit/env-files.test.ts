@@ -48,4 +48,12 @@ describe(".env.example", () => {
       expect(present.has(key), `${key} is missing from .env.example`).toBe(true)
     }
   })
+
+  it("lists the SMTP variables blank, so the hosted push stays wired but off", () => {
+    const lines = assignments(contents)
+    for (const key of ["SMTP_HOST", "SMTP_USER", "SMTP_PASS", "SMTP_ADMIN_EMAIL"]) {
+      const line = lines.find((l) => l.startsWith(key + "="))
+      expect(line, `${key} is missing from .env.example`).toBe(`${key}=`)
+    }
+  })
 })

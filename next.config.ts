@@ -1,4 +1,5 @@
 import type { NextConfig } from "next"
+import { baselineHeaders, environmentFrom } from "./lib/security/headers"
 
 /**
  * The host the dev server may serve its own dev resources to.
@@ -26,10 +27,28 @@ function tunnelHost(): string[] {
 
 const config: NextConfig = {
   reactStrictMode: true,
+  // The headers every response carries, static assets included. The
+  // Content-Security-Policy is not here: it carries a per-request nonce on the
+  // dynamic routes, so the proxy sets it. lib/security/headers.ts owns both.
+  async headers() {
+    return [{ source: "/(.*)", headers: baselineHeaders(environmentFrom(process.env)) }]
+  },
   allowedDevOrigins: tunnelHost(),
   // sharp ships prebuilt native binaries. Bundling it breaks the binding
   // resolution, so it stays external to the server build.
   serverExternalPackages: ["sharp"],
+  turbopack: {
+    // The outbound-request boundary (lib/net) is server code that the client
+    // graph can see, because the listing editor reads every adapter for its
+    // requirement specs. Next supplies a browser fallback for `crypto`; these
+    // three have none, so an inert stub stands in for them in browser chunks
+    // only. See lib/net/browser-stub.ts for why the stub throws.
+    resolveAlias: {
+      "node:net": { browser: "./lib/net/browser-stub.ts" },
+      "node:dns": { browser: "./lib/net/browser-stub.ts" },
+      "node:https": { browser: "./lib/net/browser-stub.ts" },
+    },
+  },
 }
 
 export default config

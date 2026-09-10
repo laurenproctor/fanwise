@@ -75,42 +75,18 @@ to.
 A failed exchange returns a normalized sentence and nothing else. The thrown value may hold a
 provider response body, and the request that produced it held a client secret.
 
-## Password recovery
-
-The flow is `/forgot-password` to `/auth/confirm` to `/reset-password`, and the three
-properties that make it safe are each held in one place.
-
-**It never says whether an address has an account.** `requestPasswordResetAction` answers with
-the same sentence for a registered address, an unregistered one, and a send the provider
-refused. Reporting the provider's error would be an oracle: "too many attempts" comes back
-only for an address that exists, and that is enough to enumerate a customer list one address
-at a time. The only thing reported is a malformed address, which the browser knows already and
-which depends on no account. An E2E test compares the two responses character for character,
-because this property is lost by a well-meaning improvement to an error message.
-
-**The link is spent server-side, once.** `/auth/confirm` exchanges the emailed token for a
-session and redirects. The token never reaches a client component, and it is single use at the
-auth server, which `tests/db/password-recovery.test.ts` proves by replaying one. Everything
-after the redirect authorizes on the session cookie, so `updatePasswordAction` takes no token
-parameter and re-checks the session itself, per rule 7.
-
-**The redirect target is checked.** `safeRedirectTarget` narrows the `next` parameter to a
-plain same-origin path. Unchecked, it is an open redirect on a URL that arrives by email and
-has just established a session, which is the most valuable moment to steer someone somewhere
-else. The base URL is `NEXT_PUBLIC_APP_URL`, never a request header, for the same reason the
-OAuth redirect URI is.
-
-Changing the password calls `signOut({ scope: "others" })`. Recovery exists because the old
-password may be in someone else's hands, so sessions opened with it do not survive.
-
-The recovery email is a project template, `supabase/templates/recovery.html`, and it points at
-Fanwise carrying `token_hash`. The stock template routes through Supabase's verify endpoint and
-returns a PKCE code, which only works in the browser that asked for the reset: a person who
-requests a reset on a laptop and opens the mail on their phone gets an invalid link, and
-recovery is exactly the flow where that happens. `/auth/confirm` still accepts a code, so a
-deployment whose template has not been updated degrades rather than breaks. **A hosted project
-does not inherit `config.toml`, so the template has to be set on the project itself, and the
-`/auth/confirm` URL added to its redirect allowlist.**
+**The grant route is the same argument with the steps reordered by the provider.** Some
+stores never put the credential in the browser: WooCommerce posts the consumer key and
+secret to `app/api/channels/[channelKey]/oauth/grant`, server to server, and sends the person
+back to the callback with only a yes or a no. Nobody is signed in on that POST and nothing in
+it is trusted, so the order there is: the adapter parses the body, and anything malformed is
+a 400 that touches no state; the state is consumed exactly once, so a replayed POST has
+nothing to consume; the adapter proves the keys against the store the state row names, by
+calling that store, so keys for some other store are refused; and only then is the connection
+written and the credential sealed. There is no provider signature to verify, and the
+proof-by-call is the stronger check. The callback for such a channel peeks at the state
+rather than consuming it, because the POST may trail the redirect, and reports without ever
+seeing a secret.
 
 ## Password recovery
 
@@ -146,8 +122,59 @@ returns a PKCE code, which only works in the browser that asked for the reset: a
 requests a reset on a laptop and opens the mail on their phone gets an invalid link, and
 recovery is exactly the flow where that happens. `/auth/confirm` still accepts a code, so a
 deployment whose template has not been updated degrades rather than breaks. **A hosted project
-does not inherit `config.toml`, so the template has to be set on the project itself, and the
-`/auth/confirm` URL added to its redirect allowlist.**
+does not inherit `config.toml` on its own. `pnpm auth:push` applies it, including the
+`[remotes.production]` overrides that set the live site URL, the redirect allowlist and the
+SMTP provider, and installs this template in the same push. It is a hosted mutation and is
+held to the same boundary as a migration: an approved commit on `main`, a temporary detached
+worktree that is the only thing linked and is unlinked on every exit, the project reference
+as an argument, and the CLI's own diff prompt as the final approval. Supabase's built-in
+sender rejects custom templates, so the push is refused until the four `SMTP_*` variables
+are set. The provider is Resend, and `docs/decisions/0008-transactional-email.md` is the
+account.**
+
+## Password recovery
+
+The flow is `/forgot-password` to `/auth/confirm` to `/reset-password`, and the three
+properties that make it safe are each held in one place.
+
+**It never says whether an address has an account.** `requestPasswordResetAction` answers with
+the same sentence for a registered address, an unregistered one, and a send the provider
+refused. Reporting the provider's error would be an oracle: "too many attempts" comes back
+only for an address that exists, and that is enough to enumerate a customer list one address
+at a time. The only thing reported is a malformed address, which the browser knows already and
+which depends on no account. An E2E test compares the two responses character for character,
+because this property is lost by a well-meaning improvement to an error message.
+
+**The link is spent server-side, once.** `/auth/confirm` exchanges the emailed token for a
+session and redirects. The token never reaches a client component, and it is single use at the
+auth server, which `tests/db/password-recovery.test.ts` proves by replaying one. Everything
+after the redirect authorizes on the session cookie, so `updatePasswordAction` takes no token
+parameter and re-checks the session itself, per rule 7.
+
+**The redirect target is checked.** `safeRedirectTarget` narrows the `next` parameter to a
+plain same-origin path. Unchecked, it is an open redirect on a URL that arrives by email and
+has just established a session, which is the most valuable moment to steer someone somewhere
+else. The base URL is `NEXT_PUBLIC_APP_URL`, never a request header, for the same reason the
+OAuth redirect URI is.
+
+Changing the password calls `signOut({ scope: "others" })`. Recovery exists because the old
+password may be in someone else's hands, so sessions opened with it do not survive.
+
+The recovery email is a project template, `supabase/templates/recovery.html`, and it points at
+Fanwise carrying `token_hash`. The stock template routes through Supabase's verify endpoint and
+returns a PKCE code, which only works in the browser that asked for the reset: a person who
+requests a reset on a laptop and opens the mail on their phone gets an invalid link, and
+recovery is exactly the flow where that happens. `/auth/confirm` still accepts a code, so a
+deployment whose template has not been updated degrades rather than breaks. **A hosted project
+does not inherit `config.toml` on its own. `pnpm auth:push` applies it, including the
+`[remotes.production]` overrides that set the live site URL, the redirect allowlist and the
+SMTP provider, and installs this template in the same push. It is a hosted mutation and is
+held to the same boundary as a migration: an approved commit on `main`, a temporary detached
+worktree that is the only thing linked and is unlinked on every exit, the project reference
+as an argument, and the CLI's own diff prompt as the final approval. Supabase's built-in
+sender rejects custom templates, so the push is refused until the four `SMTP_*` variables
+are set. The provider is Resend, and `docs/decisions/0008-transactional-email.md` is the
+account.**
 
 ## AI prompts
 
