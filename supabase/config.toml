@@ -10,7 +10,10 @@ max_rows = 1000
 [db]
 port = 54422
 shadow_port = 54420
-major_version = 15
+# The hosted project runs PostgreSQL 17 (17.6 on 10 September 2026, read from
+# the project itself). The local stack and CI follow it, so a migration is
+# exercised on the major version it will meet. A unit test pins this line.
+major_version = 17
 
 [studio]
 enabled = true
