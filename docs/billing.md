@@ -36,7 +36,9 @@ name.
    flipping the WooCommerce row is one migration.
 5. Assisted versus automatic pricing is **an open decision**. Charging the same $6 for a
    channel Fanwise cannot publish to is harder to defend. Resolve before the pricing page is
-   public.
+   public. Behance, planned at B9, is the second assisted marketplace and is seeded
+   billable; it also takes 30% of each sale itself unless the seller subscribes to Behance
+   Pro, which is the comparison decision 16 now has to survive.
 
 ## Entitlements
 

@@ -28,10 +28,15 @@ Current reality, from `docs/channel-feasibility.md`:
 | WooCommerce | api | yes | yes | yes | **no**, by decision, see `docs/channels/woocommerce.md` §6 | yes |
 | Etsy | api | yes | yes | yes | **yes**, 5 files at 20 MB, built at A6 | yes |
 | Creative Market | assisted | no | no | no | no | no |
+| Behance | assisted | no | no | no | no | no |
 | Adobe Stock | assisted | no | no | no | no | no |
 | MyFonts | assisted | no | no | no | no | no |
 | Gumroad | assisted | no | no | yes | no | no |
 | Envato | assisted | no | no | yes | no | no |
+
+**Behance note.** Every `no` on that row is the permanent kind: the provider cannot. Its API
+is read-only and closed, and Adobe's terms forbid the alternative. Planned at B9; the spec is
+`docs/channels/behance.md`.
 
 **Shopify note, resolved at A5.** The Admin API creates products but has no API for
 attaching a buyer-downloadable file, and Shopify's own Digital Downloads app exposes none.

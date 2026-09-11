@@ -120,6 +120,24 @@ hosted deployment, on a domain being bought for it. What is still owed is the ru
 
 ---
 
+### 26. Get a Behance profile with Stripe connected
+
+B9 is planned and not opened, and it is planned around a form nobody at Fanwise has seen from
+the seller's side. It needs a Behance profile with a Stripe account connected, which is a
+free signup and a Stripe onboarding, then one draft project with one asset attached. Nothing
+to apply for and nobody to wait on, so it sits in this section as a prerequisite, like 25.
+
+Twelve questions in `docs/channels/behance.md` §13 can only be settled there, and two decide
+code before B9 can open: the names of the five asset categories in the dropdown, and the full
+Creative Fields list. Both are mapping tables in the adapter, and a table guessed from the
+marketplace's navigation is a table that will be wrong. A third, whether a generative-AI
+disclosure field exists on the form, feeds decision 24.
+
+**Recommendation:** do it before A8 closes, so B9 can open the day A8 does. It is the
+cheapest item on this page after the Creative Market login, and unlike 25 it needs no host.
+
+---
+
 ## Shopify, before any public launch
 
 ### 4. Shopify app type: public or custom
@@ -204,6 +222,13 @@ should be Creative Market's or a neutral Fanwise one that adapters map onto each
 question is the part still owed, and the neutral wording is the one consistent with adapters
 being adapters.
 
+Behance, planned 11 September 2026, asks a softer form of the same question: it encourages
+every project to name the tools used, generative ones included, and supports Content
+Credentials, but documents no required field. That is the neutral-wording argument made by a
+second channel. The Behance adapter maps a yes onto Tools Used and the description
+(`docs/channels/behance.md` §5, §9); whether the form has grown a required field since the
+2023 FAQ is item 10 of that spec's §13.
+
 ---
 
 ## Gate B
@@ -265,6 +290,12 @@ Adobe Stock "V2, highest leverage" against MyFonts "V2, if fonts are the wedge".
 **Recommendation:** do not decide this now. It is a question about who the creator actually
 is, and Gate A's alpha creators are the ones who answer it.
 
+**Behance is not a third candidate**, as of 11 September 2026. It was planned as B9 on its
+own, after A8, because what it tests is different: B4's two candidates carry heavy, exact
+metadata, which is where assisted preparation earns its price, and Behance's metadata is
+light. What Behance tests is a project-shaped handoff, and what it is worth is reach. See
+`docs/channels/behance.md` §1.
+
 ### 15. How to show analytics holes honestly
 
 Verified sales data exists for Shopify, Etsy, Gumroad and Envato only. Everything else is CSV
@@ -274,6 +305,10 @@ will be partial for most creators.
 `docs/channel-feasibility.md` says to "say so honestly in the product rather than showing
 zeros". That is a design decision nobody has made, and a zero that means "no data" is
 indistinguishable from a zero that means "no sales".
+
+Behance, planned 11 September 2026, adds a third kind of hole: sales that exist, in full, in
+the seller's own Stripe account, and nowhere Fanwise can see. "No data from this channel"
+and "your Stripe has this, import it" are different sentences, and the second is B7's.
 
 ---
 
@@ -362,6 +397,11 @@ can be.
 
 **This must be settled before the pricing page is public.** See the contradictions section
 below: the published mockup has already answered it by accident.
+
+Behance, planned 11 September 2026, sharpens it. That marketplace takes 30% of every sale
+unless the seller pays Adobe from $9.99 a month, so Fanwise's $6 for preparing the listing
+will be read beside Adobe's cut for hosting it. An assisted price that is obviously worth it
+has to be worth it against that comparison, not in the abstract.
 
 C1 charges one channel price, 8 September 2026, because the ledger and the sync job do not
 care which; a second price is a second subscription item and a second column in the provider

@@ -28,11 +28,14 @@ step completes, and do not work on more than one step at a time.
 | Etsy commercial access | A6 | date unrecorded | by 8 Sep 2026 |
 | Shopify Partner account | A5 | yes, date unrecorded | by 5 Sep 2026 |
 | WooCommerce test store | B8 exit, and A7 if it runs before Etsy's | nothing to file | exists, 9 Sep 2026: `houseofproctor.com`, permalinks on. Fanwise needs a public HTTPS origin to meet it |
+| Behance profile with Stripe connected | B9, and its §13 questions before B9 opens | nothing to file | not yet. A profile and a Stripe account; decision 26 |
 
 The WooCommerce row is not an application. It is in this table because it is the one thing
 B8's exit waits on, and because it is the cheapest unblock the roadmap has: no developer
 account, no review, no partner program. Decision 25 in `docs/decisions/0002` says what to
-check once it exists.
+check once it exists. The Behance row is the same kind of thing for B9: a free profile and a
+Stripe account, and twelve questions in `docs/channels/behance.md` §13 that only a logged-in
+seller can answer. Decision 26 lists them.
 
 Etsy commercial access has no published SLA and applicants report waiting weeks. It is the
 single most likely thing to delay the roadmap, and it costs nothing to file today.
@@ -270,6 +273,12 @@ to call. A8 arrives after A7 and does not widen A7's exit test. What A8 does put
 Publish Everywhere is a connected channel the action must visibly skip rather than silently
 omit, which is the capability-matrix case A3's assisted mock was built to rehearse.
 
+**Behance, planned as B9 on 11 September 2026, is a second connected channel Publish
+Everywhere must visibly skip**, for the same reason as Creative Market: it declares no
+`publish`. Two assisted channels on one product is the case where a skip list with a reason
+per row stops being a courtesy and becomes the feature; ADR 0005's vocabulary already
+covers it.
+
 **WooCommerce is the third channel Publish Everywhere can call**, since B8 landed on `main`
 on 8 September 2026, and it changes A7's blocker rather than its exit. The exit still reads
 two live URLs. What has changed is that the second live channel no longer has to be Etsy: a
@@ -336,6 +345,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B6 | Analytics overview: revenue, units, by channel, by product |
 | B7 | CSV import foundation |
 | B8 | WooCommerce: store authorization, adapter, draft, images, activate with the file verified, idempotency. See `docs/channels/woocommerce.md`. Added 8 September 2026 at the founder's request; **code complete the same day**, exit unrun, see below |
+| B9 | Behance: creative-field and category mapping, the project-and-asset package, two new image derivative specs, guided handoff in new-project and existing-project modes, mark submitted, project URL capture. See `docs/channels/behance.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on A8, see below |
 
 ### B1, what was built and what is still owed
 
@@ -451,6 +461,53 @@ What B8 changes elsewhere in this file:
   row is seeded included, and `docs/billing.md` rule 4 now says so and names the decision.
 - **Gate A does not widen.** WooCommerce is not in the gate's exit test and does not need to
   be: the gate proves the loop closes, and it closes on Shopify, Etsy and Creative Market.
+
+### B9, what is planned and what it waits on
+
+Planned on 11 September 2026 at the founder's request and not built. The assessment is in
+`docs/channel-feasibility.md` under Tier 3; the spec is `docs/channels/behance.md`.
+
+What Behance is to the plan, in one sentence: the second assisted channel, the first whose
+unit is a portfolio project rather than a product, the cheapest marketplace after Creative
+Market to reach, and one where Fanwise will never hold a credential or call an API.
+
+Scope, when it opens:
+
+- `lib/channels/adapters/behance`: capabilities (every one false but `drafts`, all for the
+  permanent reason), requirements, the two mapping tables (product type to Creative Fields,
+  product type to asset category), the plain-text description transform, and a
+  merchandising profile written for a portfolio audience rather than a shop's.
+- Two derivative specs in the image service: a 1.278:1 cover and a 2800-wide project image.
+  Nothing else in the catalog shares either.
+- The handoff screen in two modes, new project and existing project, ordered to Behance's
+  editor; the fee arithmetic shown beside the price; mark submitted; project URL capture.
+- A catalog migration: one `channels` row, `integration_type = assisted`, `billable = true`,
+  since it is a marketplace and decision 16 governs what that costs.
+- Unit tests for the requirements, the mappings and the capability honesty; journey 12.
+
+**B9 waits on A8**, and the dependency is real rather than ceremonial. A8 builds the
+package build, the handoff screen, mark submitted and URL capture, and Behance reuses every
+piece. Opening B9 first would mean building the assisted machinery on a channel that is not
+in Gate A's exit and then fitting Creative Market to it, which is backwards. B9 also waits
+on decision 26, a profile with Stripe connected, because twelve questions in the spec's §13
+can only be answered from inside one, and two of them (the five category names, the
+Creative Fields list) decide the mapping tables.
+
+**B9's exit test** is journey 12: a creator carries one real product through the handoff to
+a live project with the asset For Sale, composes nothing outside Fanwise, the project URL is
+captured, and every row reads `self_reported`. No surface offers Publish.
+
+What B9 changes elsewhere in this file:
+
+- **A7** gains a second channel to skip visibly, not a third to call. See the paragraph
+  under Gate A.
+- **B4** is unchanged. Behance is not a candidate for it; decision 14 says why.
+- **B5 and B6** gain a hole that is named rather than shown as zero: Behance's sales exist
+  only in the seller's own Stripe account. Decision 15.
+- **C1 and C2** inherit decision 16 with a sharper edge: the marketplace itself takes 30% of
+  every sale unless the seller pays Adobe monthly, and a $6 charge for preparation will be
+  read next to that.
+- **Gate A does not widen.** Behance is in Gate B and is not in the gate's exit test.
 
 **B3 is vacant on purpose.** Creative Market moved to A8 and the remaining steps keep their
 numbers, because step ids are names here, not positions — `docs/data-model.md`,

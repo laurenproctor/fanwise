@@ -144,7 +144,7 @@ Integration: mock Shopify, Etsy, WooCommerce, Anthropic and Stripe. Cover OAuth 
 handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
 AI failure.
 
-E2E: the eleven journeys in `docs/testing.md`. Journey 9 (workspace A cannot reach
+E2E: the twelve journeys in `docs/testing.md`. Journey 9 (workspace A cannot reach
 workspace B) must never be skipped.
 
 ## Definition of done
