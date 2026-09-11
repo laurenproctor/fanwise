@@ -338,6 +338,9 @@ Design rules that make this work:
 - Nothing here says "publish" or implies Fanwise did anything on Creative Market.
 - The final step captures the listing URL. That URL is what links the live listing back to
   the canonical product, and without it there is no analytics story later.
+- The screen is one component that does not assume a full page's width, so it can also be
+  shown in a companion window beside Creative Market's editor. That window never touches
+  Creative Market's page. `docs/decisions/0010`.
 
 ---
 
@@ -390,7 +393,8 @@ listing they left alone for a week is a listing they endorsed.
 - They re-export the screenshots → the derivative pipeline is the problem, which is a deeper
   issue because that is the hardest part to fake and the most valuable to get right.
 - They get lost between windows → the handoff order is wrong. Cheap fix, and exactly what
-  this test is for.
+  this test is for. If the order is right and they still lose their place, the companion
+  window in `docs/decisions/0010` is the next fix.
 - They say "this is nice but I would only use it for a new marketplace, not Creative Market
   where I already have a workflow" → the wedge is wrong, and the product should lead with
   channels the creator does not yet sell on. That is a strategy finding worth more than the

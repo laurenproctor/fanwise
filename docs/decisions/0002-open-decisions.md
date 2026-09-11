@@ -241,6 +241,23 @@ second channel. The Behance adapter maps a yes onto Tools Used and the descripti
 (`docs/channels/behance.md` §5, §9); whether the form has grown a required field since the
 2023 FAQ is item 10 of that spec's §13.
 
+### 28. Whether the assisted handoff gets a companion window
+
+**Drafted as ADR 0010, 11 September 2026, and still open.** The founder chose a sidebar over a
+browser extension that fills in marketplace forms, which Behance's, Adobe's and Creative
+Market's terms forbid and `CLAUDE.md` excludes. The proposal: the handoff may be shown in a
+companion window beside the marketplace's editor, under five constraints that do not bend.
+It never touches the marketplace's page, holds no marketplace session, captures only what
+the creator hands it, writes only `self_reported` rows, and renders the same handoff
+component as the web page. Of the two forms, a pop-out window from the web app comes first,
+with no install and no new client. An extension side panel comes only if the pop-out is
+found wanting.
+
+**Recommendation:** accept the constraints now, so no later session builds the other kind of
+extension. Decide whether to build anything on A8's exit run and the B2a creator test:
+build the pop-out if creators still lose their place between windows once the step order is
+right.
+
 ---
 
 ## Gate B

@@ -631,3 +631,10 @@ into `app/` while the gates are in progress.
 Product versions table, viewer and editor roles, Framer, metric snapshots, multi-currency,
 browser automation, physical commerce, and everything in the strategy document marked V2 or
 V3.
+
+Browser automation means anything that works on a marketplace's page: filling fields,
+attaching files, clicking, or reading the page back, whether a script or a browser
+extension does it. A companion window that shows Fanwise's own handoff beside the
+marketplace and touches nothing on its page is not browser automation. It is ADR 0010,
+proposed on 11 September 2026, and it waits on the evidence from A8's exit run and the B2a
+creator test.

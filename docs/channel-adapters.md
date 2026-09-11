@@ -251,3 +251,8 @@ the second.
 No `publish`. Status moves draft, ready, then published by human action with
 `status_source = "self_reported"`. Nothing that implies verification may treat those rows as
 equal to verified ones.
+
+The handoff for an assisted channel may also be shown in a companion window beside the
+marketplace's editor, as proposed in `docs/decisions/0010`. It is a layout, not a capability.
+It never reads or writes the marketplace's page, so it adds nothing to the matrix and gives no
+assisted adapter a `publish`.
