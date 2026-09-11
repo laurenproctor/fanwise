@@ -13,8 +13,29 @@
  * open, which is why the copy says "one owned storefront" and names both as
  * the choice rather than promising both.
  */
+/**
+ * Every shop the marketing site names, on any page.
+ *
+ * A union rather than a string so that a mark, or a rail cell, keyed to a shop
+ * this site does not talk about fails to compile. It is wider than `SHOPS`:
+ * the landing rail names Gumroad, which has no spec card yet.
+ *
+ * Deliberately not derived from `ChannelKey`. The public site keeps its own
+ * list so that adding a channel to the registry cannot quietly rewrite the
+ * copy, and half of these have no adapter at all.
+ */
+export type ShopName =
+  | "Shopify"
+  | "WooCommerce"
+  | "Etsy"
+  | "Creative Market"
+  | "Envato Market"
+  | "Adobe Stock"
+  | "MyFonts"
+  | "Gumroad"
+
 export type Shop = {
-  name: string
+  name: ShopName
   badge: string
   kind: "storefront" | "marketplace"
   blurb: string
@@ -125,4 +146,26 @@ export const SHOPS: Shop[] = [
     handles:
       "Fanwise generates 2:1 specimens from your previews and keeps the family's style names consistent with the font metadata.",
   },
+]
+
+/**
+ * The shop rail on the landing page: a name and the mode Fanwise works in.
+ *
+ * It lives here beside `SHOPS` rather than in the landing component because it
+ * is the other half of the same answer to "which shops", and keeping the two
+ * lists apart is how they end up disagreeing about which shops exist. The
+ * modes are accurate; `design/README.md` holds that the channel modes and the
+ * pricing are the two things in the mockups that are.
+ */
+export const RAIL: readonly (readonly [ShopName, string])[] = [
+  ["Shopify", "Storefront"],
+  ["WooCommerce", "Storefront"],
+  ["Etsy", "Automatic"],
+  ["Creative Market", "Assisted"],
+  // Automatic since Gumroad's product API shipped in April 2026. It was
+  // assisted here until B10 was planned on 11 September 2026, and
+  // docs/channel-feasibility.md moved it the same day.
+  ["Gumroad", "Automatic"],
+  ["Adobe Stock", "Assisted"],
+  ["MyFonts", "Assisted"],
 ]

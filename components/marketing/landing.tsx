@@ -6,6 +6,8 @@ import { MarketplacePicker } from "./marketplace-picker"
 import { ScrollReveal } from "./scroll-reveal"
 import { FANWISE_DEFINITION } from "./site-footer"
 import { SiteNav } from "./site-nav"
+import { RAIL } from "./channels"
+import { ShopMark } from "./shop-mark"
 import { marketingRoutes } from "@/lib/routes"
 
 const NAV = [
@@ -96,16 +98,6 @@ const DERIVED: {
     last: true,
   },
 ]
-
-const RAIL = [
-  ["Shopify", "Storefront"],
-  ["WooCommerce", "Storefront"],
-  ["Etsy", "Automatic"],
-  ["Creative Market", "Assisted"],
-  ["Gumroad", "Assisted"],
-  ["Adobe Stock", "Assisted"],
-  ["MyFonts", "Assisted"],
-] as const
 
 const TALLY = [
   ["Re-export previews for six image specs", "1h 40m"],
@@ -394,6 +386,12 @@ export function Landing() {
           <div className="fw-wrap--wide fw-rail__grid">
             {RAIL.map(([name, mode]) => (
               <div key={name} className="fw-rail__cell">
+                {/*
+                  Above the name rather than beside it. The cells are 150px at
+                  their narrowest, and "WooCommerce" at 18px display leaves no
+                  room for a mark on the same line.
+                */}
+                <ShopMark name={name} className="fw-rail__mark" glyph={17} />
                 <strong>{name}</strong>
                 <span className="fw-rail__mode">
                   <i /> {mode}

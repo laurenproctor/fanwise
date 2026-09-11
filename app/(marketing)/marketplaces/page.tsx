@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { SHOPS } from "@/components/marketing/channels"
 import { CtaPanel } from "@/components/marketing/cta-panel"
 import { MarketingPage } from "@/components/marketing/page-shell"
+import { ShopMark } from "@/components/marketing/shop-mark"
 import { marketingRoutes } from "@/lib/routes"
 
 export const metadata: Metadata = {
@@ -52,7 +53,10 @@ export default function MarketplacesPage() {
         {SHOPS.map((shop) => (
           <article key={shop.name} className="fw-shop">
             <div className="fw-shop__head">
-              <h2>{shop.name}</h2>
+              <div className="fw-shop__id">
+                <ShopMark name={shop.name} />
+                <h2>{shop.name}</h2>
+              </div>
               <span
                 className={
                   shop.kind === "storefront"
