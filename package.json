@@ -47,5 +47,11 @@
     "trigger.dev": "4.5.16",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11"
+  },
+  "pnpm": {
+    "overrides": {
+      "ws": ">=8.21.0",
+      "@opentelemetry/core": ">=2.8.0"
+    }
   }
 }
