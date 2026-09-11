@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { CHANNEL_MARKS, findChannelMark } from "@/components/channels/channel-mark"
-import { SHOP_MARKS } from "@/components/marketing/shop-mark"
-import { SHOPS } from "@/components/marketing/channels"
+import { SHOP_MARKS, findShopMark } from "@/components/marketing/shop-mark"
+import { RAIL, SHOPS } from "@/components/marketing/channels"
 import { listAdapters } from "@/lib/channels/registry"
 import { CHANNEL_KEYS } from "@/lib/channels/types"
 
@@ -88,11 +88,25 @@ describe("a channel without a mark degrades instead of guessing", () => {
  * been shown two different companies. This is what holds them together.
  */
 describe("the marketing marks and the channel marks agree", () => {
-  const shopNames = new Set(SHOPS.map((shop) => shop.name))
+  // Every shop the site names anywhere: the spec cards and the landing rail,
+  // which are not the same list. The rail names Gumroad, which has no card.
+  const shopNames = new Set<string>([
+    ...SHOPS.map((shop) => shop.name),
+    ...RAIL.map(([name]) => name),
+  ])
 
-  it("only marks shops the marketing site actually lists", () => {
+  it("only marks shops the marketing site actually names", () => {
     for (const name of Object.keys(SHOP_MARKS)) {
-      expect(shopNames, `${name} has a mark but is not a shop on the page`).toContain(name)
+      expect(shopNames, `${name} has a mark but is named on no page`).toContain(name)
+    }
+  })
+
+  it("marks the rail, or falls back without throwing", () => {
+    // The rail cell has no room for a word of explanation, so every cell has
+    // to render something: a mark, or the initial. Neither may be blank.
+    for (const [name] of RAIL) {
+      const rendered = SHOP_MARKS[name] ?? name.trim().charAt(0)
+      expect(rendered, `${name} renders nothing in the rail`).toBeTruthy()
     }
   })
 
@@ -100,7 +114,10 @@ describe("the marketing marks and the channel marks agree", () => {
     // Matched through the adapter's own name rather than a hand-written map,
     // so a channel renamed on one side and not the other fails here too.
     const overlapping = listAdapters()
-      .map((adapter) => ({ channel: findChannelMark(adapter.key), shop: SHOP_MARKS[adapter.name] }))
+      .map((adapter) => ({
+        channel: findChannelMark(adapter.key),
+        shop: findShopMark(adapter.name),
+      }))
       .filter(({ channel, shop }) => channel && shop)
 
     // If this is empty the test has stopped testing anything, which is the
@@ -118,7 +135,7 @@ describe("the marketing marks and the channel marks agree", () => {
     // recognise, and the one least excusable to leave as a grey initial.
     const unmarked = listAdapters()
       .filter((adapter) => shopNames.has(adapter.name))
-      .filter((adapter) => !SHOP_MARKS[adapter.name])
+      .filter((adapter) => !findShopMark(adapter.name))
       .map((adapter) => adapter.name)
 
     expect(unmarked).toEqual([])

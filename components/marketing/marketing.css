@@ -2248,6 +2248,27 @@
   letter-spacing: -0.02em;
 }
 
+/* Smaller than the mark on a spec card: the rail is a glance, not a read, and
+   the cell is a third of the width. Tint and border are set per shop. */
+.fw-rail__mark {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  margin-bottom: 12px;
+}
+
+.fw-rail__mark--plain {
+  border-color: var(--fw-slab-rule);
+  background: var(--fw-slab-track);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fw-slab-ink-3);
+}
+
 .fw-rail__mode {
   display: inline-flex;
   align-items: center;
