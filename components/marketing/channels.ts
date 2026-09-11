@@ -162,7 +162,10 @@ export const RAIL: readonly (readonly [ShopName, string])[] = [
   ["WooCommerce", "Storefront"],
   ["Etsy", "Automatic"],
   ["Creative Market", "Assisted"],
-  ["Gumroad", "Assisted"],
+  // Automatic since Gumroad's product API shipped in April 2026. It was
+  // assisted here until B10 was planned on 11 September 2026, and
+  // docs/channel-feasibility.md moved it the same day.
+  ["Gumroad", "Automatic"],
   ["Adobe Stock", "Assisted"],
   ["MyFonts", "Assisted"],
 ]
