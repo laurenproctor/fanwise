@@ -16,11 +16,12 @@ explicitly requested.
 ## Current step
 
 **Step: A6 (Etsy: OAuth with PKCE, adapter, images, the digital file, activate, idempotency)
-is code complete on 8 September 2026, the day Etsy's approvals landed. Its exit needs a live
-shop: connect, publish, and confirm the listing is purchasable; five request-shape questions
-in `docs/channels/etsy.md` §13 can only be settled there. B1, B2 and B8 are on `main`; B8's
-exit needs a live WooCommerce store, which needs no approval. Gate A is not passed; A8
-resumes when a Creative Market login exists.** See `docs/roadmap.md`. Implement the current
+is done. Its exit ran on 11 September 2026 against a live shop: connect, publish, and listing
+4573259073 active in one job. Four of the five questions in `docs/channels/etsy.md` §13 are
+settled; the fifth, refresh-token rotation, waits on the first refresh. A7 (Publish
+Everywhere) is next and not yet opened, with Shopify and Etsy as its two live channels. B1,
+B2 and B8 are on `main`; B8's exit needs a live WooCommerce store, which needs no approval.
+Gate A is not passed; A8 resumes when a Creative Market login exists.** See `docs/roadmap.md`. Implement the current
 step only. Do not build ahead.
 
 ## Architecture invariants

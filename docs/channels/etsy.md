@@ -48,7 +48,7 @@ No manual steps. Etsy takes the file, so ADR 0001's assisted step does not apply
 | `short_description`, `seo_*` | **nothing** | No fields |
 | `cover_image`, then `preview_image` assets | `uploadListingImage` | Up to 10, multipart, cover first |
 | `deliverable`, `archive` assets | `uploadListingFile` | Up to 5 of 20 MB, multipart |
-| — | `type: download`, `quantity: 999`, `who_made: i_did`, `when_made: made_to_order`, `is_supply: false`, `should_auto_renew: true` | Constants **[verify]** `when_made` |
+| — | `type: download`, `quantity: 999`, `who_made: i_did`, `when_made: made_to_order`, `is_supply: false`, `should_auto_renew: true` | Constants. `when_made: made_to_order` was accepted on a download listing, 11 September 2026 |
 
 `should_auto_renew: true` means Etsy renews the listing every four months at its own fee,
 which is what a seller expects of a live listing; the alternative is a listing that
@@ -82,8 +82,8 @@ Four calls, one job:
 4. `PATCH .../listings/{listing_id}` with `state: active`. Etsy charges its listing fee
    here.
 
-The bodies of 1 and 4 are sent as JSON **[verify]**; if Etsy insists on form encoding the
-client already has that shape and it is a one-word change.
+The bodies of 1 and 4 are JSON, and Etsy accepted both on 11 September 2026. The client also
+has the form-encoded shape, which the token endpoint uses.
 
 ## 6. Digital delivery
 
@@ -162,21 +162,28 @@ needs a limit increase before there are customers who reach it.
 `expiresAt`, `shopId`, `userId`, sealed. `external_listing_id` is the listing id;
 `external_url` the public listing URL once active.
 
-## 13. Open questions to resolve against a live shop
+## 13. Questions settled against a live shop, 11 September 2026
 
-1. Whether `createDraftListing` and `updateListing` accept JSON bodies or require form
-   encoding, §5.
-2. Whether `when_made: made_to_order` is accepted on a `download` listing, or a year range is
-   required, §3.
-3. Whether a non-leaf `taxonomy_id` such as Graphic Design is accepted, §14.
-4. Whether `PATCH state: active` on a draft with images and a file activates it directly, or
-   whether Etsy wants a separate step.
-5. Whether the refresh token rotates on every refresh, which decides whether two jobs
-   refreshing at once can strand a connection.
+Listing `4573259073` in shop `67895664`, from one publish job; the record is in
+`docs/roadmap.md` under "The A6 exit run".
+
+1. JSON bodies. `createDraftListing` and the activating `PATCH` both accepted
+   `application/json`; form encoding is not required, §5. `updateListing` sends the same
+   shape and was not exercised.
+2. `when_made: made_to_order` is accepted on a `download` listing, §3.
+3. A non-leaf `taxonomy_id` is accepted: Graphic Design, 1875, with three children, created
+   and went active, §14.
+4. `PATCH state: active` on a draft holding images and a file activates it in one step. The
+   response reads `state: active` with the public URL, and there is no separate step.
+5. **Open.** Whether the refresh token rotates on every refresh. The connection was under a
+   minute old when it published, so no refresh ran. It settles the first time a publish or
+   update runs more than an hour after the connect, or at B5 when scheduled ingestion
+   refreshes routinely: the test is whether a second refresh with an already-used token is
+   refused.
 
 ## 14. Categories
 
 Read from `GET /v3/application/seller-taxonomy/nodes` on 8 September 2026. There is no node
 named Fonts anywhere in the 3,065; fonts default to Graphic Design, where the marketplace's
-own font sellers list. The labels the requirement offers, with their ids and paths, are in
+own font sellers list. Graphic Design is not a leaf, and Etsy accepted it, §13. The labels the requirement offers, with their ids and paths, are in
 `lib/channels/adapters/etsy/categories.ts`.

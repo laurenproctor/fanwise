@@ -12,8 +12,8 @@ import type { ProductType } from "@/lib/products/types"
  * `taxonomy_id` is required on every listing, so every product type has a
  * default, and the requirement engine offers the labels as an enum so the
  * creator can move a product between them. Ids are Etsy's and stable; labels
- * are the node names. **[verify]** whether Etsy accepts a non-leaf id such as
- * Graphic Design (it has three children) or insists on a leaf.
+ * are the node names. Etsy accepts a non-leaf id: Graphic Design (1875, three
+ * children) created and activated a listing on 11 September 2026.
  */
 
 export interface EtsyCategory {

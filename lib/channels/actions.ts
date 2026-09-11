@@ -292,7 +292,13 @@ export async function buildListingAction(
   if (!adapter) return { error: "That channel is not available." }
 
   const assets = await listProductAssets(product.id)
-  const subject: AdapterSubject = { product, assets }
+  const subject: AdapterSubject = {
+    product,
+    assets,
+    // The shop's currency lives on the connection. Without it the Etsy currency
+    // rule reads as if no shop were connected, in every build snapshot.
+    connectionMetadata: (connection.metadata as Record<string, unknown>) ?? {},
+  }
   const draft = buildDraft(adapter, subject)
   const evaluation = evaluate(adapter, draft, subject)
 
@@ -434,7 +440,7 @@ export async function updateListingAction(
 
   const { data: existing, error: readError } = await supabase
     .from("channel_listings")
-    .select("*, channel:channels(*)")
+    .select("*, channel:channels(*), connection:channel_connections(metadata)")
     .eq("id", listingId)
     .eq("workspace_id", workspace.id)
     .maybeSingle()
@@ -443,6 +449,9 @@ export async function updateListingAction(
   if (!existing) return { error: "That listing could not be found.", savedAt: null }
 
   const channel = (existing as { channel: { id: string; key: string } }).channel
+  const connectionMetadata =
+    ((existing as { connection: { metadata: unknown } | null }).connection?.metadata as
+      Record<string, unknown> | undefined) ?? {}
   const adapter = findAdapter(channel.key)
   if (!adapter) return { error: "That channel is not available.", savedAt: null }
 
@@ -487,7 +496,7 @@ export async function updateListingAction(
   }
 
   const assets = await listProductAssets(product.id)
-  const subject: AdapterSubject = { product, assets }
+  const subject: AdapterSubject = { product, assets, connectionMetadata }
   const evaluation = evaluate(adapter, draft, subject)
 
   const { error: snapshotError } = await supabase.from("listing_snapshots").insert({

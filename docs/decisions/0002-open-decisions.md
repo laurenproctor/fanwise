@@ -411,9 +411,9 @@ them the de-facto answer to decisions they were never meant to settle.
    decision 16 in favour of flat pricing.
 3. **The free plan exists nowhere in `docs/billing.md`**, which pre-answers decision 18.
 
-**Etsy and Creative Market stay marked "Live" on that page, and that is deliberate.** Neither
-is live — Etsy is A6, code complete with its exit unrun, and Creative Market is A8, unstarted —
-so the label is false today and will be true at Gate A exit. The mockup depicts the product at launch, and the marketing
+**Etsy and Creative Market stay marked "Live" on that page, and that is deliberate.** Etsy
+became true on 11 September 2026, when A6's exit ran; Creative Market is A8, unstarted, so its
+label is false today and will be true at Gate A exit. The mockup depicts the product at launch, and the marketing
 site is its own deployment that ships after the gates rather than a route in this app, so it
 never renders while the claim is wrong. Framer was different in kind: no amount of shipping
 makes it true. Do not "correct" Etsy or Creative Market to Planned on the strength of item 1.
