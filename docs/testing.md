@@ -72,12 +72,12 @@ the product heading, usually.
    with field regenerate and restore is code complete at B2 and proven in
    `tests/db/ai-review.test.ts`; approval is the publish click; unrun in the browser)*
 3. Connect Shopify, publish. *(code complete at A5, unverified: needs a live shop)*
-4. Connect Etsy, publish. *(code complete at A6, unverified: needs a live shop. The OAuth
-   flow and the adapter are covered in `tests/unit/etsy-oauth.test.ts` and
-   `tests/unit/etsy-adapter.test.ts`)*
-5. Publish to Shopify and Etsy in one action. *(A7's exit needs any two live channels;
-   WooCommerce, once connected, is a third the action includes, and can stand in for Etsy
-   while A6's exit waits on a shop)*
+4. Connect Etsy, publish. *(ran by hand on 11 September 2026 against the live shop, see
+   `docs/roadmap.md`; the OAuth flow and the adapter are covered in
+   `tests/unit/etsy-oauth.test.ts` and `tests/unit/etsy-adapter.test.ts`)*
+5. Publish to Shopify and Etsy in one action. *(A7's exit needs any two live channels, and
+   Shopify and Etsy are both live as of 11 September 2026; WooCommerce, once connected, is a
+   third the action includes)*
 6. Publication failure, correction, retry, no duplicate.
 7. Generate a Creative Market submission package.
 8. Analytics shows an ingested sale.

@@ -1,13 +1,13 @@
 # Roadmap
 
-**Current step: A6, Etsy, code complete 8 September 2026 and on `main`; its exit needs a
-live shop, and five request-shape questions in `docs/channels/etsy.md` §13 wait on the same
-thing. B1, B2 and B8 are also on `main`, each code complete with its exit unrun; see their
-sections under Gate B.** A5 is done; all three exit clauses ran against a live Shopify store.
-What remains of Gate A is blocked on things no code can move: A6's exit on a live Etsy shop,
-A7 on a second live channel to orchestrate (which is A6's exit, or B8's: a WooCommerce store
-needs no approval, only a WordPress host), A8 on a Creative Market seller login, and the
-gate's own exit — an outside creator, unassisted — on a real portfolio to hand them.
+**Current step: A6 is done. Its exit ran on 11 September 2026 against the live shop
+`Fanwise`: connect, publish, and an active listing in one job, with four of the five §13
+questions in `docs/channels/etsy.md` settled; see "The A6 exit run" below. A7 is next and not
+yet opened. B1, B2 and B8 are also on `main`, each code complete with its exit unrun; see
+their sections under Gate B.** A5 is done; all three exit clauses ran against a live Shopify
+store. What remains of Gate A: A7 has its two live channels, Shopify and Etsy, and is blocked
+on nothing; A8 waits on a Creative Market seller login; and the gate's own exit — an outside
+creator, unassisted — waits on a real portfolio to hand them.
 **Gate A is not passed.** Gate A's exit test is still owed before Gate B's is attempted. See
 "Reordering" below.
 
@@ -70,7 +70,7 @@ One real product, syndicated to three channels, by a person who is not you.
 | A3 | Channel registry, connections, listings, adapter contract, capability matrix, requirements engine, two mock adapters, one `api`-shaped and one `assisted`-shaped | One product yields two independent mock listings, the assisted mock implements no `publish`, and the UI offers none. No marketplace string in the product domain | done |
 | A4 | Manual listing editor, no AI. Readiness UI | A user hand-writes a listing per channel and sees deterministic readiness | done |
 | A5 | Shopify: OAuth, adapter, publish, idempotency, error normalization, digital delivery decision | Real product publishes, second click creates nothing, the file is actually deliverable to a buyer | **done**, 7 September 2026. Ran in full against the live store, twice — the second time on a product deleted underneath it. `docs/channels/shopify.md` §16 |
-| A6 | Etsy: OAuth, adapter, draft, images, digital file, activate, idempotency | Real product publishes and is purchasable | **code complete**, 8 September 2026, the day the approvals landed. Exit unrun; five questions in `docs/channels/etsy.md` §13 wait on a live shop |
+| A6 | Etsy: OAuth, adapter, draft, images, digital file, activate, idempotency | Real product publishes and is purchasable | **done**, 11 September 2026. Listing `4573259073` in shop `Fanwise` went draft, images, file, active in one job; four of the five §13 questions settled, the fifth waits on the first token refresh. See "The A6 exit run" |
 | A7 | Publish Everywhere orchestration, jobs, progress, retry, activity log | One action, two live URLs, one failure recovered without duplicates | |
 | A8 | Creative Market syndication: category and license schema, package build, image derivatives, guided submission handoff, mark submitted, URL capture. See `docs/channels/creative-market.md` | A creator carries one real product through the handoff to a live Creative Market listing without composing anything outside Fanwise, the URL is captured, and every row reads `status_source = self_reported`. No surface anywhere offers Publish for this channel | |
 
@@ -273,10 +273,36 @@ omit, which is the capability-matrix case A3's assisted mock was built to rehear
 **WooCommerce is the third channel Publish Everywhere can call**, since B8 landed on `main`
 on 8 September 2026, and it changes A7's blocker rather than its exit. The exit still reads
 two live URLs. What has changed is that the second live channel no longer has to be Etsy: a
-WooCommerce store needs no approval, so A7 can be proven on Shopify and WooCommerce while
-A6's exit waits on its shop, and Etsy joins as a third when it lands. One thing A7 must
+WooCommerce store needs no approval, so A7 could have been proven on Shopify and WooCommerce
+while A6's exit waited on its shop. Etsy landed on 11 September 2026, so A7 now has its two
+live channels without B8's exit, and WooCommerce joins as a third when that runs. One thing A7 must
 decide with WooCommerce connected: `activate` refusing a product with no file attached is the
 creator's step still owed, not a provider failure, and the progress surface has to say which.
+
+## The A6 exit run, 11 September 2026
+
+Verified against the live shop `Fanwise`, shop id `67895664`, from a local dev server on port
+3001 with a local Trigger.dev worker, both against the hosted development Supabase project:
+
+- OAuth with PKCE completed on the first attempt. The connection holds the four scopes, the
+  shop's currency and URL, and a ninety-day `expires_at`.
+- `Kerf Display` published as listing `4573259073`, at
+  `https://www.etsy.com/listing/4573259073/kerf-display`, in one job of 9.3 seconds: the draft
+  created, five images uploaded cover first, one file uploaded, and `PATCH state: active`
+  answered `active`. The job row holds all three provider responses and every uploaded id.
+  The listing row reads `published`, `status_source = verified`, `purchasable: true`.
+- Etsy charged its listing fee on activation, as §5 of the spec says it does.
+- Four of the five §13 questions are settled and written into the spec. The fifth, whether
+  the refresh token rotates, needs a refresh to have run, and none had.
+
+**No test purchase was placed.** The file reaching a buyer is the same clause A5 still owes
+and is unattempted here too.
+
+One thing the run uncovered. The build and save actions evaluated readiness against a
+subject with no connection metadata, so every build and update snapshot's
+`currency_matches_shop` warning read "Connect the shop" with the shop connected. The publish
+action never had the gap, which is why the publish went through, and the build snapshot for
+this listing records the warning as unsatisfied. Fixed with this record.
 
 ## Reordering, 7 September 2026
 
