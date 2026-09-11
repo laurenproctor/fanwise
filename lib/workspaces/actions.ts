@@ -3,35 +3,34 @@
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
-import { createWorkspaceSchema } from "./schemas"
-import {
-  RESERVED_WORKSPACE_SLUGS,
-  avoidReserved,
-  ensureMinimumLength,
-  randomSuffix,
-  slugify,
-  withSuffix,
-} from "@/lib/slug"
+import { renameWorkspaceSchema } from "./schemas"
 import { routes } from "@/lib/routes"
 
-export interface ActionState {
+/** Save state for the rename form. `savedAt` confirms the save actually landed. */
+export interface RenameState {
   error: string | null
+  savedAt: number | null
 }
 
-/** How many slug collisions to absorb before giving up and asking for a new name. */
-const MAX_SLUG_ATTEMPTS = 5
-
-// Postgres unique_violation. The slug column is the only unique constraint on
-// workspaces, so this can only mean the slug was taken.
-const UNIQUE_VIOLATION = "23505"
-
-export async function createWorkspaceAction(
-  _prev: ActionState,
+/**
+ * Renames a workspace. The slug stays put: it is the address, and an address
+ * does not move because a name did.
+ *
+ * Workspaces are provisioned now (lib/workspaces/provision.ts) and start life
+ * with a name nobody chose, so this is where a creator first names theirs.
+ *
+ * Authorization is RLS. The update policy admits the owner only, so a slug that
+ * belongs to someone else matches no row, exactly like one that does not exist,
+ * and both get the same sentence back.
+ */
+export async function renameWorkspaceAction(
+  workspaceSlug: string,
+  _prev: RenameState,
   formData: FormData,
-): Promise<ActionState> {
-  const parsed = createWorkspaceSchema.safeParse({ name: formData.get("name") })
+): Promise<RenameState> {
+  const parsed = renameWorkspaceSchema.safeParse({ name: formData.get("name") })
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the workspace name." }
+    return { error: parsed.error.issues[0]?.message ?? "Check the workspace name.", savedAt: null }
   }
 
   const supabase = await createClient()
@@ -40,37 +39,21 @@ export async function createWorkspaceAction(
   } = await supabase.auth.getUser()
   if (!user) redirect("/sign-in")
 
-  // A workspace slug is the first path segment, so it can collide with a route
-  // as well as with another workspace. Only the second kind is a unique
-  // violation; the first has to be avoided before the insert.
-  const base = avoidReserved(
-    ensureMinimumLength(slugify(parsed.data.name), randomSuffix()),
-    RESERVED_WORKSPACE_SLUGS,
-    randomSuffix(),
-  )
-  let slug = base
+  const { data, error } = await supabase
+    .from("workspaces")
+    .update({ name: parsed.data.name })
+    .eq("slug", workspaceSlug)
+    .select("id")
 
-  for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt += 1) {
-    const { data, error } = await supabase.rpc("create_workspace", {
-      p_name: parsed.data.name,
-      p_slug: slug,
-    })
-
-    if (!error && data) {
-      revalidatePath("/", "layout")
-      redirect(routes.workspace(data.slug))
-    }
-
-    if (error?.code !== UNIQUE_VIOLATION) {
-      // Rule 8: never surface a raw provider error.
-      console.error("[workspaces] create_workspace failed", error)
-      return { error: "That workspace could not be created. Try again." }
-    }
-
-    slug = withSuffix(base, randomSuffix())
+  if (error || !data || data.length === 0) {
+    // Rule 8: never surface a raw provider error.
+    if (error) console.error("[workspaces] rename failed", error)
+    return { error: "That name could not be saved. Try again.", savedAt: null }
   }
 
-  return { error: "That name is taken. Try a different one." }
+  // The name is in the header of every page under this workspace.
+  revalidatePath(routes.workspace(workspaceSlug), "layout")
+  return { error: null, savedAt: Date.now() }
 }
 
 export async function signOutAction(): Promise<void> {

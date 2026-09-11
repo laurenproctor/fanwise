@@ -1,7 +1,7 @@
 import { readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { routes } from "@/lib/routes"
+import { routes, workspaceSection } from "@/lib/routes"
 import {
   RESERVED_PRODUCT_SLUGS,
   RESERVED_WORKSPACE_SLUGS,
@@ -144,5 +144,30 @@ describe("routes", () => {
     for (const path of built) {
       expect(path.startsWith("/w/"), path).toBe(false)
     }
+  })
+})
+
+describe("workspaceSection", () => {
+  it("puts the catalog and everything hanging off it under Products", () => {
+    for (const path of [
+      routes.workspace("studio"),
+      routes.newProduct("studio"),
+      routes.product("studio", "poster"),
+      // A product's own channel page belongs to the product, not the channel list.
+      routes.productChannel("studio", "poster", "c1"),
+    ]) {
+      expect(workspaceSection(path, "studio"), path).toBe("products")
+    }
+  })
+
+  it("recognizes the channels and settings pages", () => {
+    expect(workspaceSection(routes.channels("studio"), "studio")).toBe("channels")
+    expect(workspaceSection(routes.settings("studio"), "studio")).toBe("settings")
+  })
+
+  it("is not fooled by a product slug that starts with a section's name", () => {
+    // avoidReserved turns a product called "Channels" into channels-ab12.
+    expect(workspaceSection("/studio/channels-ab12", "studio")).toBe("products")
+    expect(workspaceSection("/studio/settingsy", "studio")).toBe("products")
   })
 })

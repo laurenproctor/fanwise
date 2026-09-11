@@ -284,7 +284,9 @@ collapse at once.
    brings the recursion straight back.
 3. `auth.uid()` is written `(select auth.uid())` everywhere, so Postgres hoists it into an
    InitPlan and evaluates it once per statement instead of once per row.
-4. `workspaces` has no INSERT policy. Creation is `create_workspace()` only.
+4. `workspaces` has no INSERT policy. Creation is `provision_personal_workspace()`, which the
+   application calls and which makes at most one workspace per user however often a browser
+   replays it, or `create_workspace()`, which only the tenancy harness still uses.
 5. A tenant boundary that can be expressed as a foreign key should be. At A2,
    `product_assets` references `products (id, workspace_id)` as a pair, because a
    policy checking `workspace_id` alone still allowed attaching an asset to

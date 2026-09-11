@@ -27,7 +27,8 @@ import {
 
 /** Functions a signed-in user may call, and why. Everything else is refused. */
 const AUTHENTICATED_MAY_EXECUTE = new Set([
-  "create_workspace(p_name text, p_slug text)", // the only RPC
+  "create_workspace(p_name text, p_slug text)", // RPC, which the tenancy harness uses
+  "provision_personal_workspace(p_name text, p_slug text)", // RPC, first-run provisioning
   "is_workspace_member(p_workspace_id uuid)", // read by RLS policies
   "is_workspace_owner(p_workspace_id uuid)", // read by RLS policies
   "uuid_or_null(p_value text)", // read by the storage.objects policies
@@ -70,6 +71,14 @@ describe("anon cannot execute anything", () => {
     const { error } = await anonClient().rpc("create_workspace", {
       p_name: "Nope",
       p_slug: "anon-nope",
+    })
+    expect(error?.code).toBe(RLS_DENIED)
+  })
+
+  it("is refused on provision_personal_workspace", async () => {
+    const { error } = await anonClient().rpc("provision_personal_workspace", {
+      p_name: "Nope",
+      p_slug: "anon-provision-nope",
     })
     expect(error?.code).toBe(RLS_DENIED)
   })

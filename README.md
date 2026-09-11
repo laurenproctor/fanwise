@@ -68,7 +68,7 @@ pnpm test:e2e             # journeys 1 and 9
 
 ```
 app/(auth)/          sign in and sign up, email and password
-app/onboarding/      first workspace creation
+app/onboarding/      provisions a personal workspace and sends you into it
 app/w/[slug]/        the workspace surface. Every app route is slug-scoped
   products/          catalog, create, and the canonical record editor
   assets/.../download signed download, named from the filename column
