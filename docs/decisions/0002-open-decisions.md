@@ -50,6 +50,7 @@ Keep these here only as pointers. Do not relitigate them from this file.
 | `listing_manual_steps` | Landed at A5 with Shopify, migration `20260904190000_shopify_publishing`, and described in the data model | `docs/data-model.md` |
 | `next dev` writes into `CLAUDE.md` | Committed, 5 September 2026. The block is part of the file, so a dev run no longer dirties the tree | `CLAUDE.md`, the `nextjs-agent-rules` block |
 | Who sends Fanwise's email | Resend, over SMTP from a verified subdomain. Wired in `supabase/config.toml` and applied by `pnpm auth:push` from a temporary deployment worktree at an approved commit, which refuses to run until the four `SMTP_*` values are set. Decided 9 September 2026 | `docs/decisions/0008` |
+| Email Gumroad about their product API | Overtaken on 11 September 2026: the API had shipped. File upload 30 March 2026, product creation 6 April, publish by default 6 September. Planned as B10; the email survives as item 27 with a different ask | `docs/channel-feasibility.md`, `docs/channels/gumroad.md` |
 
 ---
 
@@ -57,18 +58,6 @@ Keep these here only as pointers. Do not relitigate them from this file.
 
 These cost nothing to start and cannot be hurried once started. They are first because the
 queue is not ours.
-
-### 2. Email Gumroad about their product API
-
-Their product-creation endpoints are documented but unimplemented. Under the current pricing
-model Shopify is the included storefront, so **at Gate A exit the only billable automatic
-channel is Etsy** — a marketplace whose approval is discretionary, whose ToS contains a
-clause that could be read against Fanwise, and whose application-level rate limit caps total
-platform throughput.
-
-**Recommendation:** send the email. It is the highest-value business development conversation
-available and it costs one message. A second billable automatic channel would materially
-de-risk Gate A's revenue story.
 
 ### 3. Get a live Creative Market seller account
 
@@ -135,6 +124,29 @@ disclosure field exists on the form, feeds decision 24.
 
 **Recommendation:** do it before A8 closes, so B9 can open the day A8 does. It is the
 cheapest item on this page after the Creative Market login, and unlike 25 it needs no host.
+
+### 27. Register a Gumroad OAuth application, and tell Gumroad a multi-tenant app is coming
+
+B10 is planned and not opened. Its build needs an OAuth application, which is self-serve in
+a Gumroad account's settings at `gumroad.com/settings/advanced`: a name and one redirect URI,
+so one application per environment, each with a client id and secret for that deployment.
+Its exit needs a seller account with a confirmed email and a payout method, because Gumroad
+refuses to publish without both. Nothing to apply for, so this sits in this section as a
+prerequisite, like 25 and 26.
+
+Eleven questions in `docs/channels/gumroad.md` §13 can only be settled with that account, and
+one decides code: whether a file attached through the API reaches the buyer without a
+rich-content embed.
+
+The email item 2 used to recommend is still worth sending, with a different ask. Two things
+only Gumroad can answer: whether its product-create limit, ten a minute per IP address and
+escalating, has a sanctioned path for an app that creates for many sellers from shared
+servers; and whether the terms' bar on commercially exploiting the Services is meant to reach
+a paid tool built on the public API.
+
+**Recommendation:** register the application and the seller account now, and send the email
+now. The email is the only part of this that waits on someone else, and the per-IP answer
+changes how B10 queues its creates.
 
 ---
 
@@ -385,6 +397,13 @@ is the decision itself, and its deadline moved: not before B8, which has passed,
 the pricing page is public, alongside 16 and 18. That page already lists WooCommerce as
 Included, which is the first reading answered by accident, the way contradictions 2 and 3
 below were.
+
+**Gumroad, planned as B10 on 11 September 2026, is on the other side of the line.** It hosts
+the creator's page on its own domain, takes a cut of every sale, and brings its own buyers
+through Discover, which is what a marketplace does and an owned storefront does not. The
+marketing handoff already prices it at $6. The B10 migration seeds it `billable = true`. It
+is recorded here because a creator will reasonably call a Gumroad page their shop, and the
+answer should not have to be reconstructed when they do.
 
 ### 16. Assisted versus automatic pricing
 

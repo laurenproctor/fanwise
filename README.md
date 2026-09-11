@@ -147,6 +147,10 @@ HTTPS with pretty permalinks, which you can host yourself; see decision 25 in
 Behance needs neither either: a profile and a Stripe account connected to it, both free. It
 is planned as B9 and its twelve seller-side questions are decision 26.
 
+Gumroad needs an OAuth application registered in a Gumroad account's settings, which is
+self-serve, and a seller account with a payout method for its exit. It is planned as B10;
+its details are decision 27.
+
 ## Working with Claude Code
 
 Read `CLAUDE.md` first. One step per branch, one PR per step, and the step is named at the

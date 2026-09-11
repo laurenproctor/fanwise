@@ -26,11 +26,11 @@ shouted loudest, and every channel added afterwards makes the schema worse.
                               |
                        CHANNEL ADAPTERS
                               |
-     +-----------+-----------+-----------+-----------+-----------+-----------+
+     +-----------+-----------+-----------+-----------+-----------+-----------+-----------+
+     |           |           |           |           |           |           |           |
+  Shopify   WooCommerce    Etsy      Gumroad   Creative Mkt   Behance   Adobe Stock   future
      |           |           |           |           |           |           |
-  Shopify   WooCommerce    Etsy    Creative Mkt   Behance   Adobe Stock   future
-     |           |           |           |           |           |
-    API         API         API      assisted    assisted    assisted
+    API         API         API         API      assisted    assisted    assisted
 ```
 
 ## Layers
