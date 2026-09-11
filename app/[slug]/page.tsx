@@ -5,6 +5,7 @@ import { listProducts } from "@/lib/products/queries"
 import { PRODUCT_TYPE_LABELS } from "@/lib/products/types"
 import { ButtonLink } from "@/components/ui/button"
 import { InfoTip } from "@/components/ui/info-tip"
+import { FirstRun } from "@/components/onboarding/first-run"
 import { routes } from "@/lib/routes"
 
 export const metadata = { title: "Products · Fanwise" }
@@ -18,6 +19,12 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
 
   const products = await listProducts(workspace.id)
 
+  // No products is a creator's first visit, or a return before the first one
+  // exists. Both get the first-run screen, decided by the catalog itself rather
+  // than by a flag or a query parameter, so it stays exactly as long as it is
+  // true.
+  if (products.length === 0) return <FirstRun workspaceSlug={slug} />
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -28,71 +35,60 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
         <ButtonLink href={routes.newProduct(slug)}>New product</ButtonLink>
       </div>
 
-      {products.length === 0 ? (
-        <div className="flex flex-col items-start gap-4 rounded-[14px] border border-dashed border-[var(--color-rule)] p-10">
-          <span className="label-mono">Nothing here yet</span>
-          <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
-            A product is the canonical record of one thing you sell. You write it once here, and
-            every channel gets its own translation of it later.
-          </p>
-          <ButtonLink href={routes.newProduct(slug)}>Create your first product</ButtonLink>
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-[14px] border border-[var(--color-rule)]">
-          <table className="w-full border-collapse bg-[var(--color-card)] text-left">
-            <thead>
-              <tr className="border-b border-[var(--color-rule)]">
-                {/*
-                  Two of the four headers carry a tip. "Status" earns one: it is
-                  the product's state in Fanwise, and a reader who takes it for
-                  "on sale" has been misled by one word. Type does not, because
-                  the column underneath it reads "font" and explains itself.
-                */}
-                <th className="label-mono p-4 font-normal">
-                  <span className="inline-flex items-center gap-1.5">
-                    Product
-                    <InfoTip term="canonicalProduct" />
-                  </span>
-                </th>
-                <th className="label-mono p-4 font-normal">Type</th>
-                <th className="label-mono p-4 font-normal">
-                  <span className="inline-flex items-center gap-1.5">
-                    Status
-                    <InfoTip term="productStatus" />
-                  </span>
-                </th>
-                <th className="label-mono p-4 font-normal">Updated</th>
+      <div className="overflow-x-auto rounded-[14px] border border-[var(--color-rule)]">
+        <table className="w-full border-collapse bg-[var(--color-card)] text-left">
+          <thead>
+            <tr className="border-b border-[var(--color-rule)]">
+              {/*
+                Two of the four headers carry a tip. "Status" earns one: it is
+                the product's state in Fanwise, and a reader who takes it for
+                "on sale" has been misled by one word. Type does not, because
+                the column underneath it reads "font" and explains itself.
+              */}
+              <th className="label-mono p-4 font-normal">
+                <span className="inline-flex items-center gap-1.5">
+                  Product
+                  <InfoTip term="canonicalProduct" />
+                </span>
+              </th>
+              <th className="label-mono p-4 font-normal">Type</th>
+              <th className="label-mono p-4 font-normal">
+                <span className="inline-flex items-center gap-1.5">
+                  Status
+                  <InfoTip term="productStatus" />
+                </span>
+              </th>
+              <th className="label-mono p-4 font-normal">Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product) => (
+              <tr
+                key={product.id}
+                className="border-b border-[var(--color-rule-2)] last:border-b-0"
+              >
+                <td className="p-4">
+                  <Link
+                    href={routes.product(slug, product.slug)}
+                    className="font-display text-[17px] font-normal hover:text-[var(--color-accent)]"
+                  >
+                    {product.name}
+                  </Link>
+                </td>
+                <td className="p-4 font-mono text-[13px] text-[var(--color-ink-2)]">
+                  {PRODUCT_TYPE_LABELS[product.product_type]}
+                </td>
+                <td className="p-4 font-mono text-[13px] text-[var(--color-ink-2)]">
+                  {product.status}
+                </td>
+                <td className="tabular p-4 font-mono text-[13px] text-[var(--color-ink-2)]">
+                  {new Date(product.updated_at).toLocaleDateString()}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {products.map((product) => (
-                <tr
-                  key={product.id}
-                  className="border-b border-[var(--color-rule-2)] last:border-b-0"
-                >
-                  <td className="p-4">
-                    <Link
-                      href={routes.product(slug, product.slug)}
-                      className="font-display text-[17px] font-normal hover:text-[var(--color-accent)]"
-                    >
-                      {product.name}
-                    </Link>
-                  </td>
-                  <td className="p-4 font-mono text-[13px] text-[var(--color-ink-2)]">
-                    {PRODUCT_TYPE_LABELS[product.product_type]}
-                  </td>
-                  <td className="p-4 font-mono text-[13px] text-[var(--color-ink-2)]">
-                    {product.status}
-                  </td>
-                  <td className="tabular p-4 font-mono text-[13px] text-[var(--color-ink-2)]">
-                    {new Date(product.updated_at).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

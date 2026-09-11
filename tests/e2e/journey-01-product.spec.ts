@@ -12,8 +12,10 @@ test("a creator signs up, gets a workspace, and creates a product", async ({ pag
   // Signup lands on the catalog directly: a workspace's root is what it sells.
   await expect(page).toHaveURL(new RegExp(`/${slug}$`))
 
-  // The empty state says something useful rather than showing a bare table.
-  await expect(page.getByText("Nothing here yet")).toBeVisible()
+  // An empty catalog is the first-run screen rather than a bare table.
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Your first product starts here." }),
+  ).toBeVisible()
 
   // Every workspace route inherits the same remembered theme from its shared
   // shell. Exercise it before moving from the catalog into the product flow.
@@ -24,7 +26,7 @@ test("a creator signs up, gets a workspace, and creates a product", async ({ pag
     .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
     .toBe(afterTheme)
 
-  await page.getByRole("link", { name: "Create your first product" }).click()
+  await page.getByRole("link", { name: "Create first product" }).click()
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
     .toBe(afterTheme)
@@ -39,9 +41,14 @@ test("a creator signs up, gets a workspace, and creates a product", async ({ pag
   const path = new URL(page.url()).pathname
   expect(path).toMatch(productUrl(slug))
 
-  // And it appears in the catalog.
+  // And it appears in the catalog, which is the dashboard now rather than the
+  // first-run screen.
   await page.goto(`/${slug}`)
   await expect(page.getByRole("link", { name: "Aster Grotesk" })).toBeVisible()
+  await expect(page.getByRole("heading", { level: 1, name: "Products" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Your first product starts here." })).toHaveCount(
+    0,
+  )
 })
 
 test("the canonical record saves and survives a reload", async ({ page }) => {

@@ -38,11 +38,18 @@ Two decisions that later tenant tables should copy:
   For the same reason `workspace_members` is **not** `force row level security`:
   FORCE subjects the table owner to RLS, which re-applies the policy inside the
   helper and restores the recursion.
-- `workspaces` has no INSERT policy. Rows are born only through
-  `create_workspace(name, slug)`, which writes the workspace and its owner
+- `workspaces` has no INSERT policy. Rows are born only through two
+  `security definer` functions, each writing the workspace and its owner
   membership in one statement. A brand new user is a member of nothing, so no
   policy could authorise their first insert, and no workspace can exist without
   an owner.
+  - `provision_personal_workspace(name, slug)` is the one the application
+    calls, from `app/onboarding/route.ts`. It gives a user with no workspace a
+    personal one and returns their earliest workspace otherwise, serialized per
+    user with an advisory lock, so a replayed or concurrent request cannot make
+    a second. Migration `20260911203255_provision_personal_workspace`.
+  - `create_workspace(name, slug)` predates it and creates unconditionally. The
+    application no longer calls it; the tenancy harness does.
 
 ## A2: the canonical product
 

@@ -15,7 +15,8 @@ export const workspaceSlugSchema = z
   .max(SLUG_LIMITS.max, `Slugs are at most ${SLUG_LIMITS.max} characters.`)
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Use lowercase letters, numbers and single hyphens.")
 
-export const createWorkspaceSchema = z.object({ name: workspaceNameSchema })
+/** The one field an owner edits in Settings. The slug does not follow it. */
+export const renameWorkspaceSchema = z.object({ name: workspaceNameSchema })
 
 export const emailSchema = z.email("Enter a valid email address.")
 
@@ -31,7 +32,7 @@ export const credentialsSchema = z.object({
   password: passwordSchema,
 })
 
-export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>
+export type RenameWorkspaceInput = z.infer<typeof renameWorkspaceSchema>
 export type CredentialsInput = z.infer<typeof credentialsSchema>
 
 export const passwordResetRequestSchema = z.object({ email: emailSchema })
