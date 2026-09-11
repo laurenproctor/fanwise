@@ -451,8 +451,7 @@ export async function updateListingAction(
   const channel = (existing as { channel: { id: string; key: string } }).channel
   const connectionMetadata =
     ((existing as { connection: { metadata: unknown } | null }).connection?.metadata as
-      | Record<string, unknown>
-      | undefined) ?? {}
+      Record<string, unknown> | undefined) ?? {}
   const adapter = findAdapter(channel.key)
   if (!adapter) return { error: "That channel is not available.", savedAt: null }
 
