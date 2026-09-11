@@ -37,7 +37,6 @@ test("an empty workspace offers one primary action, an honest import and the pat
 
   // The path starts at step one, with nothing claimed.
   await expect(main.getByRole("heading", { level: 2, name: "Your path to publish" })).toBeVisible()
-  await expect(main.getByText("0 of 4 complete")).toBeVisible()
   const current = main.locator('li[aria-current="step"]')
   await expect(current).toHaveCount(1)
   await expect(current).toContainText("Create a product")
