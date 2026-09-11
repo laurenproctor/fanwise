@@ -11,8 +11,9 @@ from a primary source.
 **Three channels can ever be automatic.** Shopify, Etsy and WooCommerce are the only
 platforms in this set with a public API that lets a third party create a listing on a
 seller's behalf. WooCommerce was added to this document on 8 September 2026, after the first
-two were built or filed for; see its section under Tier 1. Everything else is a preparation
-problem, not an integration problem.
+two were built or filed for; see its section under Tier 1. Behance was added on 11 September
+2026 under Tier 3, and it is assisted for good. Everything else is a preparation problem,
+not an integration problem.
 
 Three findings change the plan:
 
@@ -260,6 +261,68 @@ EPS, PNG, tested in Cricut Design Space and Silhouette Studio.
 Convenient overlap: Creative Fabrica and Design Bundles both want 3:2 previews, so one
 derivative spec serves both.
 
+### Behance — assisted, no review queue, and Adobe's terms close automation
+
+Assessed 11 September 2026 against the seller help center, the Behance Product Specific
+Terms (18 June 2024), the Adobe General Terms of Use (3 October 2025) and the Community
+Guidelines, and planned as B9 the same day. The spec is `docs/channels/behance.md`.
+
+**The marketplace is real and recent.** Behance opened asset sales to every profile on
+21 June 2023 and replaced off-site "linked assets" with hosted files on 16 October 2023. A
+seller attaches up to 5 downloadable assets to a project, each up to 500 MB in any of
+"over 25" file types including ZIP, PDF, TTF, PSD, AI and SVG, with a cover image, a file
+name, one of five categories, one of two licenses, a description, a price and up to 20
+example images. The asset lists when the project is published. No pre-publication review is
+documented; moderators remove assets after the fact, and adult content is refused as an
+asset. Behance's own audience figure is 40 million members.
+
+**There is no write API, and the read API is closed.** The v2 API is read-only by design
+(projects, users, collections, statistics), `behance.net/dev` answered 404 on 11 September
+2026, Adobe's developer forum has said since 2024 that new keys are not issued pending a
+migration to adobe.io with no date, and §6 of the Product Specific Terms licenses the API
+for non-commercial use only and bars any application that "replicates or attempts to
+replace the essential user experience." Nothing there is a path to a listing.
+
+**The browser-automation fallback is contractually closed, as at Creative Market.** Three
+clauses, each sufficient on its own: the Community Guidelines' "Be Authentic" section
+prohibits "using automated or scripting processes (such as bulk or automated uploading of
+content through a script)"; Adobe's General Terms §6.6 forbid accessing the Services "by any
+means other than the interface we provide or authorize"; and §5.1 and §6.3 forbid sharing
+account information and enabling others to use the Services with it. So: assisted, with no
+`publish`, and no credential held.
+
+**The fee structure is the thing a creator will notice.** No listing fee, then a **30%
+platform fee** on every sale plus Stripe's 2.9% + $0.30 or PayPal's local rate. The platform
+fee is waived for Behance Pro, from $9.99 a month on an annual commitment. A creator on the
+free plan keeps about two thirds of the price, and the handoff shows that arithmetic beside
+the price rather than leaving it to Stripe. This also sharpens decision 16: Fanwise's $6 for
+preparation sits next to Adobe's 30% for the storefront.
+
+**Sales data: none from Behance, all of it in the seller's own Stripe.** Payments run
+through a Stripe (or PayPal) account the seller connects; Behance's Assets tab shows asset
+earnings and nothing else, and refunds issued in Stripe are not reflected on Behance at all.
+A CSV export from that dashboard is B7's path. Because it is the seller's own Stripe
+account, a read-only connection to it is a conceivable later source. Not planned.
+
+**Specs worth encoding:** cover images at least 808 × 632 for a 202 × 158 display, which is a
+1.278:1 ratio nothing else in the catalog uses; project images JPEG or PNG at 2800 wide or
+under and under 10 MB, refused over 50 MB, PDF refused as project content, CMYK converted
+with visible shifts; up to 10 project tags; at least one Creative Field; an 80-character
+title per a secondary source (*unconfirmed*). Licenses are Personal or Standard Commercial
+(up to 5,000 physical products and print uses, unlimited web and social), fixed by Behance,
+no extended tier and no price floor.
+
+**Eligibility:** a profile and a payment account, nothing to apply for. Stripe in 40
+countries approved by both parties; six more that Stripe serves (Brazil, India, Indonesia,
+Malaysia, Mexico, Thailand) cannot collect the platform fee and use PayPal, as do the other
+PayPal-only countries on Behance's list. Behance Pro is for personal profiles only.
+
+**Verdict: V2, assisted, scheduled as B9 after A8**, because it reuses every piece of A8's
+handoff machinery and adds a shape the machinery has not met: a portfolio project composed
+around the product rather than a product form filled in. Cheapest assisted channel after
+Creative Market; not a candidate for B4, whose slot is reserved for heavy-metadata channels
+under decision 14.
+
 ### Design Cuts — gone
 
 Shut down 16 January 2025 after eleven years. Creative Market acquired the brand, and the
@@ -316,6 +379,7 @@ customer, the way in is their fonts and graphics, not their Framer templates.
 | MyFonts | Assisted | Portal only, exact specs | CSV download | **V2, if fonts are the wedge** |
 | Gumroad | Assisted now | Endpoints unimplemented, watch the repo | API | **V2, ask them** |
 | Envato | Assisted | No item creation, FTP for audio/video only | **API** | **V2 for analytics only** |
+| Behance | Assisted | Manual, a project plus an asset, no review queue documented | None; the seller's own Stripe | **V2, B9**, planned 11 Sep 2026, after A8 |
 | Creative Fabrica | Assisted | Manual, 1 to 2 day review | None | **V3** |
 | Design Bundles | Assisted | Manual, one design at a time by ToS | None | **V3, low priority** |
 | Payhip | Blocked | API covers coupons and license keys only | Webhooks | Skip |
@@ -337,9 +401,11 @@ price and make the assisted preparation obviously worth it, which the Adobe Stoc
 MyFonts specs suggest it can be. Decide before the pricing page goes live.
 
 **The analytics promise is thinner than the plan assumes.** Verified sales data exists for
-Shopify, Etsy, Gumroad and Envato. Everything else is CSV import or nothing. The
-cross-channel revenue view, which is the strategically important feature, will have holes in
-it for most creators. Say so honestly in the product rather than showing zeros.
+Shopify, Etsy, Gumroad and Envato. Everything else is CSV import or nothing, and Behance's
+sales sit in the seller's own Stripe account, the same CSV path today and a possible
+read-only source later. The cross-channel revenue view, which is the strategically important
+feature, will have holes in it for most creators. Say so honestly in the product rather than
+showing zeros.
 
 **Etsy concentration is real.** Under the current pricing model Shopify is the included
 storefront, so at V1 the only billable automatic channel is Etsy. Etsy's ToS contains a

@@ -144,6 +144,9 @@ WooCommerce needs neither. Its exit test needs a WordPress site with WooCommerce
 HTTPS with pretty permalinks, which you can host yourself; see decision 25 in
 `docs/decisions/0002`.
 
+Behance needs neither either: a profile and a Stripe account connected to it, both free. It
+is planned as B9 and its twelve seller-side questions are decision 26.
+
 ## Working with Claude Code
 
 Read `CLAUDE.md` first. One step per branch, one PR per step, and the step is named at the

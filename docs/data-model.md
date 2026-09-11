@@ -414,3 +414,26 @@ processed_at, error
 
 No grant to anon or authenticated, RLS on with zero policies. A redelivered event collides
 on the key; one recorded but never finished is applied again, one finished is acknowledged.
+
+## B9: Behance
+
+Planned 11 September 2026, not built. The migration lands with B9.
+
+One row in `channels`: key `behance`, `integration_type = assisted`, `billable = true`, since
+it is a marketplace and decision 16 governs what an assisted one costs. No new table, and
+nothing in `channel_connection_secrets`: the adapter declares no `oauth`, so Connect writes
+the connection row and nothing else, and no credential for this channel ever exists.
+
+What the existing columns hold: `external_account_id` is the profile username, parsed from
+`behance.net/{username}`; `external_account_name` is the display name the creator typed, if
+any. On the listing, `external_url` is the project URL captured at mark submitted,
+`external_listing_id` the numeric project id parsed from it, and `metadata` carries the
+chosen Creative Fields, the asset category, the license type and `handoffMode`, `new` or
+`existing`. `status_source` is `self_reported` on every row and the trigger that refuses
+`verified` on an assisted channel applies unchanged.
+
+One question this channel puts to the model and does not answer: a Behance project holds up
+to five assets, so one product could be several priced downloads on one project. Listing
+uniqueness is `(product_id, channel_connection_id)`, one listing per product per connection,
+and v1 keeps it by mapping one product to one project with one asset. Item 12 of
+`docs/channels/behance.md` §13 is where that gets revisited, with evidence.
