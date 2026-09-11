@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { CHANNEL_MARKS, findChannelMark } from "@/components/channels/channel-mark"
+import { SHOP_MARKS } from "@/components/marketing/shop-mark"
+import { SHOPS } from "@/components/marketing/channels"
 import { listAdapters } from "@/lib/channels/registry"
 import { CHANNEL_KEYS } from "@/lib/channels/types"
 
@@ -70,6 +72,54 @@ describe("a channel without a mark degrades instead of guessing", () => {
       .filter((adapter) => !adapter.key.startsWith("mock_"))
       .filter((adapter) => findChannelMark(adapter.key) === null)
       .map((adapter) => adapter.key)
+
+    expect(unmarked).toEqual([])
+  })
+})
+
+/**
+ * The marketing site keeps its own table, the same bargain
+ * components/marketing/channels.ts already strikes: the public site does not
+ * read the adapter layer, so adding a channel cannot quietly rewrite the
+ * public copy, and the site names four shops that have no adapter at all.
+ *
+ * The price of two tables is that they can disagree, and a creator who sees
+ * one logo on the Marketplaces page and a different one after signing up has
+ * been shown two different companies. This is what holds them together.
+ */
+describe("the marketing marks and the channel marks agree", () => {
+  const shopNames = new Set(SHOPS.map((shop) => shop.name))
+
+  it("only marks shops the marketing site actually lists", () => {
+    for (const name of Object.keys(SHOP_MARKS)) {
+      expect(shopNames, `${name} has a mark but is not a shop on the page`).toContain(name)
+    }
+  })
+
+  it("draws a shop the same way on both surfaces", () => {
+    // Matched through the adapter's own name rather than a hand-written map,
+    // so a channel renamed on one side and not the other fails here too.
+    const overlapping = listAdapters()
+      .map((adapter) => ({ channel: findChannelMark(adapter.key), shop: SHOP_MARKS[adapter.name] }))
+      .filter(({ channel, shop }) => channel && shop)
+
+    // If this is empty the test has stopped testing anything, which is the
+    // quiet way a pin like this dies.
+    expect(overlapping.length).toBeGreaterThan(0)
+
+    for (const { channel, shop } of overlapping) {
+      expect(shop!.hex).toBe(channel!.hex)
+      expect(shop!.path).toBe(channel!.path)
+    }
+  })
+
+  it("marks every shop the product can already publish to", () => {
+    // A shop Fanwise has an adapter for is one a visitor is most likely to
+    // recognise, and the one least excusable to leave as a grey initial.
+    const unmarked = listAdapters()
+      .filter((adapter) => shopNames.has(adapter.name))
+      .filter((adapter) => !SHOP_MARKS[adapter.name])
+      .map((adapter) => adapter.name)
 
     expect(unmarked).toEqual([])
   })
