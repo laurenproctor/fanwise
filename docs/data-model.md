@@ -430,3 +430,24 @@ to five assets, so one product could be several priced downloads on one project.
 uniqueness is `(product_id, channel_connection_id)`, one listing per product per connection,
 and v1 keeps it by mapping one product to one project with one asset. Item 12 of
 `docs/channels/behance.md` §13 is where that gets revisited, with evidence.
+
+## B10: Gumroad
+
+Planned 11 September 2026, not built. The migration lands with B10.
+
+One row in `channels`: key `gumroad`, `integration_type = api`, `billable = true`; decision 23
+records why a Gumroad page bills when a WooCommerce store does not. No new table. The
+authorization reuses `channel_oauth_states`, including `code_verifier` for PKCE.
+
+What the existing columns hold: `external_account_id` is the Gumroad user id;
+`external_account_name` the account name; `metadata.profileUrl`; `scopes` is
+`["edit_products"]`; `expires_at` is null, because Gumroad's access tokens do not expire.
+Credentials are `{ accessToken, refreshToken }`, sealed. On the listing,
+`external_listing_id` is the product's external id, `external_url` its `short_url`, and
+`metadata` holds the permalink, the cover ids, and the uploaded files as
+`{ assetId, fileId, fileUrl }`.
+
+That last has no precedent in this model. Gumroad returns a file's canonical URL once, at
+upload, and an update that does not resend it deletes the file. So `metadata.files` is not a
+cache: losing it would make the next update remove the buyer's download, and the adapter
+refuses an update whose stored files disagree with the product's rather than guess.

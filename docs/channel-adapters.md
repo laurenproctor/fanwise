@@ -31,12 +31,16 @@ Current reality, from `docs/channel-feasibility.md`:
 | Behance | assisted | no | no | no | no | no |
 | Adobe Stock | assisted | no | no | no | no | no |
 | MyFonts | assisted | no | no | no | no | no |
-| Gumroad | assisted | no | no | yes | no | no |
+| Gumroad | api | yes | yes | yes | **yes**, 20 GB by presigned multipart upload, planned at B10 | yes |
 | Envato | assisted | no | no | yes | no | no |
 
 **Behance note.** Every `no` on that row is the permanent kind: the provider cannot. Its API
 is read-only and closed, and Adobe's terms forbid the alternative. Planned at B9; the spec is
 `docs/channels/behance.md`.
+
+**Gumroad note.** Its row changed on 11 September 2026 from assisted to api: the product
+endpoints this matrix recorded as missing shipped in April 2026. Planned at B10; the spec is
+`docs/channels/gumroad.md`.
 
 **Shopify note, resolved at A5.** The Admin API creates products but has no API for
 attaching a buyer-downloadable file, and Shopify's own Digital Downloads app exposes none.

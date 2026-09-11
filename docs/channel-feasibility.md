@@ -8,12 +8,15 @@ from a primary source.
 
 ## The short version
 
-**Three channels can ever be automatic.** Shopify, Etsy and WooCommerce are the only
-platforms in this set with a public API that lets a third party create a listing on a
-seller's behalf. WooCommerce was added to this document on 8 September 2026, after the first
-two were built or filed for; see its section under Tier 1. Behance was added on 11 September
-2026 under Tier 3, and it is assisted for good. Everything else is a preparation problem,
-not an integration problem.
+**Four channels in this set can be automatic.** Shopify, Etsy, WooCommerce and Gumroad are
+the only platforms assessed here with a public API that lets a third party create a listing
+on a seller's behalf. WooCommerce was added to this document on 8 September 2026, after the
+first two were built or filed for. Gumroad moved up from near miss on 11 September 2026,
+when its product API turned out to have shipped in April; see its section under Tier 1.
+Behance was added the same day under Tier 3, and it is assisted for good. A wider survey
+that day found publishing APIs outside this set, at Polar, Fourthwall, Wix, Ecwid, CGTrader
+and Cults3D, none of them assessed here. Everything else is a preparation problem, not an
+integration problem.
 
 Three findings change the plan:
 
@@ -134,20 +137,50 @@ Accepted file types include .zip, .pdf, .otf is *not* on Etsy's published list; 
 report .psd is no longer accepted (*unconfirmed*). Images: .jpg, .png, .gif, .svg, .heic,
 2000px recommended, files over 1 MB may fail.
 
-### Gumroad — the near miss
+### Gumroad — full API since April 2026, one shared throttle
 
-Gumroad has proper OAuth 2.0 with `edit_products` scope, a good sales API, and webhooks. It
-should be tier 1. It is not, because **the `POST /v2/products` and `PUT /v2/products/:id`
-endpoints are documented as unimplemented and return 404**, with the docs stating that
-product updates must be done through the dashboard. There is no file upload endpoint
-either.
+Reassessed 11 September 2026 against Gumroad's own source, `antiwork/gumroad` at commit
+`409faee`, and planned as B10 the same day. The spec is `docs/channels/gumroad.md`.
 
-Gumroad is now open source (antiwork/gumroad) and there is an open issue requesting exactly
-this API, closed with "tracked separately" and no public timeline. **Worth a direct email to
-Gumroad**, because this is one merged PR away from becoming a tier 1 channel, and Gumroad's
-audience overlaps almost perfectly with the Fanwise ICP.
+The assessment this replaces said `POST /v2/products` and `PUT /v2/products/:id` were
+documented as unimplemented and returned 404, that there was no file upload, and that the
+thing to do was email Gumroad. It was true when first written and stopped being true in
+spring 2026: presigned file upload shipped on 30 March, product creation on 6 April, and
+API-created products began publishing by default on 6 September. Production answers 401 on
+all of them, not 404.
 
-For now: sales ingestion works, publishing does not.
+**It fits the adapter contract as well as Etsy does.** OAuth authorization code, with PKCE
+supported; one scope, `edit_products`, for everything a publish needs; access tokens that do
+not expire. A create takes a name, an HTML description, a price in minor units in one of 19
+currencies, tags, a category path and a custom permalink; `draft=true` holds the product
+back and `PUT .../enable` puts it on sale. Up to eight covers and a square thumbnail attach
+by URL.
+
+**It takes the file.** A presigned multipart upload to the seller's own storage, in 100 MB
+parts, up to 20 GB a file, then `files[][url]` on the product. No file-type restriction, and
+no five-file ceiling of the kind that forces Etsy's packaging question.
+
+**Sales data is there too.** `GET /v2/sales` under `view_sales`, cursor-paginated, with
+price, Gumroad's fee, currency and refund flags, and webhooks for sale, refund and dispute.
+The webhooks are unsigned.
+
+**Three things to design around:**
+
+- **The create limit is per IP address.** Ten creates a minute, escalating on repeat to 50
+  per nine hours, keyed by IP rather than by token, so every Fanwise workspace shares one
+  allowance. A seller may also create at most 100 products in a day.
+- **Failures arrive as HTTP 200** with `success: false` in the body. A client that trusts
+  the status records a refusal as a success.
+- **The terms bar commercially exploiting the Services**, and there are no API-specific
+  terms at all. The same shape of risk as Etsy's clause and the same answer: Fanwise charges
+  for cross-channel catalog management. Decision 27 asks Gumroad rather than relying on the
+  reading.
+
+**Fees:** 10% plus $0.50 on a direct sale, plus card processing; a flat 30% on a sale that
+came through Discover.
+
+Gumroad's audience still overlaps almost perfectly with the Fanwise creator, which was the
+reason the old section wanted the email sent.
 
 ---
 
@@ -377,7 +410,7 @@ customer, the way in is their fonts and graphics, not their Framer templates.
 | Creative Market | Assisted | Manual, no automation permitted | None | **V1** |
 | Adobe Stock | Assisted | SFTP + 5,000-row CSV, manual submit | None | **V2, highest leverage** |
 | MyFonts | Assisted | Portal only, exact specs | CSV download | **V2, if fonts are the wedge** |
-| Gumroad | Assisted now | Endpoints unimplemented, watch the repo | API | **V2, ask them** |
+| Gumroad | Automatic | Full API since April 2026, file by multipart upload, create limit shared per IP | API + webhooks | **V2, B10**, planned 11 Sep 2026 |
 | Envato | Assisted | No item creation, FTP for audio/video only | **API** | **V2 for analytics only** |
 | Behance | Assisted | Manual, a project plus an asset, no review queue documented | None; the seller's own Stripe | **V2, B9**, planned 11 Sep 2026, after A8 |
 | Creative Fabrica | Assisted | Manual, 1 to 2 day review | None | **V3** |
@@ -411,5 +444,6 @@ showing zeros.
 storefront, so at V1 the only billable automatic channel is Etsy. Etsy's ToS contains a
 clause that could be read against Fanwise, its approval is discretionary, and its
 application-level rate limit caps total platform throughput. That is a lot of dependency on
-one relationship. Getting Gumroad's product API unblocked would be the single highest-value
-business development conversation available, and it costs one email.
+one relationship. Gumroad is the relief: its product API shipped in April 2026, and B10
+makes it the second billable automatic channel. It brings its own dependency, a create limit
+shared by every Fanwise workspace, so it spreads the risk rather than removing it.

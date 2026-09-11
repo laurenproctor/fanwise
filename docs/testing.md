@@ -15,8 +15,8 @@ the wrong one is how this suite passes while proving nothing.
 handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
 AI failure.
 
-**E2E** — the twelve journeys below, plus two step exit tests against the mock channels
-rather than against the twelve:
+**E2E** — the thirteen journeys below, plus two step exit tests against the mock channels
+rather than against the thirteen:
 
 - `journey-03-channels.spec.ts` (A3): one product, two independent listings, and no publish
   affordance anywhere on the assisted channel.
@@ -65,7 +65,7 @@ content arrives, so `waitForURL` can return while the loading boundary is still 
 and a locator that counts elements then finds none. Follow it with a wait on real content —
 the product heading, usually.
 
-## The twelve journeys
+## The thirteen journeys
 
 1. Signup, workspace, product. *(complete at A2)*
 2. Product to AI Shopify listing, approved. *(composition ran live at B1; the review loop
@@ -94,6 +94,9 @@ the product heading, usually.
 12. Generate a Behance project and asset package, hand off, capture the project URL.
     *(planned at B9, not built; waits on A8's handoff machinery and on a profile with Stripe
     connected, decision 26)*
+13. Connect Gumroad, publish a product with its covers and its file, confirm it is
+    purchasable. *(planned at B10, not built; needs a registered Gumroad OAuth application and
+    a seller account, decision 27)*
 
 Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, the product
 is broken in the way that matters most.
@@ -111,7 +114,13 @@ product form filled in, in two modes, new project and existing project. It is th
 assisted journey that reuses A8's machinery rather than building it, which is why it cannot
 run before journey 7 does. Nothing in it may write a row that reads as verified.
 
-**Password recovery is not one of the twelve**, because it is not a step on the path from empty
+**Journey 13 was added on 11 September 2026**, when Gumroad was planned as B10. It is
+journey 4 with a different upload: the file goes to Gumroad's storage in parts, by presigned
+URL, and is then attached to the product, rather than posted to the provider in one request.
+The journey exists to see that the attach happened, by reading the product back, before
+Fanwise reports it live.
+
+**Password recovery is not one of the thirteen**, because it is not a step on the path from empty
 workspace to live listing. It is covered anyway, in two halves that meet at the token:
 `tests/db/password-recovery.test.ts` makes the same calls the confirm route makes, against the
 real auth server, and proves the link is single use; `tests/e2e/password-recovery.spec.ts`

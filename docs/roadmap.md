@@ -29,13 +29,16 @@ step completes, and do not work on more than one step at a time.
 | Shopify Partner account | A5 | yes, date unrecorded | by 5 Sep 2026 |
 | WooCommerce test store | B8 exit, and A7 if it runs before Etsy's | nothing to file | exists, 9 Sep 2026: `houseofproctor.com`, permalinks on. Fanwise needs a public HTTPS origin to meet it |
 | Behance profile with Stripe connected | B9, and its §13 questions before B9 opens | nothing to file | not yet. A profile and a Stripe account; decision 26 |
+| Gumroad OAuth application and seller account | B10 build and exit | nothing to file: self-serve in account settings | not yet. Decision 27, which also carries an email to Gumroad |
 
 The WooCommerce row is not an application. It is in this table because it is the one thing
 B8's exit waits on, and because it is the cheapest unblock the roadmap has: no developer
 account, no review, no partner program. Decision 25 in `docs/decisions/0002` says what to
 check once it exists. The Behance row is the same kind of thing for B9: a free profile and a
 Stripe account, and twelve questions in `docs/channels/behance.md` §13 that only a logged-in
-seller can answer. Decision 26 lists them.
+seller can answer. Decision 26 lists them. Gumroad's row is the third of the kind: an
+application registered in account settings, with no review step in Gumroad's code, and a
+seller account with a payout method for B10's exit.
 
 Etsy commercial access has no published SLA and applicants report waiting weeks. It is the
 single most likely thing to delay the roadmap, and it costs nothing to file today.
@@ -279,6 +282,12 @@ Everywhere must visibly skip**, for the same reason as Creative Market: it decla
 per row stops being a courtesy and becomes the feature; ADR 0005's vocabulary already
 covers it.
 
+**Gumroad, planned as B10 on 11 September 2026, would be a fourth channel Publish Everywhere
+can call**, and the first whose rate limit is not per connection. Gumroad throttles product
+creation by IP address, so every Fanwise workspace draws on one allowance of about ten
+creates a minute. A7 does not have to solve that; if its queueing cannot hold one channel's
+creates to a platform-wide pace, B10 adds it. `docs/channels/gumroad.md` §10.
+
 **WooCommerce is the third channel Publish Everywhere can call**, since B8 landed on `main`
 on 8 September 2026, and it changes A7's blocker rather than its exit. The exit still reads
 two live URLs. What has changed is that the second live channel no longer has to be Etsy: a
@@ -346,6 +355,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B7 | CSV import foundation |
 | B8 | WooCommerce: store authorization, adapter, draft, images, activate with the file verified, idempotency. See `docs/channels/woocommerce.md`. Added 8 September 2026 at the founder's request; **code complete the same day**, exit unrun, see below |
 | B9 | Behance: creative-field and category mapping, the project-and-asset package, two new image derivative specs, guided handoff in new-project and existing-project modes, mark submitted, project URL capture. See `docs/channels/behance.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on A8, see below |
+| B10 | Gumroad: OAuth with PKCE, adapter, presigned multipart file upload, draft then enable, covers and thumbnail, the compensating delete, a platform-wide create pace, idempotency. See `docs/channels/gumroad.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on nothing in code, see below |
 
 ### B1, what was built and what is still owed
 
@@ -508,6 +518,51 @@ What B9 changes elsewhere in this file:
   every sale unless the seller pays Adobe monthly, and a $6 charge for preparation will be
   read next to that.
 - **Gate A does not widen.** Behance is in Gate B and is not in the gate's exit test.
+
+### B10, what is planned and what it waits on
+
+Planned on 11 September 2026 at the founder's request and not built. The assessment is in
+`docs/channel-feasibility.md` under Tier 1; the spec is `docs/channels/gumroad.md`.
+
+What Gumroad is to the plan, in one sentence: the second billable automatic channel, the
+relief for the Etsy concentration that decision 2 was written about, and the first provider
+whose rate limit every Fanwise workspace shares.
+
+Scope, when it opens:
+
+- `lib/channels/adapters/gumroad`: capabilities, OAuth with PKCE, the presigned multipart
+  upload, the product write in its draft-then-enable sequence with the compensating delete,
+  an error map that reads the body rather than the status, the category table, and a
+  merchandising profile.
+- One derivative spec, a 1200 × 1200 square thumbnail. Covers reuse Etsy's.
+- A platform-wide pace for Gumroad creates, one at a time and at most six a minute, unless
+  A7 already provides a way to express it.
+- Disconnect revokes the token, because Gumroad's do not expire.
+- A catalog migration: one `channels` row, `integration_type = api`, `billable = true`.
+- `tests/unit/gumroad-oauth.test.ts` and `tests/unit/gumroad-adapter.test.ts`; journey 13.
+
+**B10 waits on nothing in code.** It depends on A3's contract, A5's publishing machinery, and
+A6's OAuth with PKCE and file upload, all done. It is not opened because A7 is the current
+step and is itself unblocked, and `CLAUDE.md` says one step at a time. If the founder wants
+it sooner, B8 is the precedent for opening a channel ahead of its gate. What it does wait on
+is decision 27: an OAuth application to build against, and a seller account with a payout
+method for the exit.
+
+**B10's exit test** is journey 13: connect through OAuth, publish a real product with its
+covers and its file, confirm it is purchasable, and settle the spec's §13 questions, the
+first of which decides whether the adapter also sends a rich-content embed. A second click
+creates nothing, and a failure after the draft leaves nothing behind.
+
+What B10 changes elsewhere in this file:
+
+- **A7** gains a fourth channel it could call, and a constraint no earlier channel had. See
+  the paragraph under Gate A.
+- **B5** gains a fourth ingestion source, `GET /v2/sales`, which needs the `view_sales` scope
+  and a reconnect of every Gumroad connection, the trade Etsy's spec also makes.
+- **C1 and C2** gain a second billable automatic channel. Decision 23 records why it bills.
+- **Decision 2 is resolved.** The email it recommended survives as decision 27, asking
+  something else.
+- **Gate A does not widen.** Gumroad is in Gate B.
 
 **B3 is vacant on purpose.** Creative Market moved to A8 and the remaining steps keep their
 numbers, because step ids are names here, not positions — `docs/data-model.md`,
