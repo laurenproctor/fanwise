@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
+import { InfoTip } from "@/components/ui/info-tip"
 import {
   pullFromCanonicalAction,
   updateListingAction,
@@ -16,6 +17,7 @@ import { evaluate } from "@/lib/channels/listings"
 import { getAdapter } from "@/lib/channels/registry"
 import { constraintsFor, type TextConstraint } from "@/lib/channels/constraints"
 import type { AdapterSubject, ChannelKey, ChannelListingDraft } from "@/lib/channels/types"
+import type { GlossaryTerm } from "@/lib/ui/glossary"
 import { ReadinessBar } from "./readiness-bar"
 import { RequirementList } from "./requirement-list"
 import { TagInput } from "./tag-input"
@@ -128,31 +130,41 @@ function PullButton({
 }
 
 /**
- * A labelled control with its counter and actions beside the label.
+ * A labelled control with its explanation, counter and actions beside the label.
  *
  * The label is a sibling of the input rather than its wrapper, associated by
  * htmlFor. A <button> nested inside a <label> takes the label's text into its
  * own accessible name, so "Use canonical" announces itself as
  * "Title 16 / 120 Diverged by hand", and clicking it can activate the labelled
- * control as well.
+ * control as well. The info button is a sibling for the same reason, one it
+ * would break in exactly the same way.
+ *
+ * The tip sits by the label rather than out at the right edge with the counter,
+ * because it explains the word, and an icon a column away from the word it
+ * explains is an icon nobody connects to it.
  */
 function FieldShell({
   id,
   label,
+  term,
   children,
   aside,
 }: {
   id: string
   label: string
+  term: GlossaryTerm
   children: React.ReactNode
   aside?: React.ReactNode
 }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-3">
-        <label htmlFor={id} className="label-mono">
-          {label}
-        </label>
+        <span className="flex items-baseline gap-1.5">
+          <label htmlFor={id} className="label-mono">
+            {label}
+          </label>
+          <InfoTip term={term} />
+        </span>
         {aside ? <span className="flex items-baseline gap-3">{aside}</span> : null}
       </div>
       {children}
@@ -300,6 +312,7 @@ export function ListingEditor({
         <FieldShell
           id="listing-title"
           label="Title"
+          term="listingTitle"
           aside={
             <>
               <Counter value={draft.title ?? ""} constraint={constraints.text.title} />
@@ -320,6 +333,7 @@ export function ListingEditor({
         <FieldShell
           id="listing-description"
           label="Description"
+          term="listingDescription"
           aside={
             <>
               <Counter value={draft.description ?? ""} constraint={constraints.text.description} />
@@ -345,6 +359,7 @@ export function ListingEditor({
         <FieldShell
           id="listing-short-description"
           label="Short description"
+          term="listingShortDescription"
           aside={
             <>
               <Counter
@@ -379,6 +394,7 @@ export function ListingEditor({
         <FieldShell
           id="listing-seo-title"
           label="Meta title"
+          term="listingSeoTitle"
           aside={
             <>
               <Counter value={draft.seoTitle ?? ""} constraint={constraints.text.seoTitle} />
@@ -399,6 +415,7 @@ export function ListingEditor({
         <FieldShell
           id="listing-seo-description"
           label="Meta description"
+          term="listingSeoDescription"
           aside={
             <>
               <Counter
@@ -424,6 +441,7 @@ export function ListingEditor({
           <FieldShell
             id="listing-price"
             label="Price"
+            term="listingPrice"
             aside={<PullButton field="Price" onPull={() => pull("price")} disabled={pulling} />}
           >
             <input
@@ -438,7 +456,7 @@ export function ListingEditor({
             />
           </FieldShell>
 
-          <FieldShell id="listing-currency" label="Currency">
+          <FieldShell id="listing-currency" label="Currency" term="listingCurrency">
             <input
               id="listing-currency"
               name="currency"
@@ -450,7 +468,7 @@ export function ListingEditor({
           </FieldShell>
         </div>
 
-        <FieldShell id="listing-category" label="Category">
+        <FieldShell id="listing-category" label="Category" term="listingCategory">
           {constraints.text.category?.allowed ? (
             <select
               id="listing-category"

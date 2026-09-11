@@ -25,6 +25,7 @@ function Area({
   rows = 4,
   maxLength,
   required,
+  hint,
 }: {
   label: string
   name: string
@@ -32,6 +33,7 @@ function Area({
   rows?: number
   maxLength?: number
   required?: boolean
+  hint?: string
 }) {
   return (
     <label className="flex flex-col gap-2">
@@ -47,6 +49,7 @@ function Area({
         defaultValue={defaultValue}
         className="w-full rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-card)] px-3 py-2.5 text-[15px] text-[var(--color-ink)] outline-none focus:border-[var(--color-accent)]"
       />
+      {hint ? <span className="text-[13px] text-[var(--color-ink-3)]">{hint}</span> : null}
     </label>
   )
 }
@@ -192,6 +195,7 @@ export function ProductForm({
           name="canonicalTitle"
           defaultValue={product.canonical_title ?? ""}
           maxLength={200}
+          hint="Every channel's listing starts from this. Editing a listing later never changes it back."
         />
         <Area
           label="Canonical description"
@@ -199,6 +203,7 @@ export function ProductForm({
           defaultValue={product.canonical_description ?? ""}
           rows={6}
           maxLength={8000}
+          hint="The full description each channel starts from."
         />
         <Area
           label="Short description"

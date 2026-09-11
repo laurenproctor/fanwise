@@ -4,6 +4,7 @@ import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
 import { listProducts } from "@/lib/products/queries"
 import { PRODUCT_TYPE_LABELS } from "@/lib/products/types"
 import { ButtonLink } from "@/components/ui/button"
+import { InfoTip } from "@/components/ui/info-tip"
 import { FirstRun } from "@/components/onboarding/first-run"
 import { routes } from "@/lib/routes"
 
@@ -38,9 +39,25 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
         <table className="w-full border-collapse bg-[var(--color-card)] text-left">
           <thead>
             <tr className="border-b border-[var(--color-rule)]">
-              <th className="label-mono p-4 font-normal">Product</th>
+              {/*
+                Two of the four headers carry a tip. "Status" earns one: it is
+                the product's state in Fanwise, and a reader who takes it for
+                "on sale" has been misled by one word. Type does not, because
+                the column underneath it reads "font" and explains itself.
+              */}
+              <th className="label-mono p-4 font-normal">
+                <span className="inline-flex items-center gap-1.5">
+                  Product
+                  <InfoTip term="canonicalProduct" />
+                </span>
+              </th>
               <th className="label-mono p-4 font-normal">Type</th>
-              <th className="label-mono p-4 font-normal">Status</th>
+              <th className="label-mono p-4 font-normal">
+                <span className="inline-flex items-center gap-1.5">
+                  Status
+                  <InfoTip term="productStatus" />
+                </span>
+              </th>
               <th className="label-mono p-4 font-normal">Updated</th>
             </tr>
           </thead>
