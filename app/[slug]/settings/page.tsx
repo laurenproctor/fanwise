@@ -4,6 +4,7 @@ import { getBillingOverview, listBillingLedger } from "@/lib/billing/queries"
 import { BillingPanel } from "@/components/billing/billing-panel"
 import { BillingLedger } from "@/components/billing/billing-ledger"
 import { routes } from "@/lib/routes"
+import { RenameWorkspaceForm } from "./rename-workspace-form"
 
 export const metadata = { title: "Settings · Fanwise" }
 
@@ -28,6 +29,8 @@ export default async function SettingsPage({
     searchParams,
   ])
 
+  const role = members.find((m) => m.user_id === user.id)?.role
+
   return (
     <div className="flex flex-col gap-10">
       <section className="flex flex-col gap-3">
@@ -40,6 +43,17 @@ export default async function SettingsPage({
           isolated from every other one.
         </p>
       </section>
+
+      {/*
+        Owners only, which in V1 is everyone. The update policy is the real
+        check; this keeps the form off a page where it could only be refused.
+      */}
+      {role === "owner" ? (
+        <section className="flex flex-col gap-4">
+          <h2 className="label-mono">Name</h2>
+          <RenameWorkspaceForm workspaceSlug={workspace.slug} name={workspace.name} />
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-4">
         <h2 className="label-mono">Billing</h2>
@@ -62,7 +76,7 @@ export default async function SettingsPage({
         <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-rule-2)] sm:grid-cols-3">
           {[
             { term: "Address", value: routes.workspace(workspace.slug) },
-            { term: "Your role", value: members.find((m) => m.user_id === user.id)?.role ?? "—" },
+            { term: "Your role", value: role ?? "—" },
             { term: "Created", value: new Date(workspace.created_at).toLocaleDateString() },
           ].map(({ term, value }) => (
             <div key={term} className="flex flex-col gap-1.5 bg-[var(--color-card)] p-4">

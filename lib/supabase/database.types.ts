@@ -1026,6 +1026,23 @@ export type Database = {
         Returns: boolean
       }
       is_workspace_owner: { Args: { p_workspace_id: string }; Returns: boolean }
+      provision_personal_workspace: {
+        Args: { p_name: string; p_slug: string }
+        Returns: {
+          created_at: string
+          id: string
+          name: string
+          owner_user_id: string
+          slug: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspaces"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       storage_object_workspace_id: { Args: { p_name: string }; Returns: string }
       uuid_or_null: { Args: { p_value: string }; Returns: string }
     }

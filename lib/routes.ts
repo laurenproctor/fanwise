@@ -50,3 +50,21 @@ export const routes = {
   assetDownload: (workspace: string, assetId: string) => `/${workspace}/assets/${assetId}/download`,
   assetPreview: (workspace: string, assetId: string) => `/${workspace}/assets/${assetId}/preview`,
 } as const
+
+/** The three places the workspace header navigates between. */
+export type WorkspaceSection = "products" | "channels" | "settings"
+
+/**
+ * Which of them a path belongs to, for the header's current-page marker.
+ *
+ * Products is the remainder rather than a prefix, because the catalog is the
+ * workspace root and every product, `/new` included, hangs off it. A product's
+ * own channel page is `/<workspace>/<product>/channels/...` and so stays under
+ * Products: it is part of that product, not the workspace's channel list.
+ */
+export function workspaceSection(pathname: string, workspace: string): WorkspaceSection {
+  const within = (base: string) => pathname === base || pathname.startsWith(`${base}/`)
+  if (within(routes.channels(workspace))) return "channels"
+  if (within(routes.settings(workspace))) return "settings"
+  return "products"
+}
