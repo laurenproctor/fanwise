@@ -26,10 +26,25 @@ function count(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1
 }
 
+/**
+ * The text a reader sees in a fragment of rendered markup.
+ *
+ * Splits on tags and keeps what lies between them, rather than deleting tags
+ * with a replace. The output is only ever compared in these assertions and never
+ * rendered, but a tag-stripping replace reads to code scanning as an HTML
+ * sanitizer that misses nested cases, and it is not one.
+ */
+function textOf(markup: string): string {
+  return markup
+    .split(/<[^>]*>/)
+    .join("")
+    .trim()
+}
+
 function anchors(markup: string): Array<{ href: string; text: string }> {
   return [...markup.matchAll(/<a\b[^>]*\bhref="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => ({
     href: m[1] ?? "",
-    text: (m[2] ?? "").replace(/<[^>]+>/g, "").trim(),
+    text: textOf(m[2] ?? ""),
   }))
 }
 
@@ -39,7 +54,7 @@ describe("the first-run catalog", () => {
   it("says what this is, once, as the page's only h1", () => {
     // Compared as text: a span keeps "marketplace-ready" from breaking at its
     // hyphen, and the words are what the specification fixes, not the markup.
-    const text = markup.replace(/<[^>]+>/g, "")
+    const text = textOf(markup)
 
     expect(count(markup, "<h1")).toBe(1)
     expect(text).toContain("Your first product starts here.")
