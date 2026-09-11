@@ -29,9 +29,6 @@ const STATE_LABELS: Record<PublishStepState, string> = {
   upcoming: "Upcoming",
 }
 
-// One width per possible count, spelled out so the stylesheet contains them.
-const FILL = ["w-0", "w-1/4", "w-2/4", "w-3/4", "w-full"] as const
-
 const MARKER: Record<PublishStepState, string> = {
   complete: "border-[var(--color-ink)] bg-transparent text-[var(--color-ink)]",
   current: "border-[var(--color-action)] bg-[var(--color-action)] text-[var(--color-on-action)]",
@@ -40,38 +37,24 @@ const MARKER: Record<PublishStepState, string> = {
 
 export function PublishPath({ completed }: { completed: number }) {
   const states = publishStepStates(completed)
-  const done = states.filter((state) => state === "complete").length
   const total = PUBLISH_STEPS.length
 
   return (
     <section aria-labelledby="publish-path-heading" className="flex flex-col gap-10 pt-12">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
-        <h2
-          id="publish-path-heading"
-          className="font-display text-[clamp(1.75rem,3.2vw,2.5rem)] font-extralight tracking-[-0.035em]"
-        >
-          Your path to publish
-        </h2>
-        <div className="flex items-center gap-4 sm:w-[45%] sm:max-w-[420px]">
-          <p className="tabular shrink-0 text-[14px] text-[var(--color-ink-2)]">
-            {`${done} of ${total} complete`}
-          </p>
-          {/* The sentence beside it is the accessible version of this line. */}
-          <span
-            aria-hidden="true"
-            className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--color-rule-2)]"
-          >
-            <span className={`block h-full rounded-full bg-[var(--color-ink)] ${FILL[done]}`} />
-          </span>
-        </div>
-      </div>
+      <h2
+        id="publish-path-heading"
+        className="font-display text-[clamp(1.75rem,3.2vw,2.5rem)] font-extralight tracking-[-0.035em]"
+      >
+        Your path to publish
+      </h2>
 
       {/*
-        Across from 1280px, where the column is at its full 1112px and the four
-        steps fit on one line each at 15 and 13px. Narrower than that they
-        would wrap word by word, so they stack instead.
+        The four steps read left to right as one line of travel. Each step is a
+        column with its marker above its words, so the text has the whole column
+        to wrap into rather than a sliver beside the circle. Below 640px four
+        columns leave too little of each, so there they stack.
       */}
-      <ol className="flex flex-col gap-7 xl:flex-row xl:items-start xl:gap-0">
+      <ol className="flex flex-col gap-7 sm:flex-row sm:items-start sm:gap-0">
         {PUBLISH_STEPS.map((step, index) => {
           const state = states[index] ?? "upcoming"
           const last = index === total - 1
@@ -80,21 +63,29 @@ export function PublishPath({ completed }: { completed: number }) {
             <li
               key={step.title}
               aria-current={state === "current" ? "step" : undefined}
-              className={`relative flex items-start gap-4 xl:gap-3.5 ${last ? "" : "xl:flex-auto"}`}
+              className={`relative flex items-start gap-4 sm:flex-col sm:gap-3 ${last ? "sm:w-[22%] sm:shrink-0" : "sm:flex-auto sm:pr-5"}`}
             >
               {last ? null : (
                 <span
                   aria-hidden="true"
-                  className="absolute -bottom-7 left-[22px] top-12 w-px bg-[var(--color-rule)] xl:hidden"
+                  className="absolute -bottom-7 left-[22px] top-12 w-px bg-[var(--color-rule)] sm:hidden"
                 />
               )}
-              <span
-                aria-hidden="true"
-                className={`tabular grid h-11 w-11 shrink-0 place-items-center rounded-full border text-[15px] xl:h-10 xl:w-10 xl:text-[14px] ${MARKER[state]}`}
-              >
-                {state === "complete" ? <CheckIcon /> : index + 1}
+              <span className="flex shrink-0 items-center sm:w-full">
+                <span
+                  aria-hidden="true"
+                  className={`tabular grid h-11 w-11 shrink-0 place-items-center rounded-full border text-[15px] xl:h-10 xl:w-10 xl:text-[14px] ${MARKER[state]}`}
+                >
+                  {state === "complete" ? <CheckIcon /> : index + 1}
+                </span>
+                {last ? null : (
+                  <span
+                    aria-hidden="true"
+                    className="ml-3 hidden h-px min-w-3 flex-1 bg-[var(--color-rule)] sm:block"
+                  />
+                )}
               </span>
-              <div className="flex min-w-0 flex-col gap-1 pt-2.5 xl:pt-2">
+              <div className="flex min-w-0 flex-col gap-1 pt-2.5 sm:pt-0">
                 <p
                   className={`text-[16px] font-medium xl:text-[15px] ${state === "upcoming" ? "text-[var(--color-ink-2)]" : "text-[var(--color-ink)]"}`}
                 >
@@ -105,12 +96,6 @@ export function PublishPath({ completed }: { completed: number }) {
                   {step.description}
                 </p>
               </div>
-              {last ? null : (
-                <span
-                  aria-hidden="true"
-                  className="mr-4 mt-5 hidden h-px min-w-4 flex-1 bg-[var(--color-rule)] xl:block"
-                />
-              )}
             </li>
           )
         })}

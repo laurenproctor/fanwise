@@ -87,7 +87,6 @@ describe("the first-run catalog", () => {
   })
 
   it("starts the path at step one with nothing complete", () => {
-    expect(markup).toContain("0 of 4 complete")
     expect(count(markup, 'aria-current="step"')).toBe(1)
     expect(count(markup, "Complete: ")).toBe(0)
   })
@@ -135,10 +134,10 @@ describe("the path to publish", () => {
     expect(publishStepStates(1.7)).toEqual(publishStepStates(1))
   })
 
-  it("renders the count it was given, and states each step in words as well as form", () => {
+  it("states each step in words as well as form, and counts nothing in prose", () => {
     const markup = render(createElement(PublishPath, { completed: 2 }))
 
-    expect(markup).toContain("2 of 4 complete")
+    expect(markup).not.toMatch(/\d of \d complete/)
     expect(count(markup, "Complete: ")).toBe(2)
     expect(count(markup, "Current step: ")).toBe(1)
     expect(count(markup, "Upcoming: ")).toBe(1)
