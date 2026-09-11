@@ -40,6 +40,14 @@ export type StartParams = {
   workspaceId: string
   listingId: string
   /**
+   * The Publish Everywhere run this job belongs to, when one started it.
+   *
+   * Absent for a single-channel publish, which is most of them. A run is not a
+   * row and this is not a foreign key: it is the id the jobs of one click
+   * share, which is all the activity log needs to group them again later.
+   */
+  runId?: string | null
+  /**
    * The listing's `publish_generation`, read by the caller that loaded it.
    *
    * Carried for every kind, not only the two whose key uses it, because it is
@@ -74,6 +82,7 @@ export async function startPublication(params: StartParams): Promise<StartOutcom
       kind,
       idempotency_key: idempotencyKey,
       publish_generation: generation,
+      run_id: params.runId ?? null,
       status: "pending",
     })
     .select("id")

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { ChannelError } from "@/lib/channels/errors"
+import { ChannelError, IN_CALL_MAX_ATTEMPTS, inCallBackoffMs } from "@/lib/channels/errors"
 import { ADMIN_API_VERSION } from "./config"
 import {
   emptyPayload,
@@ -23,8 +23,6 @@ import {
  * successful empty response, and the caller reports a publish that never
  * happened. That is the specific bug this file exists to not have.
  */
-
-const MAX_ATTEMPTS = 3
 
 const graphqlErrorSchema = z.object({
   message: z.string(),
@@ -69,18 +67,17 @@ export interface ShopifyClient {
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 /**
- * How long to wait before retrying a throttled call.
+ * Shopify's own answer to "how long should I wait", in milliseconds.
  *
- * Shopify restores points at a documented rate, so when the envelope carries
- * one the wait is computed from it. Without it, a bounded exponential backoff.
- * Capped, because a background job that sleeps for a minute is a background job
- * nobody can tell apart from a hung one.
+ * It restores throttled points at a documented rate, so when the envelope
+ * carries one the wait is computed from it rather than from the shared curve.
+ * Capped here, because a background job that sleeps for a minute is a
+ * background job nobody can tell apart from a hung one. The attempts and the
+ * curve itself are in lib/channels/errors.ts, shared with every other adapter.
  */
-function backoffMs(attempt: number, restoreRate: number | null): number {
-  if (restoreRate && restoreRate > 0) {
-    return Math.min(5_000, Math.ceil((50 / restoreRate) * 1000))
-  }
-  return Math.min(5_000, 250 * 2 ** (attempt - 1))
+function throttleHintMs(restoreRate: number | null): number | null {
+  if (!restoreRate || restoreRate <= 0) return null
+  return Math.min(5_000, Math.ceil((50 / restoreRate) * 1000))
 }
 
 export function createShopifyClient(options: ShopifyClientOptions): ShopifyClient {
@@ -101,7 +98,7 @@ export function createShopifyClient(options: ShopifyClientOptions): ShopifyClien
     }): Promise<T> {
       let lastError: ChannelError | null = null
 
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+      for (let attempt = 1; attempt <= IN_CALL_MAX_ATTEMPTS; attempt += 1) {
         let response: Response
         try {
           response = await doFetch(endpoint, {
@@ -118,8 +115,8 @@ export function createShopifyClient(options: ShopifyClientOptions): ShopifyClien
           })
         } catch (error) {
           lastError = new ChannelError(transportError(error))
-          if (attempt === MAX_ATTEMPTS) throw lastError
-          await sleep(backoffMs(attempt, null))
+          if (attempt === IN_CALL_MAX_ATTEMPTS) throw lastError
+          await sleep(inCallBackoffMs(attempt))
           continue
         }
 
@@ -129,9 +126,9 @@ export function createShopifyClient(options: ShopifyClientOptions): ShopifyClien
         if (!response.ok) {
           const body = await response.text().catch(() => "")
           const error = new ChannelError(httpError(response.status, body.slice(0, 2000)))
-          if (!error.normalized.retryable || attempt === MAX_ATTEMPTS) throw error
+          if (!error.normalized.retryable || attempt === IN_CALL_MAX_ATTEMPTS) throw error
           lastError = error
-          await sleep(backoffMs(attempt, null))
+          await sleep(inCallBackoffMs(attempt))
           continue
         }
 
@@ -143,10 +140,13 @@ export function createShopifyClient(options: ShopifyClientOptions): ShopifyClien
           const error = new ChannelError(
             graphqlError(envelope.data.errors as ShopifyGraphQLError[]),
           )
-          if (!error.normalized.retryable || attempt === MAX_ATTEMPTS) throw error
+          if (!error.normalized.retryable || attempt === IN_CALL_MAX_ATTEMPTS) throw error
           lastError = error
           await sleep(
-            backoffMs(attempt, envelope.data.extensions?.cost?.throttleStatus?.restoreRate ?? null),
+            inCallBackoffMs(
+              attempt,
+              throttleHintMs(envelope.data.extensions?.cost?.throttleStatus?.restoreRate ?? null),
+            ),
           )
           continue
         }

@@ -822,6 +822,7 @@ export type Database = {
           normalized_error_message: string | null
           provider_response: Json | null
           publish_generation: number
+          run_id: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["publication_job_status"]
           updated_at: string
@@ -839,6 +840,7 @@ export type Database = {
           normalized_error_message?: string | null
           provider_response?: Json | null
           publish_generation?: number
+          run_id?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["publication_job_status"]
           updated_at?: string
@@ -856,6 +858,7 @@ export type Database = {
           normalized_error_message?: string | null
           provider_response?: Json | null
           publish_generation?: number
+          run_id?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["publication_job_status"]
           updated_at?: string
@@ -938,6 +941,64 @@ export type Database = {
             foreignKeyName: "workspace_billing_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_events: {
+        Row: {
+          actor_user_id: string | null
+          channel_listing_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          product_id: string | null
+          run_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          channel_listing_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+          product_id?: string | null
+          run_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          channel_listing_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          product_id?: string | null
+          run_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_events_listing_fk"
+            columns: ["channel_listing_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "channel_listings"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "workspace_events_product_fk"
+            columns: ["product_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "workspace_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },

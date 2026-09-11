@@ -2,8 +2,11 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
 import { getProductBySlug, groupDerivatives, listProductAssets } from "@/lib/products/queries"
-import { listConnections, listProductListings } from "@/lib/channels/queries"
-import { loadPublicationViews } from "@/lib/publishing/queries"
+import { listChannels, listConnections, listProductListings } from "@/lib/channels/queries"
+import { listProductEvents, loadPublicationViews } from "@/lib/publishing/queries"
+import { planRun, runInputs } from "@/lib/publishing/run"
+import { PublishEverywhere } from "@/components/channels/publish-everywhere"
+import { ActivityLog } from "@/components/channels/activity-log"
 import { liveness, mergeManualSteps } from "@/lib/publishing/manual-steps"
 import { ListingPanel, type ChannelListingCard } from "@/components/channels/listing-panel"
 import { ListingImages, type ListingImage } from "@/components/channels/listing-images"
@@ -58,7 +61,11 @@ export default async function ProductPage({
    */
   const fileSources = sources.filter((asset) => !isReorderable(asset.asset_type))
 
-  const [connections, listings] = await Promise.all([
+  const [channels, connections, listings] = await Promise.all([
+    // Every channel Fanwise knows about, not only the connected ones: a run
+    // reports what it skipped and why, and a list that omitted the unconnected
+    // would be hiding what Fanwise could do (ADR 0005).
+    listChannels(),
     listConnections(workspace.id),
     listProductListings(product, workspace.id),
   ])
@@ -146,6 +153,29 @@ export default async function ProductPage({
       }
     })
 
+  // What one Publish Everywhere click would do, decided from the same facts the
+  // action will read and by the same function, so the button cannot promise
+  // something the server then refuses.
+  const runChannels = runInputs({ channels, connections, listings })
+  const publishRun = planRun(runChannels)
+
+  /*
+   * Offered only where some connected channel can actually publish.
+   *
+   * Not disabled, absent. A greyed-out Publish Everywhere on a workspace whose
+   * only connection is an assisted channel promises an action that will never
+   * work there, which is the rule the listing cards already follow and journey
+   * 3 holds every surface to. Once a channel that can publish is connected the
+   * section appears, and the button disables itself while nothing is ready —
+   * that one is a "not yet", which is a different sentence.
+   */
+  const canPublishSomewhere = runChannels.some((channel) => channel.canPublish && channel.connected)
+
+  // The record of what previous clicks did. Read here rather than inside the
+  // log so the page makes one round trip per section and the component stays a
+  // rendering of rows it was handed.
+  const events = await listProductEvents(workspace.id, product.id)
+
   return (
     <div className="flex flex-col gap-12">
       <div className="flex flex-col gap-2">
@@ -206,12 +236,40 @@ export default async function ProductPage({
           Each channel judges this product by its own rules. Readiness is computed from those rules,
           never estimated.
         </p>
+        {/*
+          The one action that acts on several channels at once, above the cards
+          that carry the detail. The same plan the action will make is made
+          here, so the button can say how many channels it would send to and
+          name the ones it would not, before it is pressed rather than after.
+        */}
+        {canPublishSomewhere ? (
+          <PublishEverywhere
+            workspaceSlug={slug}
+            productId={product.id}
+            attemptable={publishRun.starts.length}
+            skips={publishRun.skips.map((skip) => ({
+              channelName: skip.channelName,
+              reason: skip.reason,
+            }))}
+          />
+        ) : null}
+
         <ListingPanel
           workspaceSlug={slug}
           productSlug={product.slug}
           productId={product.id}
           cards={cards}
         />
+      </section>
+
+      {/*
+        Last, because it is history rather than an action. The cards above show
+        the present; a job that settles after the tab is closed, or a channel
+        that was tried again a quarter of an hour later, is only visible here.
+      */}
+      <section className="flex flex-col gap-5">
+        <h2 className="label-mono">Activity</h2>
+        <ActivityLog events={events} />
       </section>
     </div>
   )

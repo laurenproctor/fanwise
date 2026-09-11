@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { ChannelError } from "@/lib/channels/errors"
+import { ChannelError, IN_CALL_MAX_ATTEMPTS, inCallBackoffMs } from "@/lib/channels/errors"
 import { OutboundError, outboundFetch, type OutboundOptions } from "@/lib/net/outbound"
 import { API_NAMESPACE } from "./config"
 import {
@@ -27,8 +27,6 @@ import {
  * private, connects to the address it checked, follows no redirect, and gives
  * up on a slow or enormous answer. A refusal from it is final, never retried.
  */
-
-const MAX_ATTEMPTS = 3
 
 /**
  * How long a store gets to answer.
@@ -80,10 +78,6 @@ export interface WooClient {
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-function backoffMs(attempt: number): number {
-  return Math.min(5_000, 250 * 2 ** (attempt - 1))
-}
-
 /** The REST root for a store, with the `rest_route` form as the documented fallback. */
 export function apiUrl(storeUrl: string, path: string): string {
   return `${storeUrl}/wp-json/${API_NAMESPACE}/${path}`
@@ -104,7 +98,7 @@ export function createWooClient(options: WooClientOptions): WooClient {
     async request<T>({ method, path, body, schema }: WooRequest<T>): Promise<T> {
       let lastError: ChannelError | null = null
 
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+      for (let attempt = 1; attempt <= IN_CALL_MAX_ATTEMPTS; attempt += 1) {
         let response: Response
         try {
           response = await outboundFetch(
@@ -127,8 +121,8 @@ export function createWooClient(options: WooClientOptions): WooClient {
             throw new ChannelError(refusedByBoundary(error))
           }
           lastError = new ChannelError(transportError(error))
-          if (attempt === MAX_ATTEMPTS) throw lastError
-          await sleep(backoffMs(attempt))
+          if (attempt === IN_CALL_MAX_ATTEMPTS) throw lastError
+          await sleep(inCallBackoffMs(attempt))
           continue
         }
 
@@ -145,9 +139,9 @@ export function createWooClient(options: WooClientOptions): WooClient {
             // Not JSON. The text stands.
           }
           const error = new ChannelError(httpError(response.status, parsedBody))
-          if (!error.normalized.retryable || attempt === MAX_ATTEMPTS) throw error
+          if (!error.normalized.retryable || attempt === IN_CALL_MAX_ATTEMPTS) throw error
           lastError = error
-          await sleep(backoffMs(attempt))
+          await sleep(inCallBackoffMs(attempt))
           continue
         }
 
