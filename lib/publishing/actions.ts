@@ -3,11 +3,15 @@
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { routes } from "@/lib/routes"
 import { evaluate, listingToDraft } from "@/lib/channels/listings"
 import { findAdapter } from "@/lib/channels/registry"
 import type { AdapterSubject, Channel, ChannelListing } from "@/lib/channels/types"
 import type { Product, ProductAsset } from "@/lib/products/types"
+import { imagesFingerprint } from "@/lib/channels/images"
 import { mergeManualSteps, readyToActivate } from "./manual-steps"
+import { awaitingReview } from "@/lib/ai/review"
+import { approveListing } from "@/lib/ai/approve"
 import { startPublication } from "./start"
 
 /**
@@ -22,6 +26,24 @@ import { startPublication } from "./start"
 export interface PublishState {
   error: string | null
   notice: string | null
+  /**
+   * True when an external write is actually on its way, as opposed to a
+   * refusal or an operation that had already happened.
+   *
+   * The panel watches for the send to land so it can say "Sent" and then go
+   * quiet, and it needs to know whether there is anything to wait for. A flag
+   * rather than the caller matching on the notice text: the copy is written
+   * for a person and should stay free to change without breaking a condition.
+   */
+  sending?: boolean
+  /**
+   * True when completing a step started the activation job. The panel keeps
+   * watching until the listing reads live or failed, for the same reason it
+   * watches a send: one refresh at the moment of the click lands before the job
+   * does, and the card then says "not live" about a product that went live
+   * three seconds later.
+   */
+  activating?: boolean
 }
 
 async function requireWorkspace(workspaceSlug: string) {
@@ -145,12 +167,22 @@ export async function publishListingAction(
     }
   }
 
+  // docs/ai-merchandising.md: no first generation reaches a marketplace
+  // without a person saying so. The person is saying so now: this click is
+  // the approval, and it is stamped before the send so the record shows who
+  // vouched for the copy that went. The button said "Review and publish".
+  if (awaitingReview(listing)) {
+    const approved = await approveListing({ supabase, workspaceId: workspace.id, listingId })
+    if (approved.kind === "error") return { error: approved.message, notice: null }
+  }
+
   const outcome = await startPublication({
     supabase,
     workspaceId: workspace.id,
     listingId,
     kind: "publish",
     draft,
+    generation: listing.publish_generation,
   })
 
   if (outcome.kind === "error") return { error: outcome.message, notice: null }
@@ -165,7 +197,7 @@ export async function publishListingAction(
       .eq("workspace_id", workspace.id)
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`, "layout")
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
 
   switch (outcome.kind) {
     case "already_done":
@@ -176,6 +208,112 @@ export async function publishListingAction(
       return { error: null, notice: `Trying ${adapter.name} again.` }
     default:
       return { error: null, notice: `Publishing to ${adapter.name}.` }
+  }
+}
+
+/**
+ * Sends an edited listing to a channel that already has it.
+ *
+ * The counterpart to publishListingAction, and the caller `kind: "update"` was
+ * built for and never had. Without it the adapter declared `automaticUpdate`
+ * while nothing in the product could invoke it, which is invariant 8 read
+ * backwards: the UI must not offer what a provider cannot do, and a capability
+ * a provider has that the UI never offers is the same gap seen from the other
+ * side.
+ *
+ * Not named updateListingAction: that already exists in lib/channels/actions
+ * and saves an edit to Fanwise's own row. This one is a publication, so it is
+ * named for the vocabulary the UI uses.
+ */
+export async function publishChangesAction(
+  workspaceSlug: string,
+  listingId: string,
+): Promise<PublishState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const loaded = await loadListing(supabase, workspace.id, listingId)
+  if (!loaded) return { error: "That listing could not be found.", notice: null }
+
+  const { listing, channel, connection, product, subject } = loaded
+
+  const adapter = findAdapter(channel.key)
+  if (!adapter) return { error: "That channel is not available.", notice: null }
+
+  // Same shape as publish: the UI does not offer it where the capability is
+  // absent, and the server refuses it anyway.
+  if (!adapter.capabilities.automaticUpdate || !adapter.update) {
+    return {
+      error: `${adapter.name} cannot receive an update automatically. You edit this listing there yourself.`,
+      notice: null,
+    }
+  }
+
+  if (!connection || connection.status !== "active") {
+    return {
+      error: `${adapter.name} is not connected. Reconnect it and try again.`,
+      notice: null,
+    }
+  }
+
+  // An update is an edit to something that exists. Without an external id there
+  // is nothing to update, and productSet without an identifier would create a
+  // second product rather than change the first.
+  if (listing.status !== "published" || !listing.external_listing_id) {
+    return { error: `Publish this listing to ${adapter.name} first.`, notice: null }
+  }
+
+  const draft = listingToDraft(listing)
+  const { readiness } = evaluate(adapter, draft, subject)
+  if (!readiness.ready) {
+    const first = readiness.blocking[0]
+    return {
+      error:
+        readiness.blocking.length === 1
+          ? `This listing is not ready: ${first?.message ?? first?.label}`
+          : `This listing has ${readiness.blocking.length} things to fix before it can be sent.`,
+      notice: null,
+    }
+  }
+
+  // Same as publish: the click is the approval, stamped before the send.
+  if (awaitingReview(listing)) {
+    const approved = await approveListing({ supabase, workspaceId: workspace.id, listingId })
+    if (approved.kind === "error") return { error: approved.message, notice: null }
+  }
+
+  const outcome = await startPublication({
+    supabase,
+    workspaceId: workspace.id,
+    listingId,
+    kind: "update",
+    draft,
+    images: imagesFingerprint(subject),
+    generation: listing.publish_generation,
+  })
+
+  if (outcome.kind === "error") return { error: outcome.message, notice: null }
+
+  /*
+   * Deliberately does not set status to `publishing`.
+   *
+   * Publish does, because there the listing is not on the channel yet and the
+   * spinner is the whole truth. Here the product is live while the write is in
+   * flight, and flipping the row would make the panel report a live product as
+   * not live for as long as the job takes. The button's own pending state is
+   * the feedback, and recordSuccess rewrites the row when the channel answers.
+   */
+
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
+
+  switch (outcome.kind) {
+    case "already_done":
+      return { error: null, notice: `${adapter.name} already has these changes.` }
+    case "already_running":
+      return { error: null, notice: "These changes are already on their way.", sending: true }
+    case "retried":
+      return { error: null, notice: `Trying ${adapter.name} again.`, sending: true }
+    default:
+      return { error: null, notice: `Sending your changes to ${adapter.name}.`, sending: true }
   }
 }
 
@@ -236,7 +374,7 @@ export async function completeManualStepAction(
     .eq("workspace_id", workspace.id)
 
   const states = mergeManualSteps(adapter.manualSteps, rows ?? [])
-  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`, "layout")
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
 
   if (!readyToActivate(states) || !adapter.activate) {
     return { error: null, notice: "Step marked done." }
@@ -248,6 +386,7 @@ export async function completeManualStepAction(
     listingId,
     kind: "activate",
     draft: listingToDraft(listing),
+    generation: listing.publish_generation,
   })
 
   if (outcome.kind === "error") {
@@ -257,5 +396,5 @@ export async function completeManualStepAction(
     }
   }
 
-  return { error: null, notice: `Taking the product live on ${adapter.name}.` }
+  return { error: null, notice: `Taking the product live on ${adapter.name}.`, activating: true }
 }

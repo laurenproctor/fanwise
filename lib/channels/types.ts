@@ -21,7 +21,7 @@ export type SnapshotType = Database["public"]["Enums"]["snapshot_type"]
  * component that wants to special-case a marketplace has to name a key, and a
  * unit test fails the moment a key appears outside lib/channels/adapters.
  */
-export const CHANNEL_KEYS = ["mock_api", "mock_assisted", "shopify"] as const
+export const CHANNEL_KEYS = ["mock_api", "mock_assisted", "shopify", "woocommerce", "etsy"] as const
 export type ChannelKey = (typeof CHANNEL_KEYS)[number]
 export const channelKeySchema = z.enum(CHANNEL_KEYS)
 
@@ -149,6 +149,19 @@ export interface ChannelListingDraft {
   title: string | null
   description: string | null
   shortDescription: string | null
+  /**
+   * The search-result title and description, when the creator wants them to
+   * differ from the listing's own.
+   *
+   * Both are overrides and null is the ordinary state: a channel that has these
+   * fields falls back to the listing title and the short description, which is
+   * usually the right answer. They are separate from `shortDescription` because
+   * a blurb written for a product page and a line written for a search result
+   * are two pieces of writing, and a channel that offers both fields is a
+   * channel that expects two.
+   */
+  seoTitle: string | null
+  seoDescription: string | null
   price: number | null
   currency: string
   category: string | null
@@ -169,6 +182,24 @@ export interface PublishResult {
   externalListingId: string
   externalUrl: string | null
   externalState: ExternalListingState
+  /**
+   * Whether a buyer can actually reach and buy the thing that was just written.
+   *
+   * Separate from `externalState`, and the separation is the whole point. A5's
+   * exit test found a provider where the object's own status says "active" and
+   * a buyer still cannot reach it, because being active and being on a sales
+   * channel are two different facts there. `externalState` answers the first —
+   * it has to, because an update reads it back to avoid taking a live object
+   * off sale — so it cannot also answer the second without one of the two
+   * questions getting the wrong answer.
+   *
+   * `null` means the adapter did not establish it. That is not the same as
+   * false and must never be rendered as one: a channel with no such concept,
+   * and every listing published before this field existed, are both null, and
+   * reporting those as "nobody can buy this" would be a fresh lie in the
+   * opposite direction.
+   */
+  purchasable?: boolean | null
   /**
    * The provider's own response, persisted to publication_jobs. Never rendered,
    * and never a credential: adapters return what came back from a write.
@@ -227,6 +258,48 @@ export interface OAuthAuthorizeRequest {
   state: string
   accountHint: string
   redirectUri: string
+  /**
+   * Where a provider that delivers the credential server-to-server should post
+   * it. Built by Fanwise like the redirect URI, and ignored by a provider that
+   * hands the credential to the browser.
+   */
+  grantUri: string
+  /**
+   * The S256 challenge for a provider that requires PKCE. Present only when
+   * the adapter declares `pkce`; the verifier it was derived from stays on
+   * the state row and reaches `exchange`.
+   */
+  codeChallenge?: string
+}
+
+/**
+ * A credential that arrives by a separate POST rather than in the redirect.
+ *
+ * Some providers do not put anything secret in the browser: the store posts
+ * the keys to a server endpoint and sends the person back with a yes or a no.
+ * An adapter that declares this completes the connection from that POST, and
+ * the browser callback only reports. The generic routes branch on its
+ * presence; nothing else in the tree knows which providers work this way.
+ */
+export interface ChannelGrant {
+  /**
+   * Reads the provider's POST body. Returns null for anything that is not a
+   * well-formed grant, and never throws on a stranger's input.
+   */
+  parse(
+    body: unknown,
+  ): { state: string; credentials: Record<string, unknown>; scopes: string[] } | null
+  /**
+   * Proves the credential works against the account the flow started for,
+   * and reads what the connection should carry. A credential that does not
+   * work against that account is refused: the state proves someone approved
+   * *something*, and this proves it was the store the creator named.
+   */
+  verify(params: {
+    accountHint: string
+    credentials: Record<string, unknown>
+    scopes: string[]
+  }): Promise<OAuthGrant>
 }
 
 /**
@@ -250,11 +323,52 @@ export interface ChannelOAuth {
   accountHintLabel: string
   accountHintPlaceholder: string
   /**
+   * Everything this build asks the provider for.
+   *
+   * Declared here rather than left inside the adapter so shared code can ask
+   * whether an existing connection was granted it, without naming a provider.
+   * `channel_connections.scopes` records what was actually granted, and until
+   * this field existed nothing compared the two — the column was written at
+   * every authorization and read by nothing, which was survivable only while
+   * the list never changed.
+   *
+   * It changes. A connection authorized before a scope was added holds a token
+   * that cannot do the new thing, and the creator has to be asked again.
+   */
+  scopes: readonly string[]
+  /**
+   * Whether a granted list covers one required scope.
+   *
+   * Optional, and the default is plain membership. It exists because plain
+   * membership is wrong on at least one provider and shared code has no way to
+   * know which: Shopify treats `write_x` as implying `read_x` and grants back
+   * only the write half, so a literal comparison reports a scope missing on a
+   * connection that holds it — permanently, since reconnecting cannot add an
+   * entry the provider will not return.
+   *
+   * The rule belongs to the adapter rather than here for the ordinary reason:
+   * the next provider's rule will differ, and encoding Shopify's in shared code
+   * would make it everyone's.
+   */
+  holdsScope?(granted: readonly string[], required: string): boolean
+  /**
    * Validates and normalizes what the creator typed, before it reaches a URL.
    * An account hint becomes a hostname Fanwise redirects a person to and then
    * sends a client secret to, so it is checked rather than trusted.
    */
   parseAccountHint(raw: string): { ok: true; value: string } | { ok: false; message: string }
+  /**
+   * Present when the provider posts the credential to a server endpoint. The
+   * callback then verifies the browser's return and reports; `exchange` is
+   * never called for such a channel.
+   */
+  grant?: ChannelGrant
+  /**
+   * True when the provider's OAuth requires PKCE. The shared flow mints the
+   * verifier, keeps it on the state row, hands the challenge to
+   * `authorizeUrl` and the verifier to `exchange`.
+   */
+  pkce?: boolean
   authorizeUrl(request: OAuthAuthorizeRequest): string
   /**
    * Integrity of the callback itself, verified before any parameter is used,
@@ -265,7 +379,45 @@ export interface ChannelOAuth {
     accountHint: string
     query: URLSearchParams
     redirectUri: string
+    /** The PKCE verifier minted when the flow started, for a `pkce` adapter. */
+    codeVerifier?: string
   }): Promise<OAuthGrant>
+}
+
+/**
+ * How a channel wants to be written for.
+ *
+ * Declared per adapter, in code, like capabilities and requirements and for the
+ * same reason: it describes the channel, and a channel description that could
+ * be edited in a row is one the prompt could be talked out of. lib/ai reads
+ * this and never a provider name; the profile is the only channel-shaped thing
+ * that reaches a model, and it is merchandising instruction, never facts.
+ *
+ * docs/ai-merchandising.md is the source: do not write the canonical
+ * description four times. One product, one FactSheet, one profile per channel.
+ *
+ * `promptVersion` moves whenever the text does. It is written to every
+ * generation row so a listing can be traced to the instructions that produced
+ * it, which matters the first time a profile change makes copy worse.
+ */
+export interface MerchandisingProfile {
+  /** Bumped by hand whenever any text below changes. */
+  promptVersion: string
+  /** Who buys here and how they arrive: search, browsing, a brand they know. */
+  audience: string
+  /** The register the copy should take. */
+  voice: string
+  /** How the description should be shaped, in prose the model can follow. */
+  structure: string
+  /** Guidance per output field, beyond the limits the requirements already state. */
+  fields: {
+    title: string
+    description: string
+    shortDescription: string
+    seoTitle: string
+    seoDescription: string
+    tags: string
+  }
 }
 
 /**
@@ -289,6 +441,8 @@ export interface ChannelAdapter {
   requirements: readonly RequirementSpec[]
   /** Work this channel's API cannot do. Empty for a channel that needs none. */
   manualSteps: readonly ManualStepSpec[]
+  /** How copy for this channel should read. Read by lib/ai. Step B1. */
+  merchandising: MerchandisingProfile
   buildListing(subject: AdapterSubject): ChannelListingDraft
   /** Present only on a channel Fanwise can authorize against. */
   oauth?: ChannelOAuth
@@ -324,7 +478,8 @@ interface RequirementSpecBase {
 }
 
 /** Fields a rule may address on a draft listing. */
-export type ListingTextField = "title" | "description" | "shortDescription" | "category"
+export type ListingTextField =
+  "title" | "description" | "shortDescription" | "seoTitle" | "seoDescription" | "category"
 export type ListingNumberField = "price"
 
 export interface TextRequirement extends RequirementSpecBase {
@@ -332,6 +487,23 @@ export interface TextRequirement extends RequirementSpecBase {
   field: ListingTextField
   minLength?: number
   maxLength?: number
+  /**
+   * True when an empty value is fine and the bounds apply only to a value that
+   * is set.
+   *
+   * The field this was added for is a meta title. Leaving it blank is not a
+   * mistake — the channel falls back to the listing title, which is usually
+   * what the creator wants — but a 200 character one is a mistake, and it is
+   * the kind the creator cannot see without a counter. Without this flag the
+   * only way to get the counter was to declare a rule that complains about
+   * every listing that has quite reasonably left the field alone, and a
+   * readiness list that is mostly noise is a readiness list nobody reads.
+   *
+   * `custom` could express the same rule, but a custom rule is opaque to
+   * `constraintsFor`, so the editor would show no limit at all and the creator
+   * would learn about the wall by hitting it.
+   */
+  optional?: boolean
 }
 
 export interface NumberRequirement extends RequirementSpecBase {

@@ -1,3 +1,4 @@
+import type { ChannelAdapter } from "./types"
 import { randomBytes } from "node:crypto"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { clientEnv } from "@/lib/env"
@@ -37,9 +38,17 @@ const TTL_MS = 5 * 60 * 1000
  * of those has to be an async server action. A plain string helper exported
  * from there is a build error, not a style problem.
  */
+export function appOrigin(): string {
+  return clientEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "")
+}
+
 export function callbackUrl(channelKey: string): string {
-  const base = clientEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "")
-  return `${base}/api/channels/${channelKey}/oauth/callback`
+  return `${appOrigin()}/api/channels/${channelKey}/oauth/callback`
+}
+
+/** Where a provider that delivers the credential server-to-server posts it. */
+export function grantUrl(channelKey: string): string {
+  return `${appOrigin()}/api/channels/${channelKey}/oauth/grant`
 }
 
 export async function createAuthorizationState(params: {
@@ -47,6 +56,8 @@ export async function createAuthorizationState(params: {
   channelId: string
   userId: string
   accountHint: string
+  /** For a PKCE provider. Kept on the row, never in the browser. */
+  codeVerifier?: string
 }): Promise<string> {
   // 32 bytes. The state is the only thing standing between a forged callback
   // and a connection, so it is generated the same way a session token would be.
@@ -59,6 +70,7 @@ export async function createAuthorizationState(params: {
     channel_id: params.channelId,
     user_id: params.userId,
     external_account_hint: params.accountHint,
+    code_verifier: params.codeVerifier ?? null,
     expires_at: new Date(Date.now() + TTL_MS).toISOString(),
   })
 
@@ -71,6 +83,7 @@ export interface ConsumedState {
   channelId: string
   userId: string
   accountHint: string | null
+  codeVerifier: string | null
 }
 
 /**
@@ -94,7 +107,7 @@ export async function consumeAuthorizationState(state: string): Promise<Consumed
     .eq("state", state)
     .is("consumed_at", null)
     .gt("expires_at", new Date().toISOString())
-    .select("workspace_id, channel_id, user_id, external_account_hint")
+    .select("workspace_id, channel_id, user_id, external_account_hint, code_verifier")
     .maybeSingle()
 
   if (error || !data) return null
@@ -104,6 +117,38 @@ export async function consumeAuthorizationState(state: string): Promise<Consumed
     channelId: data.channel_id,
     userId: data.user_id,
     accountHint: data.external_account_hint,
+    codeVerifier: data.code_verifier,
+  }
+}
+
+/**
+ * Reads a state without consuming it.
+ *
+ * For a channel whose credential arrives by a separate POST, the browser's
+ * return is a report rather than a completion, and consuming the state there
+ * would leave the POST, which may arrive a moment later, with nothing to
+ * consume. Expiry is still enforced; a peek at an expired state is null.
+ */
+export async function peekAuthorizationState(
+  state: string,
+): Promise<(ConsumedState & { consumedAt: string | null }) | null> {
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from("channel_oauth_states")
+    .select("workspace_id, channel_id, user_id, external_account_hint, consumed_at")
+    .eq("state", state)
+    .gt("expires_at", new Date().toISOString())
+    .maybeSingle()
+
+  if (error || !data) return null
+  return {
+    workspaceId: data.workspace_id,
+    channelId: data.channel_id,
+    userId: data.user_id,
+    accountHint: data.external_account_hint,
+    // A peek is a report, not an exchange; the verifier stays on the row.
+    codeVerifier: null,
+    consumedAt: data.consumed_at,
   }
 }
 
@@ -118,4 +163,34 @@ export async function consumeAuthorizationState(state: string): Promise<Consumed
 export async function pruneExpiredStates(): Promise<void> {
   const admin = createAdminClient()
   await admin.from("channel_oauth_states").delete().lt("expires_at", new Date().toISOString())
+}
+
+/**
+ * Scopes a connection was never granted, because this build asks for more than
+ * it did when the creator authorized it.
+ *
+ * Provider-neutral on purpose. The adapter declares what it needs and the
+ * connection records what it got; nothing here knows which channel it is
+ * looking at, so the rule holds for Etsy at A6 without being written twice.
+ *
+ * An empty `granted` is treated as "not recorded" rather than "granted
+ * nothing". Connections predate the column being reliably populated, and
+ * forcing a re-authorization on that assumption is the more expensive mistake:
+ * it costs every creator a round trip to fix a problem most of them do not
+ * have. The adapter's own call will fail with a readable message if the token
+ * really is short.
+ */
+export function missingScopes(
+  adapter: Pick<ChannelAdapter, "oauth">,
+  granted: readonly string[] | null,
+): string[] {
+  const oauth = adapter.oauth
+  if (!oauth || !granted || granted.length === 0) return []
+
+  // The adapter's own rule when it has one, membership when it does not. A
+  // provider that collapses implied scopes in what it grants back would
+  // otherwise be reported as permanently short of something it holds.
+  const holds =
+    oauth.holdsScope ?? ((list: readonly string[], scope: string) => list.includes(scope))
+  return oauth.scopes.filter((scope) => !holds(granted, scope))
 }

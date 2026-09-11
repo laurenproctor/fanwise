@@ -96,7 +96,9 @@ plus $6 a channel, and also install Fileflare and pay them" is a worse pitch tha
 step. It also adds an install to onboarding, which is where activation goes to die.
 
 **Option C costs almost nothing** because the assisted handoff component has to exist
-anyway for Creative Market at step B3. Shopify reuses it for one field.
+anyway for Creative Market, which was step B3 when this was written and is step A8 since
+7 September 2026. Shopify reuses it for one field. The move strengthens this option rather
+than weakening it: the shared component now lands inside the same gate.
 
 ---
 

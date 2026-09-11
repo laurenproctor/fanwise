@@ -135,6 +135,8 @@ describe("an image change reaches the channel", () => {
     title: "Aster Grotesk",
     description: "A grotesque in nine weights.",
     shortDescription: null,
+    seoTitle: null,
+    seoDescription: null,
     price: 48,
     currency: "USD",
     category: "font",
@@ -189,6 +191,6 @@ describe("an image change reaches the channel", () => {
   it("does not disturb the publish key, which ignores content entirely", () => {
     // A publish happens once per listing whatever the images are, or clicking
     // Publish twice would create two products.
-    expect(publishKey("ws-1", "listing-1")).toBe(publishKey("ws-1", "listing-1"))
+    expect(publishKey("ws-1", "listing-1", 0)).toBe(publishKey("ws-1", "listing-1", 0))
   })
 })

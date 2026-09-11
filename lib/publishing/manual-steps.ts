@@ -64,18 +64,65 @@ export function readyToActivate(states: readonly ManualStepState[]): boolean {
  * Five words, chosen so that none of them can be read as "for sale" unless it
  * is. `published_not_live` is the state ADR 0001 cares about: the provider has
  * the product, Fanwise confirmed it, and a buyer cannot reach it yet.
+ *
+ * It now covers two ways of being unreachable rather than one. ADR 0001 built
+ * it for a deliverable nobody has attached; A5's exit test found a second, a
+ * product the channel calls active that is on no sales channel. The word did
+ * not need to change, which is the sign it was the right word: both are "the
+ * channel has it and a buyer cannot buy it", and a creator does not need to
+ * hold the difference in their head to know what to do next.
  */
 export type ListingLiveness =
   "unpublished" | "publishing" | "published_not_live" | "live" | "failed"
 
 export function liveness(
-  listing: Pick<ChannelListing, "status" | "external_listing_id">,
+  listing: Pick<ChannelListing, "status" | "external_listing_id" | "metadata">,
   states: readonly ManualStepState[],
 ): ListingLiveness {
   if (listing.status === "publishing") return "publishing"
   if (listing.status === "failed") return "failed"
   if (listing.status !== "published" || !listing.external_listing_id) return "unpublished"
-  return outstandingRequired(states).length === 0 ? "live" : "published_not_live"
+  if (outstandingRequired(states).length > 0) return "published_not_live"
+
+  /*
+   * The last thing between "no steps left" and "buyable", and the reason this
+   * function grew a third input.
+   *
+   * A5's exit test found products the channel called active that no buyer
+   * could reach, because being active and being on a sales channel are
+   * separate facts there. Every required step was done, so this returned
+   * `live`, and `live` promises "available to buy". The steps were never the
+   * whole of the question; they were the only part Fanwise could see.
+   *
+   * Only an explicit false withholds it. Absent is unknown — a channel with no
+   * such concept, and every listing published before the adapter began
+   * establishing it — and unknown must keep the old answer, or the correction
+   * for one channel would report every listing on every other channel as
+   * unbuyable.
+   */
+  const metadata = (listing.metadata as Record<string, unknown> | null) ?? {}
+  if (metadata.purchasable === false) return "published_not_live"
+
+  return "live"
+}
+
+/**
+ * What each state means for the person reading it, in a sentence.
+ *
+ * The labels are two words each, and two words cannot carry the distinction
+ * the whole model turns on: "Published, not live" is not a worse "Live", it is
+ * a product on a channel that nobody can buy yet. A creator who reads it as a
+ * synonym stops here and waits for sales that cannot arrive.
+ *
+ * Says what is true and what happens next, never how to feel about it.
+ */
+export const LIVENESS_MEANINGS: Record<ListingLiveness, string> = {
+  unpublished: "Written here, and not sent anywhere yet.",
+  publishing: "Sent, and waiting for the channel to confirm. You can leave this page.",
+  published_not_live:
+    "The channel has the product, but nobody can buy it until the steps below are done.",
+  live: "On the channel, and available to buy.",
+  failed: "The last attempt did not finish. Trying again is safe: it will not create a duplicate.",
 }
 
 export const LIVENESS_LABELS: Record<ListingLiveness, string> = {

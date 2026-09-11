@@ -33,6 +33,8 @@ const draft: ChannelListingDraft = {
   title: "Aster Grotesk",
   description: "A grotesque in nine weights, drawn for long text.",
   shortDescription: "Nine weights.",
+  seoTitle: null,
+  seoDescription: null,
   price: 48,
   currency: "USD",
   category: "font",
@@ -131,6 +133,7 @@ describe("publishing once", () => {
       listingId,
       kind: "publish",
       draft,
+      generation: 0,
     })
     expect(outcome.kind).toBe("started")
     await settle()
@@ -148,7 +151,7 @@ describe("publishing once", () => {
     const jobs = await jobsFor(listingId)
     expect(jobs).toHaveLength(1)
     expect(jobs[0]!.status).toBe("succeeded")
-    expect(jobs[0]!.idempotency_key).toBe(publishKey(alice.workspaceId, listingId))
+    expect(jobs[0]!.idempotency_key).toBe(publishKey(alice.workspaceId, listingId, 0))
   })
 
   it("writes exactly one immutable publish snapshot", async () => {
@@ -177,6 +180,7 @@ describe("a second click creates nothing", () => {
       listingId,
       kind: "publish",
       draft,
+      generation: 0,
     })
     await settle()
 
@@ -205,6 +209,7 @@ describe("a second click creates nothing", () => {
       listingId,
       kind: "publish",
       draft: { ...draft, title: "Aster Grotesk Variable", price: 99 },
+      generation: 0,
     })
     await settle()
 
@@ -275,6 +280,7 @@ describe("retrying a failure", () => {
       listingId: retryId,
       kind: "publish",
       draft,
+      generation: 0,
     })
     await settle()
     expect(first.kind).toBe("started")
@@ -297,6 +303,7 @@ describe("retrying a failure", () => {
       listingId: retryId,
       kind: "publish",
       draft,
+      generation: 0,
     })
     await settle()
 
@@ -312,6 +319,100 @@ describe("retrying a failure", () => {
 
     const listing = await listingRow(retryId)
     expect(listing.external_listing_id).toBe(`mock-api-${retryId}`)
+  })
+})
+
+describe("publishing again after the channel lost the product", () => {
+  /*
+    The failure this closes, end to end and against the real constraint.
+
+    A product deleted in the provider's admin leaves the listing pointing at an
+    id that returns Not Found. Everything that made a second click safe then
+    works against the creator: the publish key is claimed, so the insert
+    collides and reports "already published", and the runner's second guard
+    finds an earlier succeeded publish and skips. There was no way back.
+
+    The generation is what distinguishes "this operation has already happened"
+    from "the thing it produced no longer exists". It moves only where the
+    provider has confirmed the absence — the adapter raises
+    `external_object_missing`, and runPublication clears the listing and
+    increments it — so the guarantee inside a generation is untouched, which is
+    what the first assertion below checks before the second one relies on it.
+  */
+
+  it("blocks the repeat, then allows the re-publish once the generation moves", async () => {
+    const { listingId: goneId } = await createListing("delta")
+
+    const first = await startPublication({
+      supabase: alice.client,
+      workspaceId: alice.workspaceId,
+      listingId: goneId,
+      kind: "publish",
+      draft,
+      generation: 0,
+    })
+    await settle()
+    expect(first.kind).toBe("started")
+    expect((await listingRow(goneId)).external_listing_id).toBe(`mock-api-${goneId}`)
+
+    // Still one product, still one operation. Nothing below is allowed to
+    // weaken this.
+    const repeat = await startPublication({
+      supabase: alice.client,
+      workspaceId: alice.workspaceId,
+      listingId: goneId,
+      kind: "publish",
+      draft,
+      generation: 0,
+    })
+    expect(repeat.kind).toBe("already_done")
+    expect(await jobsFor(goneId)).toHaveLength(1)
+
+    /*
+      What runPublication does when an adapter reports the object gone. Written
+      here rather than driven through the adapter because the mock API channel
+      has no way to lose a product; what is under test is the publishing path's
+      response to that state, which is shared by every channel.
+    */
+    await adminClient()
+      .from("channel_listings")
+      .update({
+        external_listing_id: null,
+        external_url: null,
+        status: "draft",
+        status_source: "self_reported",
+        last_sent_fingerprint: null,
+        publish_generation: 1,
+      })
+      .eq("id", goneId)
+
+    const again = await startPublication({
+      supabase: alice.client,
+      workspaceId: alice.workspaceId,
+      listingId: goneId,
+      kind: "publish",
+      draft,
+      generation: 1,
+    })
+    await settle()
+
+    // A new operation, not a repeat: a new row, a new key, and a product at
+    // the end of it. Before the generation existed this was `already_done`
+    // forever.
+    expect(again.kind).toBe("started")
+
+    const jobs = await jobsFor(goneId)
+    expect(jobs).toHaveLength(2)
+    expect(jobs[0]!.idempotency_key).toBe(publishKey(alice.workspaceId, goneId, 0))
+    expect(jobs[1]!.idempotency_key).toBe(publishKey(alice.workspaceId, goneId, 1))
+    // The second guard did not skip it. That guard matches on kind, so without
+    // being scoped to the generation it would have found job one and reported
+    // this as already published, new key or not.
+    expect(jobs[1]!.status).toBe("succeeded")
+
+    const listing = await listingRow(goneId)
+    expect(listing.status).toBe("published")
+    expect(listing.external_listing_id).toBe(`mock-api-${goneId}`)
   })
 })
 

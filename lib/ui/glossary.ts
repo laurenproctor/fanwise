@@ -100,6 +100,14 @@ export const GLOSSARY = {
     label: "Short description",
     body: "A one- or two-line summary. Some channels show it in search results or on a card and some ignore it entirely. Use canonical replaces it with the product's short description, and saves immediately rather than waiting for Save listing.",
   },
+  listingSeoTitle: {
+    label: "Meta title",
+    body: "The title search engines and the channel's own search show for this listing. Left empty, the channel uses the listing title above. Most channels cut it off around sixty characters, so the counter is the constraint that matters.",
+  },
+  listingSeoDescription: {
+    label: "Meta description",
+    body: "The one- or two-line summary shown under the meta title in search results. Left empty, the channel uses the short description above. It does not appear on the listing page itself, only where the listing is found.",
+  },
   listingPrice: {
     label: "Price",
     body: "What this channel sells at. Price is per channel, so you can charge differently in different places — a marketplace that takes a cut is the usual reason. Use canonical puts the product's base price and currency back, and saves immediately rather than waiting for Save listing.",

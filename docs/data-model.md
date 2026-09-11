@@ -11,6 +11,14 @@ Built. Migration `20260904042945_workspaces_and_membership`.
 updated_at. Check constraints on name length, slug format and slug length, so a
 malformed slug cannot reach a row even if the app forgets to validate.
 
+A workspace slug is the first path segment (`/best-night`), and a product slug the
+second (`/best-night/facette-typeface`). Both therefore share a namespace with the
+application's own routes, and `workspaces_slug_not_reserved` and
+`products_slug_not_reserved` (migration `20260905173722_reserved_slugs`) keep a slug
+off a word a route would shadow. A shadowed slug is not a broken link; it is a row
+that inserts happily and a page nobody can open. The lists live in `lib/slug.ts` and
+a unit test asserts they still cover every route that exists.
+
 **workspace_members** — workspace_id, user_id, role, created_at.
 Primary key (workspace_id, user_id), plus an index on `user_id` alone: the
 composite key is workspace-id-leading and cannot serve "which workspaces does
@@ -279,11 +287,61 @@ rather it went away.
 
 ## B1: AI
 
-**ai_generations** — id, workspace_id, product_id, channel_listing_id, generation_type,
-provider, model, prompt_version, input_hash, factsheet_hash, structured_output, status,
-input_tokens, output_tokens, estimated_cost, created_at
+Built. Migration `20260907180000_ai_generations`.
 
-`factsheet_hash` is what lets a bad listing be traced back to the facts that produced it.
+**ai_generations** — id, workspace_id, product_id, channel_listing_id, generation_type,
+status, requested_by, provider, model, prompt_version, input_hash, factsheet_hash,
+structured_output, violations, input_tokens, output_tokens, cache_read_input_tokens,
+cache_creation_input_tokens, estimated_cost, error_code, error_message, started_at,
+completed_at, applied_at, created_at, updated_at
+
+One row per model call. `factsheet_hash` is what lets a bad listing be traced back to the
+facts that produced it, and `structured_output` is what B2's restore reads.
+
+Status: pending, running, succeeded, failed, **rejected**. The last is the factuality
+validator's verdict and is deliberately not `failed`: the model answered, the answer parsed,
+and the validator refused it because it claimed something the FactSheet does not support.
+That is the product working. `violations` is set only with `rejected`, by check constraint,
+and holds `{kind, value, field}` for each unsupported claim.
+
+Members hold `select` and `insert` only, as on `publication_jobs`: asking is theirs, the
+outcome is the system's. A partial unique index on `channel_listing_id` where the status is
+pending or running allows one generation in flight per listing, so a double click loses at
+the database rather than paying twice.
+
+Both tenant boundaries are composite foreign keys, to `products (id, workspace_id)` and
+`channel_listings (id, workspace_id)`.
+
+**`snapshot_type` gains `generate`.** A generation applied to a listing writes a snapshot
+like a build or a save does, carrying the copy, the readiness verdict, and the generation's
+id, provider, model, prompt version and FactSheet hash.
+
+**On `channel_listings`, two existing columns take on meaning.** `approved_at` is stamped by
+every save from the editor: a person vouching for the text as it stands. `metadata.composedAt`
+is stamped when a generation lands. When the second is newer than the first, Publish refuses.
+`composedAt` is in metadata rather than a column because a rebuild drops it, correctly: the
+adapter's draft replaced the model's and there is nothing left to review.
+
+### B2: one field, and the way back
+
+Migrations `20260908010000_field_generations_and_restore` and
+`20260908010001_field_generations_check`.
+
+`generation_type` gains `field`, and `ai_generations.field` names which one, in the listing
+output's own key names (`title`, `shortDescription`, `seoTitle` and so on) rather than column
+names, because a row is read back into that shape and never joined on the value. A check
+constraint ties the two: `field` is present exactly when the type is `field`. It lives one
+migration after the enum value because Postgres cannot reference a value in the transaction
+that added it.
+
+`snapshot_type` gains `restore`. A restore is not a generation: no model was called, and a
+history that recorded it as one would answer "what changed before revenue moved" with a call
+that never happened. The payload's `restore` key names the generation put back and, for a
+field generation, the field.
+
+**Credentials are nowhere near this table.** The runner loads the listing, the product and
+its assets; it never loads a connection or a secret, and the prompt is built from the
+FactSheet and the channel's profile alone.
 
 ## B5: commerce
 
@@ -293,3 +351,59 @@ discount_amount, refund_amount, net_revenue, currency, occurred_at, synced_at, m
 
 Unique constraint on (channel_id, external_transaction_id) so re-ingestion cannot double
 count.
+
+## B8: WooCommerce
+
+Built. Migration `20260908090000_woocommerce_channel`.
+
+One row in `channels`: key `woocommerce`, `integration_type = api`, `billable = false`. No
+new table. The authorization flow reuses `channel_oauth_states`; the store posts the consumer
+key and secret to the grant route, and they are sealed into `channel_connection_secrets` as
+`{ consumerKey, consumerSecret }` like any other credential.
+
+What the existing columns hold for this channel: `external_account_id` is the normalized
+store address, host or host/path with no scheme; `external_account_name` is the site name;
+`metadata.currency` is the store currency, read at grant time and compared by the
+`currency_matches_store` requirement; `scopes` is `["read_write"]`. On the listing,
+`external_listing_id` is the numeric product id as a string and `external_url` the admin edit
+URL, which resolves before the product is live.
+
+`billable = false` takes decision 23's recommended reading, and the migration says so in a
+comment. Flipping it is one migration, and nothing bills before C1 either way.
+
+## C1: billing
+
+Built. Migration `20260908200000_billing`.
+
+**workspace_billing** — workspace_id (pk), external_customer_id, external_subscription_id,
+subscription_status, billing_interval, base_item_id, channel_item_id, channel_quantity,
+period_peak_quantity, current_period_start, current_period_end, cancel_at_period_end,
+created_at, updated_at
+
+One row per workspace, a mirror of what the payment provider holds. Readable by members,
+writable by nobody in the browser: every write is the server's account of an external fact,
+from a webhook or the checkout action, through the service role. `period_peak_quantity` is
+the one piece of Fanwise's own state on it: the highest channel quantity billed this period,
+which is how a reconnection inside a paid period is not charged twice.
+
+**billing_events** — id, workspace_id, channel_connection_id, channel_id, kind, billable,
+idempotency_key, status, attempt_count, applied_at, provider_response,
+normalized_error_code, normalized_error_message, created_at, updated_at
+
+The ledger. Written by the trigger `record_channel_billing_event()` on every insert and
+delete of `channel_connections`, in the same transaction, which is `docs/billing.md` rule 1
+made structural. `channel_connection_id` is deliberately not a foreign key: the disconnection
+is recorded as the row is deleted, and the ledger outlives what it describes. `billable` is
+captured from the channel at the moment of the event so a later change to which channels
+bill does not rewrite history. The idempotency key is NOT NULL and unique, per invariant 3.
+
+The trigger is `security definer` because authenticated holds no insert on the ledger and
+should not. On delete it checks the workspace still exists: Postgres removes a parent before
+cascading onto its children, so a connection deleted by a workspace deletion arrives with
+nothing to reference, and that case is skipped rather than failed.
+
+**billing_webhook_events** — id (the provider's event id), type, received_at,
+processed_at, error
+
+No grant to anon or authenticated, RLS on with zero policies. A redelivered event collides
+on the key; one recorded but never finished is applied again, one finished is acknowledged.

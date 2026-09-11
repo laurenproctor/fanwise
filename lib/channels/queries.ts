@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { listProductAssets } from "@/lib/products/queries"
+import { hasUnsentChanges } from "@/lib/publishing/changes"
 import { findAdapter } from "./registry"
 import { evaluate, listingToDraft } from "./listings"
 import type { Evaluation } from "./listings"
@@ -68,6 +69,14 @@ export interface ListingView {
   connection: ChannelConnection | null
   adapter: ChannelAdapter | null
   evaluation: Evaluation | null
+  /**
+   * Whether the listing holds an edit the channel has not received.
+   *
+   * Computed here for the same reason the evaluation is: it is a comparison
+   * between the row as it stands now and what was last sent, and a stored
+   * answer would be stale the moment either side moved.
+   */
+  unsentChanges: boolean
 }
 
 /**
@@ -112,12 +121,15 @@ export async function listProductListings(
       connectionMetadata: (connection?.metadata as Record<string, unknown>) ?? {},
     }
 
+    const draft = listingToDraft(listing)
+
     return {
       listing,
       channel,
       connection,
       adapter,
-      evaluation: adapter ? evaluate(adapter, listingToDraft(listing), subject) : null,
+      evaluation: adapter ? evaluate(adapter, draft, subject) : null,
+      unsentChanges: hasUnsentChanges(listing, draft, subject),
     }
   })
 }
@@ -133,4 +145,33 @@ export async function listSnapshots(channelListingId: string, limit = 20) {
 
   if (error) throw error
   return data ?? []
+}
+
+/**
+ * How many listings each connection holds that exist on the channel.
+ *
+ * "Published" here means `external_listing_id is not null` rather than a status
+ * value, and that is the same test `disconnectChannelAction` applies. The two
+ * have to agree: a page that decides with a different rule than the action it
+ * is describing will eventually offer a button the server refuses, which is the
+ * bug this was written for.
+ */
+export async function countPublishedByConnection(
+  workspaceId: string,
+): Promise<Map<string, number>> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("channel_listings")
+    .select("channel_connection_id")
+    .eq("workspace_id", workspaceId)
+    .not("external_listing_id", "is", null)
+
+  if (error) throw error
+
+  const counts = new Map<string, number>()
+  for (const row of data ?? []) {
+    const id = row.channel_connection_id
+    if (id) counts.set(id, (counts.get(id) ?? 0) + 1)
+  }
+  return counts
 }

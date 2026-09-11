@@ -39,13 +39,22 @@ export type StartParams = {
   supabase: SupabaseClient<Database>
   workspaceId: string
   listingId: string
+  /**
+   * The listing's `publish_generation`, read by the caller that loaded it.
+   *
+   * Carried for every kind, not only the two whose key uses it, because it is
+   * also written to the job row: the runner's already-published guard asks
+   * whether a publish has succeeded *at this generation*, and a row with no
+   * generation on it could not answer that.
+   */
+  generation: number
 } & (
   | { kind: "publish" | "activate"; draft: ChannelListingDraft }
   | { kind: "update"; draft: ChannelListingDraft; images: string }
 )
 
 export async function startPublication(params: StartParams): Promise<StartOutcome> {
-  const { supabase, workspaceId, listingId, kind } = params
+  const { supabase, workspaceId, listingId, kind, generation } = params
   const idempotencyKey =
     params.kind === "update"
       ? keyFor({
@@ -55,7 +64,7 @@ export async function startPublication(params: StartParams): Promise<StartOutcom
           draft: params.draft,
           images: params.images,
         })
-      : keyFor({ kind: params.kind, workspaceId, listingId, draft: params.draft })
+      : keyFor({ kind: params.kind, workspaceId, listingId, draft: params.draft, generation })
 
   const { data: inserted, error } = await supabase
     .from("publication_jobs")
@@ -64,6 +73,7 @@ export async function startPublication(params: StartParams): Promise<StartOutcom
       channel_listing_id: listingId,
       kind,
       idempotency_key: idempotencyKey,
+      publish_generation: generation,
       status: "pending",
     })
     .select("id")

@@ -3,9 +3,17 @@ import type { NextRequest } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { storeConnectionCredentials } from "@/lib/credentials"
-import { callbackUrl, consumeAuthorizationState, pruneExpiredStates } from "@/lib/channels/oauth"
+import {
+  appOrigin,
+  callbackUrl,
+  consumeAuthorizationState,
+  peekAuthorizationState,
+  pruneExpiredStates,
+} from "@/lib/channels/oauth"
 import { findAdapter } from "@/lib/channels/registry"
 import { normalizeUnknown } from "@/lib/channels/errors"
+import { routes } from "@/lib/routes"
+import { jobs } from "@/lib/jobs"
 
 /**
  * The OAuth callback, for every channel that has one.
@@ -28,12 +36,18 @@ import { normalizeUnknown } from "@/lib/channels/errors"
  * usable state row behind after a failed attempt.
  */
 
-/** Everything the creator is told. Details go to the log, not the query string. */
-function back(request: NextRequest, workspaceSlug: string | null, message?: string): NextResponse {
-  const target = new URL(
-    workspaceSlug ? `/w/${workspaceSlug}/channels` : "/",
-    request.nextUrl.origin,
-  )
+/**
+ * Everything the creator is told. Details go to the log, not the query string.
+ *
+ * The origin comes from NEXT_PUBLIC_APP_URL, not from the request, for the same
+ * reason callbackUrl() does: an origin derived from a header is an origin
+ * someone else can suggest. Behind the tunnel that development against a real
+ * provider requires, request.nextUrl.origin is also simply wrong — it pairs the
+ * forwarded protocol with the internal host and sends the creator to
+ * https://localhost:3001, which is nowhere.
+ */
+function back(workspaceSlug: string | null, message?: string): NextResponse {
+  const target = new URL(workspaceSlug ? routes.channels(workspaceSlug) : "/", appOrigin())
   if (message) target.searchParams.set("error", message)
   return NextResponse.redirect(target)
 }
@@ -45,7 +59,7 @@ export async function GET(
   const { channelKey } = await params
   const adapter = findAdapter(channelKey)
 
-  if (!adapter?.oauth) return back(request, null, "That channel cannot be connected.")
+  if (!adapter?.oauth) return back(null, "That channel cannot be connected.")
 
   const query = request.nextUrl.searchParams
 
@@ -56,18 +70,27 @@ export async function GET(
     verified = adapter.oauth.verifyCallback(query)
   } catch (error) {
     console.error("[oauth] could not verify callback", { channelKey, error })
-    return back(request, null, "That connection could not be completed.")
+    return back(null, "That connection could not be completed.")
   }
   if (!verified) {
     console.warn("[oauth] callback failed signature verification", { channelKey })
-    return back(request, null, "That connection could not be verified. Start again.")
+    return back(null, "That connection could not be verified. Start again.")
   }
 
-  // 2. Consume the state. One winner, decided by the database.
   const state = query.get("state")
+
+  /*
+   * A channel whose credential arrives by a separate POST completes in the
+   * grant route, and this return is a report: did the POST land? The state is
+   * peeked, not consumed, because the POST may still be on its way and it is
+   * the one that has to consume. Nothing here writes a connection.
+   */
+  if (adapter.oauth.grant) return reportGrant(adapter, channelKey, state)
+
+  // 2. Consume the state. One winner, decided by the database.
   const consumed = state ? await consumeAuthorizationState(state) : null
   if (!consumed) {
-    return back(request, null, "That connection link has expired or was already used. Start again.")
+    return back(null, "That connection link has expired or was already used. Start again.")
   }
 
   void pruneExpiredStates().catch(() => {})
@@ -90,11 +113,7 @@ export async function GET(
   } = await supabase.auth.getUser()
 
   if (!user || user.id !== consumed.userId) {
-    return back(
-      request,
-      workspaceSlug,
-      "Sign in as the person who started that connection, then try again.",
-    )
+    return back(workspaceSlug, "Sign in as the person who started that connection, then try again.")
   }
 
   try {
@@ -103,6 +122,7 @@ export async function GET(
       accountHint: consumed.accountHint ?? "",
       query,
       redirectUri: callbackUrl(channelKey),
+      ...(consumed.codeVerifier ? { codeVerifier: consumed.codeVerifier } : {}),
     })
 
     const { data: connection, error: connectionError } = await admin
@@ -137,14 +157,78 @@ export async function GET(
       connectionId: connection.id,
       credentials: grant.credentials,
     })
+
+    // A new connection row is a billing event, written by the trigger in the
+    // same statement as the row. A reconnect is an update and wrote none, and
+    // the sync then finds nothing to do.
+    await jobs.enqueue("sync_billing", { workspaceId: consumed.workspaceId })
   } catch (error) {
     // Nothing from here reaches the browser except a normalized sentence. The
     // thrown value may hold a provider body, and the request that produced it
     // held a client secret.
     const normalized = normalizeUnknown(error, adapter.name)
     console.error("[oauth] exchange failed", { channelKey, code: normalized.code })
-    return back(request, workspaceSlug, normalized.message)
+    return back(workspaceSlug, normalized.message)
   }
 
-  return back(request, workspaceSlug)
+  return back(workspaceSlug)
+}
+
+/**
+ * The browser's return for a channel that completes server-to-server.
+ *
+ * Three answers. The connection is there: done. The state is still unconsumed
+ * and unexpired: the store has not posted yet, which happens when its POST
+ * trails the redirect, so the person is told to give it a moment. Anything
+ * else: the POST was refused or never came, and the honest word is to start
+ * again.
+ */
+async function reportGrant(
+  adapter: NonNullable<ReturnType<typeof findAdapter>>,
+  channelKey: string,
+  state: string | null,
+): Promise<NextResponse> {
+  const peeked = state ? await peekAuthorizationState(state) : null
+  if (!peeked) {
+    return back(null, "That connection link has expired or was already used. Start again.")
+  }
+
+  const admin = createAdminClient()
+  const { data: workspace } = await admin
+    .from("workspaces")
+    .select("slug")
+    .eq("id", peeked.workspaceId)
+    .maybeSingle()
+  const workspaceSlug = workspace?.slug ?? null
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user || user.id !== peeked.userId) {
+    return back(workspaceSlug, "Sign in as the person who started that connection, then try again.")
+  }
+
+  if (!peeked.consumedAt) {
+    return back(
+      workspaceSlug,
+      `${adapter.name} has not confirmed the connection yet. Give it a moment and refresh this page.`,
+    )
+  }
+
+  const { data: connection } = await admin
+    .from("channel_connections")
+    .select("id")
+    .eq("workspace_id", peeked.workspaceId)
+    .eq("channel_id", peeked.channelId)
+    .eq("status", "active")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!connection) {
+    console.warn("[oauth] grant consumed but no connection recorded", { channelKey })
+    return back(workspaceSlug, `${adapter.name} did not complete the connection. Start again.`)
+  }
+  return back(workspaceSlug)
 }

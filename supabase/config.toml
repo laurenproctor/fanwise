@@ -10,7 +10,10 @@ max_rows = 1000
 [db]
 port = 54422
 shadow_port = 54420
-major_version = 15
+# The hosted project runs PostgreSQL 17 (17.6 on 10 September 2026, read from
+# the project itself). The local stack and CI follow it, so a migration is
+# exercised on the major version it will meet. A unit test pins this line.
+major_version = 17
 
 [studio]
 enabled = true
@@ -52,3 +55,44 @@ content_path = "./supabase/templates/recovery.html"
 [analytics]
 enabled = true
 port = 54427
+
+# --- Hosted project overrides -----------------------------------------------
+# Everything above describes the local stack. `supabase config push` applies
+# this file to a hosted project, and the block below is what changes when the
+# target is production. The CLI selects it by matching `project_id` against the
+# ref it is pushing to. A local `supabase start` never reads it, and the env()
+# references below stay unresolved locally without error (checked against CLI
+# 2.101.0, the version CI pins).
+#
+# Push with `pnpm auth:push -- --project-ref <ref> --commit <sha>`, never
+# `supabase config push` by hand. The script pushes only from a temporary
+# detached worktree at a commit on origin/main, links nothing else, unlinks on
+# every exit, and refuses to run until every SMTP variable is set, because
+# pushing this block half-filled would enable SMTP with an empty host and stop
+# every auth email. Supabase's built-in provider rejects the custom recovery
+# template anyway (docs/decisions/0008-transactional-email.md).
+[remotes.production]
+project_id = "whepzmlbhhuxjswezall"
+
+[remotes.production.auth]
+site_url = "https://fanwise.vercel.app"
+additional_redirect_urls = ["https://fanwise.vercel.app/**"]
+
+# Wired, not yet on. The provider is Resend (ADR 0008). Turning it on is:
+# verify a sending subdomain there, put the four values in the environment or
+# in an env file outside the repository, get a deployment approved, and run
+# `pnpm auth:push` with the approved commit and project reference.
+# The push installs the custom recovery template in the same call, which is
+# what makes cross-device password reset work on the hosted project.
+#
+# The port is pinned rather than read from the environment because env()
+# substitutes strings and this field is an integer. 587 is STARTTLS, which
+# Resend's relay accepts; a provider that wants 465 needs this line edited.
+[remotes.production.auth.email.smtp]
+enabled = true
+host = "env(SMTP_HOST)"
+port = 587
+user = "env(SMTP_USER)"
+pass = "env(SMTP_PASS)"
+admin_email = "env(SMTP_ADMIN_EMAIL)"
+sender_name = "Fanwise"

@@ -6,8 +6,8 @@ Fanwise is a canonical digital-product operating system for creators who sell th
 product across multiple storefronts and marketplaces.
 
 Marketplace integrations are adapters around the Fanwise domain model. Never redesign the
-core product model around an external marketplace. Shopify and Etsy are initial
-destinations, not architectural authorities.
+core product model around an external marketplace. Shopify, Etsy and WooCommerce are
+initial destinations, not architectural authorities.
 
 Publishing is the initial wedge. Do not implement marketplace intelligence, automated
 optimization, browser automation, physical commerce, or unrelated SaaS features unless
@@ -15,9 +15,14 @@ explicitly requested.
 
 ## Current step
 
-**Step: A5 (Shopify adapter, OAuth, credentials, publishing) is code complete. Its exit
-test needs a live Shopify connection and has not been run. A6 does not begin until it has.**
-See `docs/roadmap.md`. Implement the current step only. Do not build ahead.
+**Step: A6 (Etsy: OAuth with PKCE, adapter, images, the digital file, activate, idempotency)
+is done. Its exit ran on 11 September 2026 against a live shop: connect, publish, and listing
+4573259073 active in one job. Four of the five questions in `docs/channels/etsy.md` §13 are
+settled; the fifth, refresh-token rotation, waits on the first refresh. A7 (Publish
+Everywhere) is next and not yet opened, with Shopify and Etsy as its two live channels. B1,
+B2 and B8 are on `main`; B8's exit needs a live WooCommerce store, which needs no approval.
+Gate A is not passed; A8 resumes when a Creative Market login exists.** See `docs/roadmap.md`. Implement the current
+step only. Do not build ahead.
 
 ## Architecture invariants
 
@@ -55,7 +60,12 @@ These do not bend. If a task appears to require breaking one, stop and say so.
    original.
 9. Implement the simplest correct version. Do not build V2 because the architecture allows
    it.
-10. Keep `main` deployable. One step per branch, one PR per step.
+10. Keep `main` deployable. One step per branch, one PR per step, one session per step.
+    Two agents in one working directory will fight over the index and the checked-out
+    branch, and the loser's edit disappears without an error. If parallel work is wanted,
+    each agent gets its own git worktree. Before resuming a paused session, check whether
+    another is still live: files modified more recently than your own last edit are the
+    tell.
 
 ## Stack
 
@@ -92,7 +102,9 @@ not Item. The central action is **Publish Everywhere**.
 ## Pricing model
 
 $9 per month base, plus $6 per connected external marketplace. One owned storefront
-(Shopify) is included at no channel charge. Annual billing is ten months for twelve.
+(Shopify) is included at no channel charge. WooCommerce, the second owned storefront, is
+seeded as included too; whether a second owned storefront should bill is decision 23 in
+`docs/decisions/0002`, still open. Annual billing is ten months for twelve.
 
 Billing consequences, which are not optional:
 
@@ -128,11 +140,12 @@ idempotency keys, revenue aggregation.
 Database: RLS, tenancy, membership, cascades, external ID uniqueness, transaction
 deduplication, snapshot immutability.
 
-Integration: mock Shopify, Etsy, Anthropic and Stripe. Cover OAuth token handling, product
-creation, upload, publish, retry, transaction ingestion, AI failure.
+Integration: mock Shopify, Etsy, WooCommerce, Anthropic and Stripe. Cover OAuth token
+handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
+AI failure.
 
-E2E: the ten journeys in `docs/testing.md`. Journey 9 (workspace A cannot reach workspace
-B) must never be skipped.
+E2E: the eleven journeys in `docs/testing.md`. Journey 9 (workspace A cannot reach
+workspace B) must never be skipped.
 
 ## Definition of done
 
@@ -184,3 +197,13 @@ with per-channel statuses and an inline rejection fix. Read it before building A
 
 Every figure in the mockups is placeholder except the channel modes and the pricing, which
 are accurate. Do not carry invented usage statistics into anything real.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

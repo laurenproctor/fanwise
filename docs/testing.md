@@ -11,19 +11,29 @@ deduplication, snapshot immutability. `pnpm test:db`, against a live local Supab
 (`supabase start`). See `docs/security.md` for the denial shape each verb produces; asserting
 the wrong one is how this suite passes while proving nothing.
 
-**Integration** — mocked Shopify, Etsy, Anthropic and Stripe. OAuth token handling, product
-creation, upload, publish, retry, transaction ingestion, AI failure.
+**Integration** — mocked Shopify, Etsy, WooCommerce, Anthropic and Stripe. OAuth token
+handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
+AI failure.
 
-**E2E** — the ten journeys below, plus two step exit tests against the mock channels rather
-than against the ten:
+**E2E** — the eleven journeys below, plus two step exit tests against the mock channels
+rather than against the eleven:
 
 - `journey-03-channels.spec.ts` (A3): one product, two independent listings, and no publish
   affordance anywhere on the assisted channel.
 - `journey-04-listing-editor.spec.ts` (A4): a person hand-writes a listing per channel and
   watches deterministic readiness resolve, with no AI involved.
 - `journey-05-publish.spec.ts` (A5): a product publishes, and clicking Publish again creates
-  nothing. Run against the mock API channel, because A5's exit test needs a live Shopify
-  connection that does not exist yet.
+  nothing. Run against the mock API channel, because the e2e suite has no live Shopify
+  connection; A5's exit ran by hand against the live store, see `docs/roadmap.md`.
+
+**B1's validator is proved twice.** `tests/unit/factuality.test.ts` is the vocabulary: every
+way a model could state a number, a format, a compatibility or a claim the facts do not
+support, and every way a true statement must still pass. `tests/db/ai-generation.test.ts`
+runs the whole path against real Postgres with the model replaced by a scripted provider: a
+fabricated claim is rejected and the listing is untouched; a supported one lands with a
+snapshot and a FactSheet hash. The vendor's request shape is checked in
+`tests/unit/ai-provider.test.ts` with a fetch that answers from a script, so the schema, the
+effort and the cache marker are asserted without a network. No test calls the model.
 
 **A5's idempotency is proved at the database, not in the browser**, in
 `tests/db/publication-idempotency.test.ts`. That suite drives the real job row, the real
@@ -42,30 +52,57 @@ anywhere and looks exactly like a broken finalize job. Wait for the row to appea
 button, so an unscoped `getByRole("button", { name: "Connect" })` starts failing the moment a
 channel is added — which it did when Shopify arrived at A5. Scope to the card.
 
-**A note on `waitForURL`.** `/products/[^/]+$` also matches `/products/new`, so waiting on
-that pattern resolves instantly against the form just submitted and races the redirect. It
-passes most of the time, which is worse than failing. Exclude the trailing segment
-explicitly.
+**A note on `waitForURL`.** A product now lives at `/<workspace>/<product>`, which is the
+same shape as `/<workspace>/new`, `/channels` and `/settings`. Waiting on a pattern loose
+enough to match a product matches the form just submitted, resolves instantly, and races the
+redirect. It passes most of the time, which is worse than failing. Use `productUrl()` from
+`tests/e2e/support.ts`, which builds the exclusions from `RESERVED_PRODUCT_SLUGS` so a new
+route cannot leave the pattern quietly wrong. The same applies one level up: `/onboarding` is
+a single path segment and so is a workspace.
 
-## The ten journeys
+A matching URL is not a rendered page. An App Router transition changes the URL before the
+content arrives, so `waitForURL` can return while the loading boundary is still on screen,
+and a locator that counts elements then finds none. Follow it with a wait on real content —
+the product heading, usually.
+
+## The eleven journeys
 
 1. Signup, workspace, product. *(complete at A2)*
-2. Product to AI Shopify listing, approved.
+2. Product to AI Shopify listing, approved. *(composition ran live at B1; the review loop
+   with field regenerate and restore is code complete at B2 and proven in
+   `tests/db/ai-review.test.ts`; approval is the publish click; unrun in the browser)*
 3. Connect Shopify, publish. *(code complete at A5, unverified: needs a live shop)*
-4. Connect Etsy, publish.
-5. Publish to Shopify and Etsy in one action.
+4. Connect Etsy, publish. *(ran by hand on 11 September 2026 against the live shop, see
+   `docs/roadmap.md`; the OAuth flow and the adapter are covered in
+   `tests/unit/etsy-oauth.test.ts` and `tests/unit/etsy-adapter.test.ts`)*
+5. Publish to Shopify and Etsy in one action. *(A7's exit needs any two live channels, and
+   Shopify and Etsy are both live as of 11 September 2026; WooCommerce, once connected, is a
+   third the action includes)*
 6. Publication failure, correction, retry, no duplicate.
 7. Generate a Creative Market submission package.
 8. Analytics shows an ingested sale.
 9. **Workspace A attempts Workspace B access, denied.** *(covered at A1, in the browser at
    `tests/e2e/journey-09-tenancy.spec.ts` and at the database in `tests/db/tenancy.test.ts`;
    extended to the A3 tables in `tests/db/channel-tenancy.test.ts`)*
-10. Trial to subscription.
+10. Trial to subscription. *(code complete at C1; the settings page shows the trial and the
+    two checkouts, and `tests/db/billing.test.ts` proves the ledger, the tenancy and the sync
+    job against real Postgres with the provider scripted. Unrun in the browser: it needs a
+    provider account in test mode)*
+11. Connect WooCommerce, publish a draft, attach the file, activate. *(code complete at B8,
+    unverified: needs a live store. The authorization handshake and the adapter are covered
+    in `tests/unit/woocommerce-oauth.test.ts` and `tests/unit/woocommerce-adapter.test.ts`)*
 
 Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, the product
 is broken in the way that matters most.
 
-**Password recovery is not one of the ten**, because it is not a step on the path from empty
+**Journey 11 was added on 8 September 2026**, after the list was written, because
+WooCommerce arrived at B8. It is not a copy of journey 3 with a different store. The ten were
+written before a channel existed whose provider could confirm the manual step, and that
+confirmation is what the journey exists to see: `activate` refusing until the file is on the
+product, and a product that goes live only afterwards. The count in `CLAUDE.md` moved with
+it.
+
+**Password recovery is not one of the eleven**, because it is not a step on the path from empty
 workspace to live listing. It is covered anyway, in two halves that meet at the token:
 `tests/db/password-recovery.test.ts` makes the same calls the confirm route makes, against the
 real auth server, and proves the link is single use; `tests/e2e/password-recovery.spec.ts`

@@ -25,7 +25,8 @@ Current reality, from `docs/channel-feasibility.md`:
 | Channel | Type | Publish | Update | Transactions | File upload | Image upload |
 |---|---|---|---|---|---|---|
 | Shopify | api | yes | yes | yes | **no**, see note | yes |
-| Etsy | api | yes | yes | yes | yes, 5 files at 20 MB | yes |
+| WooCommerce | api | yes | yes | yes | **no**, by decision, see `docs/channels/woocommerce.md` §6 | yes |
+| Etsy | api | yes | yes | yes | **yes**, 5 files at 20 MB, built at A6 | yes |
 | Creative Market | assisted | no | no | no | no | no |
 | Adobe Stock | assisted | no | no | no | no | no |
 | MyFonts | assisted | no | no | no | no | no |
@@ -74,11 +75,30 @@ The five words a listing may be described by are `unpublished`, `publishing`,
 `published_not_live`, `live` and `failed`. None of them can be read as "for sale" unless it
 is.
 
+## Merchandising profile
+
+Since B1 every adapter declares a `merchandising` profile: audience, voice, structure, and
+guidance per output field, each in prose the model can follow, plus a `promptVersion` that
+moves whenever the text does. It is declared in code for the reason capabilities are, and it
+is instruction only: nothing in a profile is a fact about any product, and the factuality
+validator would refuse the copy if the model treated it as one.
+
+`lib/ai/prompt.ts` renders the profile together with the channel's field limits, derived
+from the same requirement specs the evaluator walks, into the stable prefix of the prompt.
+The profile is the same bytes for every product on a channel, which is what lets the
+provider cache it.
+
 ## Authorization
 
 An adapter that Fanwise can authorize against declares an `oauth` member. Its absence is what
 the UI reads to decide whether Connect starts an authorization or simply writes a row, so a
 channel with no `oauth` is one Fanwise cannot connect to yet rather than one it pretends to.
+
+Some providers never hand the credential to the browser: the store posts it to a server
+endpoint and sends the person back with a yes or a no. Such an adapter declares `oauth.grant`
+with `parse` and `verify`, the generic grant route (`app/api/channels/[channelKey]/oauth/grant`)
+completes the connection from the POST, and the callback only reports. `exchange` is never
+called for such a channel. WooCommerce is the first.
 
 ```ts
 interface ChannelOAuth {

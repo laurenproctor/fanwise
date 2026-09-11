@@ -26,11 +26,11 @@ shouted loudest, and every channel added afterwards makes the schema worse.
                               |
                        CHANNEL ADAPTERS
                               |
-     +------------+-----------+-----------+------------+
-     |            |           |           |            |
-  Shopify       Etsy    Creative Mkt   Adobe Stock   future
-     |            |           |           |
-    API          API      assisted     assisted
+     +-----------+-----------+-----------+-----------+-----------+
+     |           |           |           |           |           |
+  Shopify   WooCommerce    Etsy    Creative Mkt  Adobe Stock   future
+     |           |           |           |           |
+    API         API         API      assisted    assisted
 ```
 
 ## Layers
@@ -96,6 +96,25 @@ before revenue moved" later.
 
 ## Jobs
 
-`lib/jobs` exposes a `JobQueue` interface with an in-process implementation. Trigger.dev
-replaces the implementation at step B1. Nothing outside `lib/jobs/index.ts` knows which
-implementation is in use.
+`lib/jobs` exposes a `JobQueue` interface with two implementations. The in-process queue
+runs handlers on the next tick and is what CI, the database suite and a fresh checkout use.
+The Trigger.dev queue, adopted at B1, is selected in `lib/jobs/index.ts` when
+`TRIGGER_SECRET_KEY` is set and enqueues each job as a task of the same name declared in
+`trigger/jobs.ts`. Both call the same handlers in `lib/jobs/handlers.ts`, so a job does not
+know which queue carried it, and nothing outside `lib/jobs/index.ts` knows which is in use.
+
+## Billing
+
+`lib/billing` owns the gateway contract, the pricing rules, the sync job and the webhook
+processor. Which vendor is configured is decided in `lib/billing/providers` by which key is
+present, and the vendor's name appears nowhere else: a unit test reads the tree for it. A
+connection row and its billing event are one transaction by trigger, and the sync job
+carries the ledger to the provider with an absolute quantity and one persisted key per
+attempt. See `docs/billing.md` for the rules and the mechanism.
+
+## AI
+
+`lib/ai` owns the provider abstraction, the FactSheet, the prompt, the factuality validator
+and the generation runner. Which vendor is configured is decided in `lib/ai/providers` by
+which key is present, and the vendor's name appears nowhere else: a unit test reads the tree
+for it. See `docs/ai-merchandising.md` for the rule and the mechanism.

@@ -1,0 +1,24 @@
+# Dependabot keeps the pinned actions in .github/workflows current: it bumps
+# the commit and the release comment together, once a week, in one grouped
+# pull request that runs the full CI like any other.
+#
+# GitHub Actions only, deliberately. Version updates for npm would open pull
+# requests against package.json and pnpm-lock.yaml, and both are being edited
+# by an open pull request (C1, Stripe billing). Add an npm entry once that has
+# merged, with the same weekly cadence and grouping.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: ci

@@ -3,12 +3,15 @@
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { routes } from "@/lib/routes"
 import { listProductAssets } from "@/lib/products/queries"
-import { buildDraft, draftToColumns, evaluate, snapshotPayload } from "./listings"
+import { buildDraft, draftToColumns, evaluate, rebuildColumns, snapshotPayload } from "./listings"
 import { listingImages } from "./images"
 import { findAdapter } from "./registry"
 import { updateListingSchema } from "./schemas"
-import { callbackUrl, createAuthorizationState } from "./oauth"
+import { callbackUrl, createAuthorizationState, grantUrl } from "./oauth"
+import { codeChallenge, generateCodeVerifier } from "./pkce"
+import { jobs } from "@/lib/jobs"
 import type { AdapterSubject, ChannelListingDraft } from "./types"
 
 export interface ActionState {
@@ -59,9 +62,10 @@ async function requireWorkspace(workspaceSlug: string) {
  * beginAuthorizationAction and the callback route, which write the same
  * connection row plus a sealed credential.
  *
- * At C1 this becomes a billing event in the same transaction as the row, per
- * docs/billing.md rule 1. It is not one yet, and pretending otherwise by
- * writing a placeholder would be building ahead.
+ * Since C1 the insert is a billing event in the same transaction as the row,
+ * per docs/billing.md rule 1: a trigger on channel_connections writes the
+ * ledger row, so this function cannot forget to. What it does after the write
+ * is ask the sync job to carry the ledger to the provider.
  */
 export async function connectChannelAction(
   workspaceSlug: string,
@@ -109,7 +113,9 @@ export async function connectChannelAction(
     return { error: "That channel could not be connected. Try again." }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/channels`)
+  await jobs.enqueue("sync_billing", { workspaceId: workspace.id })
+
+  revalidatePath(routes.channels(workspaceSlug))
   return { error: null }
 }
 
@@ -154,11 +160,16 @@ export async function beginAuthorizationAction(
   }
 
   try {
+    // A PKCE verifier is minted here and written with the state, so the
+    // challenge in the URL and the verifier at the exchange are one pair and
+    // the browser carries neither secret.
+    const codeVerifier = adapter.oauth.pkce ? generateCodeVerifier() : undefined
     const state = await createAuthorizationState({
       workspaceId: workspace.id,
       channelId: channel.id,
       userId: user.id,
       accountHint: parsed.value,
+      ...(codeVerifier ? { codeVerifier } : {}),
     })
 
     return {
@@ -167,6 +178,8 @@ export async function beginAuthorizationAction(
         state,
         accountHint: parsed.value,
         redirectUri: callbackUrl(channelKey),
+        grantUri: grantUrl(channelKey),
+        ...(codeVerifier ? { codeChallenge: codeChallenge(codeVerifier) } : {}),
       }),
     }
   } catch (error) {
@@ -233,7 +246,10 @@ export async function disconnectChannelAction(
     return { error: "That channel could not be disconnected. Try again." }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/channels`)
+  // The delete wrote the ledger row through the trigger; this carries it.
+  await jobs.enqueue("sync_billing", { workspaceId: workspace.id })
+
+  revalidatePath(routes.channels(workspaceSlug))
   return { error: null }
 }
 
@@ -276,32 +292,94 @@ export async function buildListingAction(
   if (!adapter) return { error: "That channel is not available." }
 
   const assets = await listProductAssets(product.id)
-  const subject: AdapterSubject = { product, assets }
+  const subject: AdapterSubject = {
+    product,
+    assets,
+    // The shop's currency lives on the connection. Without it the Etsy currency
+    // rule reads as if no shop were connected, in every build snapshot.
+    connectionMetadata: (connection.metadata as Record<string, unknown>) ?? {},
+  }
   const draft = buildDraft(adapter, subject)
   const evaluation = evaluate(adapter, draft, subject)
 
-  const { data: listing, error: listingError } = await supabase
+  /*
+   * Insert, and fall back to updating only what a rebuild is allowed to touch.
+   *
+   * This was one upsert, and the payload it wrote on conflict included `status`,
+   * `status_source` and `metadata`. Rebuilding a published listing therefore
+   * reset it to draft and self_reported while leaving external_listing_id and
+   * published_at in place, and blanked the metadata the runner had written.
+   *
+   * The status was the visible half. The metadata was the dangerous half:
+   * `metadata.externalState` is what the Shopify adapter reads to decide
+   * whether an update sends ACTIVE or DRAFT, so losing it turns the next edit
+   * into an instruction to take a live product off sale. Rebuilding is a
+   * regeneration of the *draft*, and it has no business having an opinion about
+   * what the channel is currently holding.
+   *
+   * Insert-then-update rather than read-then-write, so two concurrent rebuilds
+   * resolve on the unique constraint instead of racing.
+   */
+  const generatedAt = new Date().toISOString()
+
+  const insert = await supabase
     .from("channel_listings")
-    .upsert(
-      {
-        workspace_id: workspace.id,
-        product_id: product.id,
-        channel_id: channel.id,
-        channel_connection_id: connection.id,
-        status: "draft",
-        // Nothing has confirmed anything. A listing only becomes verified when
-        // a provider API says so, and an assisted channel never can.
-        status_source: "self_reported",
-        generated_at: new Date().toISOString(),
-        ...draftToColumns(draft),
-      },
-      { onConflict: "product_id,channel_connection_id" },
-    )
+    .insert({
+      workspace_id: workspace.id,
+      product_id: product.id,
+      channel_id: channel.id,
+      channel_connection_id: connection.id,
+      status: "draft",
+      // Nothing has confirmed anything. A listing only becomes verified when
+      // a provider API says so, and an assisted channel never can. Written on
+      // the first build only: after that, publication decides it.
+      status_source: "self_reported",
+      generated_at: generatedAt,
+      ...draftToColumns(draft),
+    })
     .select("id")
     .single()
 
-  if (listingError || !listing) {
-    console.error("[channels] build listing failed", listingError)
+  let listing = insert.data
+
+  if (insert.error) {
+    if (insert.error.code !== UNIQUE_VIOLATION) {
+      console.error("[channels] build listing failed", insert.error)
+      return { error: "That listing could not be built. Try again." }
+    }
+
+    // The listing already exists, so this is a regeneration. Read what
+    // publication recorded, and hand it back unchanged alongside the new draft.
+    const { data: existing } = await supabase
+      .from("channel_listings")
+      .select("id, metadata")
+      .eq("workspace_id", workspace.id)
+      .eq("product_id", product.id)
+      .eq("channel_connection_id", connection.id)
+      .maybeSingle()
+
+    if (!existing) {
+      console.error("[channels] build listing conflicted with a row it cannot read")
+      return { error: "That listing could not be built. Try again." }
+    }
+
+    const { data: updated, error: updateError } = await supabase
+      .from("channel_listings")
+      .update(rebuildColumns(draft, existing.metadata, generatedAt))
+      .eq("id", existing.id)
+      .eq("workspace_id", workspace.id)
+      .select("id")
+      .single()
+
+    if (updateError || !updated) {
+      console.error("[channels] build listing failed", updateError)
+      return { error: "That listing could not be built. Try again." }
+    }
+    listing = updated
+  }
+
+  if (!listing) {
+    console.error("[channels] build listing produced no row")
     return { error: "That listing could not be built. Try again." }
   }
 
@@ -321,7 +399,7 @@ export async function buildListingAction(
     console.error("[channels] snapshot insert failed", snapshotError)
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`)
+  revalidatePath(routes.product(workspaceSlug, product.slug))
   return { error: null }
 }
 
@@ -347,6 +425,8 @@ export async function updateListingAction(
     title: formData.get("title"),
     description: formData.get("description"),
     shortDescription: formData.get("shortDescription"),
+    seoTitle: formData.get("seoTitle"),
+    seoDescription: formData.get("seoDescription"),
     category: formData.get("category"),
     price: formData.get("price"),
     currency: formData.get("currency"),
@@ -360,7 +440,7 @@ export async function updateListingAction(
 
   const { data: existing, error: readError } = await supabase
     .from("channel_listings")
-    .select("*, channel:channels(*)")
+    .select("*, channel:channels(*), connection:channel_connections(metadata)")
     .eq("id", listingId)
     .eq("workspace_id", workspace.id)
     .maybeSingle()
@@ -369,6 +449,9 @@ export async function updateListingAction(
   if (!existing) return { error: "That listing could not be found.", savedAt: null }
 
   const channel = (existing as { channel: { id: string; key: string } }).channel
+  const connectionMetadata =
+    ((existing as { connection: { metadata: unknown } | null }).connection?.metadata as
+      Record<string, unknown> | undefined) ?? {}
   const adapter = findAdapter(channel.key)
   if (!adapter) return { error: "That channel is not available.", savedAt: null }
 
@@ -386,6 +469,8 @@ export async function updateListingAction(
     title: parsed.data.title,
     description: parsed.data.description,
     shortDescription: parsed.data.shortDescription,
+    seoTitle: parsed.data.seoTitle,
+    seoDescription: parsed.data.seoDescription,
     price: parsed.data.price,
     currency: parsed.data.currency,
     category: parsed.data.category,
@@ -393,6 +478,12 @@ export async function updateListingAction(
     metadata: (existing.metadata as Record<string, unknown>) ?? {},
   }
 
+  /*
+   * A save is not an approval. At B1 it was, for want of a review screen; B2
+   * gave approval its own action (lib/ai/approve.ts), so a creator can save
+   * an edit to composed copy and still be asked to read the whole before it
+   * ships. `approved_at` is untouched here.
+   */
   const { error: updateError } = await supabase
     .from("channel_listings")
     .update(draftToColumns(draft))
@@ -405,7 +496,7 @@ export async function updateListingAction(
   }
 
   const assets = await listProductAssets(product.id)
-  const subject: AdapterSubject = { product, assets }
+  const subject: AdapterSubject = { product, assets, connectionMetadata }
   const evaluation = evaluate(adapter, draft, subject)
 
   const { error: snapshotError } = await supabase.from("listing_snapshots").insert({
@@ -423,7 +514,7 @@ export async function updateListingAction(
     console.error("[channels] snapshot insert failed", snapshotError)
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`, "layout")
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
   return { error: null, savedAt: Date.now() }
 }
 
@@ -480,6 +571,6 @@ export async function pullFromCanonicalAction(
     return { error: "That field could not be updated. Try again." }
   }
 
-  revalidatePath(`/w/${workspaceSlug}/products/${product.slug}`, "layout")
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
   return { error: null }
 }

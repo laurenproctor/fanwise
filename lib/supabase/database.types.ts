@@ -34,6 +34,211 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_generations: {
+        Row: {
+          applied_at: string | null
+          cache_creation_input_tokens: number | null
+          cache_read_input_tokens: number | null
+          channel_listing_id: string
+          completed_at: string | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          estimated_cost: number | null
+          factsheet_hash: string | null
+          field: string | null
+          generation_type: Database["public"]["Enums"]["ai_generation_type"]
+          id: string
+          input_hash: string | null
+          input_tokens: number | null
+          model: string | null
+          output_tokens: number | null
+          product_id: string
+          prompt_version: string | null
+          provider: string | null
+          requested_by: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["ai_generation_status"]
+          structured_output: Json | null
+          updated_at: string
+          violations: Json | null
+          workspace_id: string
+        }
+        Insert: {
+          applied_at?: string | null
+          cache_creation_input_tokens?: number | null
+          cache_read_input_tokens?: number | null
+          channel_listing_id: string
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          estimated_cost?: number | null
+          factsheet_hash?: string | null
+          field?: string | null
+          generation_type?: Database["public"]["Enums"]["ai_generation_type"]
+          id?: string
+          input_hash?: string | null
+          input_tokens?: number | null
+          model?: string | null
+          output_tokens?: number | null
+          product_id: string
+          prompt_version?: string | null
+          provider?: string | null
+          requested_by?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["ai_generation_status"]
+          structured_output?: Json | null
+          updated_at?: string
+          violations?: Json | null
+          workspace_id: string
+        }
+        Update: {
+          applied_at?: string | null
+          cache_creation_input_tokens?: number | null
+          cache_read_input_tokens?: number | null
+          channel_listing_id?: string
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          estimated_cost?: number | null
+          factsheet_hash?: string | null
+          field?: string | null
+          generation_type?: Database["public"]["Enums"]["ai_generation_type"]
+          id?: string
+          input_hash?: string | null
+          input_tokens?: number | null
+          model?: string | null
+          output_tokens?: number | null
+          product_id?: string
+          prompt_version?: string | null
+          provider?: string | null
+          requested_by?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["ai_generation_status"]
+          structured_output?: Json | null
+          updated_at?: string
+          violations?: Json | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generations_listing_fk"
+            columns: ["channel_listing_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "channel_listings"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "ai_generations_product_fk"
+            columns: ["product_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "ai_generations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_events: {
+        Row: {
+          applied_at: string | null
+          attempt_count: number
+          billable: boolean
+          channel_connection_id: string
+          channel_id: string
+          created_at: string
+          id: string
+          idempotency_key: string
+          kind: Database["public"]["Enums"]["billing_event_kind"]
+          normalized_error_code: string | null
+          normalized_error_message: string | null
+          provider_response: Json | null
+          status: Database["public"]["Enums"]["billing_event_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          applied_at?: string | null
+          attempt_count?: number
+          billable: boolean
+          channel_connection_id: string
+          channel_id: string
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          kind: Database["public"]["Enums"]["billing_event_kind"]
+          normalized_error_code?: string | null
+          normalized_error_message?: string | null
+          provider_response?: Json | null
+          status?: Database["public"]["Enums"]["billing_event_status"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          applied_at?: string | null
+          attempt_count?: number
+          billable?: boolean
+          channel_connection_id?: string
+          channel_id?: string
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          kind?: Database["public"]["Enums"]["billing_event_kind"]
+          normalized_error_code?: string | null
+          normalized_error_message?: string | null
+          provider_response?: Json | null
+          status?: Database["public"]["Enums"]["billing_event_status"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_events_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_webhook_events: {
+        Row: {
+          error: string | null
+          id: string
+          processed_at: string | null
+          received_at: string
+          type: string
+        }
+        Insert: {
+          error?: string | null
+          id: string
+          processed_at?: string | null
+          received_at?: string
+          type: string
+        }
+        Update: {
+          error?: string | null
+          id?: string
+          processed_at?: string | null
+          received_at?: string
+          type?: string
+        }
+        Relationships: []
+      }
       channel_connection_secrets: {
         Row: {
           channel_connection_id: string
@@ -152,11 +357,17 @@ export type Database = {
           external_url: string | null
           generated_at: string | null
           id: string
+          last_notice_code: string | null
+          last_notice_message: string | null
+          last_sent_fingerprint: string | null
           last_synced_at: string | null
           metadata: Json
           price: number | null
           product_id: string
+          publish_generation: number
           published_at: string | null
+          seo_description: string | null
+          seo_title: string | null
           short_description: string | null
           status: Database["public"]["Enums"]["listing_status"]
           status_source: Database["public"]["Enums"]["listing_status_source"]
@@ -177,11 +388,17 @@ export type Database = {
           external_url?: string | null
           generated_at?: string | null
           id?: string
+          last_notice_code?: string | null
+          last_notice_message?: string | null
+          last_sent_fingerprint?: string | null
           last_synced_at?: string | null
           metadata?: Json
           price?: number | null
           product_id: string
+          publish_generation?: number
           published_at?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
           short_description?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           status_source?: Database["public"]["Enums"]["listing_status_source"]
@@ -202,11 +419,17 @@ export type Database = {
           external_url?: string | null
           generated_at?: string | null
           id?: string
+          last_notice_code?: string | null
+          last_notice_message?: string | null
+          last_sent_fingerprint?: string | null
           last_synced_at?: string | null
           metadata?: Json
           price?: number | null
           product_id?: string
+          publish_generation?: number
           published_at?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
           short_description?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           status_source?: Database["public"]["Enums"]["listing_status_source"]
@@ -249,6 +472,7 @@ export type Database = {
       channel_oauth_states: {
         Row: {
           channel_id: string
+          code_verifier: string | null
           consumed_at: string | null
           created_at: string
           expires_at: string
@@ -259,6 +483,7 @@ export type Database = {
         }
         Insert: {
           channel_id: string
+          code_verifier?: string | null
           consumed_at?: string | null
           created_at?: string
           expires_at: string
@@ -269,6 +494,7 @@ export type Database = {
         }
         Update: {
           channel_id?: string
+          code_verifier?: string | null
           consumed_at?: string | null
           created_at?: string
           expires_at?: string
@@ -595,6 +821,7 @@ export type Database = {
           normalized_error_code: string | null
           normalized_error_message: string | null
           provider_response: Json | null
+          publish_generation: number
           started_at: string | null
           status: Database["public"]["Enums"]["publication_job_status"]
           updated_at: string
@@ -611,6 +838,7 @@ export type Database = {
           normalized_error_code?: string | null
           normalized_error_message?: string | null
           provider_response?: Json | null
+          publish_generation?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["publication_job_status"]
           updated_at?: string
@@ -627,6 +855,7 @@ export type Database = {
           normalized_error_code?: string | null
           normalized_error_message?: string | null
           provider_response?: Json | null
+          publish_generation?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["publication_job_status"]
           updated_at?: string
@@ -644,6 +873,71 @@ export type Database = {
             foreignKeyName: "publication_jobs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_billing: {
+        Row: {
+          base_item_id: string | null
+          billing_interval: string | null
+          cancel_at_period_end: boolean
+          channel_item_id: string | null
+          channel_quantity: number
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          external_customer_id: string | null
+          external_subscription_id: string | null
+          period_peak_quantity: number
+          subscription_status:
+            | Database["public"]["Enums"]["subscription_status"]
+            | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          base_item_id?: string | null
+          billing_interval?: string | null
+          cancel_at_period_end?: boolean
+          channel_item_id?: string | null
+          channel_quantity?: number
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          external_customer_id?: string | null
+          external_subscription_id?: string | null
+          period_peak_quantity?: number
+          subscription_status?:
+            | Database["public"]["Enums"]["subscription_status"]
+            | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          base_item_id?: string | null
+          billing_interval?: string | null
+          cancel_at_period_end?: boolean
+          channel_item_id?: string | null
+          channel_quantity?: number
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          external_customer_id?: string | null
+          external_subscription_id?: string | null
+          period_peak_quantity?: number
+          subscription_status?:
+            | Database["public"]["Enums"]["subscription_status"]
+            | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_billing_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -736,6 +1030,13 @@ export type Database = {
       uuid_or_null: { Args: { p_value: string }; Returns: string }
     }
     Enums: {
+      ai_generation_status:
+        | "pending"
+        | "running"
+        | "succeeded"
+        | "failed"
+        | "rejected"
+      ai_generation_type: "listing" | "field"
       asset_state: "pending" | "ready" | "failed"
       asset_type:
         | "deliverable"
@@ -750,6 +1051,8 @@ export type Database = {
         | "screenshot"
         | "promotional"
         | "other"
+      billing_event_kind: "channel_connected" | "channel_disconnected"
+      billing_event_status: "pending" | "applied" | "skipped" | "failed"
       channel_integration_type: "api" | "assisted"
       channel_status: "available" | "coming_soon" | "unavailable"
       connection_status: "active" | "expired" | "revoked" | "error"
@@ -782,7 +1085,22 @@ export type Database = {
         | "other"
       publication_job_kind: "publish" | "update" | "activate"
       publication_job_status: "pending" | "running" | "succeeded" | "failed"
-      snapshot_type: "build" | "publish" | "update" | "unpublish"
+      snapshot_type:
+        | "build"
+        | "publish"
+        | "update"
+        | "unpublish"
+        | "generate"
+        | "restore"
+      subscription_status:
+        | "incomplete"
+        | "incomplete_expired"
+        | "trialing"
+        | "active"
+        | "past_due"
+        | "canceled"
+        | "unpaid"
+        | "paused"
       workspace_role: "owner" | "admin" | "editor" | "viewer"
     }
     CompositeTypes: {
@@ -804,6 +1122,7 @@ export type Database = {
           public: boolean | null
           type: Database["storage"]["Enums"]["buckettype"]
           updated_at: string | null
+          versioning_status: string
         }
         Insert: {
           allowed_mime_types?: string[] | null
@@ -817,6 +1136,7 @@ export type Database = {
           public?: boolean | null
           type?: Database["storage"]["Enums"]["buckettype"]
           updated_at?: string | null
+          versioning_status?: string
         }
         Update: {
           allowed_mime_types?: string[] | null
@@ -830,6 +1150,7 @@ export type Database = {
           public?: boolean | null
           type?: Database["storage"]["Enums"]["buckettype"]
           updated_at?: string | null
+          versioning_status?: string
         }
         Relationships: []
       }
@@ -1002,9 +1323,12 @@ export type Database = {
       }
       objects: {
         Row: {
+          archived_at: string | null
           bucket_id: string | null
           created_at: string | null
           id: string
+          is_delete_marker: boolean
+          is_versioned: boolean
           last_accessed_at: string | null
           metadata: Json | null
           name: string | null
@@ -1016,9 +1340,12 @@ export type Database = {
           version: string | null
         }
         Insert: {
+          archived_at?: string | null
           bucket_id?: string | null
           created_at?: string | null
           id?: string
+          is_delete_marker?: boolean
+          is_versioned?: boolean
           last_accessed_at?: string | null
           metadata?: Json | null
           name?: string | null
@@ -1030,9 +1357,12 @@ export type Database = {
           version?: string | null
         }
         Update: {
+          archived_at?: string | null
           bucket_id?: string | null
           created_at?: string | null
           id?: string
+          is_delete_marker?: boolean
+          is_versioned?: boolean
           last_accessed_at?: string | null
           metadata?: Json | null
           name?: string | null
@@ -1459,6 +1789,14 @@ export const Constants = {
   },
   public: {
     Enums: {
+      ai_generation_status: [
+        "pending",
+        "running",
+        "succeeded",
+        "failed",
+        "rejected",
+      ],
+      ai_generation_type: ["listing", "field"],
       asset_state: ["pending", "ready", "failed"],
       asset_type: [
         "deliverable",
@@ -1474,6 +1812,8 @@ export const Constants = {
         "promotional",
         "other",
       ],
+      billing_event_kind: ["channel_connected", "channel_disconnected"],
+      billing_event_status: ["pending", "applied", "skipped", "failed"],
       channel_integration_type: ["api", "assisted"],
       channel_status: ["available", "coming_soon", "unavailable"],
       connection_status: ["active", "expired", "revoked", "error"],
@@ -1509,7 +1849,24 @@ export const Constants = {
       ],
       publication_job_kind: ["publish", "update", "activate"],
       publication_job_status: ["pending", "running", "succeeded", "failed"],
-      snapshot_type: ["build", "publish", "update", "unpublish"],
+      snapshot_type: [
+        "build",
+        "publish",
+        "update",
+        "unpublish",
+        "generate",
+        "restore",
+      ],
+      subscription_status: [
+        "incomplete",
+        "incomplete_expired",
+        "trialing",
+        "active",
+        "past_due",
+        "canceled",
+        "unpaid",
+        "paused",
+      ],
       workspace_role: ["owner", "admin", "editor", "viewer"],
     },
   },

@@ -12,7 +12,9 @@ import type {
   PublishResult,
 } from "@/lib/channels/types"
 import type { Product, ProductAsset } from "@/lib/products/types"
+import { sentFingerprint } from "./idempotency"
 import type { PublicationKind } from "./idempotency"
+import { imagesFingerprint } from "@/lib/channels/images"
 
 /**
  * Performing one external write, exactly once.
@@ -186,7 +188,19 @@ async function execute(
     return
   }
 
-  /** Guard 2. An earlier job already did this exact operation. */
+  /**
+   * Guard 2. An earlier job already did this exact operation.
+   *
+   * Scoped to the listing's current generation, which is the only honest
+   * reading of "already". A generation moves when the provider confirms the
+   * product Fanwise created no longer exists, so a succeeded publish from an
+   * earlier one describes a product that is gone; treating it as proof that
+   * there is nothing to create is what left a deleted product unrecoverable,
+   * with the key claimed and this guard reporting "already published" forever.
+   *
+   * Within a generation nothing changes: the same two clicks still collide,
+   * here and at the unique key.
+   */
   const { data: earlier } = await admin
     .from("publication_jobs")
     .select("id")
@@ -194,6 +208,7 @@ async function execute(
     .eq("channel_listing_id", job.channel_listing_id)
     .eq("kind", job.kind)
     .eq("status", "succeeded")
+    .eq("publish_generation", listing.publish_generation)
     .neq("id", job.id)
     .limit(1)
 
@@ -266,11 +281,27 @@ async function execute(
   } catch (error) {
     const normalized = normalizeUnknown(error, adapter.name)
 
-    // A failed publish leaves nothing on the provider, so the listing goes back
-    // to failed. A failed update or activate does not: the product is still
-    // there and still published, and marking the listing failed would tell the
-    // creator their live product had gone away.
-    if (job.kind === "publish") {
+    /*
+     * The product Fanwise created is gone from the channel.
+     *
+     * Only an adapter that asked the provider and was told so raises this, so
+     * the listing's claim to be published is now known to be false and is
+     * withdrawn rather than left standing behind a URL that 404s. The
+     * generation moves at the same time, which is what makes the next Publish
+     * a new operation instead of a repeat the idempotency key refuses.
+     *
+     * Deliberately not a re-create. A product is usually gone because somebody
+     * deleted it on purpose, and quietly putting it back would overrule that
+     * decision with a background job. The creator is told what happened and
+     * the button is theirs to press.
+     */
+    if (normalized.code === "external_object_missing") {
+      await forgetExternalObject(admin, workspaceId, listing)
+    } else if (job.kind === "publish") {
+      // A failed publish leaves nothing on the provider, so the listing goes
+      // back to failed. A failed update or activate does not: the product is
+      // still there and still published, and marking the listing failed would
+      // tell the creator their live product had gone away.
       await admin
         .from("channel_listings")
         .update({ status: "failed" })
@@ -292,7 +323,83 @@ async function execute(
   await finish({
     status: "succeeded",
     provider_response: (result.providerResponse ?? null) as never,
+    // A retry reuses the row, so a success has to clear what the failed
+    // attempt wrote. Left in place, a succeeded job went on saying the channel
+    // had rejected it, which is what the first live retry recorded.
+    normalized_error_code: null,
+    normalized_error_message: null,
   })
+}
+
+/**
+ * Withdraws a listing's claim to be published, because the channel no longer
+ * holds the product.
+ *
+ * Everything that pointed at the external object goes: the id, the URL, the
+ * `verified` status source that was true when it was written, and the
+ * `externalState` an adapter reads to decide whether an update should put the
+ * object back on sale or leave it as a draft. That last one is the one that would
+ * bite later: left behind, it answers "live" about an object that is gone.
+ *
+ * `published_at` stays. It is history, and this listing was published; the
+ * product it was published as was then deleted somewhere else. Blanking it
+ * would rewrite the record rather than correct it, and the snapshots that
+ * describe that publication are immutable anyway.
+ */
+async function forgetExternalObject(
+  admin: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  listing: ChannelListing,
+): Promise<void> {
+  const metadata = { ...((listing.metadata as Record<string, unknown>) ?? {}) }
+  delete metadata.externalState
+
+  const { error } = await admin
+    .from("channel_listings")
+    .update({
+      external_listing_id: null,
+      external_url: null,
+      status: "draft",
+      status_source: "self_reported",
+      last_sent_fingerprint: null,
+      last_synced_at: new Date().toISOString(),
+      publish_generation: listing.publish_generation + 1,
+      metadata: metadata as never,
+    })
+    .eq("id", listing.id)
+    .eq("workspace_id", workspaceId)
+
+  if (error) {
+    // The job still reports the failure and its message, so the creator is not
+    // misled about what happened. What they lose is the ability to publish
+    // again without this running once more, which the next attempt does.
+    console.error("[publishing] could not clear a missing external object", {
+      listingId: listing.id,
+      error,
+    })
+    return
+  }
+
+  /*
+   * The steps go back too. A step is work done on the product that existed,
+   * and that product is gone: the file was attached to something the channel
+   * has since deleted. Left as complete, the re-published product reads "no steps
+   * outstanding" with `purchasable: false` — Published, not live, and nothing
+   * on the card to do about it, because the only trigger for activate is a
+   * step being marked done. Found on the first live run of this path.
+   */
+  const { error: stepsError } = await admin
+    .from("listing_manual_steps")
+    .update({ completed_at: null, completed_by: null })
+    .eq("channel_listing_id", listing.id)
+    .eq("workspace_id", workspaceId)
+
+  if (stepsError) {
+    console.error("[publishing] could not reopen manual steps for a missing external object", {
+      listingId: listing.id,
+      error: stepsError,
+    })
+  }
 }
 
 async function recordSuccess(params: {
@@ -313,7 +420,29 @@ async function recordSuccess(params: {
     // Read back by the adapter's update() so an edit does not silently take a
     // live product off sale, or put a draft one on it.
     externalState: result.externalState,
+    /*
+     * Whether a buyer can reach it, which is not what externalState answers.
+     * Written only when the adapter established it: an absent key means
+     * unknown, and liveness treats unknown as "no opinion" rather than as no.
+     * Overwriting a known answer with null on a later write that did not check
+     * would lose the one fact the UI is not allowed to guess at.
+     */
+    ...(result.purchasable === undefined || result.purchasable === null
+      ? {}
+      : { purchasable: result.purchasable }),
   }
+
+  /*
+   * What this write actually sent, so the UI can tell whether anything is left
+   * to send. Computed from the same draft the adapter was handed and the same
+   * image list it would have used, which is what makes it comparable to the
+   * fingerprint recomputed when the panel renders.
+   *
+   * Written for every kind, not only update. A publish sends content too, and
+   * a listing whose fingerprint were recorded only on update would offer
+   * "Publish changes" the moment it was first published, with nothing changed.
+   */
+  const draftSent = listingToDraft({ ...listing, metadata: metadata as never })
 
   await admin
     .from("channel_listings")
@@ -321,6 +450,7 @@ async function recordSuccess(params: {
       external_listing_id: result.externalListingId,
       external_url: result.externalUrl,
       status: "published",
+      last_sent_fingerprint: sentFingerprint(draftSent, imagesFingerprint(subject)),
       // A provider API confirmed this. The database trigger refuses `verified`
       // on an assisted channel, so this line can only ever be reached by a
       // channel that genuinely confirmed something.
@@ -356,8 +486,7 @@ async function recordSuccess(params: {
   // Evaluated against the real product and its real assets. A snapshot is
   // history, and a readiness verdict computed against a placeholder subject
   // would be a false one recorded in a table that can never be corrected.
-  const draft = listingToDraft({ ...listing, metadata: metadata as never })
-  const evaluation = evaluate(adapter, draft, subject)
+  const evaluation = evaluate(adapter, draftSent, subject)
 
   const { error: snapshotError } = await admin.from("listing_snapshots").insert({
     workspace_id: workspaceId,
@@ -366,7 +495,7 @@ async function recordSuccess(params: {
     channel_id: channel.id,
     snapshot_type: job.kind === "update" ? "update" : "publish",
     payload: {
-      ...snapshotPayload(draft, evaluation),
+      ...snapshotPayload(draftSent, evaluation),
       publication: {
         kind: job.kind,
         externalListingId: result.externalListingId,

@@ -22,3 +22,5 @@ supabase/.branches/
 # lib/supabase/database.types.ts is deliberately committed. The Supabase clients
 # import it, so `pnpm typecheck` must work on a runner with no database.
 # Regenerate with `pnpm db:types` after every migration.
+# Trigger.dev local build cache (step B1)
+.trigger/

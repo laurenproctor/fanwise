@@ -38,6 +38,8 @@ export function listingToDraft(listing: ChannelListing): ChannelListingDraft {
     title: listing.title,
     description: listing.description,
     shortDescription: listing.short_description,
+    seoTitle: listing.seo_title,
+    seoDescription: listing.seo_description,
     price: listing.price === null ? null : Number(listing.price),
     currency: listing.currency,
     category: listing.category,
@@ -66,11 +68,63 @@ export function draftToColumns(draft: ChannelListingDraft) {
     title: draft.title,
     description: draft.description,
     short_description: draft.shortDescription,
+    seo_title: draft.seoTitle,
+    seo_description: draft.seoDescription,
     price: draft.price,
     currency: draft.currency,
     category: draft.category,
     tags: draft.tags,
     metadata: draft.metadata as never,
+  }
+}
+
+/**
+ * The columns a rebuild is allowed to write over an existing listing.
+ *
+ * Rebuilding regenerates the *draft*. It has no business having an opinion
+ * about what the channel is currently holding, and this function exists so that
+ * boundary is stated once rather than implied by the shape of an upsert.
+ *
+ * What is deliberately absent: `status` and `status_source`. Those describe
+ * publication, and a rebuild has published nothing. They were previously part
+ * of the same upsert, so regenerating a live listing set it back to draft and
+ * self_reported while leaving its external id in place — a row claiming to be
+ * unpublished while pointing at a real product.
+ *
+ * Two keys survive, and they are the reason this is a function rather than a
+ * shorter object literal. The draft owns adapter metadata; publication owns
+ * these:
+ *
+ *   `externalState`  read by the adapter to decide whether an update sends
+ *                    ACTIVE or DRAFT. Dropping it turns the next edit into an
+ *                    instruction to take a live product off sale.
+ *   `purchasable`    read by liveness to decide whether "Live" may be shown.
+ *                    Dropping it was a bug that shipped: a rebuild after
+ *                    activation erased a recorded `false`, absent reads as
+ *                    unknown, and unknown keeps the old answer — so a product
+ *                    on no sales channel would have been reported as buyable
+ *                    the moment its listing was regenerated. Found on the
+ *                    first live run, 7 September 2026, where the erased value
+ *                    happened to be `true` and the display happened to stay
+ *                    right for the wrong reason.
+ */
+const PUBLICATION_OWNED_KEYS = ["externalState", "purchasable"] as const
+
+export function rebuildColumns(
+  draft: ChannelListingDraft,
+  existingMetadata: unknown,
+  generatedAt: string,
+) {
+  const existing = (existingMetadata as Record<string, unknown> | null) ?? {}
+  const kept: Record<string, unknown> = {}
+  for (const key of PUBLICATION_OWNED_KEYS) {
+    if (existing[key] !== undefined) kept[key] = existing[key]
+  }
+
+  return {
+    ...draftToColumns(draft),
+    generated_at: generatedAt,
+    metadata: { ...draft.metadata, ...kept } as never,
   }
 }
 
