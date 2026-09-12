@@ -83,6 +83,17 @@ function localSupabaseEnv(): Record<string, string> {
   }
 }
 
+/**
+ * The same values, once, for the test process as well as the server.
+ *
+ * Computed here because the config is the one place that already asks the CLI,
+ * and asking it again from a test file means one `supabase status` per worker
+ * running at the same moment, which the CLI does not survive. A test that needs
+ * to seed reads these rather than shelling out.
+ */
+const LOCAL = localSupabaseEnv()
+for (const [key, value] of Object.entries(LOCAL)) process.env[key] = value
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
@@ -105,6 +116,6 @@ export default defineConfig({
     timeout: 120_000,
     // Real environment variables win over .env files in Next, so these override
     // whatever .env.local happens to be pointing at today.
-    env: localSupabaseEnv(),
+    env: LOCAL,
   },
 })

@@ -196,10 +196,19 @@ describe("nothing in the import feature can run what it imported", () => {
   })
 
   it("fetches nothing from the browser", () => {
-    // Every read of a stranger's URL happens server-side through
-    // lib/net/outbound.ts. A fetch in a client component would be the browser
-    // reaching a host on the creator's behalf, with their cookies, from their
-    // network — which is the whole of what the outbound boundary prevents.
+    /*
+      Every read of a stranger's URL happens server-side through
+      lib/net/outbound.ts. A fetch in one of these client components would be
+      the browser reaching a host on the creator's behalf, with their cookies,
+      from their network — which is the whole of what the outbound boundary
+      prevents, and a URL out of an imported page is exactly the kind that
+      would end up there.
+
+      Uploading is the one thing a browser legitimately fetches for, and it
+      does it through `lib/products/upload-client.ts`, which is shared with the
+      product page and lives outside this sweep. One auditable call site rather
+      than an exception carved into this rule.
+    */
     const offenders: string[] = []
 
     for (const file of FILES) {
@@ -211,5 +220,15 @@ describe("nothing in the import feature can run what it imported", () => {
     }
 
     expect(offenders).toEqual([])
+  })
+
+  it("uploads only through the shared helper, which fetches exactly once", () => {
+    const helper = readFileSync(join(ROOT, "lib", "products", "upload-client.ts"), "utf8")
+    const code = withoutComments(helper)
+
+    // One fetch, and its argument is the signed URL the server just minted —
+    // never a string that came out of a page.
+    expect(code.match(/\bfetch\s*\(/g) ?? []).toHaveLength(1)
+    expect(code).toContain("intent.intent.signedUrl")
   })
 })

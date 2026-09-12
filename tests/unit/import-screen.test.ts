@@ -158,6 +158,8 @@ function detailProps() {
     missingInformation: [] as const,
     withheld: [] as const,
     aiUnavailable: false,
+    productId: "22222222-2222-4222-8222-222222222222",
+    changes: [] as const,
   }
 }
 
@@ -166,7 +168,11 @@ const COMPLETE = inputs({
   draft: markSuggestionsReviewed(ANALYZED_DRAFT),
   deliverables: [readyFile()],
   license: { id: "commercial", name: "Commercial use", summary: "Use it in client work." },
-  rights: { attestedAt: "2026-09-12T10:00:00.000Z", attestedBy: USER },
+  rights: {
+    attestedAt: "2026-09-12T10:00:00.000Z",
+    attestedBy: USER,
+    attestationVersion: "2026-09-12.1",
+  },
 })
 
 /* ------------------------------------------------------------------- page */
@@ -486,9 +492,11 @@ describe("the readiness region", () => {
 
 describe("the completion checklist", () => {
   const handlers = {
-    onFilesChosen: () => {},
-    onLicenseChosen: () => {},
-    onOwnershipConfirmed: () => {},
+    onFilesChosen: async () => null,
+    onRemoveFile: async () => null,
+    onLicenseChosen: async () => null,
+    onOwnershipConfirmed: async () => null,
+    onOwnershipWithdrawn: async () => null,
     anchors: {
       source: "#import-source-region",
       listing: "#import-draft-heading",
@@ -504,6 +512,7 @@ describe("the completion checklist", () => {
         readiness: importReadiness(input),
         deliverables: [],
         license: null,
+        rights: null,
         handlers,
       }),
     )
@@ -604,6 +613,7 @@ describe("the completion checklist", () => {
           readiness,
           deliverables: [],
           license: null,
+          rights: null,
           handlers,
         }),
       ),

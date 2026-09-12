@@ -235,6 +235,12 @@ export interface LicenseSelection {
   readonly name: string
   /** The summary that lands on `products.license_summary`. Never empty. */
   readonly summary: string
+  /**
+   * The catalogue version accepted. Absent on a selection the browser is
+   * proposing; the server reads the real one from the catalogue before it
+   * writes, because a version is a claim about what Fanwise showed.
+   */
+  readonly version?: string
 }
 
 export interface RightsAttestation {
@@ -242,4 +248,13 @@ export interface RightsAttestation {
   readonly attestedAt: string
   /** The authenticated creator who attested. Never inferred, never a model. */
   readonly attestedBy: string
+  /** Which wording they agreed to. Recorded so the exact sentence is recoverable. */
+  readonly attestationVersion: string
+  /**
+   * The second disclosure. `declaredAt` null means the question has not been
+   * answered; a null `components` after it has been means the creator said
+   * there are none.
+   */
+  readonly thirdPartyDeclaredAt?: string | null
+  readonly thirdPartyComponents?: string | null
 }

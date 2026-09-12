@@ -743,6 +743,8 @@ export type Database = {
           evidence: Json
           id: string
           normalized_url: string
+          previous_content_hash: string | null
+          previous_evidence: Json | null
           product_id: string
           prompt_version: string | null
           provider: Database["public"]["Enums"]["import_provider"]
@@ -766,6 +768,8 @@ export type Database = {
           evidence?: Json
           id?: string
           normalized_url: string
+          previous_content_hash?: string | null
+          previous_evidence?: Json | null
           product_id: string
           prompt_version?: string | null
           provider: Database["public"]["Enums"]["import_provider"]
@@ -789,6 +793,8 @@ export type Database = {
           evidence?: Json
           id?: string
           normalized_url?: string
+          previous_content_hash?: string | null
+          previous_evidence?: Json | null
           product_id?: string
           prompt_version?: string | null
           provider?: Database["public"]["Enums"]["import_provider"]
@@ -830,16 +836,22 @@ export type Database = {
           currency: string
           documentation_url: string | null
           id: string
+          license_accepted_at: string | null
+          license_id: string | null
           license_summary: string | null
+          license_version: string | null
           metadata: Json
           name: string
           product_type: Database["public"]["Enums"]["product_type"]
+          rights_attestation_version: string | null
           rights_confirmed_at: string | null
           rights_confirmed_by: string | null
           short_description: string | null
           slug: string
           status: Database["public"]["Enums"]["product_status"]
           support_url: string | null
+          third_party_components: string | null
+          third_party_declared_at: string | null
           updated_at: string
           version: string | null
           workspace_id: string
@@ -854,16 +866,22 @@ export type Database = {
           currency?: string
           documentation_url?: string | null
           id?: string
+          license_accepted_at?: string | null
+          license_id?: string | null
           license_summary?: string | null
+          license_version?: string | null
           metadata?: Json
           name: string
           product_type: Database["public"]["Enums"]["product_type"]
+          rights_attestation_version?: string | null
           rights_confirmed_at?: string | null
           rights_confirmed_by?: string | null
           short_description?: string | null
           slug: string
           status?: Database["public"]["Enums"]["product_status"]
           support_url?: string | null
+          third_party_components?: string | null
+          third_party_declared_at?: string | null
           updated_at?: string
           version?: string | null
           workspace_id: string
@@ -878,16 +896,22 @@ export type Database = {
           currency?: string
           documentation_url?: string | null
           id?: string
+          license_accepted_at?: string | null
+          license_id?: string | null
           license_summary?: string | null
+          license_version?: string | null
           metadata?: Json
           name?: string
           product_type?: Database["public"]["Enums"]["product_type"]
+          rights_attestation_version?: string | null
           rights_confirmed_at?: string | null
           rights_confirmed_by?: string | null
           short_description?: string | null
           slug?: string
           status?: Database["public"]["Enums"]["product_status"]
           support_url?: string | null
+          third_party_components?: string | null
+          third_party_declared_at?: string | null
           updated_at?: string
           version?: string | null
           workspace_id?: string

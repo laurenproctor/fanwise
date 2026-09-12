@@ -11,10 +11,20 @@ import { ReadinessRegion } from "@/components/imports/readiness-region"
 import { SourceField } from "@/components/imports/source-field"
 import { SourcePanel } from "@/components/imports/source-panel"
 import {
+  confirmOwnershipAction,
   discardImportAction,
+  removeDeliverableAction,
+  replaceSourceAction,
   retryImportAction,
+  reviewMarketplaceDraftsAction,
   saveImportDraftAction,
+  setLicenseAction,
+  withdrawOwnershipAction,
 } from "@/lib/imports/actions"
+import { uploadProductFile } from "@/lib/products/upload-client"
+import type { EvidenceChange } from "@/lib/imports/view"
+import { SourceChanges } from "@/components/imports/source-changes"
+import { ReplaceSourceDialog } from "@/components/imports/replace-source"
 import { markSuggestionsReviewed, setListingField } from "@/lib/imports/draft"
 import type { ImportState } from "@/lib/imports/machine"
 import { importReadiness, type ImportStepKey } from "@/lib/imports/readiness"
@@ -60,6 +70,10 @@ export interface ImportDetailProps {
   withheld: readonly string[]
   /** True when the page was read and no model was configured to draft from it. */
   aiUnavailable: boolean
+  /** The product id, for minting an upload the pipeline already understands. */
+  productId: string
+  /** What a re-read turned up that the previous reading did not. */
+  changes: readonly EvidenceChange[]
 }
 
 export function ImportDetail(props: ImportDetailProps) {
@@ -67,21 +81,23 @@ export function ImportDetail(props: ImportDetailProps) {
   const [, startTransition] = useTransition()
 
   /*
-    Edits, not a copy. `undefined` means "no opinion, use what the server said",
-    which is why the license and rights overrides are three-valued: null is a
-    real choice a creator can make and has to be distinguishable from silence.
+    Edits, not a copy. The listing draft is the one thing held here, because it
+    is typed continuously and saved in one go. The licence, the files and the
+    attestation each write themselves the moment they are chosen, so they are
+    read from the server and never mirrored: there is no window in which the
+    screen and the database could disagree about them.
   */
   const [edits, setEdits] = useState<Partial<ListingDraft>>({})
-  const [licenseEdit, setLicenseEdit] = useState<LicenseSelection | null | undefined>(undefined)
-  const [rightsEdit, setRightsEdit] = useState<RightsAttestation | null | undefined>(undefined)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("clean")
   const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [blocked, setBlocked] = useState<string | null>(null)
+  const [replacing, setReplacing] = useState(false)
 
   // Memoized so that the readiness and the handlers below do not see a new
   // object on every render for a draft that has not changed.
   const draft: ListingDraft = useMemo(() => ({ ...props.draft, ...edits }), [props.draft, edits])
-  const license = licenseEdit === undefined ? props.license : licenseEdit
-  const rights = rightsEdit === undefined ? props.rights : rightsEdit
+  const license = props.license
+  const rights = props.rights
 
   const busy = props.state.status === "analyzing"
 
@@ -148,13 +164,42 @@ export function ImportDetail(props: ImportDetailProps) {
     }
     setSaveStatus("saved")
     setSavedAt(Date.now())
-    // The server now holds what was typed, so the overrides stop being one.
+    // The server now holds what was typed, so the override stops being one.
     setEdits({})
-    setLicenseEdit(undefined)
-    setRightsEdit(undefined)
     startTransition(() => router.refresh())
     return true
   }, [draft, license, rights, props.workspaceSlug, props.importId, router])
+
+  /** Runs a server action, then re-reads, so readiness comes from what is stored. */
+  const afterAction = useCallback(
+    (message: string | null): string | null => {
+      if (message === null) startTransition(() => router.refresh())
+      return message
+    },
+    [router],
+  )
+
+  /**
+   * One file, through the pipeline the product page already uses.
+   *
+   * `uploadProductFile` is shared with the asset manager and is the only place
+   * in the application where the browser fetches during an upload — a signed
+   * URL the server just handed it. The import feature never calls `fetch`
+   * itself, and a boundary test holds it to that: the rule being protected is
+   * that no browser ever fetches a URL that came out of an imported page.
+   */
+  const uploadOne = useCallback(
+    async (file: File): Promise<string | null> => {
+      const result = await uploadProductFile({
+        workspaceSlug: props.workspaceSlug,
+        productId: props.productId,
+        assetType: "deliverable",
+        file,
+      })
+      return result.error
+    },
+    [props.workspaceSlug, props.productId],
+  )
 
   const anchors: Record<ImportStepKey, string | null> = {
     source: "#import-source-region",
@@ -171,10 +216,25 @@ export function ImportDetail(props: ImportDetailProps) {
           state={props.state}
           onUrlChange={() => {}}
           onSubmit={() => {}}
-          onReplaceLink={() => {
-            void discardImportAction(props.workspaceSlug, props.importId)
-          }}
+          onReplaceLink={() => setReplacing(true)}
         />
+        {replacing ? (
+          <ReplaceSourceDialog
+            currentUrl={props.state.url}
+            onCancel={() => setReplacing(false)}
+            onReplace={async (url: string) => {
+              const result = await replaceSourceAction(props.workspaceSlug, props.importId, url)
+              if (result.error === null) {
+                setReplacing(false)
+                startTransition(() => router.refresh())
+              }
+              return result.error
+            }}
+            onDiscard={() => {
+              void discardImportAction(props.workspaceSlug, props.importId)
+            }}
+          />
+        ) : null}
         <ReadinessRegion readiness={readiness} />
       </div>
 
@@ -188,9 +248,7 @@ export function ImportDetail(props: ImportDetailProps) {
           <SourcePanel
             state={props.state}
             handlers={{
-              onReplaceLink: () => {
-                void discardImportAction(props.workspaceSlug, props.importId)
-              },
+              onReplaceLink: () => setReplacing(true),
               onRetry: () => {
                 void retryImportAction(props.workspaceSlug, props.importId).then(() =>
                   startTransition(() => router.refresh()),
@@ -199,6 +257,7 @@ export function ImportDetail(props: ImportDetailProps) {
               manualHref: routes.product(props.workspaceSlug, props.productSlug),
             }}
           />
+          {props.changes.length > 0 ? <SourceChanges changes={props.changes} /> : null}
           {props.aiUnavailable ? <NoModelNotice /> : null}
           {props.missingInformation.length > 0 ? (
             <MissingInformation items={props.missingInformation} />
@@ -216,26 +275,41 @@ export function ImportDetail(props: ImportDetailProps) {
             readiness={readiness}
             deliverables={props.deliverables}
             license={license}
+            rights={rights}
             handlers={{
-              onFilesChosen: () => {
-                // Uploading a buyer file from this screen is the next phase:
-                // it needs a signed upload and a finalize job, which exist, and
-                // a place on this screen to report progress, which does not.
-                setSaveStatus("dirty")
+              onFilesChosen: async (files) => {
+                for (const file of files) {
+                  const message = await uploadOne(file)
+                  if (message) return afterAction(message)
+                }
+                return afterAction(null)
               },
-              onLicenseChosen: (chosen) => {
-                setSaveStatus("dirty")
-                setLicenseEdit(chosen)
-              },
-              onOwnershipConfirmed: () => {
-                setSaveStatus("dirty")
-                /*
-                  A local placeholder only. The attestation that counts is
-                  written by the save action from the signed-in user id: a
-                  browser saying who confirmed is not evidence of anything.
-                */
-                setRightsEdit({ attestedAt: new Date().toISOString(), attestedBy: "pending-save" })
-              },
+              onRemoveFile: async (assetId) =>
+                afterAction(
+                  (await removeDeliverableAction(props.workspaceSlug, props.importId, assetId))
+                    .error,
+                ),
+              onLicenseChosen: async (licenseId, customSummary) =>
+                afterAction(
+                  (
+                    await setLicenseAction(props.workspaceSlug, props.importId, {
+                      licenseId,
+                      customSummary,
+                    })
+                  ).error,
+                ),
+              onOwnershipConfirmed: async (thirdPartyComponents) =>
+                afterAction(
+                  (
+                    await confirmOwnershipAction(props.workspaceSlug, props.importId, {
+                      thirdPartyComponents,
+                    })
+                  ).error,
+                ),
+              onOwnershipWithdrawn: async () =>
+                afterAction(
+                  (await withdrawOwnershipAction(props.workspaceSlug, props.importId)).error,
+                ),
               anchors,
             }}
           />
@@ -246,8 +320,27 @@ export function ImportDetail(props: ImportDetailProps) {
         readiness={readiness}
         saveStatus={saveStatus}
         savedAt={savedAt}
+        blockedReason={blocked}
         onSaveDraft={() => void save()}
-        onReviewDrafts={() => void save()}
+        onReviewDrafts={() => {
+          /*
+            Save first, then ask the server whether the five steps are actually
+            done. The screen can show 100% from unsaved typing; only the
+            database can say whether it is true, and this is the last place to
+            ask before a creator is handed to the publishing flow.
+          */
+          void save().then(async (saved) => {
+            if (!saved) return
+            const outcome = await reviewMarketplaceDraftsAction(props.workspaceSlug, props.importId)
+            if (outcome.kind === "ready") {
+              // The product page, which is where channel drafts have always
+              // been built and reviewed. No second marketplace surface.
+              router.push(outcome.href)
+              return
+            }
+            setBlocked(outcome.kind === "blocked" ? outcome.reason : outcome.message)
+          })
+        }}
       />
     </ImportChrome>
   )

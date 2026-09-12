@@ -24,12 +24,21 @@ export function ImportFooter({
   readiness,
   saveStatus,
   savedAt,
+  blockedReason,
   onSaveDraft,
   onReviewDrafts,
 }: {
   readiness: ImportReadiness
   saveStatus: SaveStatus
   savedAt: number | null
+  /**
+   * Why the server refused, when it did.
+   *
+   * The screen can show 100% from typing nobody has saved; the server recounts
+   * from what is stored and this is what it said. Shown in place of the local
+   * reason, because it is the more truthful of the two.
+   */
+  blockedReason?: string | null
   onSaveDraft: () => void
   onReviewDrafts: () => void
 }) {
@@ -51,9 +60,9 @@ export function ImportFooter({
             it is read by someone who never hovers anything, and it is the id
             the button points at.
           */}
-          {allowed ? null : (
+          {allowed && !blockedReason ? null : (
             <p id="import-review-blocked" className="text-[13px] text-[var(--color-ink-2)]">
-              {readiness.blockedReason}
+              {blockedReason ?? readiness.blockedReason}
             </p>
           )}
 
@@ -64,7 +73,7 @@ export function ImportFooter({
             <Button
               type="button"
               aria-disabled={allowed ? undefined : true}
-              aria-describedby={allowed ? undefined : "import-review-blocked"}
+              aria-describedby={allowed && !blockedReason ? undefined : "import-review-blocked"}
               onClick={() => {
                 // The gate, enforced. Styling is downstream of this line.
                 if (!canReviewMarketplaceDrafts(readiness)) return

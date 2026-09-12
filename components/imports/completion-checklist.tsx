@@ -1,10 +1,19 @@
 "use client"
 
-import { useId, useState } from "react"
+import { useId, useState, useTransition } from "react"
 import { FIELD_INPUT_CLASS } from "@/components/ui/field"
-import { CUSTOM_LICENSE_ID, LICENSE_PRESETS, customLicense } from "@/lib/imports/licenses"
+import { FormError } from "@/components/ui/form-error"
+import {
+  CUSTOM_LICENSE_ID,
+  LICENSE_CATALOG,
+  RIGHTS_ATTESTATION_TEXT,
+  RIGHTS_DISCLAIMER,
+  THIRD_PARTY_HINT,
+  THIRD_PARTY_PROMPT,
+} from "@/lib/imports/licenses"
 import type { ImportReadiness, ImportStep, ImportStepKey } from "@/lib/imports/readiness"
-import type { BuyerDeliverable, LicenseSelection } from "@/lib/imports/types"
+import { ASSET_STATE_LABELS } from "@/lib/products/types"
+import type { BuyerDeliverable, LicenseSelection, RightsAttestation } from "@/lib/imports/types"
 
 /**
  * The actionable half of readiness: what is left, and the control to do it.
@@ -53,9 +62,12 @@ import type { BuyerDeliverable, LicenseSelection } from "@/lib/imports/types"
 const ACTIONABLE_HERE: readonly ImportStepKey[] = ["buyerFiles", "license", "ownership"]
 
 export interface ChecklistHandlers {
-  onFilesChosen: (files: readonly { name: string; size: number }[]) => void
-  onLicenseChosen: (license: LicenseSelection | null) => void
-  onOwnershipConfirmed: () => void
+  /** Uploads through the pipeline the product page already uses. */
+  onFilesChosen: (files: readonly File[]) => Promise<string | null>
+  onRemoveFile: (assetId: string) => Promise<string | null>
+  onLicenseChosen: (licenseId: string, customSummary: string | null) => Promise<string | null>
+  onOwnershipConfirmed: (thirdPartyComponents: string | null) => Promise<string | null>
+  onOwnershipWithdrawn: () => Promise<string | null>
   /** Where a source or listing row sends the creator. An in-page anchor. */
   anchors: Record<ImportStepKey, string | null>
 }
@@ -64,11 +76,13 @@ export function CompletionChecklist({
   readiness,
   deliverables,
   license,
+  rights,
   handlers,
 }: {
   readiness: ImportReadiness
   deliverables: readonly BuyerDeliverable[]
   license: LicenseSelection | null
+  rights: RightsAttestation | null
   handlers: ChecklistHandlers
 }) {
   const listed = readiness.steps.filter(
@@ -108,6 +122,7 @@ export function CompletionChecklist({
               onToggle={() => setOpened(openKey === step.key ? null : step.key)}
               deliverables={deliverables}
               license={license}
+              rights={rights}
               handlers={handlers}
             />
           ))}
@@ -124,6 +139,7 @@ function ChecklistRow({
   onToggle,
   deliverables,
   license,
+  rights,
   handlers,
 }: {
   step: ImportStep
@@ -132,6 +148,7 @@ function ChecklistRow({
   onToggle: () => void
   deliverables: readonly BuyerDeliverable[]
   license: LicenseSelection | null
+  rights: RightsAttestation | null
   handlers: ChecklistHandlers
 }) {
   const panelId = useId()
@@ -192,6 +209,7 @@ function ChecklistRow({
               step={step}
               deliverables={deliverables}
               license={license}
+              rights={rights}
               handlers={handlers}
             />
           </div>
@@ -244,22 +262,22 @@ function RowControl({
   step,
   deliverables,
   license,
+  rights,
   handlers,
 }: {
   step: ImportStep
   deliverables: readonly BuyerDeliverable[]
   license: LicenseSelection | null
+  rights: RightsAttestation | null
   handlers: ChecklistHandlers
 }) {
   switch (step.key) {
     case "buyerFiles":
-      return (
-        <BuyerFilesControl deliverables={deliverables} onFilesChosen={handlers.onFilesChosen} />
-      )
+      return <BuyerFilesControl deliverables={deliverables} handlers={handlers} />
     case "license":
-      return <LicenseControl license={license} onLicenseChosen={handlers.onLicenseChosen} />
+      return <LicenseControl license={license} handlers={handlers} />
     case "ownership":
-      return <OwnershipControl onConfirm={handlers.onOwnershipConfirmed} />
+      return <OwnershipControl rights={rights} handlers={handlers} />
     default: {
       const anchor = handlers.anchors[step.key]
       if (!anchor) return null
@@ -275,48 +293,109 @@ function RowControl({
   }
 }
 
+/**
+ * The files buyers receive.
+ *
+ * Uploads run through exactly the pipeline the product page uses: the server
+ * mints a signed URL, the browser pushes the bytes straight to storage, and a
+ * job measures what actually landed. Nothing the browser claims about a file
+ * survives that, which is why a row is not `ready` until the job has been.
+ *
+ * **Replacing is additive, and that is what makes it safe.** A new file is
+ * uploaded beside the old one, and the old one cannot be removed while it is
+ * the only measured file — the server refuses. So a replacement that fails
+ * leaves the original exactly where it was, without anything having to
+ * remember to put it back.
+ *
+ * A source link never counts here. `readiness.ts` measures `ready` deliverable
+ * rows and nothing else, so a public demo cannot satisfy this step however
+ * complete the rest of the import looks.
+ */
 function BuyerFilesControl({
   deliverables,
-  onFilesChosen,
+  handlers,
 }: {
   deliverables: readonly BuyerDeliverable[]
-  onFilesChosen: ChecklistHandlers["onFilesChosen"]
+  handlers: ChecklistHandlers
 }) {
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [pending, startTransition] = useTransition()
+  const hasReady = deliverables.some((file) => file.state === "ready")
+
   return (
-    <div className="mt-2 flex flex-col gap-2">
-      {/*
-        A label around the input rather than a button that clicks a hidden one:
-        a real file input keeps the keyboard behaviour and the accessible name
-        the browser already gives it.
-      */}
-      <label className="inline-flex min-h-11 w-fit cursor-pointer items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--color-action)] bg-[var(--color-action)] px-[18px] text-[14px] font-medium text-[var(--color-on-action)] transition-colors hover:bg-[var(--color-action-hover)] focus-within:outline-2 focus-within:outline-offset-3 focus-within:outline-[var(--color-accent)]">
-        <span>Upload files</span>
-        <input
-          type="file"
-          multiple
-          className="sr-only"
-          onChange={(event) => {
-            const chosen = Array.from(event.target.files ?? []).map((file) => ({
-              name: file.name,
-              size: file.size,
-            }))
-            if (chosen.length > 0) onFilesChosen(chosen)
-          }}
-        />
-      </label>
+    <div className="mt-2 flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        {/*
+          A label around the input rather than a button that clicks a hidden
+          one: a real file input keeps the keyboard behaviour and the accessible
+          name the browser already gives it.
+        */}
+        <label
+          className={`inline-flex min-h-11 w-fit items-center gap-2 rounded-[var(--radius-pill)] border border-[var(--color-action)] bg-[var(--color-action)] px-[18px] text-[14px] font-medium text-[var(--color-on-action)] transition-colors hover:bg-[var(--color-action-hover)] focus-within:outline-2 focus-within:outline-offset-3 focus-within:outline-[var(--color-accent)] ${
+            busy || pending ? "cursor-wait opacity-70" : "cursor-pointer"
+          }`}
+        >
+          <span>
+            {busy ? "Uploading\u2026" : hasReady ? "Upload a replacement" : "Upload files"}
+          </span>
+          <input
+            type="file"
+            multiple
+            disabled={busy || pending}
+            className="sr-only"
+            onChange={(event) => {
+              const chosen = Array.from(event.target.files ?? [])
+              event.target.value = ""
+              if (chosen.length === 0) return
+              setError(null)
+              setBusy(true)
+              void handlers.onFilesChosen(chosen).then((message) => {
+                setBusy(false)
+                setError(message)
+              })
+            }}
+          />
+        </label>
+        {hasReady ? (
+          <span className="text-[13px] text-[var(--color-ink-2)]">
+            The new file is added beside this one. Remove the old one once it is ready.
+          </span>
+        ) : null}
+      </div>
+
+      <FormError message={error} />
+
       {deliverables.length > 0 ? (
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-col divide-y divide-[var(--color-rule-2)]">
           {deliverables.map((file) => (
-            <li key={file.id} className="text-[13px] text-[var(--color-ink-2)]">
-              {file.filename}
-              {/*
-                Said plainly. Nothing has weighed these bytes on a server yet,
-                and a row that read as confirmed would be the screen claiming a
-                measurement it did not take.
-              */}
-              <span className="ml-2 font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--color-ink-3)]">
-                Not verified yet
+            <li key={file.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+              <span className="min-w-0 flex-1 truncate text-[14px] text-[var(--color-ink)]">
+                {file.filename}
               </span>
+              <span className="tabular font-mono text-[12px] text-[var(--color-ink-3)]">
+                {formatBytes(file.byteSize)}
+              </span>
+              <FileState state={file.state} />
+              <button
+                type="button"
+                disabled={pending}
+                /*
+                  Named for its file. A column of identical "Remove" buttons is
+                  a column a screen reader user cannot tell apart, which is the
+                  same mistake as an unlabelled icon one step later.
+                */
+                aria-label={`Remove ${file.filename}`}
+                onClick={() => {
+                  setError(null)
+                  startTransition(() => {
+                    void handlers.onRemoveFile(file.id).then(setError)
+                  })
+                }}
+                className="min-h-11 rounded-[6px] text-[13px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-accent)]"
+              >
+                Remove
+              </button>
             </li>
           ))}
         </ul>
@@ -325,37 +404,93 @@ function BuyerFilesControl({
   )
 }
 
+/** The three states a stored file can be in, as a word and a shape. */
+function FileState({ state }: { state: BuyerDeliverable["state"] }) {
+  const tone =
+    state === "ready"
+      ? "border-[var(--color-ok)] text-[var(--color-ok)]"
+      : state === "failed"
+        ? "border-[var(--color-bad)] text-[var(--color-ink)]"
+        : "border-[var(--color-warn)] text-[var(--color-ink-2)]"
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${tone}`}
+    >
+      <span aria-hidden className="h-[5px] w-[5px] rounded-full bg-current" />
+      {state === "pending" ? "Checking" : ASSET_STATE_LABELS[state]}
+    </span>
+  )
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return "\u2014"
+  const units = ["B", "KB", "MB", "GB"]
+  let value = bytes
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  return `${value < 10 && unit > 0 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`
+}
+
+/**
+ * Choosing a licence.
+ *
+ * The catalogue is code and the version is read from it server-side, never sent
+ * from here: a version is a claim about which wording Fanwise showed, and a
+ * browser that supplied one could record that a creator accepted terms they
+ * never saw.
+ *
+ * **Nothing is inferred from the page.** A source that says "royalty-free" does
+ * not preselect anything; the claims check already refuses to let a model write
+ * licence terms, and this is the other half of the same rule. A licence is a
+ * decision, and the creator makes it here.
+ */
 function LicenseControl({
   license,
-  onLicenseChosen,
+  handlers,
 }: {
   license: LicenseSelection | null
-  onLicenseChosen: ChecklistHandlers["onLicenseChosen"]
+  handlers: ChecklistHandlers
 }) {
   const [own, setOwn] = useState(license?.id === CUSTOM_LICENSE_ID)
   const [text, setText] = useState(license?.id === CUSTOM_LICENSE_ID ? license.summary : "")
+  const [error, setError] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+
+  const choose = (licenseId: string, customSummary: string | null) => {
+    setError(null)
+    startTransition(() => {
+      void handlers.onLicenseChosen(licenseId, customSummary).then(setError)
+    })
+  }
 
   return (
     <div className="mt-2 flex flex-col gap-3">
-      <fieldset className="flex flex-col gap-2">
-        <legend className="label-mono mb-1">Choose a license</legend>
-        {LICENSE_PRESETS.map((preset) => (
-          <label key={preset.id} className="flex cursor-pointer items-start gap-2.5 text-[14px]">
+      <fieldset className="flex flex-col gap-2" disabled={pending}>
+        <legend className="label-mono mb-1">Choose a licence</legend>
+        {LICENSE_CATALOG.map((entry) => (
+          <label key={entry.id} className="flex cursor-pointer items-start gap-2.5 text-[14px]">
             <input
               type="radio"
               name="import-license"
-              value={preset.id}
-              checked={license?.id === preset.id}
+              value={entry.id}
+              checked={license?.id === entry.id}
               onChange={() => {
                 setOwn(false)
-                onLicenseChosen(preset)
+                choose(entry.id, null)
               }}
               className="mt-1 accent-[var(--color-accent)]"
             />
             <span className="flex flex-col gap-0.5">
-              <span className="text-[var(--color-ink)]">{preset.name}</span>
+              <span className="text-[var(--color-ink)]">{entry.name}</span>
+              <span className="text-[13px] leading-[1.45] text-[var(--color-ink-3)]">
+                {entry.hint}
+              </span>
               <span className="text-[13px] leading-[1.45] text-[var(--color-ink-2)]">
-                {preset.summary}
+                {entry.summary}
               </span>
             </span>
           </label>
@@ -365,18 +500,15 @@ function LicenseControl({
             type="radio"
             name="import-license"
             value={CUSTOM_LICENSE_ID}
-            checked={own}
-            onChange={() => {
-              setOwn(true)
-              onLicenseChosen(text.trim().length > 0 ? customLicense(text) : null)
-            }}
+            checked={own || license?.id === CUSTOM_LICENSE_ID}
+            onChange={() => setOwn(true)}
             className="mt-1 accent-[var(--color-accent)]"
           />
           <span className="text-[var(--color-ink)]">Write my own terms</span>
         </label>
       </fieldset>
 
-      {own ? (
+      {own || license?.id === CUSTOM_LICENSE_ID ? (
         <div className="flex flex-col gap-2">
           <label htmlFor="import-license-summary" className="label-mono">
             Your terms
@@ -386,35 +518,141 @@ function LicenseControl({
             rows={3}
             value={text}
             maxLength={2000}
-            onChange={(event) => {
-              setText(event.target.value)
-              onLicenseChosen(
-                event.target.value.trim().length > 0 ? customLicense(event.target.value) : null,
-              )
-            }}
+            onChange={(event) => setText(event.target.value)}
             placeholder="Say what a buyer may and may not do."
             className={`${FIELD_INPUT_CLASS} resize-y leading-[1.6]`}
           />
+          <button
+            type="button"
+            disabled={pending || text.trim().length === 0}
+            onClick={() => choose(CUSTOM_LICENSE_ID, text)}
+            className="inline-flex min-h-11 w-fit items-center rounded-[var(--radius-pill)] border border-[var(--color-ink)] px-[18px] text-[14px] font-medium text-[var(--color-ink)] transition-colors hover:bg-[var(--color-paper-2)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Use these terms
+          </button>
         </div>
       ) : null}
+
+      {license?.version ? (
+        <p className="text-[13px] text-[var(--color-ink-3)]">
+          Recorded as {license.name}, version {license.version}.
+        </p>
+      ) : null}
+
+      <FormError message={error} />
     </div>
   )
 }
 
-function OwnershipControl({ onConfirm }: { onConfirm: () => void }) {
+/**
+ * The creator's statement about rights, and the second disclosure beside it.
+ *
+ * Two questions asked together because they are answered together, and recorded
+ * together: who said it, when, which wording, and what they declared. The user
+ * id comes from the session rather than the form.
+ *
+ * `RIGHTS_DISCLAIMER` is rendered every time and is not decoration. Fanwise is
+ * collecting a statement, not making a determination, and the place to say so
+ * is where the statement is made.
+ */
+function OwnershipControl({
+  rights,
+  handlers,
+}: {
+  rights: RightsAttestation | null
+  handlers: ChecklistHandlers
+}) {
+  const [agreed, setAgreed] = useState(rights !== null)
+  const [components, setComponents] = useState(rights?.thirdPartyComponents ?? "")
+  const [error, setError] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+
+  if (rights) {
+    return (
+      <div className="mt-2 flex flex-col gap-2">
+        <p className="max-w-prose text-[14px] leading-[1.55] text-[var(--color-ink)]">
+          “{RIGHTS_ATTESTATION_TEXT}”
+        </p>
+        <p className="text-[13px] text-[var(--color-ink-3)]">
+          Recorded {new Date(rights.attestedAt).toISOString().slice(0, 10)}, wording{" "}
+          {rights.attestationVersion}.
+          {rights.thirdPartyComponents
+            ? ` Third-party components declared: ${rights.thirdPartyComponents}`
+            : rights.thirdPartyDeclaredAt
+              ? " You declared no third-party components."
+              : ""}
+        </p>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            setError(null)
+            startTransition(() => {
+              void handlers.onOwnershipWithdrawn().then(setError)
+            })
+          }}
+          className="min-h-11 w-fit rounded-[6px] text-[13px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-accent)]"
+        >
+          Withdraw this statement
+        </button>
+        <FormError message={error} />
+      </div>
+    )
+  }
+
   return (
-    <div className="mt-2 flex flex-col gap-2">
-      <p className="max-w-prose text-[13px] leading-[1.55] text-[var(--color-ink-2)]">
-        Confirm you made this, or that you hold the rights to sell it. Fanwise records who confirmed
-        and when.
+    <div className="mt-2 flex flex-col gap-3">
+      <label className="flex cursor-pointer items-start gap-2.5">
+        <input
+          type="checkbox"
+          checked={agreed}
+          onChange={(event) => setAgreed(event.target.checked)}
+          className="mt-1 accent-[var(--color-accent)]"
+        />
+        <span className="max-w-prose text-[14px] leading-[1.55] text-[var(--color-ink)]">
+          {RIGHTS_ATTESTATION_TEXT}
+        </span>
+      </label>
+
+      <div className="flex flex-col gap-2">
+        <label htmlFor="import-third-party" className="text-[14px] text-[var(--color-ink)]">
+          {THIRD_PARTY_PROMPT}
+        </label>
+        <textarea
+          id="import-third-party"
+          rows={2}
+          value={components}
+          maxLength={4000}
+          aria-describedby="import-third-party-hint"
+          onChange={(event) => setComponents(event.target.value)}
+          placeholder="Inter (SIL Open Font License), photos from Unsplash…"
+          className={`${FIELD_INPUT_CLASS} resize-y leading-[1.6]`}
+        />
+        <span id="import-third-party-hint" className="text-[13px] text-[var(--color-ink-3)]">
+          {THIRD_PARTY_HINT}
+        </span>
+      </div>
+
+      <p className="max-w-prose text-[13px] leading-[1.55] text-[var(--color-ink-3)]">
+        {RIGHTS_DISCLAIMER}
       </p>
+
       <button
         type="button"
-        onClick={onConfirm}
-        className="inline-flex min-h-11 w-fit items-center rounded-[var(--radius-pill)] border border-[var(--color-ink)] px-[18px] text-[14px] font-medium text-[var(--color-ink)] transition-colors hover:bg-[var(--color-paper-2)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-accent)]"
+        disabled={!agreed || pending}
+        onClick={() => {
+          setError(null)
+          startTransition(() => {
+            void handlers
+              .onOwnershipConfirmed(components.trim().length > 0 ? components : null)
+              .then(setError)
+          })
+        }}
+        className="inline-flex min-h-11 w-fit items-center rounded-[var(--radius-pill)] border border-[var(--color-ink)] px-[18px] text-[14px] font-medium text-[var(--color-ink)] transition-colors hover:bg-[var(--color-paper-2)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        I have the right to sell this
+        Confirm and continue
       </button>
+      <FormError message={error} />
     </div>
   )
 }

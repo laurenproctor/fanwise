@@ -1,6 +1,8 @@
 import type { ProductAsset, ProductType } from "@/lib/products/types"
 import { PRODUCT_TYPES } from "@/lib/products/types"
 import { IMPORT_ERROR_RECOVERIES } from "./errors"
+import { licenseEntry } from "./licenses"
+import { parseEvidence, type ProductSourceEvidence } from "./evidence"
 import { SOURCE_LABELS, descriptorFor } from "./sources/registry"
 import type { ImportRecord } from "./queries"
 import type { AnalyzingStage, ImportState } from "./machine"
@@ -321,19 +323,96 @@ export function deliverablesFor(assets: readonly ProductAsset[]): BuyerDeliverab
   }))
 }
 
-/** The product's licence, when it carries one. */
+/**
+ * The product's licence, when it carries one.
+ *
+ * Keyed on `license_id` rather than on the summary being non-empty. A summary
+ * with no key is a licence that reached the column by some other path — the
+ * product form has always allowed free text — and it should not read as a
+ * choice this screen recorded.
+ */
 export function licenseFor(record: ImportRecord): LicenseSelection | null {
-  const summary = nonEmpty(record.product.license_summary)
-  if (!summary) return null
-  return { id: "stored", name: "Your licence", summary }
+  const product = record.product
+  const summary = nonEmpty(product.license_summary)
+  if (!product.license_id || !summary) return null
+
+  const entry = licenseEntry(product.license_id)
+  return {
+    id: product.license_id,
+    name: entry?.name ?? "Your own terms",
+    summary,
+    version: product.license_version ?? undefined,
+  }
 }
 
 /** The rights attestation, when one has been recorded. */
 export function rightsFor(record: ImportRecord): RightsAttestation | null {
-  const at = record.product.rights_confirmed_at
-  const by = record.product.rights_confirmed_by
-  if (!at || !by) return null
-  return { attestedAt: at, attestedBy: by }
+  const product = record.product
+  const at = product.rights_confirmed_at
+  const by = product.rights_confirmed_by
+  const version = product.rights_attestation_version
+  if (!at || !by || !version) return null
+
+  return {
+    attestedAt: at,
+    attestedBy: by,
+    attestationVersion: version,
+    thirdPartyDeclaredAt: product.third_party_declared_at,
+    thirdPartyComponents: product.third_party_components,
+  }
+}
+
+/* ----------------------------------------------------------- what changed */
+
+export interface EvidenceChange {
+  field: "title" | "summary" | "features" | "pictures"
+  label: string
+  before: string | null
+  after: string | null
+}
+
+/**
+ * What a re-read of the source turned up that the previous one did not.
+ *
+ * Shown before a creator accepts any of it, which is the whole point: a swapped
+ * link that silently rewrote a listing would be the worst thing this screen
+ * could do, and the reason it cannot is that suggestions never reach `products`
+ * without a save. This is the visible half of that guarantee — the creator sees
+ * the difference and decides, rather than discovering it later.
+ *
+ * Returns an empty list when there is nothing to compare against, which is
+ * every import that has only ever been read once.
+ */
+export function evidenceChanges(record: ImportRecord): EvidenceChange[] {
+  const now = record.evidence
+  const before = parseEvidence(record.row.previous_evidence)
+  if (!now || !before) return []
+
+  const changes: EvidenceChange[] = []
+
+  const compare = (
+    field: EvidenceChange["field"],
+    label: string,
+    a: string | null,
+    b: string | null,
+  ) => {
+    if ((a ?? "") !== (b ?? "")) changes.push({ field, label, before: a, after: b })
+  }
+
+  compare("title", "Title", before.title?.value ?? null, now.title?.value ?? null)
+  compare("summary", "Description", before.summary?.value ?? null, now.summary?.value ?? null)
+  compare(
+    "features",
+    "Headings and list items",
+    before.visibleFeatures.value.join(" · ") || null,
+    now.visibleFeatures.value.join(" · ") || null,
+  )
+
+  const pictures = (evidence: ProductSourceEvidence) =>
+    String(evidence.previewAssets.filter((asset) => asset.assetId).length)
+  compare("pictures", "Pictures saved", pictures(before), pictures(now))
+
+  return changes
 }
 
 export { SOURCE_LABELS }

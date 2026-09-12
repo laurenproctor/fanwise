@@ -4,7 +4,7 @@ The implementation plan for the **Import a product** screen: a creator pastes a 
 Fanwise reads what is publicly there, proposes a listing draft, and the creator completes
 five steps before any marketplace draft is offered.
 
-**Status: phases 1 to 5 built, 12 September 2026. Branch `feat/product-link-import`, not
+**Status: phases 1 to 8 built, 12 September 2026. Branch `feat/product-link-import`, not
 merged.** The screen, the schema, the adapters, the job and the draft generation are real and
 tested; what is still fixture-backed or absent is listed in §12. Phases 6 to 9 — the licence
 and rights surfaces beyond their readiness steps, buyer-file upload from this screen, and the
@@ -784,3 +784,67 @@ Written at the end of the ingestion phase, because the gap between "the screen w
   vendor-name sweep in `tests/unit/channel-boundaries.test.ts` reads, and a vendor name there
   would fail it. The mapping from key to service lives in `sources/registry.ts`, which is the
   one directory allowed to know.
+
+
+---
+
+## 13. The licence model, proposed and built
+
+`docs/product-link-import.md` §3.3 said a licence catalogue was its own feature and left
+`license_summary` as the whole of it. Completing the readiness steps needed an answer to
+"which licence, exactly, and when", so the smallest compatible model was proposed and built
+rather than a generator.
+
+**What was added:** three columns on `products` — `license_id`, `license_version`,
+`license_accepted_at` — and a catalogue in `lib/imports/licenses.ts` that the keys point at.
+`license_summary` keeps its meaning and all of its readers: the FactSheet derives from it,
+every channel adapter reads it, the public product page renders it. Nothing downstream
+changed.
+
+**Why a version.** Wording moves. A product that accepted `commercial@1` still says so after
+the catalogue is edited, and `licenseText()` returns the stored summary rather than the new
+words whenever the versions disagree. The version is read from the catalogue server-side and
+never taken from the browser: it is a claim about what Fanwise showed, and a client that
+supplied one could record that a creator accepted terms they never saw.
+
+**What is still absent, and is a different feature:** no `licenses` table, so no per-workspace
+catalogue; no licence documents or PDF; no per-channel licence mapping; no versioning
+machinery beyond a string the catalogue owns. A creator writing their own terms is
+`custom@own` with their words in `license_summary`.
+
+**Nothing infers a licence from a page.** `claims.ts` already refuses to let a model write
+licence terms; the selection UI preselects nothing and the source's copy never reaches it.
+
+### Ownership
+
+`rights_confirmed_at` and `rights_confirmed_by` gained `rights_attestation_version`, held
+together by one all-or-nothing constraint. The second disclosure is
+`third_party_components` and `third_party_declared_at`, and the pair distinguishes "the
+creator says there are none" from "nobody asked" — a null components column after a
+declaration means none.
+
+`RIGHTS_DISCLAIMER` renders beside the control every time: Fanwise records the statement and
+the time it was made, does not check it, and is not giving legal advice.
+
+### What the buyer-files step will and will not accept
+
+The upload path is the one the product page already uses, now shared as
+`lib/products/upload-client.ts` so the two cannot drift: the server mints a signed URL, the
+browser PUTs to storage, and `finalize_asset` measures what landed. Formats and the 4 GB cap
+are unchanged — nothing was added.
+
+**A link never satisfies this step.** Readiness counts `ready` deliverable rows, so a public
+demo, a source snapshot and a preview image are all invisible to it. Preview images the
+importer fetched are `cover_image` and `preview_image` and are counted by nothing here.
+
+**Replacing is additive.** A new file is uploaded beside the old one, and the server refuses
+to remove the last measured deliverable. A replacement that fails therefore leaves the
+original where it was, without anything having to put it back.
+
+### The handoff
+
+`Review marketplace drafts` saves, then recomputes readiness **from what is persisted** and
+returns the product page's address — the surface where channel drafts have always been built,
+reviewed and published. There is no second marketplace flow. A browser holding an unsaved
+licence can show 100%; only the database can say whether the five steps are done, and
+`reviewMarketplaceDraftsAction` is the last place that asks.

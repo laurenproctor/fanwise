@@ -323,11 +323,15 @@ describe("the rights attestation", () => {
   })
 
   it("records who confirmed and when", async () => {
+    // The wording version came with the licence migration and is part of the
+    // same all-or-nothing constraint: an attestation nobody can quote is an
+    // attestation to nothing in particular.
     const { error } = await alice.client
       .from("products")
       .update({
         rights_confirmed_at: new Date().toISOString(),
         rights_confirmed_by: alice.userId,
+        rights_attestation_version: "2026-09-12.1",
       })
       .eq("id", aliceProductId)
 
@@ -345,10 +349,179 @@ describe("the rights attestation", () => {
   it("is not something another workspace can write", async () => {
     const { data } = await bob.client
       .from("products")
-      .update({ rights_confirmed_at: new Date().toISOString(), rights_confirmed_by: bob.userId })
+      .update({
+        rights_confirmed_at: new Date().toISOString(),
+        rights_confirmed_by: bob.userId,
+        rights_attestation_version: "2026-09-12.1",
+      })
       .eq("id", aliceProductId)
       .select("id")
 
     expect(data).toEqual([])
+  })
+})
+
+describe("the licence", () => {
+  it("refuses a key with no version, and a version with no key", async () => {
+    const now = new Date().toISOString()
+
+    const noVersion = await alice.client
+      .from("products")
+      .update({ license_id: "commercial", license_accepted_at: now, license_summary: "Terms." })
+      .eq("id", aliceProductId)
+    expect(noVersion.error).not.toBeNull()
+
+    const noKey = await alice.client
+      .from("products")
+      .update({ license_version: "1", license_accepted_at: now })
+      .eq("id", aliceProductId)
+    expect(noKey.error).not.toBeNull()
+  })
+
+  it("refuses a chosen licence that says nothing", async () => {
+    // Readiness reads the summary rather than the key, and this is what stops
+    // a row reaching that state by another path.
+    const { error } = await alice.client
+      .from("products")
+      .update({
+        license_id: "commercial",
+        license_version: "1",
+        license_accepted_at: new Date().toISOString(),
+        license_summary: "   ",
+      })
+      .eq("id", aliceProductId)
+
+    expect(error).not.toBeNull()
+  })
+
+  it("records the key, the version and the moment together", async () => {
+    const { error } = await alice.client
+      .from("products")
+      .update({
+        license_id: "commercial",
+        license_version: "1",
+        license_accepted_at: new Date().toISOString(),
+        license_summary: "For personal and commercial projects by the buyer.",
+      })
+      .eq("id", aliceProductId)
+    expect(error).toBeNull()
+
+    const { data } = await alice.client
+      .from("products")
+      .select("license_id, license_version")
+      .eq("id", aliceProductId)
+      .single()
+
+    // The version is what makes the exact wording recoverable after the
+    // catalogue moves on.
+    expect(data).toMatchObject({ license_id: "commercial", license_version: "1" })
+  })
+
+  it("is not something another workspace can set", async () => {
+    const { data } = await bob.client
+      .from("products")
+      .update({
+        license_id: "extended",
+        license_version: "1",
+        license_accepted_at: new Date().toISOString(),
+        license_summary: "Anything at all.",
+      })
+      .eq("id", aliceProductId)
+      .select("id")
+
+    expect(data).toEqual([])
+  })
+})
+
+describe("the attestation's wording", () => {
+  it("refuses a confirmation with no version recorded", async () => {
+    const { error } = await alice.client
+      .from("products")
+      .update({
+        rights_confirmed_at: new Date().toISOString(),
+        rights_confirmed_by: alice.userId,
+        rights_attestation_version: null,
+      })
+      .eq("id", aliceProductId)
+
+    expect(error).not.toBeNull()
+  })
+
+  it("records who, when, and which words", async () => {
+    const { error } = await alice.client
+      .from("products")
+      .update({
+        rights_confirmed_at: new Date().toISOString(),
+        rights_confirmed_by: alice.userId,
+        rights_attestation_version: "2026-09-12.1",
+      })
+      .eq("id", aliceProductId)
+    expect(error).toBeNull()
+
+    const { data } = await alice.client
+      .from("products")
+      .select("rights_confirmed_by, rights_attestation_version")
+      .eq("id", aliceProductId)
+      .single()
+
+    expect(data).toMatchObject({
+      rights_confirmed_by: alice.userId,
+      rights_attestation_version: "2026-09-12.1",
+    })
+  })
+
+  it("refuses a component list nobody submitted", async () => {
+    const { error } = await alice.client
+      .from("products")
+      .update({ third_party_components: "Inter", third_party_declared_at: null })
+      .eq("id", aliceProductId)
+
+    expect(error).not.toBeNull()
+  })
+
+  it("tells 'none' apart from 'not asked'", async () => {
+    // Declared with nothing listed is a creator saying there are none, and it
+    // has to stay distinguishable from never having been asked.
+    const { error } = await alice.client
+      .from("products")
+      .update({
+        third_party_declared_at: new Date().toISOString(),
+        third_party_components: null,
+      })
+      .eq("id", aliceProductId)
+    expect(error).toBeNull()
+
+    const { data } = await alice.client
+      .from("products")
+      .select("third_party_declared_at, third_party_components")
+      .eq("id", aliceProductId)
+      .single()
+
+    expect(data?.third_party_declared_at).not.toBeNull()
+    expect(data?.third_party_components).toBeNull()
+  })
+})
+
+describe("the previous reading", () => {
+  it("keeps one back, for the change preview", async () => {
+    const admin = adminClient()
+    const { error } = await admin
+      .from("product_imports")
+      .update({
+        previous_evidence: { provider: "webpage", title: { value: "What it said before" } },
+        previous_content_hash: "c".repeat(64),
+      })
+      .eq("id", aliceImportId)
+
+    expect(error).toBeNull()
+  })
+
+  it("refuses a previous hash that is not one", async () => {
+    const { error } = await alice.client
+      .from("product_imports")
+      .update({ previous_content_hash: "nope" })
+      .eq("id", aliceImportId)
+
+    expect(error).not.toBeNull()
   })
 })

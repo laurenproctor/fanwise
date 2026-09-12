@@ -65,7 +65,11 @@ function everything(): ImportReadinessInput {
     deliverables: [readyFile()],
     externalDelivery: null,
     license: { id: "commercial", name: "Commercial use", summary: "Use it in client work." },
-    rights: { attestedAt: "2026-09-12T10:00:00.000Z", attestedBy: "user-1" },
+    rights: {
+      attestedAt: "2026-09-12T10:00:00.000Z",
+      attestedBy: "user-1",
+      attestationVersion: "2026-09-12.1",
+    },
   }
 }
 
@@ -282,7 +286,11 @@ describe("the ownership step", () => {
 
     const anonymous = importReadiness({
       ...everything(),
-      rights: { attestedAt: "2026-09-12T10:00:00.000Z", attestedBy: "" },
+      rights: {
+        attestedAt: "2026-09-12T10:00:00.000Z",
+        attestedBy: "",
+        attestationVersion: "2026-09-12.1",
+      },
     })
     expect(anonymous.steps.find((step) => step.key === "ownership")!.complete).toBe(false)
   })

@@ -7,7 +7,12 @@ import { jobs } from "@/lib/jobs"
 import { routes } from "@/lib/routes"
 import { toJson } from "./json"
 import { startImport } from "./start"
-import { getImport } from "./queries"
+import { getImport, listDeliverables } from "./queries"
+import { CUSTOM_LICENSE_ID, RIGHTS_ATTESTATION_VERSION, licenseEntry, versionFor } from "./licenses"
+import { importReadiness } from "./readiness"
+import { deliverablesFor, draftFor, licenseFor, rightsFor, snapshotFor } from "./view"
+import { normalizeSourceUrl, validateSourceUrl } from "./url"
+import { sourceKindFor } from "./sources/registry"
 
 /**
  * Everything the import screen can ask the server to do.
@@ -243,4 +248,297 @@ export async function saveImportDraftAction(
 
   revalidatePath(routes.productImport(workspaceSlug, importId))
   return { error: null }
+}
+
+/* ------------------------------------------------------------------ licence */
+
+/**
+ * Choosing a licence.
+ *
+ * **The version is read from the catalogue here, never taken from the browser.**
+ * A version is a claim about which wording Fanwise showed, and a client that
+ * supplied it could record that a creator accepted terms they never saw.
+ *
+ * Terms the creator wrote are stored verbatim and versioned `own`, because
+ * there is no catalogue entry for them to be out of date with.
+ */
+export async function setLicenseAction(
+  workspaceSlug: string,
+  importId: string,
+  input: { licenseId: string; customSummary: string | null },
+): Promise<ImportActionState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const record = await getImport(supabase, workspace.id, importId)
+  if (!record) return { error: "That import could not be found." }
+
+  const custom = input.licenseId === CUSTOM_LICENSE_ID
+  const entry = custom ? null : licenseEntry(input.licenseId)
+  if (!custom && !entry) return { error: "That is not a licence Fanwise offers." }
+
+  const summary = custom ? (input.customSummary ?? "").trim() : entry!.summary
+  if (summary.length === 0) {
+    return { error: "Say what a buyer may and may not do with this." }
+  }
+  if (summary.length > 2000) {
+    return { error: "Keep the licence terms under 2000 characters." }
+  }
+
+  const { error } = await supabase
+    .from("products")
+    .update({
+      license_id: input.licenseId,
+      license_version: versionFor(input.licenseId),
+      license_summary: summary,
+      license_accepted_at: new Date().toISOString(),
+    })
+    .eq("id", record.row.product_id)
+    .eq("workspace_id", workspace.id)
+
+  if (error) {
+    console.error("[imports] could not record the licence", { importId, error })
+    return { error: "That licence could not be saved. Try again." }
+  }
+
+  revalidatePath(routes.productImport(workspaceSlug, importId))
+  return { error: null }
+}
+
+/* ---------------------------------------------------------------- ownership */
+
+/**
+ * Recording the creator's statement about rights.
+ *
+ * Three things are written and none of them are optional: who said it, when,
+ * and which wording they agreed to. The user id comes from the session, never
+ * from the form — a browser saying who confirmed is not evidence of anything.
+ *
+ * The second disclosure is written in the same call, because it is asked in the
+ * same breath. `third_party_declared_at` set with `third_party_components` null
+ * is the creator saying there are none, which is a different state from not
+ * having been asked and has to stay distinguishable.
+ *
+ * Fanwise records the statement. It does not check it, and the copy beside the
+ * control says so.
+ */
+export async function confirmOwnershipAction(
+  workspaceSlug: string,
+  importId: string,
+  input: { thirdPartyComponents: string | null },
+): Promise<ImportActionState> {
+  const { supabase, user, workspace } = await requireWorkspace(workspaceSlug)
+
+  const record = await getImport(supabase, workspace.id, importId)
+  if (!record) return { error: "That import could not be found." }
+
+  const components = (input.thirdPartyComponents ?? "").trim()
+  if (components.length > 4000) {
+    return { error: "Keep the list of third-party components under 4000 characters." }
+  }
+
+  const now = new Date().toISOString()
+  const { error } = await supabase
+    .from("products")
+    .update({
+      rights_confirmed_at: now,
+      rights_confirmed_by: user.id,
+      rights_attestation_version: RIGHTS_ATTESTATION_VERSION,
+      third_party_declared_at: now,
+      third_party_components: components.length > 0 ? components : null,
+    })
+    .eq("id", record.row.product_id)
+    .eq("workspace_id", workspace.id)
+
+  if (error) {
+    console.error("[imports] could not record the attestation", { importId, error })
+    return { error: "That confirmation could not be saved. Try again." }
+  }
+
+  revalidatePath(routes.productImport(workspaceSlug, importId))
+  return { error: null }
+}
+
+/**
+ * Withdrawing the statement.
+ *
+ * Offered because an attestation a creator cannot take back is one they will
+ * hesitate to make. Clearing it clears the version too, which the constraint
+ * requires: two of the three columns is a row nobody can interpret.
+ */
+export async function withdrawOwnershipAction(
+  workspaceSlug: string,
+  importId: string,
+): Promise<ImportActionState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const record = await getImport(supabase, workspace.id, importId)
+  if (!record) return { error: "That import could not be found." }
+
+  const { error } = await supabase
+    .from("products")
+    .update({
+      rights_confirmed_at: null,
+      rights_confirmed_by: null,
+      rights_attestation_version: null,
+    })
+    .eq("id", record.row.product_id)
+    .eq("workspace_id", workspace.id)
+
+  if (error) return { error: "That could not be withdrawn. Try again." }
+
+  revalidatePath(routes.productImport(workspaceSlug, importId))
+  return { error: null }
+}
+
+/* ------------------------------------------------------------- buyer files */
+
+/**
+ * Removing a buyer file.
+ *
+ * Refuses to remove the last ready deliverable, which is what makes "replace"
+ * safe: a creator uploads the new file first, and the old one cannot be taken
+ * away until the new one has been measured and found to be real. A replacement
+ * that fails therefore leaves the original exactly where it was, without
+ * anything having to remember to put it back.
+ */
+export async function removeDeliverableAction(
+  workspaceSlug: string,
+  importId: string,
+  assetId: string,
+): Promise<ImportActionState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const record = await getImport(supabase, workspace.id, importId)
+  if (!record) return { error: "That import could not be found." }
+
+  const files = await listDeliverables(supabase, workspace.id, record.row.product_id)
+  const target = files.find((file) => file.id === assetId)
+  if (!target) return { error: "That file could not be found." }
+
+  const otherReady = files.some((file) => file.id !== assetId && file.asset_state === "ready")
+  if (target.asset_state === "ready" && !otherReady) {
+    return {
+      error: "That is the only file buyers would receive. Upload its replacement first.",
+    }
+  }
+
+  const { deleteAssetAction } = await import("@/lib/products/actions")
+  const result = await deleteAssetAction(workspaceSlug, assetId)
+  if (result.error) return { error: result.error }
+
+  revalidatePath(routes.productImport(workspaceSlug, importId))
+  return { error: null }
+}
+
+/* --------------------------------------------------------- source replacement */
+
+/**
+ * Pointing the same import at a different link.
+ *
+ * Not a discard. The product, the creator's edits, the uploaded files, the
+ * licence and the attestation all stay exactly where they are; what changes is
+ * the page the evidence comes from. The previous reading is kept so the screen
+ * can show what is different before a creator accepts any of it — and because
+ * suggestions never reach `products` without a save, a re-read cannot overwrite
+ * anything they have already settled.
+ */
+export async function replaceSourceAction(
+  workspaceSlug: string,
+  importId: string,
+  rawUrl: string,
+): Promise<ImportActionState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const checked = validateSourceUrl(rawUrl)
+  if (!checked.ok) return { error: checked.message }
+
+  const record = await getImport(supabase, workspace.id, importId)
+  if (!record) return { error: "That import could not be found." }
+
+  const normalizedUrl = normalizeSourceUrl(checked.url)
+  if (normalizedUrl === record.row.normalized_url) {
+    return { error: "That is the link this import already uses." }
+  }
+
+  const { error } = await supabase
+    .from("product_imports")
+    .update({
+      source_url: checked.url,
+      normalized_url: normalizedUrl,
+      provider: sourceKindFor(new URL(checked.url)),
+      status: "pending",
+      error_code: null,
+      error_message: null,
+      resolved_url: null,
+      // Kept for the change preview; the runner moves the current reading here.
+      previous_evidence: record.row.evidence,
+      previous_content_hash: record.row.content_hash,
+    })
+    .eq("id", importId)
+    .eq("workspace_id", workspace.id)
+
+  if (error) {
+    // The one URL per workspace index. Another import already owns this link.
+    if (error.code === "23505") {
+      return { error: "You are already importing that link somewhere else." }
+    }
+    console.error("[imports] could not replace the source", { importId, error })
+    return { error: "That link could not be swapped in. Try again." }
+  }
+
+  await jobs.enqueue(
+    "import_source",
+    { workspaceId: workspace.id, importId },
+    { idempotencyKey: `${importId}:${Date.now()}` },
+  )
+
+  revalidatePath(routes.productImport(workspaceSlug, importId))
+  return { error: null }
+}
+
+/* -------------------------------------------------------------- the handoff */
+
+export type ReviewOutcome =
+  | { kind: "ready"; href: string }
+  | { kind: "blocked"; reason: string }
+  | { kind: "error"; message: string }
+
+/**
+ * Reaching the marketplace drafts.
+ *
+ * **The gate is recomputed here from what is persisted**, not from what the
+ * screen believed. A browser holding an unsaved licence is a browser that can
+ * show 100%; only the database can say whether the five steps are actually
+ * done, and this is the last place to ask before a creator is handed to the
+ * publishing flow.
+ *
+ * There is no new flow on the other side. The product page is where channel
+ * drafts have always been built, reviewed and published, and this returns its
+ * address. Adding a second marketplace surface for imported products would be
+ * two places to fix every time a channel changes.
+ */
+export async function reviewMarketplaceDraftsAction(
+  workspaceSlug: string,
+  importId: string,
+): Promise<ReviewOutcome> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const record = await getImport(supabase, workspace.id, importId)
+  if (!record) return { kind: "error", message: "That import could not be found." }
+
+  const assets = await listDeliverables(supabase, workspace.id, record.row.product_id)
+  const readiness = importReadiness({
+    snapshot: snapshotFor(record),
+    draft: draftFor(record),
+    deliverables: deliverablesFor(assets),
+    externalDelivery: null,
+    license: licenseFor(record),
+    rights: rightsFor(record),
+  })
+
+  if (!readiness.ready) {
+    return { kind: "blocked", reason: readiness.blockedReason ?? "Some steps are not done." }
+  }
+
+  return { kind: "ready", href: routes.product(workspaceSlug, record.product.slug) }
 }

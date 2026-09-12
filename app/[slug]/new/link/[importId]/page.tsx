@@ -2,7 +2,14 @@ import { notFound, redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
 import { getImport, listDeliverables } from "@/lib/imports/queries"
-import { deliverablesFor, draftFor, licenseFor, rightsFor, stateFor } from "@/lib/imports/view"
+import {
+  deliverablesFor,
+  draftFor,
+  evidenceChanges,
+  licenseFor,
+  rightsFor,
+  stateFor,
+} from "@/lib/imports/view"
 import { ImportDetail } from "./import-detail"
 
 export const metadata = { title: "Import a product · Fanwise" }
@@ -44,6 +51,7 @@ export default async function ImportDetailPage({
       workspaceSlug={workspace.slug}
       importId={record.row.id}
       productSlug={record.product.slug}
+      productId={record.row.product_id}
       state={stateFor(record)}
       draft={draftFor(record)}
       deliverables={deliverablesFor(assets)}
@@ -52,6 +60,7 @@ export default async function ImportDetailPage({
       missingInformation={record.missingInformation}
       withheld={record.withheld}
       aiUnavailable={record.aiUnavailable}
+      changes={evidenceChanges(record)}
     />
   )
 }
