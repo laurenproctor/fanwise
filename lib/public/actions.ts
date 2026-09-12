@@ -57,7 +57,12 @@ function profileError(message: string): PublicProfileState {
  * to a suffixed form rather than failing: arriving at an empty settings page
  * and being told the name of your own studio is taken is a bad first minute.
  */
-export async function createPublicProfileAction(workspaceSlug: string): Promise<void> {
+export async function createPublicProfileAction(
+  workspaceSlug: string,
+  // Where to land afterwards. Bound alongside the slug, so a form's FormData
+  // never arrives in this position.
+  destination: "settings" | "builder",
+): Promise<void> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -97,7 +102,11 @@ export async function createPublicProfileAction(workspaceSlug: string): Promise<
   }
 
   revalidatePath(routes.publicProfileSettings(workspaceSlug))
-  redirect(routes.publicProfileSettings(workspaceSlug))
+  redirect(
+    destination === "builder"
+      ? routes.publicProfileBuilder(workspaceSlug)
+      : routes.publicProfileSettings(workspaceSlug),
+  )
 }
 
 /**
@@ -167,7 +176,7 @@ export async function savePublicProfileAction(
 
   if (hasUpload) {
     if (file.size > MAX_AVATAR_BYTES) {
-      return profileFieldError("avatar", "That image is over 2 MB. Choose a smaller one.")
+      return profileFieldError("avatar", "That image is over 5 MB. Choose a smaller one.")
     }
     const bytes = Buffer.from(await file.arrayBuffer())
     const checked = checkAvatar(bytes, file.size)

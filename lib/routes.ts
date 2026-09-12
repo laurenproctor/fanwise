@@ -69,6 +69,17 @@ export const routes = {
   channels: (workspace: string) => `/${workspace}/channels`,
   settings: (workspace: string) => `/${workspace}/settings`,
   publicProfileSettings: (workspace: string) => `/${workspace}/settings/public-profile`,
+  /**
+   * The three-step builder. Nested under the management page, which stays the
+   * place a profile is published from until the builder's own publish step
+   * replaces it; nothing here shares a namespace with a product slug, because
+   * `settings` is already reserved.
+   */
+  publicProfileBuilder: (workspace: string) => `/${workspace}/settings/public-profile/builder`,
+  publicProfileBuilderProducts: (workspace: string) =>
+    `/${workspace}/settings/public-profile/builder/products`,
+  publicProfileHandleAvailability: (workspace: string, handle: string) =>
+    `/${workspace}/settings/public-profile/builder/handle-availability?handle=${encodeURIComponent(handle)}`,
   assetDownload: (workspace: string, assetId: string) => `/${workspace}/assets/${assetId}/download`,
   assetPreview: (workspace: string, assetId: string) => `/${workspace}/assets/${assetId}/preview`,
 } as const

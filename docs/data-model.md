@@ -491,8 +491,20 @@ describes data one workspace can see; this section describes data the open web c
 see, and the differences are the parts worth reading twice.
 
 **public_profiles** — id, workspace_id, handle (citext, unique), display_name,
-short_bio, location, avatar_path, website_url, instagram_url, contact_url, status,
-seo_title, seo_description, published_at, created_at, updated_at
+short_bio, location, avatar_path, website_url, instagram_url, behance_url, contact_url,
+status, seo_title, seo_description, published_at, created_at, updated_at
+
+**public_profile_drafts** — public_profile_id (pk), workspace_id, handle, display_name,
+short_bio, website, instagram, behance, avatar_path, products (jsonb), revision,
+updated_by, created_at, updated_at
+
+The profile builder's unpublished working copy, one per profile
+(20260912160000). Autosave writes here and **never** to `public_profiles`; only
+publication copies a draft onto the live row. `anon` holds no grant at all. Text
+columns are stored as typed and bounded only by length, so a half-typed link survives
+a refresh; validation is the builder's Continue and Publish, not a CHECK. `revision`
+is optimistic concurrency: a save names the revision it read and a mismatch is a
+conflict. The tenant boundary is the composite FK `(public_profile_id, workspace_id)`.
 
 A **public profile is not a workspace**. A workspace is an operational container with
 a slug for `/<slug>`; a profile is a public identity with a handle for `/@<handle>`.

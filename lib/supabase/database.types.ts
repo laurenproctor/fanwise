@@ -1144,9 +1144,76 @@ export type Database = {
           },
         ]
       }
+      public_profile_drafts: {
+        Row: {
+          avatar_path: string | null
+          behance: string
+          created_at: string
+          display_name: string
+          handle: string
+          instagram: string
+          products: Json
+          public_profile_id: string
+          revision: number
+          short_bio: string
+          updated_at: string
+          updated_by: string | null
+          website: string
+          workspace_id: string
+        }
+        Insert: {
+          avatar_path?: string | null
+          behance?: string
+          created_at?: string
+          display_name?: string
+          handle?: string
+          instagram?: string
+          products?: Json
+          public_profile_id: string
+          revision?: number
+          short_bio?: string
+          updated_at?: string
+          updated_by?: string | null
+          website?: string
+          workspace_id: string
+        }
+        Update: {
+          avatar_path?: string | null
+          behance?: string
+          created_at?: string
+          display_name?: string
+          handle?: string
+          instagram?: string
+          products?: Json
+          public_profile_id?: string
+          revision?: number
+          short_bio?: string
+          updated_at?: string
+          updated_by?: string | null
+          website?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_profile_drafts_profile_fk"
+            columns: ["public_profile_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "public_profile_drafts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       public_profiles: {
         Row: {
           avatar_path: string | null
+          behance_url: string | null
           contact_url: string | null
           created_at: string
           display_name: string
@@ -1165,6 +1232,7 @@ export type Database = {
         }
         Insert: {
           avatar_path?: string | null
+          behance_url?: string | null
           contact_url?: string | null
           created_at?: string
           display_name: string
@@ -1183,6 +1251,7 @@ export type Database = {
         }
         Update: {
           avatar_path?: string | null
+          behance_url?: string | null
           contact_url?: string | null
           created_at?: string
           display_name?: string
@@ -1513,6 +1582,7 @@ export type Database = {
         Args: { p_new_handle: string; p_public_profile_id: string }
         Returns: {
           avatar_path: string | null
+          behance_url: string | null
           contact_url: string | null
           created_at: string
           display_name: string

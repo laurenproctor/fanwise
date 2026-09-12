@@ -62,6 +62,17 @@ export default async function PublicProfileSettingsPage({
           sell it. Everything on this page is public once you publish it. Your account email, your
           billing and your unpublished products never appear here.
         </p>
+        <p className="text-[15px]">
+          <Link
+            href={routes.publicProfileBuilder(workspace.slug)}
+            className="underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+          >
+            Try the new profile builder
+          </Link>{" "}
+          <span className="text-[var(--color-ink-3)]">
+            It saves a draft as you go and publishes nothing until you say so.
+          </span>
+        </p>
       </header>
 
       {settings === null ? (
@@ -121,7 +132,7 @@ export default async function PublicProfileSettingsPage({
  * act. Saying so here is what makes the button safe to press.
  */
 function NoProfileYet({ workspaceSlug }: { workspaceSlug: string }) {
-  const create = createPublicProfileAction.bind(null, workspaceSlug)
+  const create = createPublicProfileAction.bind(null, workspaceSlug, "settings")
 
   return (
     <section className="flex flex-col items-start gap-5 rounded-[16px] border border-dashed border-[var(--color-rule)] px-6 py-12">
