@@ -580,6 +580,36 @@ moment it was published. The public read path never runs as `authenticated` —
 subquery naming `status = 'published'` explicitly, rather than the tidier security
 definer helper, precisely so that stays true.
 
+## Importing a product from sources
+
+Off-roadmap, like the link importer it extends (`docs/product-link-import.md` §14 and §15).
+Not B12: nothing here reads a connected channel.
+
+`product_imports` is the **import session**: one per draft product, holding the combined
+evidence, the suggestions, what the creator accepted, and the legacy URL columns that carry the
+one-live-import-per-link index. `submission_id` (unique per workspace) is the composer's
+idempotency key.
+
+`product_import_sources` is one row per source, `import_id` nullable only while a file or
+recording is staged in the composer:
+
+| Column | Notes |
+|---|---|
+| `source_type` | `public_url`, `pasted_text`, `pdf`, `html`, `audio` |
+| `status` | `uploading`, `staged`, `transcribing`, `pending`, `reading`, `ready`, `failed`, `unavailable`, `removed` |
+| `position` | the creator's order, unique per live import |
+| `source_url`, `normalized_url` | links only; at most one live link per import |
+| `storage_path` | `<workspace_id>/import-sources/<uuid>.<ext>`, held to the row's workspace by check |
+| `mime_type`, `byte_size`, `duration_ms` | sniffed and measured server-side |
+| `text_content` | pasted text, or a recording's transcript |
+| `evidence`, `content_hash` | what reading this source produced |
+| `error_code`, `error_message` | normalized, from `lib/imports/errors.ts` |
+
+`(import_id, workspace_id)` references `product_imports (id, workspace_id)`. RLS delegates to
+`is_workspace_member`; no delete grant, removal is `removed`. `create_import_session` (security
+invoker) creates the product, the session and every source in one transaction. Migration
+`20260912230000_product_import_sources` backfilled one source for every existing import.
+
 ## B12: importing a live listing
 
 Planned 12 September 2026, not built. The migration lands with B12. The plan is

@@ -135,10 +135,18 @@ export const audioRecordingImporter: ContentImporter = {
   async read(source) {
     if (!source.text) throw new ImportError("no_text", { reason: "no_transcript" })
     const reading = fromText(source.text, null)
+    // Speech has no title line, so the opening of the transcript is its summary
+    // rather than a first sentence mistaken for a name.
+    const opening = sanitizeText(source.text, HTML_LIMITS.maxSummaryLength)
     return finish("audio_recording", source, {
-      // A spoken first sentence is not a title anybody chose.
-      ...(reading.summary
-        ? { summary: { ...reading.summary, origin: "transcript" as const } }
+      ...(opening
+        ? {
+            summary: {
+              value: opening,
+              provenance: "observed" as const,
+              origin: "transcript" as const,
+            },
+          }
         : {}),
       visibleFeatures: { ...reading.visibleFeatures, origin: "transcript" },
       ...(reading.bodyText

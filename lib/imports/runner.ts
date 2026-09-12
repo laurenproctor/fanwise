@@ -5,7 +5,13 @@ import type { AiProvider } from "@/lib/ai/types"
 import { jobs, type JobQueue } from "@/lib/jobs"
 import { composeDraftFromSources, type ComposeDeps } from "./compose"
 import { detectConflicts, type LabelledEvidence } from "./conflicts"
-import { ImportError, normalizeImportError, statusForImportError } from "./errors"
+import {
+  IMPORT_ERROR_MESSAGES,
+  ImportError,
+  normalizeImportError,
+  statusForImportError,
+  type ImportErrorCode,
+} from "./errors"
 import { toJson } from "./json"
 import { parseEvidence, type ProductSourceEvidence, type SourceAsset } from "./evidence"
 import { fetchPage, type FetchPageOptions } from "./retrieval/fetch-page"
@@ -337,12 +343,17 @@ export async function composeSession(
 
   if (plan.action === "fail") {
     const retryable = plan.unreadable.some((source) => source.status === "failed")
+    // One source: its own reason, and the recoveries that go with it. Several:
+    // none could be read, and the sources list says why for each.
+    const only = plan.unreadable.length === 1 ? plan.unreadable[0]!.error_code : null
+    const code: ImportErrorCode =
+      only && only in IMPORT_ERROR_MESSAGES ? (only as ImportErrorCode) : "no_readable_source"
     await admin
       .from("product_imports")
       .update({
         status: retryable ? "failed" : "unavailable",
-        error_code: "no_readable_source",
-        error_message: new ImportError("no_readable_source").userMessage,
+        error_code: code,
+        error_message: IMPORT_ERROR_MESSAGES[code],
       })
       .eq("id", importId)
       .eq("workspace_id", workspaceId)

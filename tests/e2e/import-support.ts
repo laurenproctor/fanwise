@@ -92,8 +92,8 @@ export async function importAnalyzedSource(
   sourceUrl = "https://fanwise-import.invalid/aster-grotesk",
 ): Promise<{ importUrl: string; importId: string }> {
   await page.goto(routes.importProduct(slug))
-  await page.getByLabel("Product link").fill(sourceUrl)
-  await page.getByRole("button", { name: "Analyze product" }).click()
+  await page.getByLabel("Product link or description").fill(sourceUrl)
+  await page.getByRole("button", { name: "Create draft" }).click()
 
   await expect(page).toHaveURL(new RegExp(`${slug}/new/link/[0-9a-f-]{36}$`), { timeout: 20_000 })
   const importUrl = page.url()

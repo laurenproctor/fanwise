@@ -19,14 +19,17 @@ export function JourneySteps() {
       className="flex flex-col gap-5 border-t border-[var(--color-rule)] pt-6 sm:flex-row sm:items-center sm:gap-4"
     >
       {STEPS.map((step, index) => (
-        <li key={step.title} className="flex min-w-0 flex-1 items-center gap-4">
+        <li
+          key={step.title}
+          className={`flex min-w-0 items-center gap-4 ${index === 0 ? "sm:flex-none" : "sm:flex-1"}`}
+        >
           {index > 0 ? (
             <span
               aria-hidden
-              className="hidden h-px w-8 shrink-0 bg-[var(--color-rule)] sm:block lg:w-14"
+              className="hidden h-px min-w-6 flex-1 bg-[var(--color-rule)] sm:block"
             />
           ) : null}
-          <span className="flex min-w-0 items-start gap-3">
+          <span className="flex min-w-0 shrink-0 items-start gap-3">
             <span
               aria-hidden
               className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[13px] font-medium ${
@@ -37,7 +40,7 @@ export function JourneySteps() {
             >
               {index + 1}
             </span>
-            <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="flex min-w-0 flex-col gap-0.5 lg:whitespace-nowrap">
               <span className="text-[14px] font-medium text-[var(--color-ink)]">{step.title}</span>
               <span className="text-[13px] text-[var(--color-ink-3)]">{step.body}</span>
             </span>

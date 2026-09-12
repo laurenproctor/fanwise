@@ -103,7 +103,9 @@ alter table public.product_imports
     end
   );
 
--- Every source failed. The per-source reasons are on the sources.
+-- Every source failed. A session of one source carries that source's own
+-- reason, so a single link reads as it always did; a session of several says
+-- none could be read, and each source says why.
 alter table public.product_imports
   drop constraint product_imports_error_code_known;
 
@@ -113,7 +115,8 @@ alter table public.product_imports
       'login_required', 'organization_only', 'not_found', 'expired', 'unsupported_source',
       'not_html', 'too_large', 'timeout', 'unreachable', 'blocked_address',
       'too_many_redirects', 'provider_error', 'ai_unavailable', 'internal',
-      'unreadable_file', 'no_text', 'no_readable_source'
+      'unreadable_file', 'no_text', 'no_readable_source', 'upload_incomplete',
+      'unsupported_file', 'transcription_unavailable', 'audio_too_long'
     )
   );
 

@@ -33,15 +33,15 @@ export function SourcePill({
 
   return (
     <li
-      className={`flex max-w-full flex-col gap-1 rounded-[14px] border bg-[var(--color-card)] py-1 pl-3.5 pr-1 ${
-        tone === "bad" ? "border-[var(--color-bad)]" : "border-[var(--color-rule)]"
-      }`}
+      className={`flex max-w-full flex-col gap-1 border bg-[var(--color-card)] py-0.5 pl-4 pr-1 ${
+        message ? "rounded-[20px]" : "rounded-[var(--radius-pill)]"
+      } ${tone === "bad" ? "border-[var(--color-bad)]" : "border-[var(--color-rule)]"}`}
     >
       <span className="flex min-h-11 min-w-0 items-center gap-3">
         <SourceGlyph type={source.type} />
         <span
           title={source.label}
-          className="min-w-0 max-w-[22ch] truncate text-[14px] text-[var(--color-ink)]"
+          className="min-w-0 flex-1 truncate text-[14px] text-[var(--color-ink)] sm:max-w-[22ch] sm:flex-none"
         >
           {source.label}
         </span>

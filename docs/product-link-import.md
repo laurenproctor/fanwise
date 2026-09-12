@@ -1,5 +1,10 @@
 # Import a product from a link
 
+> **Now the product composer.** The link importer below accepts every public source format a
+> creator already has — one link, pasted text, PDFs, HTML files and a voice recording, together —
+> through one composer on the same route. §15 describes the session/source model that made that
+> possible; everything earlier in this document still holds for the link itself.
+
 The implementation plan for the **Import a product** screen: a creator pastes a public URL,
 Fanwise reads what is publicly there, proposes a listing draft, and the creator completes
 five steps before any marketplace draft is offered.
@@ -922,4 +927,100 @@ the handoff are unchanged. A handed-over source is a kind of import, not a secon
 - No clean-up job for an upload that was never started. Discarding an import removes its
   object; an abandoned upload leaves a private object behind.
 - No replacing a handed-over source. Discard and start again.
+
+---
+
+## 15. The composer: one import, many sources
+
+Added 12 September 2026, off-roadmap, at the founder's request, on branch
+`feat/universal-product-import`. It replaces §14's tabs with one composer at the same route,
+`/[slug]/new/link`, and turns an import from one source into a session of several. The
+connected-channel importer (B12, `docs/listing-import.md`) is a different feature and is
+untouched: nothing here uses `/[slug]/import`, a channel connection or an adapter.
+
+### What a creator sees
+
+`Create a product listing`: one text box, source pills, **Add PDF or HTML**, **Record**, and
+**Create draft**. A standalone `https://` link, pasted or entered, becomes a pill; anything else
+typed stays text and becomes a "Pasted text" source when the draft is created — a paragraph that
+mentions a URL is still a paragraph. Files are uploaded and checked the moment they are added;
+a recording is uploaded and transcribed before it says `Transcribed`. "Create draft" waits for
+unfinished pills and refuses to submit around one that needs attention.
+
+### Limits
+
+All in `lib/imports/limits.ts`.
+
+| Source | Limit |
+|---|---|
+| Sources per import | 10, counting the link and the pasted text |
+| Public links | 1 per import (replaceable) |
+| Pasted text | 200,000 characters |
+| PDF | 20 MB; text of the first 40 pages |
+| HTML | 2 MB |
+| Running text per source in evidence | 20,000 characters |
+| Recording | 25 MB and ten minutes, stopped automatically at ten |
+
+### Session and sources
+
+`product_imports` is the session; `product_import_sources` holds one row per source (see
+`docs/data-model.md`). Migration `20260912230000_product_import_sources` backfilled every
+existing import with the source it already had, so every existing detail link and every
+single-link import reads as before.
+
+Creation is one call to `create_import_session`, a security-invoker function that inserts the
+product, the session, the link and text sources, and attaches the files and recordings staged
+beforehand — or none of it. A submission id minted when the composer opens makes a double click
+one session. A link already being imported opens that import; if other sources came with it,
+the composer refuses with a link to the existing import instead of silently dropping them.
+
+### Background jobs
+
+- `transcribe_import_source { sourceId }` — before the session exists; claims `transcribing`.
+- `import_source { importId }` — advance: queue a read per pending source, or compose.
+- `import_source { importId, sourceId }` — read one source (claim `pending → reading`), then try
+  to compose.
+
+Composition runs once every live source is terminal. It composes from the sources that read,
+names the ones that did not, and fails the session only when none read — with the one source's
+own reason when there was one source. The session's `content_hash` is the hash of the readable
+sources' hashes in order: equal hashes and an existing draft mean no model call. Every step
+claims by compare-and-swap, so redelivery and a racing retry do their work once.
+
+### Provenance and conflicts
+
+Each source keeps its own evidence, so the prompt renders every source under its own numbered
+heading, and the review screen lists each source with its type and status. Before composing,
+`lib/imports/conflicts.ts` reads four factual kinds from every source — price, dimensions,
+file formats, licence terms — and any kind two sources state differently is a conflict: listed
+in the prompt as a disagreement, withheld from the draft by the claims check whichever source
+it matches, and shown on the review screen as "Your sources disagree" for the creator to settle.
+The claims allow-list is the union of what every readable source said. Nothing reaches
+`products` without a save.
+
+### Storage and retention
+
+Staged and attached source objects live under `<workspace_id>/import-sources/`, private, stored
+as opaque bytes, never offered to buyers. Removing a pill removes its object; discarding an
+import removes every source object. See `docs/security.md`, "Import sources and recordings".
+
+### Transcription
+
+`lib/ai/transcription` is a provider abstraction with **no vendor configured**. Choosing one adds a
+processor of creators' voices to the privacy policy and is the founder's decision; an adapter
+goes in `lib/ai/transcription/providers/<vendor>` and is selected by its key in `index.ts`.
+Until then a recording is refused as `transcription_unavailable`, and the composer says so. The
+e2e suite enables a fixed transcript with `FANWISE_E2E_FAKE_TRANSCRIPTION=1`, which is refused
+against any non-local database. The microphone is allowed for this origin only
+(`Permissions-Policy: microphone=(self)`).
+
+### Known limitations
+
+- No transcription vendor, so voice works end to end only in the test suite until one is chosen.
+- No OCR, no images from PDFs, and no clean-up job for staged sources abandoned in a closed tab.
+- Conflicts are detected for four fact kinds with narrow patterns; others fall to the claims
+  check and the creator's review.
+- A handed-over source cannot be replaced from the review screen; a failed one can be retried.
+- Composition picks the first readable source, in the creator's order, as the preview and the
+  observed title.
 

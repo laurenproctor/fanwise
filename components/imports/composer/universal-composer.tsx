@@ -363,7 +363,7 @@ export function UniversalComposer({ workspaceSlug }: { workspaceSlug: string }) 
           id={textareaId}
           ref={textareaRef}
           value={text}
-          rows={2}
+          rows={1}
           autoFocus
           spellCheck
           aria-describedby={`${helperId} ${limitsId}${error ? ` ${errorId}` : ""}`}
@@ -395,7 +395,7 @@ export function UniversalComposer({ workspaceSlug }: { workspaceSlug: string }) 
               if (takeLink(text)) event.preventDefault()
             }
           }}
-          className="min-h-[64px] w-full resize-none bg-transparent font-display text-[clamp(1.125rem,2.2vw,1.375rem)] font-light leading-[1.4] tracking-[-0.01em] text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink-3)]"
+          className="max-h-[40vh] min-h-[2.25rem] w-full resize-none bg-transparent [field-sizing:content] font-display text-[clamp(1.125rem,2.2vw,1.375rem)] font-light leading-[1.4] tracking-[-0.01em] text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink-3)]"
         />
         <p id={helperId} className="mt-1 text-[14px] text-[var(--color-ink-2)]">
           Or attach a PDF or HTML file, or describe the product aloud.

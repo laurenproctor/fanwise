@@ -38,15 +38,6 @@ const UNREACHABLE = "https://fanwise-import.invalid/a-product"
 /** The widths tests/e2e/catalog.spec.ts already uses, plus a wide desktop. */
 const WIDTHS = [320, 390, 768, 1280, 1600]
 
-/** The left padding of `<main>`, in pixels. */
-function gutter(page: import("@playwright/test").Page): Promise<number> {
-  return page.evaluate(() => {
-    const main = document.querySelector("main")
-    if (!main) throw new Error("no main")
-    return Number.parseFloat(getComputedStyle(main).paddingLeft)
-  })
-}
-
 test("the importer opens from the new-product page and says what it is", async ({ page }) => {
   const { slug } = await newCreator(page, "imp1", "Import Studio")
 
@@ -54,10 +45,12 @@ test("the importer opens from the new-product page and says what it is", async (
   await page.getByRole("link", { name: "Import a product from a link" }).click()
 
   await expect(page).toHaveURL(new RegExp(`${slug}/new/link$`))
-  await expect(page.getByRole("heading", { name: "Import a product", level: 1 })).toBeVisible()
+  await expect(
+    page.getByRole("heading", { name: "Create a product listing", level: 1 }),
+  ).toBeVisible()
   await expect(
     page.getByText(
-      "Turn a product page, a document, or text you already have into an editable Fanwise listing.",
+      "Add anything you already have. Fanwise will organize it into an editable draft.",
     ),
   ).toBeVisible()
   await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toBeVisible()
@@ -66,18 +59,23 @@ test("the importer opens from the new-product page and says what it is", async (
   // the only way out of the page, is still above it.
   await expect(page.getByRole("link", { name: /Import Studio/ })).toBeVisible()
 
-  // What Fanwise will and will not do, said before anything is pasted.
-  await expect(page.getByText("Run, unpack or preview code it downloads.")).toBeVisible()
+  // One composer, one action, and what happens next said before anything is added.
+  await expect(page.getByRole("button", { name: "Create draft" })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  )
+  await expect(page.getByText("Nothing is published until you review it.")).toBeVisible()
 
-  // A bad shape is refused in the form, before anything is fetched. Next's own
-  // route announcer is a role="alert" on every page, so the complaint is
-  // located by what it says rather than by its role alone.
-  await page.getByLabel("Product link").fill("http://example.com/a")
-  await page.getByRole("button", { name: "Analyze product" }).click()
-  await expect(page.getByRole("alert").filter({ hasText: "https links only" })).toBeVisible()
+  // A bad shape is refused in the composer, before anything is fetched.
+  await page.getByLabel("Product link or description").fill("http://example.com/a")
+  await expect(page.getByText(/https links only/).first()).toBeVisible()
+  await expect(page.getByRole("button", { name: "Create draft" })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  )
   await expect(page).toHaveURL(new RegExp(`${slug}/new/link$`))
 
-  // The screen widens without ever scrolling sideways, in either theme.
+  // One centred column that never scrolls sideways, in either theme.
   for (const theme of ["light", "dark"] as const) {
     const toggle = page.getByRole("button", { name: `Switch to ${theme} mode` })
     if (await toggle.isVisible()) await toggle.click()
@@ -85,7 +83,9 @@ test("the importer opens from the new-product page and says what it is", async (
 
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 900 })
-      await expect(page.getByRole("heading", { name: "Import a product", level: 1 })).toBeVisible()
+      await expect(
+        page.getByRole("heading", { name: "Create a product listing", level: 1 }),
+      ).toBeVisible()
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       )
@@ -93,21 +93,19 @@ test("the importer opens from the new-product page and says what it is", async (
     }
   }
 
-  // The gutters are the wide ones on a desktop and the narrow ones on a phone.
-  await page.setViewportSize({ width: 1280, height: 900 })
-  expect(await gutter(page)).toBeGreaterThanOrEqual(48)
   await page.setViewportSize({ width: 1600, height: 900 })
-  expect(await gutter(page)).toBe(64)
-  await page.setViewportSize({ width: 390, height: 900 })
-  expect(await gutter(page)).toBe(24)
+  const composerWidth = await page
+    .getByRole("form", { name: "Product sources" })
+    .evaluate((form) => form.getBoundingClientRect().width)
+  expect(composerWidth).toBeLessThanOrEqual(960)
 })
 
 test("a pasted link becomes an import that survives a refresh", async ({ page }) => {
   const { slug } = await newCreator(page, "imp3", "Pipeline Studio")
   await page.goto(routes.importProduct(slug))
 
-  await page.getByLabel("Product link").fill(UNREACHABLE)
-  await page.getByRole("button", { name: "Analyze product" }).click()
+  await page.getByLabel("Product link or description").fill(UNREACHABLE)
+  await page.getByRole("button", { name: "Create draft" }).click()
 
   // The id is in the URL, which is what makes the next part possible.
   await expect(page).toHaveURL(new RegExp(`${slug}/new/link/[0-9a-f-]{36}$`), { timeout: 20_000 })
@@ -139,8 +137,8 @@ test("a failed import can be retried, and readiness never claims the source is d
   const { slug } = await newCreator(page, "imp4", "Retry Studio")
   await page.goto(routes.importProduct(slug))
 
-  await page.getByLabel("Product link").fill(UNREACHABLE)
-  await page.getByRole("button", { name: "Analyze product" }).click()
+  await page.getByLabel("Product link or description").fill(UNREACHABLE)
+  await page.getByRole("button", { name: "Create draft" }).click()
   await expect(page.getByRole("heading", { name: "That did not finish" })).toBeVisible({
     timeout: 30_000,
   })
@@ -166,16 +164,16 @@ test("importing the same link twice opens the import that exists", async ({ page
   const { slug } = await newCreator(page, "imp5", "Idempotent Studio")
 
   await page.goto(routes.importProduct(slug))
-  await page.getByLabel("Product link").fill(UNREACHABLE)
-  await page.getByRole("button", { name: "Analyze product" }).click()
+  await page.getByLabel("Product link or description").fill(UNREACHABLE)
+  await page.getByRole("button", { name: "Create draft" }).click()
   await expect(page).toHaveURL(new RegExp(`${slug}/new/link/[0-9a-f-]{36}$`), { timeout: 20_000 })
   const first = page.url()
 
   // The same page again, with the tracking parameters and the trailing slash a
   // second paste usually carries. Same page, so the same import.
   await page.goto(routes.importProduct(slug))
-  await page.getByLabel("Product link").fill(`${UNREACHABLE}/?utm_source=newsletter`)
-  await page.getByRole("button", { name: "Analyze product" }).click()
+  await page.getByLabel("Product link or description").fill(`${UNREACHABLE}/?utm_source=newsletter`)
+  await page.getByRole("button", { name: "Create draft" }).click()
   await expect(page).toHaveURL(new RegExp(`${slug}/new/link/[0-9a-f-]{36}$`), { timeout: 20_000 })
 
   expect(page.url()).toBe(first)
