@@ -28,14 +28,11 @@ vi.mock("@/lib/public/actions", () => ({
 }))
 
 const { ProductCard, formatPrice } = await import("@/components/public/product-card")
-const { DestinationList, ChooseWhereToBuy } = await import(
-  "@/components/public/destination-list"
-)
+const { DestinationList, ChooseWhereToBuy } = await import("@/components/public/destination-list")
 const { PublicImage, PublicAvatar } = await import("@/components/public/public-image")
 const { PublicShell } = await import("@/components/public/public-shell")
-const { PublicProfileForm } = await import(
-  "@/app/[slug]/settings/public-profile/public-profile-form"
-)
+const { PublicProfileForm } =
+  await import("@/app/[slug]/settings/public-profile/public-profile-form")
 const { PublishControls } = await import("@/app/[slug]/settings/public-profile/publish-controls")
 
 function render(element: Parameters<typeof renderToStaticMarkup>[0]): string {

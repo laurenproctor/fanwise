@@ -456,7 +456,7 @@ describe("the handle namespace spans the live table and its history", () => {
   it("two profiles cannot hold the same handle", async () => {
     const { error } = await bob.client
       .from("public_profiles")
-      .update({ handle: (await currentHandle(aliceProfileId)) })
+      .update({ handle: await currentHandle(aliceProfileId) })
       .eq("id", bobProfileId)
     expect(error?.code).toBe("23505")
   })

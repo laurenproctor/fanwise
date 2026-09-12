@@ -451,7 +451,9 @@ function TextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? true : undefined}
-        aria-describedby={`${hint ? `${id}-hint` : ""}${error ? ` ${id}-error` : ""}`.trim() || undefined}
+        aria-describedby={
+          `${hint ? `${id}-hint` : ""}${error ? ` ${id}-error` : ""}`.trim() || undefined
+        }
         className="w-full rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-card)] px-3 py-2.5 text-[15px] text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink-3)] focus:border-[var(--color-accent)] aria-[invalid=true]:border-[var(--color-bad)]"
         {...rest}
       />

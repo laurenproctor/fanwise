@@ -28,10 +28,7 @@ import { createPreviewUrl } from "@/lib/products/storage"
  * stored bytes rather than by anything a browser claimed at upload. Without
  * that check this would render any uploaded file inline on request.
  */
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ assetId: string }> },
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ assetId: string }> }) {
   const { assetId } = await params
 
   // A malformed id is a 404 rather than a 400. The response for "no such

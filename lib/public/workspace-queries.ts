@@ -39,10 +39,7 @@ export async function getProfileForSettings(
   if (!profile) return null
 
   const [{ data: pages }, avatarUrl] = await Promise.all([
-    supabase
-      .from("public_product_pages")
-      .select("status")
-      .eq("public_profile_id", profile.id),
+    supabase.from("public_product_pages").select("status").eq("public_profile_id", profile.id),
     profile.avatar_path ? createAvatarUrl(profile.avatar_path) : Promise.resolve(null),
   ])
 

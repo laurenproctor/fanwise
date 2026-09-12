@@ -58,9 +58,9 @@ export default async function PublicProfileSettingsPage({
           Public profile
         </h1>
         <p className="max-w-prose text-[16px] text-[var(--color-ink-2)]">
-          Your portfolio on the open web: one address that gathers everything you sell, wherever
-          you sell it. Everything on this page is public once you publish it. Your account email,
-          your billing and your unpublished products never appear here.
+          Your portfolio on the open web: one address that gathers everything you sell, wherever you
+          sell it. Everything on this page is public once you publish it. Your account email, your
+          billing and your unpublished products never appear here.
         </p>
       </header>
 
