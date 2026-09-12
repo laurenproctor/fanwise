@@ -18,7 +18,7 @@ const PNG = Buffer.from(
   "base64",
 )
 
-test("the page is three sections, and Access is not one of them", async ({ page }) => {
+test("the page is four sections, and Access is not one of them", async ({ page }) => {
   const { slug } = await signUp(page, "set-shape")
   await page.goto(routes.settings(slug))
   const main = page.getByRole("main")
@@ -26,7 +26,15 @@ test("the page is three sections, and Access is not one of them", async ({ page 
   await expect(main.getByRole("heading", { level: 1, name: "Studio settings" })).toBeVisible()
 
   const sections = main.getByRole("heading", { level: 2 })
-  await expect(sections).toHaveText(["Studio details", "Subscription", "Account"])
+  await expect(sections).toHaveText([
+    "Studio details",
+    // Public profile is a summary and a link; the identity fields live at
+    // /settings/public-profile, because a page strangers read does not belong
+    // in the same scroll as an email address.
+    "Public profile",
+    "Subscription",
+    "Account",
+  ])
 
   // The removed section, and the metadata that went with it.
   await expect(main.getByRole("table", { name: /member/i })).toHaveCount(0)
@@ -37,6 +45,9 @@ test("the page is three sections, and Access is not one of them", async ({ page 
   await expect(main.getByRole("button", { name: "Save changes" })).toHaveCount(0)
   await expect(main.getByRole("button", { name: "Save studio details" })).toHaveCount(1)
   await expect(main.getByRole("button", { name: "Save account details" })).toHaveCount(1)
+  // The public profile section saves nothing here: it is a link out.
+  await expect(main.getByRole("button", { name: /Save public profile/ })).toHaveCount(0)
+  await expect(main.getByRole("link", { name: /public profile/i })).toHaveCount(1)
 
   // The shell is untouched.
   const banner = page.getByRole("banner")

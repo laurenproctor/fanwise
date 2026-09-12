@@ -30,6 +30,12 @@ export const RESERVED_WORKSPACE_SLUGS: ReadonlySet<string> = new Set([
   "onboarding",
   "pricing",
   "privacy",
+  // The internal destination the proxy rewrites /@<handle> onto. Nobody reaches
+  // it with a browser — it answers a direct request with a permanent redirect to
+  // the canonical /@<handle> — but it is a real path in the route tree, and a
+  // workspace slugged `profile` would be shadowed by it exactly as one slugged
+  // `pricing` would.
+  "profile",
   "reset-password",
   "sign-in",
   "sign-up",

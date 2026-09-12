@@ -266,11 +266,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "channel_connection_secrets_channel_connection_id_fkey"
-            columns: ["channel_connection_id"]
-            isOneToOne: true
+            foreignKeyName: "channel_connection_secrets_connection_workspace_fkey"
+            columns: ["channel_connection_id", "workspace_id"]
+            isOneToOne: false
             referencedRelation: "channel_connections"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "workspace_id"]
           },
           {
             foreignKeyName: "channel_connection_secrets_workspace_id_fkey"
@@ -809,6 +809,289 @@ export type Database = {
           },
         ]
       }
+      public_handle_history: {
+        Row: {
+          created_at: string
+          handle: string
+          id: string
+          public_profile_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          handle: string
+          id?: string
+          public_profile_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          handle?: string
+          id?: string
+          public_profile_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_handle_history_profile_fk"
+            columns: ["public_profile_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      public_outbound_clicks: {
+        Row: {
+          campaign: string | null
+          channel_id: string
+          id: string
+          occurred_at: string
+          public_product_page_id: string
+          public_profile_id: string
+          referrer_host: string | null
+          workspace_id: string
+        }
+        Insert: {
+          campaign?: string | null
+          channel_id: string
+          id?: string
+          occurred_at?: string
+          public_product_page_id: string
+          public_profile_id: string
+          referrer_host?: string | null
+          workspace_id: string
+        }
+        Update: {
+          campaign?: string | null
+          channel_id?: string
+          id?: string
+          occurred_at?: string
+          public_product_page_id?: string
+          public_profile_id?: string
+          referrer_host?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_outbound_clicks_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "public_outbound_clicks_page_fk"
+            columns: ["public_product_page_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "public_product_pages"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "public_outbound_clicks_profile_fk"
+            columns: ["public_profile_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "public_outbound_clicks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      public_product_pages: {
+        Row: {
+          cover_asset_id: string | null
+          created_at: string
+          description_override: string | null
+          display_order: number
+          featured: boolean
+          id: string
+          product_id: string
+          public_profile_id: string
+          published_at: string | null
+          seo_description: string | null
+          seo_title: string | null
+          slug: string
+          status: Database["public"]["Enums"]["public_page_status"]
+          summary_override: string | null
+          title_override: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          cover_asset_id?: string | null
+          created_at?: string
+          description_override?: string | null
+          display_order?: number
+          featured?: boolean
+          id?: string
+          product_id: string
+          public_profile_id: string
+          published_at?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          slug: string
+          status?: Database["public"]["Enums"]["public_page_status"]
+          summary_override?: string | null
+          title_override?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          cover_asset_id?: string | null
+          created_at?: string
+          description_override?: string | null
+          display_order?: number
+          featured?: boolean
+          id?: string
+          product_id?: string
+          public_profile_id?: string
+          published_at?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          slug?: string
+          status?: Database["public"]["Enums"]["public_page_status"]
+          summary_override?: string | null
+          title_override?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_product_pages_cover_asset_fk"
+            columns: ["cover_asset_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "product_assets"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "public_product_pages_product_fk"
+            columns: ["product_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "public_product_pages_profile_fk"
+            columns: ["public_profile_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "public_product_pages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      public_product_slug_history: {
+        Row: {
+          created_at: string
+          id: string
+          public_product_page_id: string
+          public_profile_id: string
+          slug: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          public_product_page_id: string
+          public_profile_id: string
+          slug: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          public_product_page_id?: string
+          public_profile_id?: string
+          slug?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_product_slug_history_page_fk"
+            columns: ["public_product_page_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "public_product_pages"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      public_profiles: {
+        Row: {
+          avatar_path: string | null
+          contact_url: string | null
+          created_at: string
+          display_name: string
+          handle: string
+          id: string
+          instagram_url: string | null
+          location: string | null
+          published_at: string | null
+          seo_description: string | null
+          seo_title: string | null
+          short_bio: string | null
+          status: Database["public"]["Enums"]["public_page_status"]
+          updated_at: string
+          website_url: string | null
+          workspace_id: string
+        }
+        Insert: {
+          avatar_path?: string | null
+          contact_url?: string | null
+          created_at?: string
+          display_name: string
+          handle: string
+          id?: string
+          instagram_url?: string | null
+          location?: string | null
+          published_at?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          short_bio?: string | null
+          status?: Database["public"]["Enums"]["public_page_status"]
+          updated_at?: string
+          website_url?: string | null
+          workspace_id: string
+        }
+        Update: {
+          avatar_path?: string | null
+          contact_url?: string | null
+          created_at?: string
+          display_name?: string
+          handle?: string
+          id?: string
+          instagram_url?: string | null
+          location?: string | null
+          published_at?: string | null
+          seo_description?: string | null
+          seo_title?: string | null
+          short_bio?: string | null
+          status?: Database["public"]["Enums"]["public_page_status"]
+          updated_at?: string
+          website_url?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_profiles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       publication_jobs: {
         Row: {
           attempt_count: number
@@ -1109,6 +1392,65 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      release_public_handle: {
+        Args: { p_new_handle: string; p_public_profile_id: string }
+        Returns: {
+          avatar_path: string | null
+          contact_url: string | null
+          created_at: string
+          display_name: string
+          handle: string
+          id: string
+          instagram_url: string | null
+          location: string | null
+          published_at: string | null
+          seo_description: string | null
+          seo_title: string | null
+          short_bio: string | null
+          status: Database["public"]["Enums"]["public_page_status"]
+          updated_at: string
+          website_url: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "public_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      release_public_product_slug: {
+        Args: { p_new_slug: string; p_public_product_page_id: string }
+        Returns: {
+          cover_asset_id: string | null
+          created_at: string
+          description_override: string | null
+          display_order: number
+          featured: boolean
+          id: string
+          product_id: string
+          public_profile_id: string
+          published_at: string | null
+          seo_description: string | null
+          seo_title: string | null
+          slug: string
+          status: Database["public"]["Enums"]["public_page_status"]
+          summary_override: string | null
+          title_override: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "public_product_pages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      storage_object_profile_workspace_id: {
+        Args: { p_name: string }
+        Returns: string
+      }
       storage_object_workspace_id: { Args: { p_name: string }; Returns: string }
       uuid_or_null: { Args: { p_value: string }; Returns: string }
     }
@@ -1166,6 +1508,7 @@ export type Database = {
         | "three_d"
         | "theme"
         | "other"
+      public_page_status: "draft" | "published"
       publication_job_kind: "publish" | "update" | "activate"
       publication_job_status: "pending" | "running" | "succeeded" | "failed"
       snapshot_type:
@@ -1205,7 +1548,6 @@ export type Database = {
           public: boolean | null
           type: Database["storage"]["Enums"]["buckettype"]
           updated_at: string | null
-          versioning_status: string
         }
         Insert: {
           allowed_mime_types?: string[] | null
@@ -1219,7 +1561,6 @@ export type Database = {
           public?: boolean | null
           type?: Database["storage"]["Enums"]["buckettype"]
           updated_at?: string | null
-          versioning_status?: string
         }
         Update: {
           allowed_mime_types?: string[] | null
@@ -1233,7 +1574,6 @@ export type Database = {
           public?: boolean | null
           type?: Database["storage"]["Enums"]["buckettype"]
           updated_at?: string | null
-          versioning_status?: string
         }
         Relationships: []
       }
@@ -1406,12 +1746,9 @@ export type Database = {
       }
       objects: {
         Row: {
-          archived_at: string | null
           bucket_id: string | null
           created_at: string | null
           id: string
-          is_delete_marker: boolean
-          is_versioned: boolean
           last_accessed_at: string | null
           metadata: Json | null
           name: string | null
@@ -1423,12 +1760,9 @@ export type Database = {
           version: string | null
         }
         Insert: {
-          archived_at?: string | null
           bucket_id?: string | null
           created_at?: string | null
           id?: string
-          is_delete_marker?: boolean
-          is_versioned?: boolean
           last_accessed_at?: string | null
           metadata?: Json | null
           name?: string | null
@@ -1440,12 +1774,9 @@ export type Database = {
           version?: string | null
         }
         Update: {
-          archived_at?: string | null
           bucket_id?: string | null
           created_at?: string | null
           id?: string
-          is_delete_marker?: boolean
-          is_versioned?: boolean
           last_accessed_at?: string | null
           metadata?: Json | null
           name?: string | null
@@ -1930,6 +2261,7 @@ export const Constants = {
         "theme",
         "other",
       ],
+      public_page_status: ["draft", "published"],
       publication_job_kind: ["publish", "update", "activate"],
       publication_job_status: ["pending", "running", "succeeded", "failed"],
       snapshot_type: [
