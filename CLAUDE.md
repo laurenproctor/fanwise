@@ -15,14 +15,16 @@ explicitly requested.
 
 ## Current step
 
-**Step: A6 (Etsy: OAuth with PKCE, adapter, images, the digital file, activate, idempotency)
-is done. Its exit ran on 11 September 2026 against a live shop: connect, publish, and listing
-4573259073 active in one job. Four of the five questions in `docs/channels/etsy.md` §13 are
-settled; the fifth, refresh-token rotation, waits on the first refresh. A7 (Publish
-Everywhere) is next and not yet opened, with Shopify and Etsy as its two live channels. B1,
-B2 and B8 are on `main`; B8's exit needs a live WooCommerce store, which needs no approval.
-Gate A is not passed; A8 resumes when a Creative Market login exists.** See `docs/roadmap.md`. Implement the current
-step only. Do not build ahead.
+**Step: A7 (Publish Everywhere: run planning, per-channel outcomes, the activity log, the
+re-attempt schedule) is code complete on `feat/a7-publish-everywhere`, exit unrun. The exit —
+one action, two live URLs, one failure recovered without duplicates — needs a live Shopify
+and a live Etsy in one click, which is a run a person does by hand. A6 is done; its exit ran
+on 11 September 2026 against a live shop, and the fifth question in `docs/channels/etsy.md`
+§13, refresh-token rotation, still waits on the first refresh. First-run onboarding shipped
+on 11 September 2026 outside the step order, as PR #61. B1, B2 and B8 are on `main`; B8's
+exit needs a live WooCommerce store, which needs no approval. Gate A is not passed; A8 waits
+on a Creative Market seller login and the questions in that spec's §13.** See
+`docs/roadmap.md`. Implement the current step only. Do not build ahead.
 
 ## Architecture invariants
 
@@ -95,9 +97,15 @@ Use these words in code, UI and docs, consistently.
 | Sale event | A normalized transaction |
 | Readiness | Deterministic validation of publishability |
 | FactSheet | The typed, derived set of facts AI is allowed to state |
+| Run | One Publish Everywhere action and the per-channel outcomes it produced |
+| Skipped | A connected channel a run did not attempt, always with a reason |
 
 In the UI say **Publish**, not Submit. Say **Channels**, not Marketplaces. Say **Product**,
 not Item. The central action is **Publish Everywhere**.
+
+A product is never described as published, partially published or unpublished. Listings are.
+A run says what it did per channel and counts the results; "partially published" is banned
+from code, UI and docs, because no listing was ever partially anything (ADR 0005).
 
 ## Pricing model
 

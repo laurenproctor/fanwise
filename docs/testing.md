@@ -25,6 +25,13 @@ rather than against the thirteen:
 - `journey-05-publish.spec.ts` (A5): a product publishes, and clicking Publish again creates
   nothing. Run against the mock API channel, because the e2e suite has no live Shopify
   connection; A5's exit ran by hand against the live store, see `docs/roadmap.md`.
+- `journey-05-publish-everywhere.spec.ts` (A7): one click starts every channel that can take
+  the product, names each channel it skipped and why, and a second run sends nothing again.
+  The activity log is asserted after a reload, because a run is a record rather than a
+  screen. The exit's "two live URLs" needs two live channels and is a run a person does by
+  hand; the recovery half is proved in `tests/unit/publish-retry.test.ts` and
+  `tests/db/publication-idempotency.test.ts`, where a failure can be made to happen on
+  demand. Both publish specs share their setup through `tests/e2e/publish-support.ts`.
 
 **B1's validator is proved twice.** `tests/unit/factuality.test.ts` is the vocabulary: every
 way a model could state a number, a format, a compatibility or a claim the facts do not
@@ -75,9 +82,10 @@ the product heading, usually.
 4. Connect Etsy, publish. *(ran by hand on 11 September 2026 against the live shop, see
    `docs/roadmap.md`; the OAuth flow and the adapter are covered in
    `tests/unit/etsy-oauth.test.ts` and `tests/unit/etsy-adapter.test.ts`)*
-5. Publish to Shopify and Etsy in one action. *(A7's exit needs any two live channels, and
-   Shopify and Etsy are both live as of 11 September 2026; WooCommerce, once connected, is a
-   third the action includes)*
+5. Publish to Shopify and Etsy in one action. *(code complete at A7 and proved against the
+   mock channels in `tests/e2e/journey-05-publish-everywhere.spec.ts`. The exit needs any two
+   live channels, and Shopify and Etsy are both live as of 11 September 2026; WooCommerce,
+   once connected, is a third the action includes. Unrun against live channels)*
 6. Publication failure, correction, retry, no duplicate.
 7. Generate a Creative Market submission package.
 8. Analytics shows an ingested sale.

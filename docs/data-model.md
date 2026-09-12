@@ -290,7 +290,30 @@ rather it went away.
 
 ## A7: orchestration
 
-**workspace_events** — append-only activity log. Never updated, never deleted.
+Built. Migration `20260911224831_publish_everywhere_runs`.
+
+**workspace_events** — append-only activity log: id, workspace_id, event_type, product_id,
+channel_listing_id, run_id, actor_user_id, payload, created_at.
+
+Never updated, never deleted, and not by the service role either. Three lines enforce that:
+members hold `select` and `insert` only, no policy exists for the other two verbs, and a
+trigger refuses both whatever the role. It is the shape `listing_snapshots` earned the hard
+way, for the same reason — a log its own writer can edit afterwards is not evidence of
+anything.
+
+`event_type` is text with a format check rather than an enum, because the set of things worth
+logging grows with every step and an enum puts a migration between a new event and the code
+that writes it. `lib/publishing/events.ts` owns the vocabulary. Both tenant boundaries are
+composite foreign keys, to `products (id, workspace_id)` and
+`channel_listings (id, workspace_id)`.
+
+**`publication_jobs.run_id`** — nullable, and permanently so. It groups the jobs one Publish
+Everywhere click created, and a single-channel publish belongs to no run. Not a foreign key:
+a run is not a row, it is the id those jobs share.
+
+**There is no product-level publish status, by decision.** A product is never published; its
+listings are (ADR 0005). A run reports per channel and counts the results, and a query that
+wants to know how much of a product is live counts listings by liveness at read time.
 
 ## B1: AI
 
