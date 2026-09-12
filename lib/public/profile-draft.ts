@@ -66,7 +66,7 @@ export const draftFieldsSchema = z.object({
   behance: z.string().max(DRAFT_LIMITS.link),
 })
 
-const draftProductsSchema = z
+export const draftProductsSchema = z
   .array(z.object({ productId: z.uuid(), visible: z.boolean() }))
   .max(500)
 

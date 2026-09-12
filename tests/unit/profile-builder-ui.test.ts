@@ -24,6 +24,7 @@ vi.mock("@/lib/public/draft-actions", () => ({
   saveProfileDraftAction: vi.fn(),
   uploadProfileDraftAvatarAction: vi.fn(),
   continueProfileDetailsAction: vi.fn(),
+  saveProfileProductsAction: vi.fn(),
 }))
 
 const { PublicProfile } = await import("@/components/public/public-profile")
@@ -32,6 +33,9 @@ const { ProfilePreview } =
 const { ProfileDetailsStep } =
   await import("@/app/[slug]/settings/public-profile/builder/profile-details-step")
 const { BuilderSteps } = await import("@/app/[slug]/settings/public-profile/builder/builder-header")
+const { ManageProductsStep } =
+  await import("@/app/[slug]/settings/public-profile/builder/manage-products-step")
+const { arrange } = await import("@/lib/public/product-arrangement")
 
 const FIELDS: ProfileDraftFields = {
   handle: "lauren-proctor",
@@ -234,5 +238,160 @@ describe("step 1, profile details", () => {
     expect(steps.match(/<li/g)).toHaveLength(3)
     expect(steps).toMatch(/aria-current="step"[^>]*>[\s\S]*?Profile details/)
     expect(textOf(steps)).toMatch(/Manage products[\s\S]*Preview and publish/)
+  })
+})
+
+describe("step 2, manage products", () => {
+  const pid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`
+  const product = (
+    n: number,
+    title: string,
+    overrides: Partial<import("@/lib/public/product-arrangement").ProductCandidate> = {},
+  ) => ({
+    id: pid(n),
+    title,
+    typeLabel: "Templates",
+    imageUrl: `/laurens-studio/assets/a${n}/preview`,
+    eligibility: { eligible: true } as const,
+    existingOrder: null,
+    ...overrides,
+  })
+
+  const CANDIDATES = [
+    product(1, "Editorial Type System"),
+    product(2, "Campaign Template Collection", { imageUrl: null }),
+    product(3, "Brand Strategy Workbook"),
+    product(4, "Minimal Portfolio Template", {
+      eligibility: { eligible: false, reason: "not_live" },
+    }),
+  ]
+
+  function renderStep(
+    draft: Array<{ productId: string; visible: boolean }>,
+    candidates = CANDIDATES,
+    unlistedCount = 0,
+  ) {
+    const rows = arrange(draft, candidates)
+    return renderToStaticMarkup(
+      createElement(ManageProductsStep, {
+        workspaceSlug: "laurens-studio",
+        origin: "https://fanwise.com",
+        published: false,
+        identity: present(),
+        initial: { rows, revision: 3, stored: true, arranged: draft.length > 0 },
+        unlistedCount,
+      }),
+    )
+  }
+
+  const previewOf = (markup: string) =>
+    markup.slice(markup.indexOf("<article"), markup.indexOf("</article>"))
+
+  const ARRANGED = [
+    { productId: pid(3), visible: true },
+    { productId: pid(1), visible: false },
+    { productId: pid(2), visible: true },
+    { productId: pid(4), visible: true },
+  ]
+
+  it("has the heading, count, select-all, helper text and actions", () => {
+    const text = textOf(renderStep(ARRANGED))
+    expect(text).toContain("Choose what customers see")
+    expect(text).toContain("2 of 3 selected")
+    expect(text).toContain("Select all")
+    expect(text).toContain(
+      "Drag products to reorder them. Hidden products stay published in their connected shops.",
+    )
+    expect(text).toContain("Continue")
+    expect(text).toContain("Back")
+    expect(text).toContain("Draft saved")
+    expect(text).toContain("Updates as you edit")
+  })
+
+  it("previews only shown products, in the stored order, with the step 1 identity intact", () => {
+    const preview = textOf(previewOf(renderStep(ARRANGED)))
+    expect(preview).toContain("Lauren Proctor")
+    expect(preview).toContain("Design tools, templates, and resources for thoughtful brands.")
+    const order = ["Brand Strategy Workbook", "Campaign Template Collection"].map((t) =>
+      preview.indexOf(t),
+    )
+    expect(order.every((i) => i >= 0)).toBe(true)
+    expect(order[0]!).toBeLessThan(order[1]!)
+    expect(preview).not.toContain("Editorial Type System")
+    // Ineligible, even though its stored flag says shown.
+    expect(preview).not.toContain("Minimal Portfolio Template")
+  })
+
+  it("renders a switch per product whose state matches the preview", () => {
+    const markup = renderStep(ARRANGED)
+    const switches = [
+      ...markup.matchAll(
+        /role="switch" aria-checked="(true|false)"[^>]*aria-label="Show ([^"]+) on your profile"/g,
+      ),
+    ].map((m) => [m[2], m[1]])
+    expect(switches).toEqual([
+      ["Brand Strategy Workbook", "true"],
+      ["Editorial Type System", "false"],
+      ["Campaign Template Collection", "true"],
+      ["Minimal Portfolio Template", "false"],
+    ])
+  })
+
+  it("gives every row a keyboard-operable drag handle that states its position", () => {
+    const markup = renderStep(ARRANGED)
+    const handles = [
+      ...markup.matchAll(/<button[^>]*aria-label="Reorder ([^"]+), position (\d) of (\d)"/g),
+    ]
+    expect(handles.map((m) => [m[1], m[2], m[3]])).toEqual([
+      ["Brand Strategy Workbook", "1", "4"],
+      ["Editorial Type System", "2", "4"],
+      ["Campaign Template Collection", "3", "4"],
+      ["Minimal Portfolio Template", "4", "4"],
+    ])
+    expect(markup).toContain('aria-describedby="reorder-instructions"')
+    expect(textOf(markup)).toMatch(/up or down arrow keys/)
+  })
+
+  it("explains an ineligible product and disables its switch", () => {
+    const markup = renderStep(ARRANGED)
+    expect(textOf(markup)).toContain("Not live in a connected shop right now")
+    expect(markup).toMatch(
+      /role="switch"[^>]*aria-label="Show Minimal Portfolio Template on your profile"[^>]*disabled=""/,
+    )
+  })
+
+  it("shows an intentional placeholder for a product with no image, in the row and the preview", () => {
+    const markup = renderStep(ARRANGED)
+    expect(markup).toContain("Campaign Template Collection has no image yet")
+    expect(previewOf(markup)).toContain("data-missing-image")
+  })
+
+  it("handles an empty selection in the list and the preview", () => {
+    const markup = renderStep(ARRANGED.map((entry) => ({ ...entry, visible: false })))
+    const text = textOf(markup)
+    expect(text).toContain("0 of 3 selected")
+    expect(text).toContain("No products are selected")
+    expect(textOf(previewOf(markup))).toContain("No products selected yet")
+  })
+
+  it("explains a workspace with nothing live yet, and why products are missing", () => {
+    const text = textOf(renderStep([], [], 2))
+    expect(text).toContain("No products are live in a connected shop yet.")
+    expect(text).toMatch(
+      /2 products aren(?:'|&#x27;)t listed because they aren(?:'|&#x27;)t live in a connected shop\./,
+    )
+  })
+
+  it("never offers email and never names a listing action", () => {
+    const markup = renderStep(ARRANGED)
+    expect(markup).not.toMatch(/mailto:|type="email"|data-link="email"/)
+    expect(textOf(markup)).not.toMatch(/\bunpublish|\bdelist/i)
+  })
+
+  it("marks step 1 complete and step 2 current", () => {
+    const steps = renderToStaticMarkup(createElement(BuilderSteps, { current: 2 }))
+    expect(textOf(steps)).toMatch(/Profile details , complete/)
+    expect(steps).toMatch(/aria-current="step"[^>]*>[\s\S]*?Manage products/)
+    expect(steps.match(/aria-current="step"/g)).toHaveLength(1)
   })
 })

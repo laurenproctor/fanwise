@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import type { Json } from "@/lib/supabase/database.types"
 import {
   RLS_DENIED,
   adminClient,
@@ -202,5 +203,142 @@ describe("the live profile's new rules", () => {
       .update({ handle: "channels" })
       .eq("id", aliceProfileId)
     expect(error).not.toBeNull()
+  })
+})
+
+/**
+ * Step 2: the draft's product arrangement.
+ *
+ * The server action checks ownership, but a member can write their own draft
+ * row straight through PostgREST, so these are made with the member's client
+ * directly: the trigger from 20260912170000 is what has to refuse them.
+ */
+describe("a draft's product arrangement", () => {
+  let aliceProductId: string
+  let aliceListingId: string
+  let bobProductId: string
+  let alicePageId: string
+
+  async function productFor(actor: Actor, slug: string): Promise<string> {
+    const { data, error } = await actor.client
+      .from("products")
+      .insert({ workspace_id: actor.workspaceId, name: "Arranged", slug, product_type: "font" })
+      .select("id")
+      .single()
+    if (error) throw new Error(`product: ${error.message}`)
+    return data.id
+  }
+
+  beforeAll(async () => {
+    const suffix = Date.now().toString(36)
+    aliceProductId = await productFor(alice, `arranged-${suffix}`)
+    bobProductId = await productFor(bob, `arranged-${suffix}`)
+
+    const { data: channels } = await adminClient().from("channels").select("id, key")
+    const channelId = channels!.find((c) => c.key === "mock_api")!.id
+    const { data: connection, error: connectionError } = await alice.client
+      .from("channel_connections")
+      .insert({
+        workspace_id: alice.workspaceId,
+        channel_id: channelId,
+        external_account_id: `arrange-${suffix}`,
+        status: "active",
+      })
+      .select("id")
+      .single()
+    if (connectionError) throw new Error(`connection: ${connectionError.message}`)
+
+    const { data: listing, error: listingError } = await alice.client
+      .from("channel_listings")
+      .insert({
+        workspace_id: alice.workspaceId,
+        product_id: aliceProductId,
+        channel_id: channelId,
+        channel_connection_id: connection.id,
+        title: "Listed",
+      })
+      .select("id")
+      .single()
+    if (listingError) throw new Error(`listing: ${listingError.message}`)
+    aliceListingId = listing.id
+
+    const { data: page, error: pageError } = await alice.client
+      .from("public_product_pages")
+      .insert({
+        workspace_id: alice.workspaceId,
+        public_profile_id: aliceProfileId,
+        product_id: aliceProductId,
+        slug: `arranged-${suffix}`,
+      })
+      .select("id")
+      .single()
+    if (pageError) throw new Error(`page: ${pageError.message}`)
+    alicePageId = page.id
+  })
+
+  const saveProducts = (products: Json) =>
+    alice.client
+      .from("public_profile_drafts")
+      .update({ products: products as Json })
+      .eq("public_profile_id", aliceProfileId)
+
+  it("stores the workspace's own products, in order, and reads them back after a refresh", async () => {
+    const products = [{ productId: aliceProductId, visible: false }]
+    expect((await saveProducts(products)).error).toBeNull()
+
+    const { data } = await alice.client
+      .from("public_profile_drafts")
+      .select("products")
+      .eq("public_profile_id", aliceProfileId)
+      .single()
+    expect(data?.products).toEqual(products)
+  })
+
+  it("refuses another workspace's product, even written directly", async () => {
+    const { error } = await saveProducts([
+      { productId: aliceProductId, visible: true },
+      { productId: bobProductId, visible: true },
+    ])
+    expect(error?.code).toBe(RLS_DENIED)
+  })
+
+  it("refuses a product listed twice and a malformed entry", async () => {
+    expect(
+      (
+        await saveProducts([
+          { productId: aliceProductId, visible: true },
+          { productId: aliceProductId, visible: false },
+        ])
+      ).error,
+    ).not.toBeNull()
+    expect((await saveProducts([{ productId: "not-a-uuid", visible: true }])).error).not.toBeNull()
+    expect(
+      (await saveProducts([{ productId: aliceProductId, visible: "yes" }])).error,
+    ).not.toBeNull()
+  })
+
+  it("accepts an empty arrangement", async () => {
+    expect((await saveProducts([])).error).toBeNull()
+  })
+
+  it("changes no listing, public page or live profile while the arrangement is edited", async () => {
+    const admin = adminClient()
+    const snapshot = async () => ({
+      listing: (await admin.from("channel_listings").select("*").eq("id", aliceListingId).single())
+        .data,
+      page: (await admin.from("public_product_pages").select("*").eq("id", alicePageId).single())
+        .data,
+      profile: (await admin.from("public_profiles").select("*").eq("id", aliceProfileId).single())
+        .data,
+    })
+
+    const before = await snapshot()
+    await saveProducts([{ productId: aliceProductId, visible: true }])
+    await saveProducts([{ productId: aliceProductId, visible: false }])
+    const after = await snapshot()
+
+    expect(after).toEqual(before)
+    expect(after.listing?.status).toBe(before.listing?.status)
+    expect(after.page?.status).toBe("draft")
   })
 })

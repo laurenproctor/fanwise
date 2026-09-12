@@ -251,7 +251,30 @@ function ProductTile({ product }: { product: PresentationProduct }) {
             decoding="async"
             className="h-full w-full object-cover"
           />
-        ) : null}
+        ) : (
+          // Intentional rather than an empty grey box: a creator should be able to
+          // tell "no image yet" from "image still loading".
+          <span
+            role="img"
+            aria-label={`${product.title} has no image`}
+            data-missing-image
+            className="flex h-full w-full items-center justify-center text-[var(--color-ink-3)]"
+          >
+            <svg
+              aria-hidden
+              viewBox="0 0 24 24"
+              width="28"
+              height="28"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+            >
+              <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+              <path d="m3.5 16 5-5 4 4 3-3 5 5" strokeLinejoin="round" />
+              <circle cx="15.5" cy="9" r="1.5" />
+            </svg>
+          </span>
+        )}
       </div>
       <span className="text-[15px] break-words text-[var(--color-ink)]">{product.title}</span>
       <span className="text-[13px] text-[var(--color-ink-3)]">{product.typeLabel}</span>

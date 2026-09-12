@@ -18,8 +18,14 @@ import {
   loadBuilderContext,
   writeDraftAvatar,
   writeDraftFields,
+  writeDraftProducts,
 } from "./draft-store"
-import { checkDetailsStep, draftFieldsSchema, type DetailsErrors } from "./profile-draft"
+import {
+  checkDetailsStep,
+  draftFieldsSchema,
+  draftProductsSchema,
+  type DetailsErrors,
+} from "./profile-draft"
 
 /**
  * The profile builder's writes. Every one of them lands in
@@ -50,6 +56,34 @@ export async function saveProfileDraftAction(
   if (!ctx) return { ok: false, reason: "failed" }
 
   return writeDraftFields(supabase, ctx, parsed.data.fields, parsed.data.revision)
+}
+
+const productsInput = z.object({
+  products: draftProductsSchema,
+  revision: z.number().int().min(0),
+})
+
+/**
+ * Step 2's autosave: which products show on the profile, in order.
+ *
+ * The workspace is the one RLS resolves from the slug for the signed-in user;
+ * nothing the browser sends names a workspace. Every product id is checked
+ * against that workspace before the write, and an unchanged arrangement is a
+ * no-op. The listings behind these products are not read or touched: hiding a
+ * product here removes it from the profile and nowhere else.
+ */
+export async function saveProfileProductsAction(
+  workspaceSlug: string,
+  input: unknown,
+): Promise<AutosaveResult> {
+  const parsed = productsInput.safeParse(input)
+  if (!parsed.success) return { ok: false, reason: "failed" }
+
+  const supabase = await createClient()
+  const ctx = await loadBuilderContext(supabase, workspaceSlug)
+  if (!ctx) return { ok: false, reason: "failed" }
+
+  return writeDraftProducts(supabase, ctx, parsed.data.products, parsed.data.revision)
 }
 
 export type AvatarUploadResult = { ok: true } | { ok: false; message: string }

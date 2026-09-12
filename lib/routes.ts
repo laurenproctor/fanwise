@@ -78,6 +78,8 @@ export const routes = {
   publicProfileBuilder: (workspace: string) => `/${workspace}/settings/public-profile/builder`,
   publicProfileBuilderProducts: (workspace: string) =>
     `/${workspace}/settings/public-profile/builder/products`,
+  publicProfileBuilderPublish: (workspace: string) =>
+    `/${workspace}/settings/public-profile/builder/publish`,
   publicProfileHandleAvailability: (workspace: string, handle: string) =>
     `/${workspace}/settings/public-profile/builder/handle-availability?handle=${encodeURIComponent(handle)}`,
   assetDownload: (workspace: string, assetId: string) => `/${workspace}/assets/${assetId}/download`,

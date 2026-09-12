@@ -41,6 +41,7 @@ interface Builder extends PromiseLike<Result> {
   delete: () => Builder
   eq: (column: string, value: unknown) => Builder
   neq: (column: string, value: unknown) => Builder
+  in: (column: string, values: unknown[]) => Builder
   limit: (n: number) => Builder
   maybeSingle: () => Promise<Result>
   single: () => Promise<Result>
@@ -71,6 +72,7 @@ function makeClient(kind: "user" | "admin") {
         delete: () => ((call.op = "delete"), builder),
         eq: (column, value) => (call.filters.push([column, value]), builder),
         neq: (column, value) => (call.filters.push([`!${column}`, value]), builder),
+        in: (column, values) => (call.filters.push([`in:${column}`, values]), builder),
         limit: () => builder,
         maybeSingle: async () => {
           const result = run()
@@ -102,8 +104,12 @@ vi.mock("@/lib/public/avatars", async (importOriginal) => ({
   removeAvatars: (...args: unknown[]) => removeAvatars(...(args as [])),
 }))
 
-const { saveProfileDraftAction, continueProfileDetailsAction, uploadProfileDraftAvatarAction } =
-  await import("@/lib/public/draft-actions")
+const {
+  saveProfileDraftAction,
+  continueProfileDetailsAction,
+  uploadProfileDraftAvatarAction,
+  saveProfileProductsAction,
+} = await import("@/lib/public/draft-actions")
 
 const PROFILE_ID = "0f9f2d4e-1c3b-4a5e-9f7d-2b8c6a1e4d30"
 const LIVE_AVATAR = `${PROFILE_ID}/live.png`
@@ -135,6 +141,9 @@ interface World {
   draftRevision: number
   draftAvatar: string | null
   takenHandles: string[]
+  /** Product ids RLS returns for this workspace. */
+  ownedProductIds: string[]
+  draftProducts: Array<{ productId: string; visible: boolean }>
 }
 
 function world(overrides: Partial<World> = {}): World {
@@ -143,6 +152,8 @@ function world(overrides: Partial<World> = {}): World {
     draftRevision: 0,
     draftAvatar: LIVE_AVATAR,
     takenHandles: [],
+    ownedProductIds: [],
+    draftProducts: [],
     ...overrides,
   }
   resolver = (call) => {
@@ -160,18 +171,42 @@ function world(overrides: Partial<World> = {}): World {
         return { data: PROFILE, error: null }
       case "public_handle_history":
         return { data: [], error: null }
+      case "products": {
+        const wanted = (filter("in:id") as string[] | undefined) ?? []
+        return {
+          data: wanted.filter((pid) => w.ownedProductIds.includes(pid)).map((pid) => ({ id: pid })),
+          error: null,
+        }
+      }
       case "public_profile_drafts":
         if (call.op === "update") {
           const payload = call.payload as Row
+          if ("revision" in payload && filter("revision") === w.draftRevision) {
+            if ("products" in payload) {
+              w.draftProducts = payload.products as World["draftProducts"]
+            }
+          }
           if ("revision" in payload) {
             if (filter("revision") !== w.draftRevision) return { data: [], error: null }
             w.draftRevision = payload.revision as number
             return { data: [{ revision: w.draftRevision }], error: null }
           }
-          w.draftAvatar = payload.avatar_path as string | null
+          if ("products" in payload) {
+            w.draftProducts = payload.products as World["draftProducts"]
+          }
+          if ("avatar_path" in payload) w.draftAvatar = payload.avatar_path as string | null
           return { data: null, error: null }
         }
-        if (call.op === "select") return { data: { avatar_path: w.draftAvatar }, error: null }
+        if (call.op === "select") {
+          return {
+            data: {
+              avatar_path: w.draftAvatar,
+              revision: w.draftRevision,
+              products: w.draftProducts,
+            },
+            error: null,
+          }
+        }
         return { data: null, error: null }
       default:
         return { data: null, error: null }
@@ -185,6 +220,10 @@ function publicationWrites() {
     (c) =>
       (c.table === "public_profiles" && c.op !== "select") ||
       (c.table === "public_product_pages" && c.op !== "select") ||
+      // Marketplace state: listings, their jobs and the canonical product.
+      (c.table === "channel_listings" && c.op !== "select") ||
+      (c.table === "publication_jobs" && c.op !== "select") ||
+      (c.table === "products" && c.op !== "select") ||
       JSON.stringify(c.payload ?? {}).includes('"status"'),
   )
 }
@@ -343,6 +382,103 @@ describe("draft image", () => {
   })
 })
 
+describe("saving the product arrangement", () => {
+  const P1 = "11111111-1111-4111-8111-111111111111"
+  const P2 = "22222222-2222-4222-8222-222222222222"
+  const FOREIGN = "99999999-9999-4999-8999-999999999999"
+
+  it("stores order and visibility in the draft and touches nothing else", async () => {
+    const w = world({ ownedProductIds: [P1, P2] })
+    const products = [
+      { productId: P2, visible: true },
+      { productId: P1, visible: false },
+    ]
+    await expect(
+      saveProfileProductsAction("laurens-studio", { products, revision: 0 }),
+    ).resolves.toEqual({ ok: true, revision: 1 })
+
+    expect(w.draftProducts).toEqual(products)
+    const writes = calls.filter((c) => c.op !== "select")
+    expect(new Set(writes.map((c) => c.table))).toEqual(new Set(["public_profile_drafts"]))
+    expect(publicationWrites()).toEqual([])
+    expect(rpcs).toEqual([])
+  })
+
+  it("scopes the ownership check to the workspace RLS resolved, not one the browser sent", async () => {
+    world({ ownedProductIds: [P1] })
+    await saveProfileProductsAction("laurens-studio", {
+      products: [{ productId: P1, visible: true }],
+      revision: 0,
+      workspaceId: "someone-elses-workspace",
+    })
+    const check = calls.find((c) => c.table === "products")!
+    expect(check.filters).toContainEqual(["workspace_id", "ws-1"])
+  })
+
+  it("refuses a product from another workspace without writing", async () => {
+    world({ ownedProductIds: [P1] })
+    const result = await saveProfileProductsAction("laurens-studio", {
+      products: [
+        { productId: P1, visible: true },
+        { productId: FOREIGN, visible: true },
+      ],
+      revision: 0,
+    })
+    expect(result).toEqual({ ok: false, reason: "failed" })
+    expect(calls.filter((c) => c.op !== "select")).toEqual([])
+  })
+
+  it("refuses a product listed twice", async () => {
+    world({ ownedProductIds: [P1] })
+    const result = await saveProfileProductsAction("laurens-studio", {
+      products: [
+        { productId: P1, visible: true },
+        { productId: P1, visible: false },
+      ],
+      revision: 0,
+    })
+    expect(result).toEqual({ ok: false, reason: "failed" })
+    expect(calls.filter((c) => c.op !== "select")).toEqual([])
+  })
+
+  it("is idempotent: the same arrangement at the same revision writes nothing", async () => {
+    const products = [{ productId: P1, visible: true }]
+    world({ ownedProductIds: [P1], draftRevision: 4, draftProducts: products })
+    await expect(
+      saveProfileProductsAction("laurens-studio", { products, revision: 4 }),
+    ).resolves.toEqual({ ok: true, revision: 4 })
+    expect(calls.filter((c) => c.op !== "select")).toEqual([])
+  })
+
+  it("reports a stale revision as a conflict", async () => {
+    world({ ownedProductIds: [P1], draftRevision: 6 })
+    await expect(
+      saveProfileProductsAction("laurens-studio", {
+        products: [{ productId: P1, visible: false }],
+        revision: 5,
+      }),
+    ).resolves.toEqual({ ok: false, reason: "conflict" })
+  })
+
+  it("stops before any read when the workspace is not the caller's", async () => {
+    world({ workspaceVisible: false, ownedProductIds: [P1] })
+    const result = await saveProfileProductsAction("someone-elses-studio", {
+      products: [{ productId: P1, visible: true }],
+      revision: 0,
+    })
+    expect(result).toEqual({ ok: false, reason: "failed" })
+    expect(calls.some((c) => c.table === "products" || c.op !== "select")).toBe(false)
+  })
+
+  it("accepts an empty selection, clearing a stored one", async () => {
+    const w = world({ ownedProductIds: [P1], draftProducts: [{ productId: P1, visible: true }] })
+    await expect(
+      saveProfileProductsAction("laurens-studio", { products: [], revision: 0 }),
+    ).resolves.toEqual({ ok: true, revision: 1 })
+    expect(w.draftProducts).toEqual([])
+  })
+})
+
 describe("the builder has no path to publication", () => {
   const read = (...parts: string[]) => readFileSync(join(__dirname, "..", "..", ...parts), "utf8")
 
@@ -350,6 +486,9 @@ describe("the builder has no path to publication", () => {
     ["lib", "public", "draft-actions.ts"],
     ["lib", "public", "draft-store.ts"],
     ["app", "[slug]", "settings", "public-profile", "builder", "profile-details-step.tsx"],
+    ["app", "[slug]", "settings", "public-profile", "builder", "manage-products-step.tsx"],
+    ["lib", "public", "product-arrangement.ts"],
+    ["lib", "public", "product-candidates.ts"],
   ])("%s never names a publishing operation", (...parts) => {
     // Comments stripped: the docblocks say these operations are absent, by name.
     const source = read(...parts)

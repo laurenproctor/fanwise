@@ -506,6 +506,16 @@ a refresh; validation is the builder's Continue and Publish, not a CHECK. `revis
 is optimistic concurrency: a save names the revision it read and a mismatch is a
 conflict. The tenant boundary is the composite FK `(public_profile_id, workspace_id)`.
 
+`products` is the builder's step 2: an array of `{ productId, visible }` in display
+order, every arranged product included, so hiding one keeps its position. Order is
+array position; there are no separate order numbers. Product ids cannot be foreign keys
+inside jsonb, so `check_profile_draft_products` (20260912170000) refuses a malformed
+entry, a repeated product, or a product outside the draft's workspace on every write,
+including a direct PostgREST one. A product is **eligible** for a profile when it is not
+archived and at least one of its listings is `live` by the catalog's `liveness()` rule
+(`lib/public/product-arrangement.ts`); an arranged product that later becomes
+ineligible keeps its entry and flag but is never previewed or published.
+
 A **public profile is not a workspace**. A workspace is an operational container with
 a slug for `/<slug>`; a profile is a public identity with a handle for `/@<handle>`.
 They are separate fields on separate tables, and the handle is never derived from a

@@ -72,6 +72,8 @@ const TRIGGER_ONLY = [
   "check_history_handle_available",
   "check_product_slug_available",
   "check_history_product_slug_available",
+  // A profile draft's jsonb product list may only name its own workspace's products.
+  "check_profile_draft_products",
 ] as const
 
 /** PostgREST's answer for a function that is not in its schema cache. */

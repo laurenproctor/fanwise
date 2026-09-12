@@ -3,9 +3,12 @@ import type { Database } from "@/lib/supabase/database.types"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { classifyHandle } from "./handles"
 import type { AutosaveResult } from "./draft-autosave"
+import { sameArrangement } from "./product-arrangement"
 import {
   draftFromRow,
+  draftProductsSchema,
   seedDraftFromProfile,
+  type DraftProduct,
   type ProfileDraft,
   type ProfileDraftFields,
 } from "./profile-draft"
@@ -133,10 +136,76 @@ export async function writeDraftFields(
   baseRevision: number,
 ): Promise<AutosaveResult> {
   if (!(await ensureDraftRow(supabase, ctx))) return { ok: false, reason: "failed" }
+  return conditionalUpdate(supabase, ctx, fieldColumns(fields), baseRevision)
+}
 
+/**
+ * Stores the product arrangement: which products show, in array order.
+ *
+ * Three checks before anything is written, all on the server:
+ *
+ *   - every id is a product in the caller's workspace, read through the
+ *     caller's own client so RLS answers it (the draft table's trigger holds
+ *     the same rule for any write that does not come through here);
+ *   - no id appears twice;
+ *   - an arrangement identical to the stored one at the same revision is a
+ *     no-op that returns that revision, so a repeated save — a retry, a
+ *     double click, a flush after an autosave already landed — changes
+ *     nothing and cannot manufacture a conflict for the next one.
+ *
+ * Nothing here reads or writes a listing, a public page or the live profile.
+ */
+export async function writeDraftProducts(
+  supabase: Client,
+  ctx: BuilderContext,
+  products: DraftProduct[],
+  baseRevision: number,
+): Promise<AutosaveResult> {
+  const ids = products.map((entry) => entry.productId)
+  if (new Set(ids).size !== ids.length) return { ok: false, reason: "failed" }
+
+  if (ids.length > 0) {
+    const { data: owned, error } = await supabase
+      .from("products")
+      .select("id")
+      .eq("workspace_id", ctx.workspaceId)
+      .in("id", ids)
+    if (error) {
+      console.error("[public] draft product ownership check failed", error)
+      return { ok: false, reason: "failed" }
+    }
+    if ((owned ?? []).length !== ids.length) return { ok: false, reason: "failed" }
+  }
+
+  const { data: current } = await supabase
+    .from("public_profile_drafts")
+    .select("revision, products")
+    .eq("public_profile_id", ctx.profile.id)
+    .maybeSingle()
+
+  if (current && current.revision === baseRevision) {
+    const stored = draftProductsSchema.safeParse(current.products)
+    if (stored.success && sameArrangement(stored.data, products)) {
+      return { ok: true, revision: current.revision }
+    }
+  }
+
+  if (!current && !(await ensureDraftRow(supabase, ctx))) return { ok: false, reason: "failed" }
+  // Plain literals rather than the interface: the generated Json type needs an
+  // index signature, which an interface does not carry.
+  const stored = products.map(({ productId, visible }) => ({ productId, visible }))
+  return conditionalUpdate(supabase, ctx, { products: stored }, baseRevision)
+}
+
+async function conditionalUpdate(
+  supabase: Client,
+  ctx: BuilderContext,
+  patch: Database["public"]["Tables"]["public_profile_drafts"]["Update"],
+  baseRevision: number,
+): Promise<AutosaveResult> {
   const { data, error } = await supabase
     .from("public_profile_drafts")
-    .update({ ...fieldColumns(fields), revision: baseRevision + 1, updated_by: ctx.userId })
+    .update({ ...patch, revision: baseRevision + 1, updated_by: ctx.userId })
     .eq("public_profile_id", ctx.profile.id)
     .eq("revision", baseRevision)
     .select("revision")
