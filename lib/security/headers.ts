@@ -83,7 +83,10 @@ export function baselineHeaders(environment: Environment): HeaderEntry[] {
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     {
       key: "Permissions-Policy",
-      value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+      // The microphone is this origin's alone, for the product composer's Record
+      // button. Every other origin, including any frame, is still refused, and
+      // the browser still asks the creator before a page may use it.
+      value: "camera=(), microphone=(self), geolocation=(), payment=(), usb=(), browsing-topics=()",
     },
     // Belt for browsers that predate frame-ancestors. Same answer.
     { key: "X-Frame-Options", value: "DENY" },

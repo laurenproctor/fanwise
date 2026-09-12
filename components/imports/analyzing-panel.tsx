@@ -34,7 +34,7 @@ export function AnalyzingPanel({
       className="flex flex-col gap-5 rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-card)] px-6 py-7"
     >
       <h2 id="import-analyzing-heading" className="label-mono">
-        {mode === "link" ? "Reading the link" : "Reading your source"}
+        {mode === "link" ? "Reading the link" : "Reading your sources"}
       </h2>
 
       <div className="import-indeterminate h-[4px] w-full rounded-full" aria-hidden />

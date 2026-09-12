@@ -16,6 +16,7 @@ const stubs = {
   generate_listing: async () => {},
   sync_billing: async () => {},
   import_source: async () => {},
+  transcribe_import_source: async () => {},
 } satisfies Omit<JobHandlers, "noop">
 
 describe("job queue", () => {

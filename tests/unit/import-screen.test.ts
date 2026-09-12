@@ -164,6 +164,9 @@ function detailProps() {
     productId: "22222222-2222-4222-8222-222222222222",
     changes: [] as const,
     sourceMode: "link" as const,
+    canReplaceLink: true,
+    sources: [] as const,
+    conflicts: [] as const,
   }
 }
 

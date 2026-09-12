@@ -5,8 +5,7 @@ import {
   downloadObject,
   uploadObject,
 } from "@/lib/products/storage"
-import { PDF_LIMITS } from "./retrieval/pdf"
-import { HTML_LIMITS } from "./retrieval/html"
+import { IMPORT_LIMITS } from "./limits"
 import type { ContentSourceKind } from "./types"
 
 /**
@@ -27,17 +26,20 @@ import type { ContentSourceKind } from "./types"
  * URLs is one careless link away from being rendered on the storage host.
  */
 
-export const SOURCE_EXTENSIONS: Record<ContentSourceKind, "txt" | "pdf" | "html"> = {
+export type SourceExtension = "txt" | "pdf" | "html" | "webm" | "ogg" | "m4a" | "wav"
+
+export const SOURCE_EXTENSIONS: Record<ContentSourceKind, SourceExtension> = {
   pasted_text: "txt",
   pdf_document: "pdf",
   html_document: "html",
+  audio_recording: "webm",
 }
 
 export const SOURCE_LIMITS = {
-  /** Characters a paste may hold. Well inside the server action body limit. */
-  maxPasteCharacters: 200_000,
-  maxPdfBytes: PDF_LIMITS.maxBytes,
-  maxHtmlBytes: HTML_LIMITS.maxBytes,
+  maxPasteCharacters: IMPORT_LIMITS.maxPasteCharacters,
+  maxPdfBytes: IMPORT_LIMITS.maxPdfBytes,
+  maxHtmlBytes: IMPORT_LIMITS.maxHtmlBytes,
+  maxAudioBytes: IMPORT_LIMITS.maxAudioBytes,
 } as const
 
 /** The bytes a file of this kind may be. Paste limits are characters, above. */
@@ -51,15 +53,18 @@ export function sourcePathFor(
   workspaceId: string,
   uploadId: string,
   kind: ContentSourceKind,
+  extension: SourceExtension = SOURCE_EXTENSIONS[kind],
 ): string {
   if (!new RegExp(`^${UUID}$`).test(uploadId)) throw new Error("upload id is not a uuid")
-  return `${workspaceId}/import-sources/${uploadId}.${SOURCE_EXTENSIONS[kind]}`
+  return `${workspaceId}/import-sources/${uploadId}.${extension}`
 }
 
 /** Whether a stored path is one this workspace's server could have built. */
 export function isSourcePathFor(workspaceId: string, path: string): boolean {
   const escaped = workspaceId.replace(/[^0-9a-f-]/gi, "")
-  return new RegExp(`^${escaped}/import-sources/${UUID}\\.(txt|html|pdf)$`).test(path)
+  return new RegExp(`^${escaped}/import-sources/${UUID}\\.(txt|html|pdf|webm|ogg|m4a|wav)$`).test(
+    path,
+  )
 }
 
 /** Stores pasted text. The server wrote the bytes, so it knows their size. */

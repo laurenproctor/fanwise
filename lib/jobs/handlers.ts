@@ -3,6 +3,7 @@ import { runPublication } from "@/lib/publishing/runner"
 import { runGeneration } from "@/lib/ai/runner"
 import { syncBilling } from "@/lib/billing/sync"
 import { runImport } from "@/lib/imports/runner"
+import { runTranscription } from "@/lib/imports/transcribe"
 import type { JobHandlers } from "./types"
 
 /**
@@ -34,5 +35,8 @@ export const handlers: JobHandlers = {
   },
   import_source: async (payload) => {
     await runImport(payload)
+  },
+  transcribe_import_source: async (payload) => {
+    await runTranscription(payload)
   },
 }

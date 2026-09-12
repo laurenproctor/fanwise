@@ -299,31 +299,27 @@ describe("pasted markup", () => {
 })
 
 describe("naming the product before anything is read", () => {
-  it("uses the file name, then a first line that reads like a name, then the kind", () => {
+  it("uses the file name, then a first line that reads like a name, then a fallback", () => {
     expect(
       provisionalContentName({
-        kind: "pdf_document",
         filename: "aster-grotesk_specimen.pdf",
         firstLine: null,
       }),
     ).toBe("Aster Grotesk Specimen")
     expect(
       provisionalContentName({
-        kind: "pasted_text",
         filename: null,
         firstLine: "# Type Scale Studio",
       }),
     ).toBe("Type Scale Studio")
     expect(
       provisionalContentName({
-        kind: "pasted_text",
         filename: null,
         firstLine: 'import React from "react"',
+        fallback: "Pasted text",
       }),
     ).toBe("Pasted text")
-    expect(provisionalContentName({ kind: "html_document", filename: null, firstLine: null })).toBe(
-      "Imported HTML",
-    )
+    expect(provisionalContentName({ filename: null, firstLine: null })).toBe("Imported product")
   })
 })
 

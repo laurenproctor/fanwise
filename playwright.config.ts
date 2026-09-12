@@ -80,6 +80,9 @@ function localSupabaseEnv(): Record<string, string> {
     // whatever the checkout's file says.
     TRIGGER_SECRET_KEY: "",
     TRIGGER_PROJECT_REF: "",
+    // A recording reaches "Transcribed" through a fixed test transcript, never
+    // a vendor. lib/ai/transcription refuses this unless the database is local.
+    FANWISE_E2E_FAKE_TRANSCRIPTION: "1",
   }
 }
 

@@ -6,9 +6,13 @@ import { parseEvidence, type ProductSourceEvidence } from "./evidence"
 import { SOURCE_LABELS, descriptorFor } from "./sources/registry"
 import type { ImportRecord } from "./queries"
 import type { AnalyzingStage, ImportState } from "./machine"
-import { OBSERVATION_ORIGINS, isContentSourceKind, type ObservationOrigin } from "./types"
-import type {
-  BuyerDeliverable,
+import { detectConflicts, type FactConflict } from "./conflicts"
+import {
+  OBSERVATION_ORIGINS,
+  isContentSourceKind,
+  type ImportSourceType,
+  type ObservationOrigin,
+  type BuyerDeliverable,
   FieldOrigin,
   LicenseSelection,
   ListingDraft,
@@ -83,8 +87,10 @@ const LINK_ONLY_RECOVERIES: readonly RecoveryOption["action"][] = [
 
 export function recoveriesFor(record: ImportRecord): RecoveryOption[] {
   if (!record.errorCode) return []
-  const hint = descriptorFor(record.row.provider).publishHint
-  const content = isContentSourceKind(record.row.provider)
+  const provider = record.row.provider
+  const hint = provider === "composed" ? null : descriptorFor(provider).publishHint
+  // Link-only recoveries need a link.
+  const content = !record.row.source_url
 
   const actions = IMPORT_ERROR_RECOVERIES[record.errorCode].filter(
     (action) => !(content && LINK_ONLY_RECOVERIES.includes(action)),
@@ -150,11 +156,82 @@ export function snapshotFor(record: ImportRecord): SourceSnapshot | null {
  * uploaded; the kind of thing it was when there is not, which is every paste.
  */
 export function sourceLabelFor(record: ImportRecord): string {
+  const sources = record.sources ?? []
+  if (sources.length > 1) return `${sources.length} sources`
   if (record.row.source_url) return record.row.source_url
+  if (sources.length === 1) return sources[0]!.display_name
   if (record.row.source_filename) return record.row.source_filename
-  return record.row.provider === "html_document"
-    ? "Pasted HTML"
-    : SOURCE_LABELS[record.row.provider]
+  const provider = record.row.provider
+  if (provider === "composed") return "Your sources"
+  return provider === "html_document" ? "Pasted HTML" : SOURCE_LABELS[provider]
+}
+
+/**
+ * Whether the screen talks about a link or about sources.
+ *
+ * A single link keeps the wording it always had, so an import made before the
+ * composer reads exactly as it did. Anything else — a file, a paste, or several
+ * sources together — is "your sources".
+ */
+export function sourceModeFor(record: ImportRecord): "link" | "content" {
+  const sources = record.sources ?? []
+  return record.row.source_url && sources.length <= 1 ? "link" : "content"
+}
+
+/* ------------------------------------------------------------ the sources */
+
+export interface SourceSummary {
+  id: string
+  type: ImportSourceType
+  label: string
+  /** The word on screen, beside a dot. */
+  statusWord: string
+  tone: "ok" | "busy" | "bad"
+  /** Written by Fanwise, when the source did not read. */
+  message: string | null
+  /** A try-again button is offered only where trying again could help. */
+  retryable: boolean
+}
+
+export const SOURCE_TYPE_LABELS: Record<ImportSourceType, string> = {
+  public_url: "Link",
+  pasted_text: "Pasted text",
+  pdf: "PDF",
+  html: "HTML",
+  audio: "Recording",
+}
+
+function statusWordFor(type: ImportSourceType, status: string): string {
+  if (status === "ready") return type === "audio" ? "Transcribed" : "Read"
+  if (status === "failed" || status === "unavailable") return "Needs attention"
+  if (status === "transcribing") return "Transcribing"
+  if (status === "reading") return "Reading"
+  return "Waiting"
+}
+
+export function sourcesFor(record: ImportRecord): SourceSummary[] {
+  return (record.sources ?? []).map((source) => {
+    const bad = source.status === "failed" || source.status === "unavailable"
+    return {
+      id: source.id,
+      type: source.source_type,
+      label: source.display_name,
+      statusWord: statusWordFor(source.source_type, source.status),
+      tone: source.status === "ready" ? "ok" : bad ? "bad" : "busy",
+      message: bad ? source.error_message : null,
+      retryable: source.status === "failed",
+    }
+  })
+}
+
+/** Where the readable sources disagree, from their evidence. Pure. */
+export function conflictsFor(record: ImportRecord): FactConflict[] {
+  const readable = (record.sources ?? []).flatMap((source) =>
+    source.status === "ready" && source.evidence
+      ? [{ label: source.display_name, evidence: source.evidence }]
+      : [],
+  )
+  return readable.length < 2 ? [] : detectConflicts(readable)
 }
 
 export function stateFor(record: ImportRecord): ImportState {

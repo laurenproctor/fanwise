@@ -66,3 +66,13 @@ export const importSource = task({
   retry: { maxAttempts: 1 },
   run: async (payload: JobPayloads["import_source"]) => handlers.import_source(payload),
 })
+
+export const transcribeImportSource = task({
+  id: "transcribe_import_source",
+  // The runner records every outcome on the row, including a provider that is
+  // down. A second attempt here would transcribe, and bill, the same audio
+  // twice; the creator removing and re-recording is the honest retry.
+  retry: { maxAttempts: 1 },
+  run: async (payload: JobPayloads["transcribe_import_source"]) =>
+    handlers.transcribe_import_source(payload),
+})

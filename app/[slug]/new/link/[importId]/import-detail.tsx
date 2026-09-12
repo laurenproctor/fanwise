@@ -16,13 +16,17 @@ import {
   removeDeliverableAction,
   replaceSourceAction,
   retryImportAction,
+  retrySourceAction,
   reviewMarketplaceDraftsAction,
   saveImportDraftAction,
   setLicenseAction,
   withdrawOwnershipAction,
 } from "@/lib/imports/actions"
 import { uploadProductFile } from "@/lib/products/upload-client"
-import type { EvidenceChange } from "@/lib/imports/view"
+import type { EvidenceChange, SourceSummary } from "@/lib/imports/view"
+import type { FactConflict } from "@/lib/imports/conflicts"
+import { SourcesSection } from "@/components/imports/sources-section"
+import { ConflictsSection } from "@/components/imports/conflicts-section"
 import { SourceChanges } from "@/components/imports/source-changes"
 import { ReplaceSourceDialog } from "@/components/imports/replace-source"
 import { markSuggestionsReviewed, setListingField } from "@/lib/imports/draft"
@@ -76,6 +80,12 @@ export interface ImportDetailProps {
   changes: readonly EvidenceChange[]
   /** A link, or text or a file the creator handed over. */
   sourceMode: "link" | "content"
+  /** Whether this import has a link that can be swapped for another. */
+  canReplaceLink: boolean
+  /** Every source, with its status and any recovery. */
+  sources: readonly SourceSummary[]
+  /** Facts the readable sources state differently. */
+  conflicts: readonly FactConflict[]
 }
 
 export function ImportDetail(props: ImportDetailProps) {
@@ -220,8 +230,9 @@ export function ImportDetail(props: ImportDetailProps) {
           onSubmit={() => {}}
           onReplaceLink={() => setReplacing(true)}
           mode={props.sourceMode}
+          canReplaceLink={props.canReplaceLink}
         />
-        {replacing && props.sourceMode === "link" ? (
+        {replacing && props.canReplaceLink ? (
           <ReplaceSourceDialog
             currentUrl={props.state.url}
             onCancel={() => setReplacing(false)}
@@ -258,10 +269,21 @@ export function ImportDetail(props: ImportDetailProps) {
                 )
               },
               manualHref: routes.product(props.workspaceSlug, props.productSlug),
-              pasteHref: `${routes.importProduct(props.workspaceSlug)}?from=text`,
+              pasteHref: routes.importProduct(props.workspaceSlug),
             }}
             mode={props.sourceMode}
           />
+          {props.sources.length > 1 || props.sourceMode === "content" ? (
+            <SourcesSection
+              sources={props.sources}
+              onRetry={(sourceId) => {
+                void retrySourceAction(props.workspaceSlug, props.importId, sourceId).then(() =>
+                  startTransition(() => router.refresh()),
+                )
+              }}
+            />
+          ) : null}
+          <ConflictsSection conflicts={props.conflicts} />
           {props.changes.length > 0 ? <SourceChanges changes={props.changes} /> : null}
           {props.aiUnavailable ? <NoModelNotice mode={props.sourceMode} /> : null}
           {props.missingInformation.length > 0 ? (
@@ -358,9 +380,9 @@ function NoModelNotice({ mode }: { mode: "link" | "content" }) {
     <section className="flex flex-col gap-2 rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-card)] px-5 py-4">
       <h2 className="label-mono">No draft was composed</h2>
       <p className="text-[14px] leading-[1.55] text-[var(--color-ink-2)]">
-        Fanwise read the {mode === "link" ? "page" : "source"} and saved what it found, but this
+        Fanwise read the {mode === "link" ? "page" : "sources"} and saved what it found, but this
         deployment has no model configured, so nothing was proposed. The details are yours to write,
-        and everything on the left is what the {mode === "link" ? "page" : "source"} actually said.
+        and everything on the left is what the {mode === "link" ? "page" : "sources"} actually said.
       </p>
     </section>
   )
@@ -376,7 +398,7 @@ function MissingInformation({
   return (
     <section className="flex flex-col gap-2 rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-card)] px-5 py-4">
       <h2 className="label-mono">
-        {mode === "link" ? "What the page did not say" : "What the source did not say"}
+        {mode === "link" ? "What the page did not say" : "What your sources did not say"}
       </h2>
       <ul className="flex flex-col gap-1.5">
         {items.map((item) => (
@@ -406,7 +428,7 @@ function Withheld({ fields, mode }: { fields: readonly string[]; mode: "link" | 
       <h2 className="label-mono">Held back</h2>
       <p className="text-[14px] leading-[1.55] text-[var(--color-ink-2)]">
         Fanwise did not offer a suggestion for {fields.join(", ")}, because what it wrote made a
-        claim the {mode === "link" ? "page" : "source"} does not support — about files,
+        claim the {mode === "link" ? "page" : "sources"} does not support — about files,
         compatibility, licensing, support, ownership or resale. Those are yours to state.
       </p>
     </section>

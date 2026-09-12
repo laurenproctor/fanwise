@@ -52,6 +52,16 @@ export const IMPORT_ERROR_CODES = [
   "unreadable_file",
   /** A handed-over file that opened and holds no text, such as a scanned document. */
   "no_text",
+  /** Every source of an import failed. Each source says why. */
+  "no_readable_source",
+  /** A file or recording was never confirmed as stored. */
+  "upload_incomplete",
+  /** The stored bytes are not the kind of file the creator added. */
+  "unsupported_file",
+  /** A recording was made on a deployment with no transcription provider. */
+  "transcription_unavailable",
+  /** A recording longer than the importer accepts. */
+  "audio_too_long",
 ] as const
 
 export type ImportErrorCode = (typeof IMPORT_ERROR_CODES)[number]
@@ -112,6 +122,15 @@ export const IMPORT_ERROR_MESSAGES: Record<ImportErrorCode, string> = {
     "Fanwise could not open that file. It may be damaged, or locked with a password. Nothing inside it was run.",
   no_text:
     "That file has no text Fanwise can read. A scanned document is a picture of words rather than words, so paste the text instead.",
+  no_readable_source:
+    "None of your sources could be read. Each one below says why, and nothing was saved from them.",
+  upload_incomplete: "That file did not finish uploading. Remove it and add it again.",
+  unsupported_file:
+    "That file is not what its name says. Fanwise reads PDF, HTML and recorded audio, checked from the file itself.",
+  transcription_unavailable:
+    "Transcription is not available on this Fanwise deployment, so the recording was not turned into text. Remove it, or type what you said instead.",
+  audio_too_long:
+    "That recording is longer than ten minutes, which is as much as Fanwise transcribes.",
 }
 
 /**
@@ -143,6 +162,12 @@ export const IMPORT_ERROR_RECOVERIES: Record<ImportErrorCode, readonly RecoveryA
   internal: ["retry", "continue_manually"],
   unreadable_file: ["paste_code", "continue_manually"],
   no_text: ["paste_code", "continue_manually"],
+  // Retrying is offered per source, beside the source that can be retried.
+  no_readable_source: ["paste_code", "continue_manually"],
+  upload_incomplete: ["paste_code", "continue_manually"],
+  unsupported_file: ["paste_code", "continue_manually"],
+  transcription_unavailable: ["paste_code", "continue_manually"],
+  audio_too_long: ["paste_code", "continue_manually"],
 }
 
 /**
