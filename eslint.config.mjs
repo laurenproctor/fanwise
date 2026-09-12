@@ -16,6 +16,8 @@ const config = [
   {
     ignores: [
       ".next/**",
+      // Worktrees for parallel sessions: whole copies of the repo, linted in their own checkouts.
+      ".claude/**",
       // The Trigger.dev worker's build cache. Bundled vendor code, not ours.
       ".trigger/**",
       "node_modules/**",
