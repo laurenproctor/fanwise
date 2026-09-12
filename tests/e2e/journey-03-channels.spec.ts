@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
-import { productUrl, signUpAndCreateWorkspace } from "./support"
+import { newCreator, productUrl } from "./support"
+import { listingCard } from "./publish-support"
 
 /**
  * A3's exit test, driven through the browser.
@@ -8,6 +9,11 @@ import { productUrl, signUpAndCreateWorkspace } from "./support"
  * channel offers no publishing at any point, and the two channels reach
  * different verdicts about the same product because they enforce different
  * rules.
+ *
+ * What each channel says it cannot do, before it is connected, is rendered and
+ * checked in tests/unit/capability-list.test.ts against every adapter's real
+ * capabilities; that an assisted adapter has no publish method at all is
+ * tests/unit/channels.test.ts and tests/unit/channel-boundaries.test.ts.
  *
  * This is not journey 3 from docs/testing.md, which needs a real Shopify
  * connection at A5. It is the mock-channel proof that the contract holds first.
@@ -25,26 +31,8 @@ async function createProduct(page: import("@playwright/test").Page, slug: string
   )
 }
 
-test("a channel states what it cannot do before it is connected", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j3cap", "Capability Studio")
-
-  await page.getByRole("link", { name: "Channels" }).click()
-  await page.waitForURL(new RegExp(`/${slug}/channels$`))
-
-  const assisted = page.locator("section").filter({ hasText: "Mock Marketplace" })
-
-  // The limits are visible before anyone commits to the channel, not after.
-  await expect(assisted.getByText("Publish automatically — not supported")).toBeVisible()
-  await expect(assisted.getByText("Upload the deliverable — not supported")).toBeVisible()
-  await expect(assisted.getByText("Fanwise prepares the listing and you submit it")).toBeVisible()
-
-  const api = page.locator("section").filter({ hasText: "Mock Storefront" })
-  await expect(api.getByText("Publish automatically", { exact: false }).first()).toBeVisible()
-  await expect(api.getByText("Read sales — not supported")).toBeVisible()
-})
-
 test("one product yields two independent listings, judged by different rules", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j3two", "Two Channel Studio")
+  const { slug } = await newCreator(page, "j3two", "Two Channel Studio")
 
   await page.goto(`/${slug}/channels`)
   const cards = page.locator("section")
@@ -89,34 +77,22 @@ test("one product yields two independent listings, judged by different rules", a
   const assistedCard = page.locator("section").filter({ hasText: "Mock Marketplace" })
   await expect(assistedCard.getByText("Add at least 3 tags. There are 0.")).toBeVisible()
   await expect(assistedCard.getByText("Status here is self-reported")).toBeVisible()
-})
 
-test("the assisted channel never offers publishing, anywhere", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j3pub", "No Publish Studio")
-
-  await page.goto(`/${slug}/channels`)
-  await page
-    .locator("section")
-    .filter({ hasText: "Mock Marketplace" })
-    .getByRole("button", { name: "Connect", exact: true })
-    .click()
-  await expect(page.getByText("Connected")).toBeVisible()
-
-  await createProduct(page, slug, "Assisted Only")
-  await page.getByRole("button", { name: "Build listing" }).click()
-  await expect(page.getByRole("button", { name: "Rebuild" })).toBeVisible()
-
-  // Not disabled. Absent. A greyed-out button still promises that the action
-  // will work one day, and on this channel it never will. Anchored to the
-  // start of the name so it matches Publish and Republish, the actions, and
-  // not the glossary trigger "What not published means", which explains the
-  // state without offering to change it.
-  await expect(page.getByRole("button", { name: /^(re)?publish/i })).toHaveCount(0)
+  // And it never offers publishing. Not disabled: absent. A greyed-out button
+  // still promises the action will work one day, and on this channel it never
+  // will. Anchored to the start of the name so it matches Publish and
+  // Republish, the actions, and not the glossary trigger "What not published
+  // means", which explains the state without offering to change it.
+  await expect(
+    listingCard(page, "Mock Marketplace", "Mock Storefront").getByRole("button", {
+      name: /^(re)?publish/i,
+    }),
+  ).toHaveCount(0)
   await expect(page.getByText("Publishing arrives at step A7")).toHaveCount(0)
 })
 
 test("disconnecting a channel takes its listings with it", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j3dis", "Disconnect Studio")
+  const { slug } = await newCreator(page, "j3dis", "Disconnect Studio")
 
   await page.goto(`/${slug}/channels`)
   await page

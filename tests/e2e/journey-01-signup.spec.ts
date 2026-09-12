@@ -7,9 +7,13 @@ import { PASSWORD, renameWorkspace, signOut, signUp } from "./support"
  * workspace on arrival; nobody is asked to name one before seeing the product.
  * The database proof that it is exactly one, under replay and under a race, is
  * tests/db/workspace-provisioning.test.ts.
+ *
+ * This is the suite's one signup through the form. Every other file starts from
+ * `newCreator` in support.ts, which signs a fresh account in rather than
+ * repeating this journey as setup.
  */
 test("a new creator signs up and lands in a provisioned workspace", async ({ page }) => {
-  const { slug } = await signUp(page, "j1")
+  const { email, slug } = await signUp(page, "j1")
 
   // Email signup supplies no name, so the workspace is the fallback, suffixed.
   expect(slug).toMatch(/^my-studio-[a-z0-9]{4}$/)
@@ -24,6 +28,16 @@ test("a new creator signs up and lands in a provisioned workspace", async ({ pag
     "aria-current",
     "page",
   )
+
+  // The root, and a replayed onboarding, resolve to the one workspace.
+  // Provisioning is a GET, and GETs get replayed. A replay lands on the
+  // workspace that exists rather than making another.
+  await page.goto("/")
+  await expect(page).toHaveURL(new RegExp(`/${slug}$`))
+  for (let replay = 0; replay < 2; replay += 1) {
+    await page.goto("/onboarding")
+    await expect(page).toHaveURL(new RegExp(`/${slug}$`))
+  }
 
   /**
    * Settings names the page rather than the workspace, so the provisioned name
@@ -46,28 +60,14 @@ test("a new creator signs up and lands in a provisioned workspace", async ({ pag
   await renameWorkspace(page, slug, "Northbound Type")
   await expect(page).toHaveURL(new RegExp(`/${slug}$`))
   await expect(page.getByRole("link", { name: /My studio/ })).toHaveCount(0)
-})
 
-test("the root, a replayed onboarding and a new session all resolve to the one workspace", async ({
-  page,
-}) => {
-  const { email, slug } = await signUp(page, "j1b")
-
-  await page.goto("/")
-  await expect(page).toHaveURL(new RegExp(`/${slug}$`))
-
-  // Provisioning is a GET, and GETs get replayed. A replay lands on the
-  // workspace that exists rather than making another.
-  for (let replay = 0; replay < 2; replay += 1) {
-    await page.goto("/onboarding")
-    await expect(page).toHaveURL(new RegExp(`/${slug}$`))
-  }
-
+  // A new session resolves to the same workspace, not a second one.
   await signOut(page)
   await page.getByLabel("Email").fill(email)
   await page.getByLabel("Password").fill(PASSWORD)
   await page.getByRole("button", { name: "Sign in" }).click()
   await page.waitForURL(new RegExp(`/${slug}$`))
+  await expect(page.getByRole("link", { name: /Northbound Type/ })).toBeVisible()
   await expect(
     page.getByRole("heading", { level: 1, name: "Your first product starts here." }),
   ).toBeVisible()

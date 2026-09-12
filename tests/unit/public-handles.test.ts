@@ -328,3 +328,22 @@ describe("displayHost and referrerHost", () => {
     expect(referrerHost("not a url")).toBeNull()
   })
 })
+
+describe("what a refused handle says", () => {
+  /**
+   * The creator reads these while typing, beside the field. The browser still
+   * types a reserved one in journey-14-public-pages.spec.ts; every rule's words
+   * are pinned here, because a message that names the wrong problem is a field
+   * a creator cannot fill in.
+   */
+  it.each([
+    ["fanwise", "That handle is reserved. Choose another."],
+    ["no", `A handle is at least ${HANDLE_LIMITS.min} characters.`],
+    ["Not A Handle", "A handle uses lowercase letters, numbers and hyphens only."],
+    ["north--line", "A handle cannot start or end with a hyphen, or contain two in a row."],
+    ["-northline", "A handle cannot start or end with a hyphen, or contain two in a row."],
+    ["", "Choose a handle."],
+  ])("refuses %j with the words for that problem", (input, message) => {
+    expect(checkHandle(input)).toEqual({ ok: false, message })
+  })
+})
