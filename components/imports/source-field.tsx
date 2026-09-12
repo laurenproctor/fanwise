@@ -62,15 +62,21 @@ export function SourceField({
   onUrlChange,
   onSubmit,
   onReplaceLink,
+  mode = "link",
 }: {
   state: ImportState
   onUrlChange: (url: string) => void
   onSubmit: () => void
   onReplaceLink: () => void
+  /**
+   * Whether the source is a link or something handed over. A paste or a file
+   * shows its name rather than an address, and has no link to replace.
+   */
+  mode?: "link" | "content"
 }) {
   const inputId = useId()
   const hintId = useId()
-  const editable = state.status === "empty" || state.status === "validating"
+  const editable = mode === "link" && (state.status === "empty" || state.status === "validating")
   const busy = state.status === "validating" || state.status === "analyzing"
 
   return (
@@ -123,7 +129,7 @@ export function SourceField({
       ) : (
         <div className="flex flex-col gap-3 rounded-[var(--radius-pill)] border border-[var(--color-rule)] bg-[var(--color-card)] px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:py-2.5 sm:pl-5">
           <span className="flex min-w-0 flex-1 items-center gap-3">
-            <LinkGlyph inline />
+            {mode === "link" ? <LinkGlyph inline /> : <DocumentGlyph />}
             <span className="min-w-0 truncate font-mono text-[13px] text-[var(--color-ink-2)]">
               {state.url}
             </span>
@@ -138,15 +144,19 @@ export function SourceField({
               />
               {STATE_WORDS[state.status]}
             </span>
-            <span aria-hidden className="hidden h-5 w-px bg-[var(--color-rule)] sm:block" />
-            <button
-              type="button"
-              onClick={onReplaceLink}
-              className="inline-flex min-h-11 items-center gap-2 rounded-[6px] text-[14px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-accent)]"
-            >
-              <SwapGlyph />
-              Replace link
-            </button>
+            {mode === "link" ? (
+              <>
+                <span aria-hidden className="hidden h-5 w-px bg-[var(--color-rule)] sm:block" />
+                <button
+                  type="button"
+                  onClick={onReplaceLink}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-[6px] text-[14px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-accent)]"
+                >
+                  <SwapGlyph />
+                  Replace link
+                </button>
+              </>
+            ) : null}
           </span>
         </div>
       )}
@@ -184,6 +194,27 @@ function LinkGlyph({ inline = false }: { inline?: boolean }) {
     >
       <path
         d="M6.5 9.5a3 3 0 0 0 4.24 0l2-2a3 3 0 0 0-4.24-4.24l-.8.8M9.5 6.5a3 3 0 0 0-4.24 0l-2 2a3 3 0 0 0 4.24 4.24l.8-.8"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function DocumentGlyph() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+      className="shrink-0 text-[var(--color-ink-3)]"
+    >
+      <path
+        d="M4 1.75h5.25L12.5 5v9.25H4zM9 1.75V5.25h3.5M6 8.25h4.5M6 10.75h4.5"
         stroke="currentColor"
         strokeWidth="1.3"
         strokeLinecap="round"

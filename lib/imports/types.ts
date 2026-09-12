@@ -26,8 +26,27 @@ import type { ProductType } from "@/lib/products/types"
  * holds the channel keys. Code outside that directory branches on the kind, not
  * on a provider's name.
  */
-export const SOURCE_KINDS = ["hosted_artifact", "webpage"] as const
+export const LINK_SOURCE_KINDS = ["hosted_artifact", "webpage"] as const
+export type LinkSourceKind = (typeof LINK_SOURCE_KINDS)[number]
+
+/**
+ * Sources a creator hands over rather than points at.
+ *
+ * No URL, no fetch, no outbound boundary: the bytes are pasted or uploaded
+ * into private storage, and the job reads them from there. Everything after
+ * the reading — evidence, suggestions, the review screen — is the same as for
+ * a link, which is why these are kinds of the same import rather than a second
+ * feature beside it.
+ */
+export const CONTENT_SOURCE_KINDS = ["pasted_text", "pdf_document", "html_document"] as const
+export type ContentSourceKind = (typeof CONTENT_SOURCE_KINDS)[number]
+
+export const SOURCE_KINDS = [...LINK_SOURCE_KINDS, ...CONTENT_SOURCE_KINDS] as const
 export type SourceKind = (typeof SOURCE_KINDS)[number]
+
+export function isContentSourceKind(kind: SourceKind): kind is ContentSourceKind {
+  return (CONTENT_SOURCE_KINDS as readonly string[]).includes(kind)
+}
 
 /**
  * Where in a document an observed fact was read.
@@ -37,7 +56,15 @@ export type SourceKind = (typeof SOURCE_KINDS)[number]
  * may be the site's name with the page's name appended. The UI names the origin
  * so a creator can judge the value rather than trust it.
  */
-export const OBSERVATION_ORIGINS = ["og", "twitter", "meta", "dom", "header"] as const
+export const OBSERVATION_ORIGINS = [
+  "og",
+  "twitter",
+  "meta",
+  "dom",
+  "header",
+  "document",
+  "properties",
+] as const
 export type ObservationOrigin = (typeof OBSERVATION_ORIGINS)[number]
 
 export const OBSERVATION_ORIGIN_LABELS: Record<ObservationOrigin, string> = {
@@ -46,6 +73,8 @@ export const OBSERVATION_ORIGIN_LABELS: Record<ObservationOrigin, string> = {
   meta: "Meta tag",
   dom: "Page content",
   header: "Response header",
+  document: "Document text",
+  properties: "Document properties",
 }
 
 /**
@@ -125,7 +154,10 @@ export interface SourceFact {
  */
 export interface SourceSnapshot {
   readonly sourceKind: SourceKind
-  /** The normalized URL that was read. Never the raw paste. */
+  /**
+   * The normalized URL that was read, never the raw paste. For a source that
+   * was handed over rather than linked, the file's name or what it was.
+   */
   readonly url: string
   /** ISO 8601. Fixed by the service so a render is deterministic. */
   readonly capturedAt: string

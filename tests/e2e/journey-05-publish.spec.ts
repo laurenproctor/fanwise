@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { signUpAndCreateWorkspace } from "./support"
+import { newCreator } from "./support"
 import { connect, upload, waitForProductPage, writeListing } from "./publish-support"
 
 /**
@@ -16,10 +16,14 @@ import { connect, upload, waitForProductPage, writeListing } from "./publish-sup
  * Mock Storefront is used deliberately rather than a real channel: it declares
  * digitalFileUpload, so it is the case with nothing left for a human to do, and
  * everything above the adapter is identical.
+ *
+ * That an assisted channel never offers Publish is asserted in
+ * journey-03-channels.spec.ts and journey-05-publish-everywhere.spec.ts, which
+ * both connect one, and in tests/unit/listing-panel.test.ts over every state.
  */
 
 test("a product publishes, and clicking publish again creates nothing", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j5p", "Publishing Studio")
+  const { slug } = await newCreator(page, "j5p", "Publishing Studio")
   await connect(page, slug, "Mock Storefront")
 
   await page.goto(`/${slug}/new`)
@@ -29,17 +33,25 @@ test("a product publishes, and clicking publish again creates nothing", async ({
   await waitForProductPage(page, slug, "Aster Grotesk")
   const productPage = page.url()
 
-  await upload(page, "cover_image", "tests/fixtures/small-800x600.png", 0)
-  await upload(page, "deliverable", "tests/fixtures/specimen-3000x2000.jpg", 1)
-
   await page.getByRole("button", { name: "Build listing" }).click()
   await expect(page.getByRole("link", { name: "Edit listing" })).toHaveCount(1)
+
+  // A listing that is not ready cannot be published. No deliverable, no cover
+  // image, no description: the channel's own rules say so, and the button is
+  // offered but refuses rather than being hidden, because the creator needs to
+  // see that publishing is the next step once they fix it.
+  await expect(page.getByText("Resolve what is blocking before publishing.")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeDisabled()
+
+  await upload(page, "cover_image", "tests/fixtures/small-800x600.png", 0)
+  await upload(page, "deliverable", "tests/fixtures/specimen-3000x2000.jpg", 1)
 
   await writeListing(page, slug)
   await page.goto(productPage)
 
   // Nothing has been sent yet, and the card says so rather than staying blank.
   await expect(page.getByText("Not published")).toBeVisible()
+  await expect(page.getByText("Resolve what is blocking before publishing.")).toHaveCount(0)
 
   await page.getByRole("button", { name: "Publish", exact: true }).click()
 
@@ -58,41 +70,4 @@ test("a product publishes, and clicking publish again creates nothing", async ({
   await expect(page.getByText("Live", { exact: true })).toBeVisible()
   await expect(page.getByRole("link", { name: /View on Mock Storefront/ })).toHaveCount(1)
   await expect(page.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0)
-})
-
-test("a listing that is not ready cannot be published", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j5g", "Unready Studio")
-  await connect(page, slug, "Mock Storefront")
-
-  await page.goto(`/${slug}/new`)
-  await page.getByLabel("Product name").fill("Unfinished Font")
-  await page.getByRole("button", { name: "Create product" }).click()
-  await waitForProductPage(page, slug, "Unfinished Font")
-
-  await page.getByRole("button", { name: "Build listing" }).click()
-  await expect(page.getByRole("link", { name: "Edit listing" })).toHaveCount(1)
-
-  // No deliverable, no cover image, no description. The channel's own rules
-  // say so, and the button is offered but refuses rather than being hidden:
-  // the creator needs to see that publishing is the next step once they fix it.
-  await expect(page.getByText("Resolve what is blocking before publishing.")).toBeVisible()
-  await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeDisabled()
-})
-
-test("an assisted channel never offers to publish", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j5a", "Assisted Studio")
-  await connect(page, slug, "Mock Marketplace")
-
-  await page.goto(`/${slug}/new`)
-  await page.getByLabel("Product name").fill("Assisted Font")
-  await page.getByRole("button", { name: "Create product" }).click()
-  await waitForProductPage(page, slug, "Assisted Font")
-
-  await page.getByRole("button", { name: "Build listing" }).click()
-  await expect(page.getByRole("link", { name: "Edit listing" })).toHaveCount(1)
-
-  // Not disabled. Absent. A greyed-out button says "this will work later", and
-  // on a channel with no publish method it never will.
-  await expect(page.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0)
-  await expect(page.getByText("Status here is self-reported.")).toBeVisible()
 })

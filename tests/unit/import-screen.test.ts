@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
@@ -114,6 +116,7 @@ const RECOVERY_HANDLERS = {
   onReplaceLink: () => {},
   onRetry: () => {},
   manualHref: routes.newProduct(SLUG),
+  pasteHref: `${routes.importProduct(SLUG)}?from=text`,
 }
 
 const SNAPSHOT: SourceSnapshot = (() => {
@@ -160,6 +163,7 @@ function detailProps() {
     aiUnavailable: false,
     productId: "22222222-2222-4222-8222-222222222222",
     changes: [] as const,
+    sourceMode: "link" as const,
   }
 }
 
@@ -184,7 +188,9 @@ describe("the import page's frame", () => {
   it("says what it is, once, as the page's only h1", () => {
     expect(count(markup, "<h1")).toBe(1)
     expect(text).toContain("Import a product")
-    expect(text).toContain("Turn a public product page into an editable Fanwise listing.")
+    expect(text).toContain(
+      "Turn a product page, a document, or text you already have into an editable Fanwise listing.",
+    )
   })
 
   it("puts the creator back in the catalog through a breadcrumb", () => {
@@ -378,7 +384,7 @@ describe("every source state", () => {
     // it is named once. It was named twice before anybody looked at the screen.
     expect(count(markup, "Claude Artifact")).toBe(1)
     // A snapshot, not a subscription, said where a creator will look for it.
-    expect(text).toContain("Fanwise does not re-read this link")
+    expect(text).toContain("Fanwise does not re-read this source")
   })
 
   it("gives every unhappy state a heading, a reason and a way out", () => {
@@ -821,5 +827,46 @@ describe("the layout at the widths the repository already tests", () => {
   it("lets the source field and the footer become rows only when there is room", () => {
     expect(markup).toContain("sm:flex-row")
     expect(markup).toContain("lg:flex-row")
+  })
+})
+
+describe("only the importer asks for the whole window", () => {
+  /**
+   * The browser used to measure `<main>` on three other workspace routes at
+   * 1600px to prove none of them had been widened. What decides that is one CSS
+   * rule keyed on one attribute, and who carries the attribute, so both are
+   * read here. The importer's own widths and gutters are still measured in
+   * product-link-import.spec.ts.
+   */
+  const ROOT = join(__dirname, "..", "..")
+
+  function sourceFiles(dir: string): string[] {
+    return readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) return sourceFiles(path)
+      return /\.(tsx?|css)$/.test(entry.name) ? [path] : []
+    })
+  }
+
+  it("is the one component that carries the wide-canvas attribute", () => {
+    const carriers = [...sourceFiles("app"), ...sourceFiles("components"), ...sourceFiles("lib")]
+      .filter((path) => readFileSync(join(ROOT, path), "utf8").includes("data-workspace-canvas"))
+      .sort()
+
+    expect(carriers).toEqual([
+      join("app", "globals.css"),
+      join("components", "imports", "import-chrome.tsx"),
+    ])
+  })
+
+  it("widens only a main that directly holds that canvas, and leaves the reading column alone", () => {
+    const css = readFileSync(join(ROOT, "app", "globals.css"), "utf8")
+    const layout = readFileSync(join(ROOT, "app", "[slug]", "layout.tsx"), "utf8")
+
+    expect(css).toMatch(
+      /main:has\(> \[data-workspace-canvas="full"\]\) \{\s*max-width: none;\s*padding-inline: clamp\(1\.5rem, 4vw, 4rem\);/,
+    )
+    // Every other workspace route keeps the 1160px column and its 24px gutters.
+    expect(layout).toContain('<main className="mx-auto w-full max-w-[1160px] px-6 py-10">')
   })
 })

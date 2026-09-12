@@ -2,7 +2,7 @@
  * What a profile image may be. Split from `./avatars` so browser code can read
  * the rules without importing the module that holds the service-role client.
  *
- * Matches the bucket's own limit (migration 20260912160000) and the sentence
+ * Matches the bucket's own limit (migration 20260912220000) and the sentence
  * the builder shows.
  */
 export const MAX_AVATAR_BYTES = 5 * 1024 * 1024

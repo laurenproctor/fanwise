@@ -16,7 +16,8 @@ extract evidence, pictures are fetched and measured into `product_assets`, a mod
 draft that a claims check refuses to let over-claim, and the row survives a refresh.
 
 **What is not:** no browser rendering, so a page that renders with JavaScript yields nothing
-and says so; no ZIP or pasted-code intake, so those two recoveries are marked not built; no
+and says so, and offers pasting the text instead (§14); no ZIP intake, so that recovery is
+marked not built; no
 malware scanning, so §12 records the operational requirement rather than pretending; buyer
 files are still uploaded on the product page rather than this one.
 
@@ -635,7 +636,7 @@ Eight rules, each with the thing that enforces it.
 - The recovery path: an unavailable source offers four options and **continue manually**
   reaches the product page with the draft intact.
 - **No new numbered journey.** This is a variation on journey 1 — empty workspace to a
-  product — with a different first step, and journey 14 is B12's. `docs/testing.md` should
+  product — with a different first step, and journey 15 is B12's. `docs/testing.md` should
   say that explicitly, the way it already says B11 adds none.
 
 ---
@@ -848,3 +849,77 @@ returns the product page's address — the surface where channel drafts have alw
 reviewed and published. There is no second marketplace flow. A browser holding an unsaved
 licence can show 100%; only the database can say whether the five steps are done, and
 `reviewMarketplaceDraftsAction` is the last place that asks.
+
+---
+
+## 14. Importing from pasted text, a PDF or an HTML file
+
+Added 12 September 2026, off-roadmap like the rest of this feature, at the founder's request.
+PR #78 showed that a link cannot import a Claude artifact (the page is a JavaScript shell), and
+the founder chose to let a creator hand the material over instead. Three ways, on the same
+screen as the link, chosen by `?from=`:
+
+| Tab | What the creator does | Kind | Stored as |
+|---|---|---|---|
+| Link | pastes a public URL | `hosted_artifact` or `webpage` | nothing; fetched |
+| Paste text | pastes words, notes or code, up to 200,000 characters | `pasted_text` | `.txt` |
+| PDF | uploads a `.pdf`, up to 20 MB | `pdf_document` | `.pdf` |
+| HTML | uploads an `.html` file up to 2 MB, or pastes markup | `html_document` | `.html` |
+
+A pasted text that is a whole HTML document (a doctype or an `<html>` element at the top) is
+read as HTML, because a creator copying an artifact's code has handed over markup.
+
+### What is the same
+
+Everything after the reading. The row is a `product_imports` row, the job is `import_source`,
+the evidence is `ProductSourceEvidence`, the draft goes through `composeDraft` and the claims
+check, suggestions never reach `products` without a save, and readiness, licence, ownership and
+the handoff are unchanged. A handed-over source is a kind of import, not a second feature.
+
+### What is different
+
+- **No URL, no fetch.** Migration `20260912210000_import_content_sources` adds three provider
+  values and `source_path`, `source_filename`, `source_byte_size`, and makes the two URL
+  columns nullable. `product_imports_one_source` holds each row to exactly one source: a link
+  kind has a URL and no object, a handed-over kind has an object and no URL.
+- **Where the bytes live.** `<workspace_id>/import-sources/<upload_id>.<ext>` in the private
+  `product-assets` bucket, so the existing storage policies cover it. The server builds every
+  path (`lib/imports/source-storage.ts`). A paste is written by the server action; a file is
+  PUT by the browser to a signed URL through `lib/products/upload-client.ts`, still the only
+  place the browser fetches, and measured from storage before an import starts. Objects are
+  stored as `application/octet-stream`, so no signed link can ever render one as a page.
+- **The tenant check, twice.** The job reads `source_path` with the service role, which ignores
+  storage policies. `product_imports_source_path_in_workspace` refuses a path outside the row's
+  own workspace prefix or of any other shape, and the runner checks `isSourcePathFor` again
+  before reading. Without both, a member could point their own import at another workspace's
+  object and have the job read it for them. `tests/db/product-import.test.ts` proves the
+  database half.
+- **The readers** (`lib/imports/sources/content.ts`). Text is read line by line
+  (`retrieval/plain-text.ts`): first line as a title unless it looks like code, first
+  paragraph as a summary, headings and bullets as visible lines. HTML gets the same
+  parse-never-render reading as a fetched page, minus an address, so relative image URLs are
+  dropped. A PDF is read with PDF.js through `unpdf` (`retrieval/pdf.ts`): the title property
+  if it is a real title, the text layer of the first 40 pages, and nothing else — no rendering,
+  images, forms, annotations or attachments.
+- **`bodyText`.** Handed-over sources carry up to 20,000 characters of running text in
+  evidence, rendered into the prompt and added to the claims corpus. Link imports do not, so
+  their hashes and prompts are unchanged; a unit test pins a link import's hash to the value it
+  had before this change.
+- **No dedupe.** A paste has no stable identity; pasting again makes a second draft.
+- **Two new error codes.** `unreadable_file` (not text, not a PDF, damaged or locked) and
+  `no_text` (a scanned PDF). Both recover to pasting the text. `unsupported_source` now offers
+  pasting the text too, for links and files alike. A handed-over import is never offered
+  "replace link" or "publish a public link".
+- **The prompt** names the kind of source and moved to version `2026-09-12.2`.
+
+### Not built
+
+- No OCR. A scanned PDF says it has no text and offers pasting.
+- No images from a PDF, and none from an HTML file's relative or `data:` URLs.
+- The uploaded file is a source, never a buyer file. Whether an artifact is what buyers receive
+  is the open question in the artifact-import plan; a creator still adds buyer files in the
+  checklist.
+- No clean-up job for an upload that was never started. Discarding an import removes its
+  object; an abandoned upload leaves a private object behind.
+- No replacing a handed-over source. Discard and start again.
+

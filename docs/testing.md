@@ -15,23 +15,72 @@ the wrong one is how this suite passes while proving nothing.
 handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
 AI failure.
 
-**E2E** — the fourteen journeys below, plus two step exit tests against the mock channels
-rather than against the fourteen:
+**E2E** — the fifteen journeys below, plus step exit tests against the mock channels
+rather than against the fifteen:
 
 - `journey-03-channels.spec.ts` (A3): one product, two independent listings, and no publish
   affordance anywhere on the assisted channel.
 - `journey-04-listing-editor.spec.ts` (A4): a person hand-writes a listing per channel and
   watches deterministic readiness resolve, with no AI involved.
-- `journey-05-publish.spec.ts` (A5): a product publishes, and clicking Publish again creates
-  nothing. Run against the mock API channel, because the e2e suite has no live Shopify
-  connection; A5's exit ran by hand against the live store, see `docs/roadmap.md`.
-- `journey-05-publish-everywhere.spec.ts` (A7): one click starts every channel that can take
-  the product, names each channel it skipped and why, and a second run sends nothing again.
-  The activity log is asserted after a reload, because a run is a record rather than a
-  screen. The exit's "two live URLs" needs two live channels and is a run a person does by
-  hand; the recovery half is proved in `tests/unit/publish-retry.test.ts` and
+- `journey-05-publish.spec.ts` (A5): a listing that is not ready refuses to publish, then a
+  product publishes, and clicking Publish again creates nothing. Run against the mock API
+  channel, because the e2e suite has no live Shopify connection; A5's exit ran by hand
+  against the live store, see `docs/roadmap.md`.
+- `journey-05-publish-everywhere.spec.ts` (A7): with only an assisted channel there is
+  nothing to press; once a channel that can publish is connected, one click starts it,
+  names each channel it skipped and why, a second run sends nothing again, and the activity
+  log records the run after a reload, because a run is a record rather than a screen. The
+  exit's "two live URLs" needs two live channels and is a run a person does by hand; the
+  recovery half is proved in `tests/unit/publish-retry.test.ts` and
   `tests/db/publication-idempotency.test.ts`, where a failure can be made to happen on
   demand. Both publish specs share their setup through `tests/e2e/publish-support.ts`.
+
+## What the browser suite is for
+
+The Playwright suite is a small number of critical journeys, not a catalogue of rules. It
+was cut from 111 tests to 47 on 12 September 2026, with every removed test's guarantee
+either moved to a lower layer or folded into a journey that was kept; the test-by-test
+record is `docs/e2e-rightsizing.md`.
+
+A browser test earns its place by proving something only an integrated, running application
+can: that a person can finish a workflow, that routing, authentication, hydration and the
+browser's own behaviour hold across the system's boundaries, that a public or private page
+answers a visitor correctly, or that a security- or commerce-critical journey reaches its
+outcome.
+
+**Permutations live below the browser.** Which inputs a validator refuses and what it says,
+readiness arithmetic, which channel may publish in which state, which paths the proxy lets a
+stranger reach, what a component renders for each state, price arithmetic, route tables and
+RLS belong in `tests/unit` and `tests/db`, which run in seconds and cover every case. A
+journey asserts one representative case of each on the way through, where it is already
+standing on the page, rather than growing a separate test per case. Layout that only a
+browser can measure — sideways overflow at a phone width, a tap target's box, Tab order —
+is asserted inside the journey that already renders that screen.
+
+**What is still proved in the browser, and must stay there:**
+
+- Tenancy: journey 9 sends a signed-in creator to another workspace and its product, and a
+  stranger to a private workspace, and requires the same 404 for a workspace that never
+  existed. The exhaustive proof is `tests/db/*tenancy*.test.ts`.
+- Security headers: `security-headers.spec.ts` in full — nonce policy, nonce isolation,
+  report-only marketing policy, baseline headers, hydration under the policy.
+- Publication idempotency: a second Publish and a second Publish Everywhere create nothing.
+- Public and private boundaries: journey 14 reads a draft as a stranger (404), a published
+  page (200), an unpublished one (404 again), the sitemap and robots, and the canonical
+  redirects; password recovery answers identically for a registered and an unregistered
+  address.
+
+**One signup goes through the form.** `journey-01-signup.spec.ts` is the suite's signup
+journey, including replayed onboarding and a new session. Every other test that needs an
+account starts from `newCreator` in `tests/e2e/support.ts`, which creates a unique account
+through the local auth admin API and then signs in through the real sign-in form, so the
+workspace is still provisioned by the production route under the creator's own session and
+RLS. It refuses to run against anything but a local Supabase URL. Setup does not repeat
+signup through the UI. (`security-headers.spec.ts` keeps its original signup, because that
+file is held unchanged.)
+
+Each test creates its own account and workspace; none depends on another test having run,
+and none shares an account with another file.
 
 **B1's validator is proved twice.** `tests/unit/factuality.test.ts` is the vocabulary: every
 way a model could state a number, a format, a compatibility or a claim the facts do not
@@ -72,7 +121,7 @@ content arrives, so `waitForURL` can return while the loading boundary is still 
 and a locator that counts elements then finds none. Follow it with a wait on real content —
 the product heading, usually.
 
-## The fourteen journeys
+## The fifteen journeys
 
 1. Signup, workspace, product. *(complete at A2)*
 2. Product to AI Shopify listing, approved. *(composition ran live at B1; the review loop
@@ -91,7 +140,8 @@ the product heading, usually.
 8. Analytics shows an ingested sale.
 9. **Workspace A attempts Workspace B access, denied.** *(covered at A1, in the browser at
    `tests/e2e/journey-09-tenancy.spec.ts` and at the database in `tests/db/tenancy.test.ts`;
-   extended to the A3 tables in `tests/db/channel-tenancy.test.ts`)*
+   extended to the A3 tables in `tests/db/channel-tenancy.test.ts`. The proxy's redirect for
+   a visitor with no session is run over every private route in `tests/unit/proxy.test.ts`)*
 10. Trial to subscription. *(code complete at C1; the settings page shows the trial and the
     two checkouts, and `tests/db/billing.test.ts` proves the ledger, the tenancy and the sync
     job against real Postgres with the provider scripted. Unrun in the browser: it needs a
@@ -110,6 +160,9 @@ the product heading, usually.
     builder; the permission half is `tests/db/public-pages-tenancy.test.ts`,
     `tests/db/profile-drafts-tenancy.test.ts` and `tests/db/profile-publication.test.ts`, and
     the routing table `tests/unit/public-routing.test.ts`)*
+15. Import a live listing, then publish the imported product to a second channel.
+    *(planned at B12, not built; opens after Gate A passes, and the listing it imports must
+    be one Fanwise did not create, see `docs/listing-import.md`)*
 
 Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, the product
 is broken in the way that matters most.
@@ -153,12 +206,35 @@ public page matching the final preview, an edit that stays a draft until "Publis
 and another account refused the draft. Everything that journey passes through is also
 tested below the browser, so the journey asserts the path, not every rule on it.
 
-**Password recovery is not one of the fourteen**, because it is not a step on the path from empty
+**Journey 15 was added on 12 September 2026**, when importing a live listing was planned as
+B12. It is the only journey that does not begin in Fanwise. Every other path starts with an
+upload or a form and ends at a marketplace; this one starts at a marketplace listing the
+creator already sells and ends with that product published somewhere else. That is a
+fifteenth path rather than a variation, and it is the test this list applies to every
+candidate: a second view of a screen that already has a journey does not earn a number, and
+a different way into the product does.
+
+The clause that makes it worth running is in `docs/listing-import.md` §15: the listing must
+be one Fanwise did not create. A listing Fanwise published, imported back, only proves the
+round trip closes. What the mapping has to survive is a stranger's category, a stranger's
+tags and a stranger's line breaks. The journey also runs the import twice, because the second
+import is a navigation to the product that already exists and not an error.
+
+**B11 adds no journey.** The companion window planned on 12 September 2026 in
+`docs/companion-window.md` is journey 7 run in a second window, not a new path from empty
+workspace to live listing. Its own tests assert the handoff renders identically into a
+detached document and that the pop-out button is absent where the API is, and the rest is
+covered by journey 7 being run once with the companion open. A new number would imply a
+new path, and there is not one.
+
+**Password recovery is not one of the fifteen**, because it is not a step on the path from empty
 workspace to live listing. It is covered anyway, in two halves that meet at the token:
 `tests/db/password-recovery.test.ts` makes the same calls the confirm route makes, against the
 real auth server, and proves the link is single use; `tests/e2e/password-recovery.spec.ts`
 covers what a person sees, including that the answer is identical for a registered and an
-unregistered address. Neither needs a mail catcher: the db test asks the admin API for the same
+unregistered address and that a spent link explains itself; and
+`tests/unit/password-reset-request.test.ts` calls the request action directly to prove a
+malformed address is refused without the auth server being asked anything. Neither needs a mail catcher: the db test asks the admin API for the same
 token the email would have carried. What that leaves unproven is the email itself, and it is
 the only part of the flow no automated test touches.
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { createUploadIntent, finalizeUploadAction } from "./actions"
+import { createSourceUploadAction, startUploadedImportAction } from "@/lib/imports/actions"
 import type { AssetType } from "./types"
 
 /**
@@ -45,13 +46,13 @@ export async function uploadProductFile(params: {
 
   if ("error" in intent) return { assetId: null, error: intent.error }
 
-  const response = await fetch(intent.intent.signedUrl, {
-    method: "PUT",
-    body: params.file,
-    headers: { "content-type": params.file.type || "application/octet-stream" },
-  })
+  const stored = await putToSignedUrl(
+    intent.intent.signedUrl,
+    params.file,
+    params.file.type || "application/octet-stream",
+  )
 
-  if (!response.ok) {
+  if (!stored) {
     /*
       The asset row stays `pending` and nothing that was already stored has been
       touched. That is what makes replacing a file safe: a failed upload cannot
@@ -63,4 +64,52 @@ export async function uploadProductFile(params: {
 
   const finalized = await finalizeUploadAction(params.workspaceSlug, intent.intent.assetId)
   return { assetId: intent.intent.assetId, error: finalized.error }
+}
+
+/**
+ * The one fetch. Both uploads go through it, and its argument is always a URL
+ * the server minted a moment ago — never a string that came out of a page.
+ */
+async function putToSignedUrl(
+  signedUrl: string,
+  body: File,
+  contentType: string,
+): Promise<boolean> {
+  const response = await fetch(signedUrl, {
+    method: "PUT",
+    body,
+    headers: { "content-type": contentType },
+  })
+  return response.ok
+}
+
+/**
+ * Uploading a PDF or an HTML file to import a product from.
+ *
+ * The same three steps as a product file, pointed somewhere else: the server
+ * mints a signed URL for a path it builds, the browser pushes the bytes, and
+ * the server measures what landed before it starts anything. The type sent is
+ * always opaque, so an HTML file is stored as bytes rather than as a page a
+ * signed link could ever render.
+ */
+export async function uploadImportSource(params: {
+  workspaceSlug: string
+  kind: "pdf_document" | "html_document"
+  file: File
+}): Promise<{ href: string } | { error: string }> {
+  const intent = await createSourceUploadAction(params.workspaceSlug, {
+    kind: params.kind,
+    filename: params.file.name,
+    byteSize: params.file.size,
+  })
+  if ("error" in intent) return { error: intent.error }
+
+  const stored = await putToSignedUrl(intent.signedUrl, params.file, "application/octet-stream")
+  if (!stored) return { error: "The upload did not complete. Try again." }
+
+  return startUploadedImportAction(params.workspaceSlug, {
+    kind: params.kind,
+    uploadId: intent.uploadId,
+    filename: params.file.name,
+  })
 }

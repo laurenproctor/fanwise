@@ -499,7 +499,7 @@ short_bio, website, instagram, behance, avatar_path, products (jsonb), revision,
 updated_by, created_at, updated_at
 
 The profile builder's unpublished working copy, one per profile
-(20260912160000). Autosave writes here and **never** to `public_profiles`; only
+(20260912220000). Autosave writes here and **never** to `public_profiles`; only
 publication copies a draft onto the live row. `anon` holds no grant at all. Text
 columns are stored as typed and bounded only by length, so a half-typed link survives
 a refresh; validation is the builder's Continue and Publish, not a CHECK. `revision`
@@ -509,7 +509,7 @@ conflict. The tenant boundary is the composite FK `(public_profile_id, workspace
 `products` is the builder's step 2: an array of `{ productId, visible }` in display
 order, every arranged product included, so hiding one keeps its position. Order is
 array position; there are no separate order numbers. Product ids cannot be foreign keys
-inside jsonb, so `check_profile_draft_products` (20260912170000) refuses a malformed
+inside jsonb, so `check_profile_draft_products` (20260912220100) refuses a malformed
 entry, a repeated product, or a product outside the draft's workspace on every write,
 including a direct PostgREST one. A product is **eligible** for a profile when it is not
 archived and at least one of its listings is `live` by the catalog's `liveness()` rule
@@ -519,7 +519,7 @@ ineligible keeps its entry and flag but is never previewed or published.
 **public_profile_publications** — id, public_profile_id, workspace_id, handle,
 draft_updated_at, snapshot (jsonb), published_by, published_at
 
-One immutable row per successful publish (20260912180000), written only by
+One immutable row per successful publish (20260912220200), written only by
 `publish_public_profile()`. **The live rows stay the published state**: the public route
 still reads `public_profiles` and `public_product_pages` through anon RLS, and never a
 draft. Publishing is that one security-definer function, one transaction: it locks the
@@ -617,3 +617,38 @@ moment it was published. The public read path never runs as `authenticated` —
 `anon` executes **no function in `public`**. The published-ness gate is an inline
 subquery naming `status = 'published'` explicitly, rather than the tidier security
 definer helper, precisely so that stays true.
+
+## B12: importing a live listing
+
+Planned 12 September 2026, not built. The migration lands with B12. The plan is
+`docs/listing-import.md`.
+
+**No new table, and no new column.** Import writes the rows publishing already writes, from
+the other direction: one `products` row, one `channel_listings` row with its
+`external_listing_id` claimed, `product_assets` rows for the images, and one snapshot. If
+this step grows a table, something has been misread.
+
+`snapshot_type` gains one member, `import`, and that is the whole migration. The snapshot
+holds the provider's payload as it arrived, before any mapping, and it is insert-only like
+every other: it is the only record of what the marketplace said on the day, and the answer to
+every later question about where a canonical field came from.
+
+`channel_listings.metadata.import` holds `{ importedAt, sourceUrl, unmappedFields, writes }`.
+`unmappedFields` is what the review screen showed the creator as dropped — a marketplace
+concept with no canonical home is named there rather than discarded silently. `writes` counts
+the publishes and updates Fanwise has since made to the listing, and it is maintained by
+those paths rather than derived afterwards, because it decides whether the listing may be
+forgotten at disconnection: a listing imported and never written to can be, since forgetting
+it restores the world to before the import. Decision 21.
+
+The imported listing reads `status = published` and `status_source = verified`, which is
+honest — Fanwise read it on the channel — and it is the first `verified` row in the model
+that no publication produced. Nothing downstream needs to tell the two apart; anything that
+did would be asking about provenance, and provenance is what the `import` snapshot is for.
+
+**What import may not write is a canonical field nobody confirmed.** The provider payload
+reaches `products` only through a person accepting it on the review screen, which is
+architecture invariant 1 held at the one place in the plan where a marketplace's shape flows
+inward. Imported copy that the creator does not promote stays on the listing, where it is
+copy for one channel rather than a fact the FactSheet would let AI restate on another.
+Decision 29.

@@ -8,6 +8,9 @@ import { parseEvidence, type ProductSourceEvidence, type SourceAsset } from "./e
 import { fetchPage, type FetchPageOptions } from "./retrieval/fetch-page"
 import { AssetSkipped, ASSET_LIMITS, fetchAsset } from "./retrieval/fetch-asset"
 import { importerFor } from "./sources/registry"
+import { CONTENT_IMPORTERS } from "./sources/content"
+import { isSourcePathFor, readStoredSource } from "./source-storage"
+import { isContentSourceKind, type SourceKind } from "./types"
 
 /**
  * One import, run to a recorded end.
@@ -20,7 +23,8 @@ import { importerFor } from "./sources/registry"
  * What it does, in order, and what each step writes:
  *
  *   1. claim the row              pending|failed -> retrieving
- *   2. read the page              resolved_url
+ *   2. read the page, or the      resolved_url (links only)
+ *      stored paste or file
  *   3. extract evidence           evidence, content_hash, retrieved_at
  *   4. fetch the pictures         product_assets rows, evidence.previewAssets
  *   5. compose a draft            suggestions, prompt_version, schema_version
@@ -48,6 +52,8 @@ export interface RunImportPayload {
 
 export interface RunImportDeps extends ComposeDeps, FetchPageOptions {
   provider?: AiProvider
+  /** Test seam. Production reads the stored object from the private bucket. */
+  readSource?: (path: string) => Promise<Uint8Array>
 }
 
 type Admin = ReturnType<typeof createAdminClient>
@@ -71,7 +77,9 @@ export async function runImport(
     .eq("id", importId)
     .eq("workspace_id", workspaceId)
     .in("status", ["pending", "failed"])
-    .select("id, product_id, source_url, provider, content_hash, suggestions")
+    .select(
+      "id, product_id, source_url, source_path, source_filename, provider, content_hash, suggestions",
+    )
     .maybeSingle()
 
   if (claimError) {
@@ -118,7 +126,10 @@ async function execute(
   importId: string,
   row: {
     product_id: string
-    source_url: string
+    provider: SourceKind
+    source_url: string | null
+    source_path: string | null
+    source_filename: string | null
     content_hash: string | null
     suggestions: unknown
   },
@@ -127,9 +138,7 @@ async function execute(
   let evidence: ProductSourceEvidence
 
   try {
-    const page = await fetchPage(row.source_url, { outbound: deps.outbound })
-    const importer = importerFor(new URL(row.source_url))
-    evidence = importer.read(page, row.source_url)
+    evidence = await readSource(workspaceId, row, deps)
   } catch (error) {
     await settleWithError(admin, workspaceId, importId, normalizeImportError(error))
     return
@@ -149,7 +158,7 @@ async function execute(
     .from("product_imports")
     .update({
       status: "analyzing",
-      resolved_url: withAssets.resolvedUrl,
+      resolved_url: withAssets.resolvedUrl ?? null,
       content_hash: withAssets.contentHash,
       evidence: toJson(withAssets),
       retrieved_at: withAssets.retrievedAt,
@@ -217,6 +226,47 @@ async function execute(
     }
     await settleWithError(admin, workspaceId, importId, normalized)
   }
+}
+
+/**
+ * The evidence for one row, from wherever its source is.
+ *
+ * A link is fetched through the outbound boundary, as it always was. A paste
+ * or a file is read from private storage — and only after the path has been
+ * checked against the workspace this job is running for. The database checks
+ * the same thing when the row is written; this is the second lock on the same
+ * door, because the service role reading another workspace's object is the one
+ * mistake here that crosses a tenant boundary.
+ */
+async function readSource(
+  workspaceId: string,
+  row: {
+    provider: SourceKind
+    source_url: string | null
+    source_path: string | null
+    source_filename: string | null
+  },
+  deps: RunImportDeps,
+): Promise<ProductSourceEvidence> {
+  if (isContentSourceKind(row.provider)) {
+    if (!row.source_path || !isSourcePathFor(workspaceId, row.source_path)) {
+      throw new ImportError("internal", { reason: "source_path" })
+    }
+    let bytes: Uint8Array
+    try {
+      bytes = await (deps.readSource ?? readStoredSource)(row.source_path)
+    } catch (error) {
+      throw new ImportError("internal", { reason: "storage", name: (error as Error)?.name })
+    }
+    return CONTENT_IMPORTERS[row.provider].read({
+      bytes,
+      filename: row.source_filename,
+    })
+  }
+
+  if (!row.source_url) throw new ImportError("internal", { reason: "source_url" })
+  const page = await fetchPage(row.source_url, { outbound: deps.outbound })
+  return importerFor(new URL(row.source_url)).read(page, row.source_url)
 }
 
 /**

@@ -10,6 +10,7 @@ import {
   rightsFor,
   stateFor,
 } from "@/lib/imports/view"
+import { isContentSourceKind } from "@/lib/imports/types"
 import { ImportDetail } from "./import-detail"
 
 export const metadata = { title: "Import a product · Fanwise" }
@@ -61,6 +62,7 @@ export default async function ImportDetailPage({
       withheld={record.withheld}
       aiUnavailable={record.aiUnavailable}
       changes={evidenceChanges(record)}
+      sourceMode={isContentSourceKind(record.row.provider) ? "content" : "link"}
     />
   )
 }

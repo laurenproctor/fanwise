@@ -43,7 +43,7 @@ export const RESERVED_HANDLES: ReadonlySet<string> = new Set([
   "assets",
   "auth",
   "billing",
-  // `/<workspace>/channels`. Added in 20260912160000 so the list covers every
+  // `/<workspace>/channels`. Added in 20260912220000 so the list covers every
   // workspace sub-route as well as every top-level one; a unit test holds that.
   "channels",
   "collections",

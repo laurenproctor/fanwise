@@ -10,12 +10,12 @@ import type { RecoveryAction, RecoveryOption } from "@/lib/imports/types"
  * `SourceAnalysis` makes the recoveries part of the failure itself, so no
  * caller has to remember to offer them.
  *
- * **What is wired and what is not is said plainly.** Pasting code and uploading
- * a project need somewhere to put the bytes, and the table that holds them is
- * phase 2 of `docs/product-link-import.md`. Until then those two are marked the
- * way `components/onboarding/import-listing-action.tsx` marks its own promise —
- * aria-disabled rather than disabled, so they stay in the tab order and a
- * keyboard user learns they are coming instead of never finding them.
+ * **What is wired and what is not is said plainly.** Pasting text goes to the
+ * paste form. Uploading a ZIP or a project still has nowhere to put the bytes,
+ * so it is marked the way `components/onboarding/import-listing-action.tsx`
+ * marks its own promise — aria-disabled rather than disabled, so it stays in
+ * the tab order and a keyboard user learns it is coming instead of never
+ * finding it.
  */
 
 const TONE = {
@@ -34,15 +34,30 @@ const HEADINGS: Record<RecoveryTone, string> = {
   failed: "That did not finish",
 }
 
+/** A paste or a file is not a link, and is never private or unpublished. */
+const CONTENT_HEADINGS: Record<RecoveryTone, string> = {
+  private: "Fanwise cannot read that",
+  notFound: "Fanwise cannot read that",
+  unsupported: "Fanwise cannot read that",
+  failed: "That did not finish",
+}
+
 export interface RecoveryHandlers {
   onReplaceLink: () => void
   onRetry: () => void
   /** Where "continue manually" goes. The existing new-product form. */
   manualHref: string
+  /** Where "paste the text instead" goes. The import screen's paste form. */
+  pasteHref: string
 }
 
 /** Which recoveries have somewhere to go today. The rest say so. */
-const WIRED: readonly RecoveryAction[] = ["replace_link", "retry", "continue_manually"]
+const WIRED: readonly RecoveryAction[] = [
+  "replace_link",
+  "retry",
+  "continue_manually",
+  "paste_code",
+]
 
 const FOCUS =
   "focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-accent)]"
@@ -52,11 +67,13 @@ export function RecoveryPanel({
   message,
   recoveries,
   handlers,
+  mode = "link",
 }: {
   tone: RecoveryTone
   message: string
   recoveries: readonly RecoveryOption[]
   handlers: RecoveryHandlers
+  mode?: "link" | "content"
 }) {
   return (
     <section
@@ -68,7 +85,7 @@ export function RecoveryPanel({
           id="import-recovery-heading"
           className="font-display text-[22px] font-light tracking-[-0.02em]"
         >
-          {HEADINGS[tone]}
+          {(mode === "link" ? HEADINGS : CONTENT_HEADINGS)[tone]}
         </h2>
         {/*
           Written by Fanwise, never a provider's own error text. Rule 8: the
@@ -108,10 +125,10 @@ function RecoveryControl({
 }) {
   const label = `text-[15px] font-medium ${FOCUS} inline-flex min-h-11 items-center rounded-[6px]`
 
-  if (option.action === "continue_manually") {
+  if (option.action === "continue_manually" || option.action === "paste_code") {
     return (
       <Link
-        href={handlers.manualHref}
+        href={option.action === "paste_code" ? handlers.pasteHref : handlers.manualHref}
         className={`${label} text-[var(--color-accent)] underline underline-offset-4 hover:text-[var(--color-ink)]`}
       >
         {option.label}

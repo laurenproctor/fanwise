@@ -55,9 +55,26 @@ export const SOURCE_DESCRIPTORS: readonly SourceDescriptor[] = [
   },
 ]
 
+/**
+ * The sources a creator hands over. No hosts, because nothing is fetched, and
+ * no publish hint, because there is nothing to publish.
+ *
+ * Kept out of `SOURCE_DESCRIPTORS`, whose order is the order links are claimed
+ * in and whose last entry is the catch-all. A file is never claimed by looking
+ * at a URL, so putting one in that list would only make its tail lie.
+ */
+export const CONTENT_SOURCE_DESCRIPTORS: readonly SourceDescriptor[] = [
+  { kind: "pasted_text", label: "Pasted text", hosts: [], publishHint: null },
+  { kind: "pdf_document", label: "PDF document", hosts: [], publishHint: null },
+  { kind: "html_document", label: "HTML file", hosts: [], publishHint: null },
+]
+
 export const SOURCE_LABELS: Record<SourceKind, string> = {
   hosted_artifact: "Claude Artifact",
   webpage: "Public webpage",
+  pasted_text: "Pasted text",
+  pdf_document: "PDF document",
+  html_document: "HTML file",
 }
 
 /**
@@ -94,7 +111,9 @@ export function sourceKindFor(url: URL): SourceKind {
 }
 
 export function descriptorFor(kind: SourceKind): SourceDescriptor {
-  const found = SOURCE_DESCRIPTORS.find((descriptor) => descriptor.kind === kind)
+  const found = [...SOURCE_DESCRIPTORS, ...CONTENT_SOURCE_DESCRIPTORS].find(
+    (descriptor) => descriptor.kind === kind,
+  )
   if (!found) throw new Error(`no descriptor for source kind ${kind}`)
   return found
 }

@@ -211,7 +211,7 @@ describe("the live profile's new rules", () => {
  *
  * The server action checks ownership, but a member can write their own draft
  * row straight through PostgREST, so these are made with the member's client
- * directly: the trigger from 20260912170000 is what has to refuse them.
+ * directly: the trigger from 20260912220100 is what has to refuse them.
  */
 describe("a draft's product arrangement", () => {
   let aliceProductId: string
