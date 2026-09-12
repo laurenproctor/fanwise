@@ -22,12 +22,32 @@ import type { Database } from "./database.types"
  *
  * Preview is the deliberate exception and does not come through here. It uses
  * the member client, is marked no-store, and is never the canonical URL.
+ *
+ * ## Why every read here is `no-store`
+ *
+ * supabase-js talks over `fetch`, and Next caches `fetch` on its own terms —
+ * separately from, and underneath, whatever a route says about revalidation.
+ * That put two caches in series on the sitemap: the route's own hourly
+ * revalidate, and a fetch-cache entry that outlived it. The observable effect
+ * was a sitemap that kept serving a pre-publish answer across a full rebuild,
+ * with no error anywhere and nothing in the route to explain it.
+ *
+ * Publishing and unpublishing are privacy operations, so a stale read is not a
+ * freshness bug here, it is a page that is public when its creator believes it
+ * is not. Opting these reads out leaves exactly one place that decides how
+ * stale a public surface may be — the route — instead of two that can
+ * disagree.
  */
 export function createPublicClient() {
   const env = clientEnv()
   return createSupabaseClient<Database>(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    { auth: { persistSession: false, autoRefreshToken: false } },
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: {
+        fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+      },
+    },
   )
 }

@@ -40,11 +40,35 @@
 --      unique index that can be dropped in one line when a workspace should own
 --      several public identities; nothing else in the schema assumes it.
 --
--- Rollback: this migration is additive. To reverse it, drop the tables in the
--- order public_outbound_clicks, public_product_slug_history,
--- public_product_pages, public_handle_history, public_profiles, then the two
--- functions, the trigger functions and the type. Nothing outside this migration
--- references them.
+-- Rollback. Mostly additive, but not entirely, and the exceptions are the part
+-- worth writing down, because they touch objects that existed before this file.
+--
+--   1. Drop the new tables, children first: public_outbound_clicks,
+--      public_product_slug_history, public_product_pages,
+--      public_handle_history, public_profiles. Then release_public_handle,
+--      release_public_product_slug, storage_object_profile_workspace_id, the
+--      four check_* trigger functions, and the type public_page_status.
+--      Nothing outside this migration references any of them.
+--
+--   2. Revoke the column grants this file adds to `anon` on the four
+--      pre-existing tables (products, product_assets, channel_listings,
+--      channels) and drop the five policies it adds to them. This is the only
+--      change here to objects older than this migration. Leaving them behind
+--      is not itself an exposure — with public_product_pages dropped the
+--      EXISTS subqueries are false and nothing is readable — but a grant whose
+--      gate no longer exists is exactly the kind of thing that becomes an
+--      exposure the next time somebody adds a table with that name.
+--
+--   3. Restore workspaces_slug_not_reserved without 'profile'. Check first
+--      that no workspace has since been slugged `profile`; removing it is safe
+--      only while `app/profile` is gone too.
+--
+--   4. Drop the four storage policies on the public-profile-avatars bucket and
+--      then the bucket, after deleting its objects. Dropping a bucket that
+--      still holds objects fails, which is the right default.
+--
+-- Data loss on rollback: every public profile, public page, redirect-history
+-- row and click row. There is no second copy of any of them.
 
 -- ---------------------------------------------------------------------------
 -- Types
