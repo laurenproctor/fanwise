@@ -1,5 +1,6 @@
 import { promises as dns } from "node:dns"
 import { isIP } from "node:net"
+import { brotliDecompressSync, gunzipSync, inflateSync } from "node:zlib"
 import { isBlockedAddress, type Family, type ResolvedAddress } from "./addresses"
 
 export type { Family, ResolvedAddress } from "./addresses"
@@ -308,9 +309,20 @@ export async function outboundFetch(
     }
 
     const body = await collect(response.body, maxBodyBytes, controller, hostname)
-    return new Response(NO_BODY.has(response.status) ? null : body, {
+    const decoded = decode(body, response.headers.get("content-encoding"), maxBodyBytes, hostname)
+
+    /*
+      The body handed back is decoded, so the headers that described it
+      encoded would be lies. A caller that trusted either would decode twice
+      or truncate.
+    */
+    const headers = new Headers(response.headers)
+    headers.delete("content-encoding")
+    headers.delete("content-length")
+
+    return new Response(NO_BODY.has(response.status) ? null : decoded, {
       status: response.status,
-      headers: response.headers,
+      headers,
     })
   } finally {
     clearTimeout(deadline)
@@ -339,6 +351,81 @@ async function collect(
     throw asOutboundError(error, controller.signal, hostname)
   }
   return Buffer.concat(chunks)
+}
+
+/**
+ * A compressed answer, decompressed.
+ *
+ * Not an optimization. A server may compress whether or not it was asked to:
+ * a WordPress store behind a page cache answers its REST index gzipped even
+ * when the request says `Accept-Encoding: identity`, and the bytes that
+ * arrive are then not JSON, not UTF-8, and not anything an adapter's schema
+ * can read. The adapter sees a shape it does not recognise and reports that
+ * the provider answered strangely, which sends whoever reads the log looking
+ * in the wrong place entirely.
+ *
+ * **The cap is applied to the decompressed size, not the compressed one.**
+ * A few kilobytes of gzip can become gigabytes, so `maxOutputLength` stops
+ * the inflate at the same limit `collect` holds the wire to, and the overrun
+ * is reported as what it is rather than as a broken stream.
+ *
+ * An encoding that is not understood is refused rather than passed through.
+ * Handing an adapter bytes it cannot read while telling it they are fine is
+ * how this arrived in the first place.
+ */
+/**
+ * zlib answers with a Buffer over Node's shared pool. A `Response` body needs
+ * a view that owns its buffer, so the decoded bytes are copied out of the pool
+ * once. The uncompressed path never reaches here and never pays for it.
+ */
+function own(buffer: Buffer): Uint8Array<ArrayBuffer> {
+  const copy = new Uint8Array(new ArrayBuffer(buffer.byteLength))
+  copy.set(buffer)
+  return copy
+}
+
+function decode(
+  body: Buffer<ArrayBuffer>,
+  encoding: string | null,
+  maxBodyBytes: number,
+  hostname: string,
+): Uint8Array<ArrayBuffer> {
+  // A comma list is legal; the last coding applied is the outermost, and
+  // nothing here has ever needed to unwrap more than one.
+  const codings = (encoding ?? "")
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter((part) => part.length > 0 && part !== "identity")
+
+  if (codings.length === 0) return body
+  if (codings.length > 1) {
+    throw new OutboundError("network", `${hostname} answered in more encodings than one`)
+  }
+
+  const limit = { maxOutputLength: maxBodyBytes }
+  try {
+    switch (codings[0]) {
+      case "gzip":
+      case "x-gzip":
+        return own(gunzipSync(body, limit))
+      case "deflate":
+        return own(inflateSync(body, limit))
+      case "br":
+        return own(brotliDecompressSync(body, limit))
+      default:
+        throw new OutboundError(
+          "network",
+          `${hostname} answered in an encoding Fanwise cannot read`,
+        )
+    }
+  } catch (error) {
+    if (error instanceof OutboundError) throw error
+    // zlib raises a RangeError once the output passes maxOutputLength.
+    if (error instanceof RangeError) {
+      throw new OutboundError("body_too_large", `${hostname} answered with too much`)
+    }
+    throw new OutboundError("network", `${hostname} answered in an encoding it did not keep to`)
+  }
 }
 
 /**
