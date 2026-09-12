@@ -148,6 +148,9 @@ test("disconnecting a channel takes its listings with it", async ({ page }) => {
   ).toBeVisible()
 
   await page.goto(`/${slug}`)
-  await page.getByRole("link", { name: "Doomed Listing" }).click()
+  // Exact: a catalog row carries two links to the same product, the name and
+  // the next action, and the action's accessible name ends with the product's
+  // so a screen reader can tell one row's action from another's.
+  await page.getByRole("link", { name: "Doomed Listing", exact: true }).click()
   await expect(page.getByText("No channels connected")).toBeVisible()
 })
