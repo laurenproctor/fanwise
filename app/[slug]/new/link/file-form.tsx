@@ -19,7 +19,7 @@ const RULES = {
   pdf_document: {
     accept: ".pdf,application/pdf",
     extension: /\.pdf$/i,
-    maxBytes: 20 * 1024 * 1024,
+    maxBytes: Math.floor(4.8 * 1024 * 1024),
     label: "PDF file",
     wrong: "Choose a .pdf file.",
     hint: "A guide, a brochure, a product sheet. Fanwise reads the text of the first 40 pages. A scanned document has no text to read, so paste its words instead.",
@@ -28,7 +28,7 @@ const RULES = {
   html_document: {
     accept: ".html,.htm,text/html",
     extension: /\.html?$/i,
-    maxBytes: 2 * 1024 * 1024,
+    maxBytes: Math.floor(4.8 * 1024 * 1024),
     label: "HTML file",
     wrong: "Choose an .html file.",
     hint: "A page you saved or downloaded, such as an exported artifact. Fanwise reads the markup and never runs its scripts.",
@@ -55,7 +55,7 @@ export function FileSourceForm({
     if (!rules.extension.test(candidate.name)) return rules.wrong
     if (candidate.size === 0) return "That file is empty."
     if (candidate.size > rules.maxBytes) {
-      return `That file is larger than ${Math.round(rules.maxBytes / (1024 * 1024))} MB, which is as much as Fanwise will read.`
+      return `That file is larger than ${Number((rules.maxBytes / (1024 * 1024)).toFixed(1))} MB, which is as much as Fanwise will read.`
     }
     return null
   }

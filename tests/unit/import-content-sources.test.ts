@@ -4,7 +4,7 @@ import { evidenceCorpus } from "@/lib/imports/claims"
 import { IMPORT_ERROR_CODES, IMPORT_ERROR_RECOVERIES, ImportError } from "@/lib/imports/errors"
 import { hashEvidence, productSourceEvidenceSchema } from "@/lib/imports/evidence"
 import { isWholeHtmlDocument } from "@/lib/imports/paste"
-import { readVisibleText } from "@/lib/imports/retrieval/html"
+import { HTML_LIMITS, readVisibleText } from "@/lib/imports/retrieval/html"
 import { isPlausibleDocumentTitle, readPdf } from "@/lib/imports/retrieval/pdf"
 import { isMostlyCode, looksLikeCode, readPlainText } from "@/lib/imports/retrieval/plain-text"
 import {
@@ -15,7 +15,7 @@ import {
   pdfDocumentImporter,
 } from "@/lib/imports/sources/content"
 import { SOURCE_LABELS, descriptorFor } from "@/lib/imports/sources/registry"
-import { isSourcePathFor, sourcePathFor } from "@/lib/imports/source-storage"
+import { isSourcePathFor, maxBytesFor, sourcePathFor } from "@/lib/imports/source-storage"
 import { provisionalContentName } from "@/lib/imports/start"
 import { CONTENT_SOURCE_KINDS, SOURCE_KINDS, isContentSourceKind } from "@/lib/imports/types"
 import { recoveriesFor, sourceLabelFor, stateFor } from "@/lib/imports/view"
@@ -278,6 +278,32 @@ describe("storage paths", () => {
 
   it("refuses to build a path from anything but a uuid", () => {
     expect(() => sourcePathFor(WORKSPACE, "../../etc", "pasted_text")).toThrow()
+  })
+})
+
+describe("upload limits", () => {
+  const LIMIT = Math.floor(4.8 * 1024 * 1024)
+
+  it("takes a PDF or an HTML file up to 4.8 MB", () => {
+    expect(maxBytesFor("pdf_document")).toBe(LIMIT)
+    expect(maxBytesFor("html_document")).toBe(LIMIT)
+  })
+
+  it("keeps a fetched page at its own, smaller limit", () => {
+    expect(HTML_LIMITS.maxBytes).toBe(2 * 1024 * 1024)
+  })
+
+  it("reads an uploaded HTML file larger than a fetched page may be", async () => {
+    const page = `<!doctype html><html><head><title>Type Scale Studio</title></head><body><h1>Type Scale Studio</h1><p>Generate modular type scales for modern products.</p>${" ".repeat(3 * 1024 * 1024)}</body></html>`
+    const evidence = await htmlDocumentImporter.read({ bytes: bytes(page), filename: null })
+    expect(evidence.title?.value).toBe("Type Scale Studio")
+  })
+
+  it("refuses an uploaded HTML file over 4.8 MB", async () => {
+    const page = `<html>${" ".repeat(LIMIT)}</html>`
+    expect(await refusal(htmlDocumentImporter.read({ bytes: bytes(page), filename: null }))).toBe(
+      "too_large",
+    )
   })
 })
 

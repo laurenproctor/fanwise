@@ -26,7 +26,7 @@ import { sniffMimeType } from "@/lib/products/sniff"
 export const PROFILE_AVATAR_BUCKET = "public-profile-avatars"
 
 /** Matches the bucket's own limit and the sentence the settings page shows. */
-export const MAX_AVATAR_BYTES = 2 * 1024 * 1024
+export const MAX_AVATAR_BYTES = 4 * 1024 * 1024
 
 export const AVATAR_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const
 
@@ -52,7 +52,7 @@ export type AvatarCheck =
   { ok: true; mimeType: AvatarMimeType; bytes: Buffer } | { ok: false; message: string }
 
 export function describeAvatarRules(): string {
-  return "PNG, JPG or WebP. Maximum 2 MB. Square images look best."
+  return "PNG, JPG or WebP. Maximum 4 MB. Square images look best."
 }
 
 /**
@@ -66,7 +66,7 @@ export function checkAvatar(bytes: Buffer, declaredSize: number): AvatarCheck {
     return { ok: false, message: "That file is empty. Choose an image." }
   }
   if (bytes.length > MAX_AVATAR_BYTES) {
-    return { ok: false, message: "That image is over 2 MB. Choose a smaller one." }
+    return { ok: false, message: "That image is over 4 MB. Choose a smaller one." }
   }
 
   const sniffed = sniffMimeType(bytes)

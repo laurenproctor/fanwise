@@ -175,7 +175,7 @@ function fileRefusal(kind: z.infer<typeof fileKindSchema>, filename: string, byt
   }
   const max = maxBytesFor(kind)
   if (byteSize > max) {
-    return `That file is larger than ${Math.round(max / (1024 * 1024))} MB, which is as much as Fanwise will read.`
+    return `That file is larger than ${Number((max / (1024 * 1024)).toFixed(1))} MB, which is as much as Fanwise will read.`
   }
   return null
 }

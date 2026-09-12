@@ -167,7 +167,7 @@ export async function savePublicProfileAction(
 
   if (hasUpload) {
     if (file.size > MAX_AVATAR_BYTES) {
-      return profileFieldError("avatar", "That image is over 2 MB. Choose a smaller one.")
+      return profileFieldError("avatar", "That image is over 4 MB. Choose a smaller one.")
     }
     const bytes = Buffer.from(await file.arrayBuffer())
     const checked = checkAvatar(bytes, file.size)

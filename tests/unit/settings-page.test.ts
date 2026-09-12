@@ -115,7 +115,7 @@ describe("the studio details section", () => {
   })
 
   it("states the icon rules the bucket actually enforces", () => {
-    expect(textOf(markup)).toContain("PNG, JPG or WebP. Maximum 2 MB.")
+    expect(textOf(markup)).toContain("PNG, JPG or WebP. Maximum 4 MB.")
   })
 
   it("accepts only the three formats it names", () => {

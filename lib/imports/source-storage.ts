@@ -37,7 +37,7 @@ export const SOURCE_LIMITS = {
   /** Characters a paste may hold. Well inside the server action body limit. */
   maxPasteCharacters: 200_000,
   maxPdfBytes: PDF_LIMITS.maxBytes,
-  maxHtmlBytes: HTML_LIMITS.maxBytes,
+  maxHtmlBytes: HTML_LIMITS.maxUploadBytes,
 } as const
 
 /** The bytes a file of this kind may be. Paste limits are characters, above. */

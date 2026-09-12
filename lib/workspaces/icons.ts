@@ -18,7 +18,7 @@ import { sniffMimeType } from "@/lib/products/sniff"
 export const WORKSPACE_ICON_BUCKET = "workspace-icons"
 
 /** Matches the bucket's own limit and the sentence the settings page shows. */
-export const MAX_ICON_BYTES = 2 * 1024 * 1024
+export const MAX_ICON_BYTES = 4 * 1024 * 1024
 
 /** Rendered in an <img> by the browser, so: raster formats it can decode. */
 export const ICON_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const
@@ -42,7 +42,7 @@ export type IconCheck =
   { ok: true; mimeType: IconMimeType; bytes: Buffer } | { ok: false; message: string }
 
 export function describeIconRules(): string {
-  return "PNG, JPG or WebP. Maximum 2 MB."
+  return "PNG, JPG or WebP. Maximum 4 MB."
 }
 
 /**
@@ -58,7 +58,7 @@ export function checkIcon(bytes: Buffer, declaredSize: number): IconCheck {
     return { ok: false, message: "That file is empty. Choose an image." }
   }
   if (bytes.length > MAX_ICON_BYTES) {
-    return { ok: false, message: "That image is over 2 MB. Choose a smaller one." }
+    return { ok: false, message: "That image is over 4 MB. Choose a smaller one." }
   }
 
   const sniffed = sniffMimeType(bytes)

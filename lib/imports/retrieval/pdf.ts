@@ -18,7 +18,7 @@ import { ImportError } from "../errors"
 
 export const PDF_LIMITS = {
   /** The largest PDF an import will read. Checked at upload and again here. */
-  maxBytes: 20 * 1024 * 1024,
+  maxBytes: Math.floor(4.8 * 1024 * 1024),
   /** Pages read for text. A draft needs the opening, not chapter nine. */
   maxPages: 40,
   /** Characters kept across all pages. Matches the evidence body limit with room. */

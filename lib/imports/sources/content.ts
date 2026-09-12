@@ -140,7 +140,7 @@ export const htmlDocumentImporter: ContentImporter = {
   kind: "html_document",
   async read(source) {
     const html = decodeText(source.bytes)
-    if (html.length > HTML_LIMITS.maxBytes) throw new ImportError("too_large")
+    if (html.length > HTML_LIMITS.maxUploadBytes) throw new ImportError("too_large")
 
     // The same reading a fetched page gets, in the same order of trust, minus
     // the address: relative image URLs have nothing to resolve against and are

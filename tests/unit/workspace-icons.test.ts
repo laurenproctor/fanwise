@@ -47,11 +47,11 @@ describe("checkIcon", () => {
     expect(checkIcon(SVG, SVG.length).ok).toBe(false)
   })
 
-  it("refuses anything over 2 MB", () => {
+  it("refuses anything over 4 MB", () => {
     const big = Buffer.concat([PNG, Buffer.alloc(MAX_ICON_BYTES)])
     const result = checkIcon(big, big.length)
     expect(result.ok).toBe(false)
-    expect(result.ok === false && result.message).toContain("2 MB")
+    expect(result.ok === false && result.message).toContain("4 MB")
   })
 
   it("accepts a file exactly at the limit", () => {
@@ -65,7 +65,7 @@ describe("checkIcon", () => {
   })
 
   it("states the same limit the bucket enforces", () => {
-    expect(MAX_ICON_BYTES).toBe(2 * 1024 * 1024)
+    expect(MAX_ICON_BYTES).toBe(4 * 1024 * 1024)
     expect([...ICON_MIME_TYPES]).toEqual(["image/png", "image/jpeg", "image/webp"])
   })
 })

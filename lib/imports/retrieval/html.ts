@@ -24,6 +24,8 @@
 export const HTML_LIMITS = {
   /** The most markup to look at. Beyond this the read is refused, not truncated. */
   maxBytes: 2 * 1024 * 1024,
+  /** The largest HTML file a creator may upload. Fetched pages keep `maxBytes`. */
+  maxUploadBytes: Math.floor(4.8 * 1024 * 1024),
   /** How many headings and list items may become visible features. */
   maxFeatures: 40,
   maxFeatureLength: 300,

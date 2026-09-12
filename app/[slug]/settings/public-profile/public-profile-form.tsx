@@ -134,7 +134,7 @@ export function PublicProfileForm({
       return
     }
     if (file.size > MAX_AVATAR_BYTES) {
-      reject("That image is over 2 MB. Choose a smaller one.")
+      reject("That image is over 4 MB. Choose a smaller one.")
       return
     }
 
@@ -229,7 +229,7 @@ export function PublicProfileForm({
           <input type="hidden" name="removeAvatar" value={removeAvatar ? "true" : "false"} />
 
           <p id={`${ids.avatar}-hint`} className="text-[13px] text-[var(--color-ink-3)]">
-            PNG, JPG or WebP. Maximum 2 MB. Square images look best.
+            PNG, JPG or WebP. Maximum 4 MB. Square images look best.
             {pick ? ` ${pick.file.name} is ready to save.` : ""}
             {removeAvatar ? " The picture will be removed when you save." : ""}
           </p>
