@@ -42,8 +42,41 @@ interface Placement {
   bottom?: number
 }
 
+/**
+ * The glossary-backed icon. One term in, the explanation the glossary holds for
+ * it out, so the same word is never explained two ways on two screens.
+ */
 export function InfoTip({ term, className = "" }: { term: GlossaryTerm; className?: string }) {
   const { label, body } = GLOSSARY[term]
+  return <Tip label={label} body={body} className={className} />
+}
+
+export interface TipProps {
+  /** The word this explains. Names the trigger, and heads the panel. */
+  label: string
+  /** Plain language, always in the DOM. */
+  body: string
+  /**
+   * The trigger's accessible name, when "What <label> means" is the wrong
+   * sentence. A tip listing the channels a product is live on is answering
+   * "which", not "what", and the row it sits in has four of them.
+   */
+  triggerLabel?: string
+  className?: string
+}
+
+/**
+ * The tip itself, for copy the glossary cannot hold.
+ *
+ * Extracted from `InfoTip` when the catalog needed a tip whose body is a list
+ * of channel names read from the database. The glossary is for words the
+ * product uses; this is for facts about one row, and the two must not share a
+ * table or the glossary fills up with sentences that are true of one workspace.
+ *
+ * Everything below the props is unchanged from the original component, and the
+ * three decisions it documents are the reason it is shared rather than copied.
+ */
+export function Tip({ label, body, triggerLabel, className = "" }: TipProps) {
   const descriptionId = useId()
   const trigger = useRef<HTMLButtonElement>(null)
   const [placement, setPlacement] = useState<Placement | null>(null)
@@ -100,7 +133,7 @@ export function InfoTip({ term, className = "" }: { term: GlossaryTerm; classNam
           information" buttons is a row a screen reader user cannot tell apart,
           which is the same mistake as an unlabelled icon, one step later.
         */
-        aria-label={`What ${label.toLowerCase()} means`}
+        aria-label={triggerLabel ?? `What ${label.toLowerCase()} means`}
         aria-describedby={descriptionId}
         onPointerEnter={(event) => {
           if (event.pointerType === "mouse") place()
