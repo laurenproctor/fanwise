@@ -191,25 +191,29 @@ create table public.product_import_sources (
     )
   ),
   -- Each type carries exactly what it needs, and nothing that would let it be
-  -- read two ways.
+  -- read two ways. Every branch is null-safe: a CHECK passes on NULL, so a
+  -- regex match against a missing path would otherwise let the row through.
   constraint product_import_sources_shape check (
-    case source_type
+    coalesce(case source_type
       when 'public_url' then
         import_id is not null
+        and source_url is not null and normalized_url is not null
         and source_url ~ '^https://' and length(source_url) between 8 and 2048
         and normalized_url ~ '^https://' and length(normalized_url) between 8 and 2048
         and storage_path is null
       when 'pasted_text' then
         source_url is null and normalized_url is null
-        and (text_content is not null or storage_path ~ '\.txt$')
+        and (text_content is not null or (storage_path is not null and storage_path ~ '\.txt$'))
       when 'pdf' then
-        source_url is null and normalized_url is null and storage_path ~ '\.pdf$'
+        source_url is null and normalized_url is null
+        and storage_path is not null and storage_path ~ '\.pdf$'
       when 'html' then
-        source_url is null and normalized_url is null and storage_path ~ '\.html$'
+        source_url is null and normalized_url is null
+        and storage_path is not null and storage_path ~ '\.html$'
       when 'audio' then
         source_url is null and normalized_url is null
-        and storage_path ~ '\.(webm|ogg|m4a|mp4|wav)$'
-    end
+        and storage_path is not null and storage_path ~ '\.(webm|ogg|m4a|mp4|wav)$'
+    end, false)
   ),
   constraint product_import_sources_error_matches_status check (
     (status in ('failed', 'unavailable')) = (error_code is not null)
