@@ -15,6 +15,12 @@ import { isReorderable } from "@/lib/products/image-order"
 import { ProductForm } from "./product-form"
 import { AssetManager } from "./asset-manager"
 import { routes } from "@/lib/routes"
+import { appOrigin } from "@/lib/channels/oauth"
+import { getProductPageForEditor } from "@/lib/public/workspace-queries"
+import { createPublicProductPageAction } from "@/lib/public/actions"
+import { Button } from "@/components/ui/button"
+import { ButtonLink } from "@/components/ui/button"
+import { PublicPageForm } from "./public-page-form"
 import { awaitingReview } from "@/lib/ai/review"
 
 export const metadata = { title: "Product · Fanwise" }
@@ -176,6 +182,11 @@ export default async function ProductPage({
   // rendering of rows it was handed.
   const events = await listProductEvents(workspace.id, product.id)
 
+  // The public showcase, which is a different question from "which channels
+  // carry this". A product can be on four marketplaces with no public page, or
+  // have a public page and be on none.
+  const publicPage = await getProductPageForEditor(workspace.id, product.id)
+
   return (
     <div className="flex flex-col gap-12">
       <div className="flex flex-col gap-2">
@@ -263,6 +274,27 @@ export default async function ProductPage({
       </section>
 
       {/*
+        Below Channels, because a public page is a shop window onto the
+        listings above rather than another channel. It sells nothing itself: it
+        routes a visitor to whichever of those channels they prefer, so it only
+        makes sense once there is something for it to point at.
+      */}
+      <section className="flex flex-col gap-5">
+        <h2 className="label-mono">Public page</h2>
+        <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
+          A page on the open web that shows this product and sends buyers to the channels above.
+          Fanwise takes no payment here.
+        </p>
+        <PublicPageSection
+          workspaceSlug={slug}
+          productSlug={product.slug}
+          publicPage={publicPage}
+          hasDestinations={cards.some((card) => card.externalUrl !== null)}
+          hasContact={false}
+        />
+      </section>
+
+      {/*
         Last, because it is history rather than an action. The cards above show
         the present; a job that settles after the tab is closed, or a channel
         that was tried again a quarter of an hour later, is only visible here.
@@ -272,5 +304,94 @@ export default async function ProductPage({
         <ActivityLog events={events} />
       </section>
     </div>
+  )
+}
+
+/**
+ * Three states, deliberately distinguished.
+ *
+ * No profile, no page, and a page. Collapsing the first two into "not
+ * published" would send a creator looking for a Publish button that is not
+ * there, because the thing they are missing is a handle, one screen away.
+ */
+function PublicPageSection({
+  workspaceSlug,
+  productSlug,
+  publicPage,
+  hasDestinations,
+}: {
+  workspaceSlug: string
+  productSlug: string
+  publicPage: Awaited<ReturnType<typeof getProductPageForEditor>>
+  hasDestinations: boolean
+  hasContact: boolean
+}) {
+  if (publicPage.handle === null) {
+    return (
+      <div className="flex flex-col items-start gap-4 rounded-[14px] border border-dashed border-[var(--color-rule)] px-5 py-8">
+        <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
+          Claim a public handle for the studio first. Every product page lives under it, at{" "}
+          <span className="font-mono text-[13px]">/@your-handle/{productSlug}</span>.
+        </p>
+        <ButtonLink href={routes.publicProfileSettings(workspaceSlug)} variant="secondary">
+          Set up a public profile
+        </ButtonLink>
+      </div>
+    )
+  }
+
+  if (publicPage.page === null) {
+    const create = createPublicProductPageAction.bind(null, workspaceSlug, productSlug)
+    return (
+      <div className="flex flex-col items-start gap-4 rounded-[14px] border border-dashed border-[var(--color-rule)] px-5 py-8">
+        <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
+          This product has no public page yet. Creating one makes a draft at{" "}
+          <span className="font-mono text-[13px]">
+            /@{publicPage.handle}/{productSlug}
+          </span>
+          , visible only to you until you publish it.
+        </p>
+        {/*
+          Said here rather than discovered at the bottom of the public page. A
+          product with no live listing anywhere still gets a page — it can carry
+          the studio's contact action — but a creator should know that is what
+          they are publishing before they publish it.
+        */}
+        {!hasDestinations ? (
+          <p className="max-w-prose text-[13px] text-[var(--color-ink-3)]">
+            Nothing is live on a channel yet, so the page will show your profile&rsquo;s contact
+            action instead of a Buy option, or say the product is not available to buy yet if you
+            have not set one.
+          </p>
+        ) : null}
+        <form action={create}>
+          <Button type="submit" variant="secondary">
+            Create a public page
+          </Button>
+        </form>
+      </div>
+    )
+  }
+
+  return (
+    <PublicPageForm
+      workspaceSlug={workspaceSlug}
+      productSlug={productSlug}
+      handle={publicPage.handle}
+      appOrigin={appOrigin()}
+      status={publicPage.page.status}
+      profileStatus={publicPage.profileStatus ?? "draft"}
+      featured={publicPage.page.featured}
+      page={{
+        slug: publicPage.page.slug,
+        titleOverride: publicPage.page.title_override ?? "",
+        summaryOverride: publicPage.page.summary_override ?? "",
+        descriptionOverride: publicPage.page.description_override ?? "",
+        coverAssetId: publicPage.page.cover_asset_id ?? "",
+        seoTitle: publicPage.page.seo_title ?? "",
+        seoDescription: publicPage.page.seo_description ?? "",
+      }}
+      images={publicPage.images}
+    />
   )
 }

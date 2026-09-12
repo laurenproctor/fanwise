@@ -150,6 +150,17 @@ describe("the marketing routes", () => {
       (JSON.parse(readFileSync(manifest, "utf8")) as { routes: Record<string, unknown> }).routes,
     )
       .filter((route) => !route.startsWith("/_"))
+      /*
+        Pages only. `/sitemap.xml` and `/robots.txt` are metadata routes: they
+        are prerendered like a marketing page and are nothing like one — no
+        document, no scripts, and so no nonce to carry and nothing for a
+        script policy to govern. What this assertion is actually protecting is
+        that every prerendered *document* is one the marketing policy covers,
+        because a prerendered document cannot carry the per-request nonce the
+        application policy mints. A file extension is what separates the two,
+        and Next's own metadata conventions all have one.
+      */
+      .filter((route) => !/\.[a-z0-9]+$/i.test(route))
       .sort()
     expect(routes).toEqual([...STATIC_MARKETING_ROUTES].sort())
   })
