@@ -42,6 +42,19 @@ test("an unknown URL answers 404 with the not-found page", async ({ page }) => {
   // and the page stays static text with working links. That is a recorded
   // consequence of ADR 0007, and the signed-in test below is where the page
   // hydrates and the console is checked.
+
+  // It does not scroll sideways at a phone, a tablet or a desktop width. Loaded
+  // fresh at each, so the broken-route illustration is laid out for that width
+  // rather than resized from the last.
+  for (const width of [320, 390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto(UNKNOWN)
+    await expect(page.getByTestId("broken-route")).toBeVisible()
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(overflow, `scrolls sideways at ${width}px`).toBe(0)
+  }
 })
 
 test("a signed-in creator on an unknown workspace gets the same page, hydrated and clean", async ({
@@ -88,15 +101,3 @@ test("go to dashboard asks a signed-out visitor to sign in", async ({ page }) =>
   await page.getByRole("main").getByRole("link", { name: "Go to dashboard" }).click()
   await expect(page).toHaveURL(/\/sign-in$/)
 })
-
-for (const width of [320, 390, 768, 1280]) {
-  test(`does not scroll sideways at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 })
-    await page.goto(UNKNOWN)
-    await expect(page.getByTestId("broken-route")).toBeVisible()
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    )
-    expect(overflow).toBe(0)
-  })
-}

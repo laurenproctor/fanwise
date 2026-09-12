@@ -38,7 +38,7 @@ rather than against the fourteen:
 ## What the browser suite is for
 
 The Playwright suite is a small number of critical journeys, not a catalogue of rules. It
-was cut from 111 tests to 51 on 12 September 2026, with every removed test's guarantee
+was cut from 111 tests to 47 on 12 September 2026, with every removed test's guarantee
 either moved to a lower layer or folded into a journey that was kept; the test-by-test
 record is `docs/e2e-rightsizing.md`.
 

@@ -2,7 +2,7 @@
 
 12 September 2026. Branch `chore/rightsize-e2e-suite`, from `origin/main` at `ccb78d6`.
 
-The Playwright suite went from **111 tests to 51**. No production code, schema, migration,
+The Playwright suite went from **111 tests to 47**. No production code, schema, migration,
 dependency or copy changed. Every removed test is accounted for below: its guarantee either
 already lived at a lower layer, was moved there in this change, or was folded into a browser
 journey that was kept. `docs/testing.md` says what the suite is for now.
@@ -11,14 +11,15 @@ journey that was kept. `docs/testing.md` says what the suite is for now.
 
 | | Before | After |
 |---|---|---|
-| Playwright tests | 111 in 18 files | 51 in 18 files |
+| Playwright tests | 111 in 18 files | 47 in 18 files |
 | Local run, `CI=1`, one worker, retries 2 | 5.2 min (282 s in tests) | 2.3 min |
 | Flaky or retried | 0 | 0 |
 | Unit tests (`pnpm test`) | 1,206 in 68 files | 1,286 in 77 files (+80) |
 | Database tests (`pnpm test:db`) | unchanged | unchanged |
 
 The brief was written against 104 tests. `not-found.spec.ts` (7 tests, PR #80) landed after
-it and is kept unchanged, so the planned 44 is 51 here. CI timings are in the pull request,
+it; its four width checks were then folded into one of its own tests, so the planned 44 is 47
+here. CI timings are in the pull request,
 measured from GitHub Actions rather than extrapolated from local hardware.
 
 Before, the slowest files were `catalog.spec.ts` (47 s), `journey-01-product.spec.ts` (36 s),
@@ -52,8 +53,9 @@ Every new unit test was checked against a deliberately broken copy of the code i
 required mark, the importer's server refusal); each failed, and the production files were
 restored before committing.
 
-**Totals for the 60 removed tests:** 43 consolidated into kept journeys, 11 moved to a lower
-layer, 6 removed as redundant (already proved at the right layer, nothing new needed).
+**Totals for the 64 removed tests:** 47 consolidated into kept journeys, 11 moved to a lower
+layer, 6 removed as redundant (already proved at the right layer, nothing new needed). 60
+were in the brief; the other four are `not-found.spec.ts` width checks.
 
 **Setup.** Only `journey-01-signup.spec.ts` signs up through the form. Every other test
 starts from `newCreator` (`tests/e2e/support.ts`): a unique account from the local auth
@@ -81,8 +83,8 @@ because that file is held byte for byte as it was.
 - **A trailing-slash canonical redirect** is not in `proxy.test.ts`: a running Next server
   strips the slash before the proxy is called, and a hand-built `NextRequest` does not, so a
   unit assertion would test the harness. Journey 14 asserts it against the server.
-- **`security-headers.spec.ts` and `not-found.spec.ts` keep all their tests.** The first is
-  untouched; the second changed only its account setup.
+- **`security-headers.spec.ts` keeps all its tests, untouched.** `not-found.spec.ts` keeps
+  every assertion; see its own section below.
 
 ## Test by test
 
@@ -265,7 +267,22 @@ Paths are under `tests/`. "Kept journey" names the retained test an assertion no
 | the root serves the marketing site to an anonymous visitor | Move (existing) | Kept `marketing.spec.ts` reachable | `/` is the landing page signed out | Already asserted by a kept journey |
 | an anonymous visitor is still turned away from the app | Move (new) | `unit/proxy.test.ts` (onboarding); journey 9 stranger | No session → sign in | Proxy logic; one browser proof kept |
 
+### not-found.spec.ts
+
+Not in the original brief; added by PR #80 after it was written. Its account setup moved to
+`newCreator`, and its four width checks were folded into the test that already loads the same
+unknown URL signed out.
+
+| Original E2E test | Disposition | Destination | Guarantee preserved | Why that layer |
+|---|---|---|---|---|
+| an unknown URL answers 404 with the not-found page | Keep | — | 404, title, links, shared shell | Server status and render |
+| a signed-in creator on an unknown workspace gets the same page, hydrated and clean | Keep | — | Hydrates under the nonce policy, no errors | Browser |
+| go to dashboard asks a signed-out visitor to sign in | Keep | — | Link goes to sign in | Navigation |
+| does not scroll sideways at 320px | Consolidate | Kept: unknown URL answers 404 | No overflow, fresh load at the width | Layout needs a browser |
+| does not scroll sideways at 390px | Consolidate | Kept: unknown URL answers 404 | No overflow, fresh load at the width | Layout needs a browser |
+| does not scroll sideways at 768px | Consolidate | Kept: unknown URL answers 404 | No overflow, fresh load at the width | Layout needs a browser |
+| does not scroll sideways at 1280px | Consolidate | Kept: unknown URL answers 404 | No overflow, fresh load at the width | Layout needs a browser |
+
 ### Unchanged
 
-`security-headers.spec.ts` (7 tests) is byte for byte as it was. `not-found.spec.ts` (7
-tests) keeps every assertion; only its account setup moved to `newCreator`.
+`security-headers.spec.ts` (7 tests) is byte for byte as it was.
