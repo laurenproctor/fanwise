@@ -340,7 +340,8 @@ Design rules that make this work:
   the canonical product, and without it there is no analytics story later.
 - The screen is one component that does not assume a full page's width, so it can also be
   shown in a companion window beside Creative Market's editor. That window never touches
-  Creative Market's page. `docs/decisions/0010`.
+  Creative Market's page. `docs/decisions/0010`, and `docs/companion-window.md` for what
+  that layout rule buys and when it would be built.
 
 ---
 
