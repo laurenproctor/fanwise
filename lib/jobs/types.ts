@@ -19,6 +19,7 @@ export type JobName =
   | "publish_listing"
   | "generate_listing"
   | "sync_billing"
+  | "import_source"
 
 export interface JobPayloads {
   noop: { message: string }
@@ -55,6 +56,15 @@ export interface JobPayloads {
    * job that runs late or twice sets the same number.
    */
   sync_billing: { workspaceId: string }
+  /**
+   * Read one public link and draft a product from it.
+   *
+   * Ids only, for the same reason as publish_listing and generate_listing: the
+   * page is read when the job runs, not when the creator clicked, and the row
+   * records what was actually found. The job claims the row by
+   * compare-and-swap, so a redelivery does nothing.
+   */
+  import_source: { workspaceId: string; importId: string }
 }
 
 /**
@@ -70,6 +80,7 @@ export const JOB_NAMES = [
   "publish_listing",
   "generate_listing",
   "sync_billing",
+  "import_source",
 ] as const satisfies readonly JobName[]
 
 export interface EnqueueOptions {

@@ -42,6 +42,27 @@ export const routes = {
   /** The catalog. A workspace's home is the list of what it sells. */
   workspace: (workspace: string) => `/${workspace}`,
   newProduct: (workspace: string) => `/${workspace}/new`,
+  /**
+   * Importing a product from a link.
+   *
+   * Under `/new` rather than at `/<workspace>/import`. Two reasons: `new` is
+   * already in `RESERVED_PRODUCT_SLUGS`, so nesting here reserves no further
+   * word in the product-slug namespace; and `/import` is wanted by a different
+   * feature with the same English name, importing a listing already sold on a
+   * connected channel (`docs/listing-import.md`). One word, two features, and
+   * they must not share a route.
+   */
+  importProduct: (workspace: string) => `/${workspace}/new/link`,
+  /**
+   * One import, addressable.
+   *
+   * The id is in the URL because the reading happens in a background job: a
+   * creator who closes the tab and comes back must land on the import that is
+   * still running rather than on an empty field. `lib/imports/queries.ts` is
+   * what makes that safe — the row is read through RLS, so an id belonging to
+   * another workspace is indistinguishable from one that does not exist.
+   */
+  productImport: (workspace: string, importId: string) => `/${workspace}/new/link/${importId}`,
   product: (workspace: string, product: string) => `/${workspace}/${product}`,
   productChannel: (workspace: string, product: string, connectionId: string) =>
     `/${workspace}/${product}/channels/${connectionId}`,

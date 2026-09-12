@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { InfoTip } from "@/components/ui/info-tip"
 
 /**
@@ -19,6 +19,7 @@ export function TagInput({
   maxCount,
   maxTagLength,
   onChange,
+  annotation,
 }: {
   name: string
   defaultValue: string[]
@@ -26,6 +27,12 @@ export function TagInput({
   maxCount?: number
   maxTagLength?: number
   onChange?: (tags: string[]) => void
+  /**
+   * Rendered beside the label, for a caller that has something to say about
+   * where the value came from. A sibling of the label rather than a child, for
+   * the same reason the tip is one: a button inside a label steals its name.
+   */
+  annotation?: ReactNode
 }) {
   const [value, setValue] = useState(defaultValue.join(", "))
 
@@ -44,6 +51,7 @@ export function TagInput({
         </label>
         {/* Sibling, not child: a button inside a label steals the label's name. */}
         <InfoTip term="listingTags" />
+        {annotation}
       </span>
       <input
         id="listing-tags"

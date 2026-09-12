@@ -2,6 +2,7 @@ import { buildDerivative, finalizeAsset } from "@/lib/products/assets"
 import { runPublication } from "@/lib/publishing/runner"
 import { runGeneration } from "@/lib/ai/runner"
 import { syncBilling } from "@/lib/billing/sync"
+import { runImport } from "@/lib/imports/runner"
 import type { JobHandlers } from "./types"
 
 /**
@@ -30,5 +31,8 @@ export const handlers: JobHandlers = {
   },
   sync_billing: async (payload) => {
     await syncBilling(payload)
+  },
+  import_source: async (payload) => {
+    await runImport(payload)
   },
 }
