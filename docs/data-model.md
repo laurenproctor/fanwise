@@ -491,8 +491,46 @@ describes data one workspace can see; this section describes data the open web c
 see, and the differences are the parts worth reading twice.
 
 **public_profiles** — id, workspace_id, handle (citext, unique), display_name,
-short_bio, location, avatar_path, website_url, instagram_url, contact_url, status,
-seo_title, seo_description, published_at, created_at, updated_at
+short_bio, location, avatar_path, website_url, instagram_url, behance_url, contact_url,
+status, seo_title, seo_description, published_at, created_at, updated_at
+
+**public_profile_drafts** — public_profile_id (pk), workspace_id, handle, display_name,
+short_bio, website, instagram, behance, avatar_path, products (jsonb), revision,
+updated_by, created_at, updated_at
+
+The profile builder's unpublished working copy, one per profile
+(20260912220000). Autosave writes here and **never** to `public_profiles`; only
+publication copies a draft onto the live row. `anon` holds no grant at all. Text
+columns are stored as typed and bounded only by length, so a half-typed link survives
+a refresh; validation is the builder's Continue and Publish, not a CHECK. `revision`
+is optimistic concurrency: a save names the revision it read and a mismatch is a
+conflict. The tenant boundary is the composite FK `(public_profile_id, workspace_id)`.
+
+`products` is the builder's step 2: an array of `{ productId, visible }` in display
+order, every arranged product included, so hiding one keeps its position. Order is
+array position; there are no separate order numbers. Product ids cannot be foreign keys
+inside jsonb, so `check_profile_draft_products` (20260912220100) refuses a malformed
+entry, a repeated product, or a product outside the draft's workspace on every write,
+including a direct PostgREST one. A product is **eligible** for a profile when it is not
+archived and at least one of its listings is `live` by the catalog's `liveness()` rule
+(`lib/public/product-arrangement.ts`); an arranged product that later becomes
+ineligible keeps its entry and flag but is never previewed or published.
+
+**public_profile_publications** — id, public_profile_id, workspace_id, handle,
+draft_updated_at, snapshot (jsonb), published_by, published_at
+
+One immutable row per successful publish (20260912220200), written only by
+`publish_public_profile()`. **The live rows stay the published state**: the public route
+still reads `public_profiles` and `public_product_pages` through anon RLS, and never a
+draft. Publishing is that one security-definer function, one transaction: it locks the
+profile and draft, refuses a draft changed since review (PT409), claims the handle (a
+held one raises 23505 and rolls everything back), writes the profile columns, publishes
+exactly the draft's shown products in order with `featured` cleared, sets every other page
+under the profile back to draft, and records the snapshot. Publishing an unchanged draft
+again returns the existing publication and writes nothing. A never-published profile's
+old handle is not kept as a redirect; a published one's is. The builder is the only
+authority for which product pages a profile publishes; the product editor edits a page's
+copy, not its visibility.
 
 A **public profile is not a workspace**. A workspace is an operational container with
 a slug for `/<slug>`; a profile is a public identity with a handle for `/@<handle>`.

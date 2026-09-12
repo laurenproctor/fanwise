@@ -57,6 +57,13 @@ const AUTHENTICATED_MAY_EXECUTE = new Set([
   "create_import_session(p_workspace_id uuid, p_submission_id uuid, p_product_name text, p_product_slug text, p_product_metadata jsonb, p_provider import_provider, p_source_url text, p_normalized_url text, p_url_display_name text, p_pasted_text text, p_staged_source_ids uuid[])",
   "release_public_handle(p_public_profile_id uuid, p_new_handle text)",
   "release_public_product_slug(p_public_product_page_id uuid, p_new_slug text)",
+  /*
+    The builder's publish: one transaction that claims the handle, writes the
+    live profile and its product pages, and records the publication. Security
+    definer, and like the two above it re-checks is_workspace_member() itself.
+    tests/db/profile-publication.test.ts holds that line from the outside.
+  */
+  "publish_public_profile(p_public_profile_id uuid, p_expected_draft_updated_at timestamp with time zone, p_values jsonb, p_product_ids uuid[])",
 ])
 
 /**
@@ -79,6 +86,10 @@ const TRIGGER_ONLY = [
   "check_history_handle_available",
   "check_product_slug_available",
   "check_history_product_slug_available",
+  // A profile draft's jsonb product list may only name its own workspace's products.
+  "check_profile_draft_products",
+  // A profile publication is an immutable record.
+  "enforce_profile_publication_immutability",
 ] as const
 
 /** PostgREST's answer for a function that is not in its schema cache. */

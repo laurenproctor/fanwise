@@ -19,20 +19,19 @@ import type { PublicDestination, PublicProductCard } from "@/lib/public/types"
  */
 
 vi.mock("@/lib/public/actions", () => ({
-  savePublicProfileAction: vi.fn(),
-  setProfilePublishedAction: vi.fn(),
   createPublicProfileAction: vi.fn(),
   savePublicProductPageAction: vi.fn(),
-  setProductPagePublishedAction: vi.fn(),
   createPublicProductPageAction: vi.fn(),
+}))
+vi.mock("@/lib/public/publish-actions", () => ({
+  publishProfileAction: vi.fn(),
+  unpublishProfileAction: vi.fn(),
 }))
 
 const { ProductCard, formatPrice } = await import("@/components/public/product-card")
 const { DestinationList, ChooseWhereToBuy } = await import("@/components/public/destination-list")
 const { PublicImage, PublicAvatar } = await import("@/components/public/public-image")
 const { PublicShell } = await import("@/components/public/public-shell")
-const { PublicProfileForm } =
-  await import("@/app/[slug]/settings/public-profile/public-profile-form")
 const { PublishControls } = await import("@/app/[slug]/settings/public-profile/publish-controls")
 
 function render(element: Parameters<typeof renderToStaticMarkup>[0]): string {
@@ -317,49 +316,6 @@ describe("the public shell", () => {
   })
 })
 
-describe("the public profile settings form", () => {
-  const markup = render(
-    createElement(PublicProfileForm, {
-      workspaceSlug: "northbound-type",
-      appOrigin: "https://fanwise.example",
-      profile: {
-        handle: HANDLE,
-        displayName: "Northline Studio",
-        shortBio: "",
-        location: "",
-        websiteUrl: "",
-        instagramUrl: "",
-        contactUrl: "",
-        seoTitle: "",
-        seoDescription: "",
-      },
-      avatarUrl: null,
-      hasAvatar: false,
-    }),
-  )
-
-  it("shows the whole public address around the editable part", () => {
-    expect(textOf(markup)).toContain("fanwise.example/@")
-    expect(markup).toContain(`value="${HANDLE}"`)
-  })
-
-  it("says a rename keeps the old address working, which the workspace slug cannot", () => {
-    expect(textOf(markup)).toMatch(/old address keeps working|redirect/i)
-  })
-
-  it("carries no account or billing field", () => {
-    const names = [...markup.matchAll(/name="([^"]+)"/g)].map((m) => m[1]!)
-    for (const forbidden of ["email", "password", "firstName", "lastName", "plan"]) {
-      expect(names, `${forbidden} does not belong on the public profile`).not.toContain(forbidden)
-    }
-  })
-
-  it("starts with the save button disabled, because nothing has changed", () => {
-    const save = /<button[^>]*type="submit"[^>]*>/.exec(markup)?.[0] ?? ""
-    expect(save).toContain("disabled")
-  })
-})
-
 describe("the publish controls", () => {
   function controls(status: "draft" | "published") {
     return render(
@@ -369,7 +325,7 @@ describe("the publish controls", () => {
         status,
         appOrigin: "https://fanwise.example",
         publishedCount: 4,
-        draftCount: 2,
+        hasUnpublishedChanges: false,
       }),
     )
   }
@@ -379,7 +335,7 @@ describe("the publish controls", () => {
   })
 
   it("names the state in words as well as colour", () => {
-    expect(textOf(controls("draft"))).toContain("Draft")
+    expect(textOf(controls("draft"))).toContain("Not published")
     expect(textOf(controls("published"))).toContain("Live")
   })
 
@@ -394,8 +350,12 @@ describe("the publish controls", () => {
     expect(text).toContain("Nothing is deleted")
   })
 
-  it("says that publishing a profile does not publish its products", () => {
-    expect(textOf(controls("draft"))).toMatch(/does not publish them|stay private/i)
+  it("sends publishing to the builder rather than offering a second way to publish", () => {
+    const draft = controls("draft")
+    expect(textOf(draft)).toContain("Build your profile")
+    expect(textOf(draft)).toMatch(/Publishing happens in the builder/)
+    expect(textOf(draft)).not.toMatch(/Publish profile/)
+    expect(textOf(controls("published"))).toContain("Edit public profile")
   })
 
   it("offers the public link only once there is something to see", () => {

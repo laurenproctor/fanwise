@@ -1,23 +1,22 @@
 "use client"
 
 import { useEffect, useId, useState, useTransition } from "react"
-import { Button } from "@/components/ui/button"
-import { setProfilePublishedAction } from "@/lib/public/actions"
-import { publicRoutes } from "@/lib/routes"
+import { Button, ButtonLink } from "@/components/ui/button"
+import { unpublishProfileAction } from "@/lib/public/publish-actions"
+import { publicRoutes, routes } from "@/lib/routes"
 import type { PublicPageStatus } from "@/lib/public/types"
 
 /**
- * The address, and the switch.
+ * Where the public profile stands, and the two things to do about it.
  *
- * Publishing is one deliberate act with its own button, never a side effect of
- * saving a field. The two are separated all the way down: the save action
- * never touches `status`, and this action never touches anything else.
+ * Editing and publishing both live in the builder, so this is an overview:
+ * the address, whether it is live, a way into the builder, and Unpublish.
+ * Unpublish stays here rather than in the builder because it is the one action
+ * a creator in a hurry needs to find without walking three steps.
  *
- * Unpublishing is the one that needs care, because a creator pressing it is
- * usually in a hurry and always means it. It is not behind a modal — a
- * confirmation dialog for an action that is instantly reversible is friction
- * pretending to be safety — but the button says what will happen to the
- * products beneath it, which is the part people do not expect.
+ * Unpublishing is not behind a modal — a confirmation for an instantly
+ * reversible action is friction pretending to be safety — but the copy says
+ * what happens to the products beneath it, and that the draft is kept.
  */
 export function PublishControls({
   workspaceSlug,
@@ -25,14 +24,14 @@ export function PublishControls({
   status,
   appOrigin,
   publishedCount,
-  draftCount,
+  hasUnpublishedChanges,
 }: {
   workspaceSlug: string
   handle: string
   status: PublicPageStatus
   appOrigin: string
   publishedCount: number
-  draftCount: number
+  hasUnpublishedChanges: boolean
 }) {
   const [pending, startTransition] = useTransition()
   const published = status === "published"
@@ -46,8 +45,7 @@ export function PublishControls({
         <div className="flex flex-wrap items-center gap-3">
           {/*
             A dot and a word, per docs/design-system.md: state has to be
-            readable from form as well as colour, so the label is never the
-            colour's only carrier.
+            readable from form as well as colour.
           */}
           <span
             className={`inline-flex items-center gap-2 rounded-[var(--radius-pill)] border px-3 py-1 font-mono text-[10px] tracking-[0.12em] uppercase ${
@@ -62,72 +60,69 @@ export function PublishControls({
                 published ? "bg-[var(--color-ok)]" : "bg-[var(--color-ink-3)]"
               }`}
             />
-            {published ? "Live" : "Draft"}
+            {published ? "Live" : "Not published"}
           </span>
 
           <p className="text-[14px] text-[var(--color-ink-2)]">
             {published
               ? `Anyone with the link can see this profile${
                   publishedCount > 0
-                    ? ` and the ${publishedCount} ${publishedCount === 1 ? "product" : "products"} published on it`
+                    ? ` and the ${publishedCount} ${publishedCount === 1 ? "product" : "products"} on it`
                     : ""
                 }.`
               : "Only you can see this profile."}
           </p>
         </div>
 
+        {published && hasUnpublishedChanges ? (
+          <p className="border-l-2 border-[var(--color-warn)] bg-[var(--color-paper-2)] py-2 pl-3 text-[14px] text-[var(--color-ink)]">
+            You have draft changes that aren&rsquo;t live yet. The public profile stays as it is
+            until you publish them.
+          </p>
+        ) : null}
+
         <div className="flex flex-wrap items-center gap-4">
-          <form
-            action={() => {
-              startTransition(async () => {
-                await setProfilePublishedAction(workspaceSlug, !published)
-              })
-            }}
-          >
-            <Button type="submit" variant={published ? "secondary" : "primary"} disabled={pending}>
-              {pending
-                ? published
-                  ? "Unpublishing…"
-                  : "Publishing…"
-                : published
-                  ? "Unpublish"
-                  : "Publish profile"}
-            </Button>
-          </form>
+          <ButtonLink href={routes.publicProfileBuilder(workspaceSlug)}>
+            {published ? "Edit public profile" : "Build your profile"}
+          </ButtonLink>
 
           {published ? (
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[14px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
-            >
-              View public profile
-              <span className="sr-only"> (opens in a new tab)</span>
-            </a>
+            <>
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[14px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              >
+                View public profile
+                <span className="sr-only"> (opens in a new tab)</span>
+              </a>
+              <form
+                action={() => {
+                  startTransition(async () => {
+                    await unpublishProfileAction(workspaceSlug)
+                  })
+                }}
+              >
+                <Button type="submit" variant="secondary" disabled={pending}>
+                  {pending ? "Unpublishing…" : "Unpublish"}
+                </Button>
+              </form>
+            </>
           ) : null}
         </div>
 
         <p className="text-[13px] text-[var(--color-ink-3)]">
           {published
-            ? "Unpublishing hides the profile and every product page under it immediately, including ones you published individually. Nothing is deleted."
-            : draftCount > 0
-              ? `${draftCount} product ${draftCount === 1 ? "page is" : "pages are"} waiting. Publishing the profile does not publish them — each product has its own switch in its editor.`
-              : "Publishing makes the profile visible. Products stay private until you publish each one from its editor."}
+            ? "Unpublishing hides the profile and every product page under it immediately. Nothing is deleted, and your draft is kept."
+            : "Publishing happens in the builder's last step, after you review the final preview."}
         </p>
       </div>
     </div>
   )
 }
 
-/**
- * The public URL, shown and copyable.
- *
- * Unlike the workspace address on the settings page, this one *can* change:
- * handles carry a redirect history, so an old address keeps working. The hint
- * says so, because a creator who has read the other page has been told the
- * opposite about a URL that looks much the same.
- */
+/** The public URL, shown and copyable. */
 function AddressRow({ url }: { url: string }) {
   const [copied, setCopied] = useState(false)
   const labelId = useId()
@@ -168,8 +163,8 @@ function AddressRow({ url }: { url: string }) {
         </button>
       </div>
       <p id={hintId} className="text-[13px] text-[var(--color-ink-3)]">
-        Change your handle whenever you like: the old address keeps working and redirects here, so
-        links you have already shared do not break.
+        Once your profile has been published, changing its address keeps the old one working as a
+        redirect, so links you have already shared do not break.
       </p>
       <span role="status" aria-live="polite" className="sr-only">
         {copied ? "Public address copied to the clipboard." : ""}
