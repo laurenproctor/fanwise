@@ -258,6 +258,12 @@ extension. Decide whether to build anything on A8's exit run and the B2a creator
 build the pop-out if creators still lose their place between windows once the step order is
 right.
 
+**Planned as B11 on 12 September 2026**, at the founder's request, in
+`docs/companion-window.md`. The plan does not decide this entry and does not open the step.
+It writes down what would be built, what it may never do as things a test can fail, the one
+layout rule it asks of A8, and the finding that has to arrive first. What is still owed here
+is the founder accepting or amending ADR 0010's constraints, and the evidence itself.
+
 ---
 
 ## Gate B

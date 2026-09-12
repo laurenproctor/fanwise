@@ -161,6 +161,13 @@ round trip closes. What the mapping has to survive is a stranger's category, a s
 tags and a stranger's line breaks. The journey also runs the import twice, because the second
 import is a navigation to the product that already exists and not an error.
 
+**B11 adds no journey.** The companion window planned on 12 September 2026 in
+`docs/companion-window.md` is journey 7 run in a second window, not a new path from empty
+workspace to live listing. Its own tests assert the handoff renders identically into a
+detached document and that the pop-out button is absent where the API is, and the rest is
+covered by journey 7 being run once with the companion open. A new number would imply a
+new path, and there is not one.
+
 **Password recovery is not one of the fifteen**, because it is not a step on the path from empty
 workspace to live listing. It is covered anyway, in two halves that meet at the token:
 `tests/db/password-recovery.test.ts` makes the same calls the confirm route makes, against the
