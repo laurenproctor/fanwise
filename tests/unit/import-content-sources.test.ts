@@ -286,6 +286,15 @@ describe("pasted markup", () => {
     expect(isWholeHtmlDocument("<!DOCTYPE html><html></html>")).toBe(true)
     expect(isWholeHtmlDocument("  <!-- saved -->\n<html lang=en>")).toBe(true)
     expect(isWholeHtmlDocument("Use the <b> tag for bold.")).toBe(false)
+    expect(isWholeHtmlDocument("<!-- a --><!-- b -->\n<!doctype html>")).toBe(true)
+    expect(isWholeHtmlDocument("<!-- never closed <html>")).toBe(false)
+  })
+
+  it("stays fast on a paste built to make a regular expression backtrack", () => {
+    const hostile = "<!--" + "--><!--".repeat(50_000) + "x"
+    const started = performance.now()
+    expect(isWholeHtmlDocument(hostile)).toBe(false)
+    expect(performance.now() - started).toBeLessThan(500)
   })
 })
 
