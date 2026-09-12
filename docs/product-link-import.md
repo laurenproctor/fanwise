@@ -635,7 +635,7 @@ Eight rules, each with the thing that enforces it.
 - The recovery path: an unavailable source offers four options and **continue manually**
   reaches the product page with the draft intact.
 - **No new numbered journey.** This is a variation on journey 1 — empty workspace to a
-  product — with a different first step, and journey 14 is B12's. `docs/testing.md` should
+  product — with a different first step, and journey 15 is B12's. `docs/testing.md` should
   say that explicitly, the way it already says B11 adds none.
 
 ---

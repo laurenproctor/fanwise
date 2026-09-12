@@ -48,6 +48,16 @@ Re-verified 4 September 2026: still true. `docs/decisions/0001` takes the assist
 so Shopify ships with `digitalFileUpload: false` and one manual step. The full spec is
 `docs/channels/shopify.md`.
 
+**Reading a listing inward is planned at B12 and is not in this matrix yet.** Importing a
+listing a creator already sells adds one capability, `importListing`, present only where a
+provider can be read back and permanently false for every assisted channel, which exposes no
+read API at all. The matrix moves when the step opens rather than now, and the plan is
+`docs/listing-import.md`. Two rules from it belong here: a provider's listing URL is parsed
+inside its own adapter, because a hostname pattern in a shared util is a provider name
+outside the adapter layer and the tree test is right to fail on it; and the mapping from a
+provider payload to a canonical proposal is a pure function, so the whole of it is testable
+without a network.
+
 ## Manual steps
 
 A channel may be able to publish and still be unable to do one necessary thing. Shopify is

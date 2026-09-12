@@ -415,6 +415,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B9 | Behance: creative-field and category mapping, the project-and-asset package, two new image derivative specs, guided handoff in new-project and existing-project modes, mark submitted, project URL capture. See `docs/channels/behance.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on A8, see below |
 | B10 | Gumroad: OAuth with PKCE, adapter, presigned multipart file upload, draft then enable, covers and thumbnail, the compensating delete, a platform-wide create pace, idempotency. See `docs/channels/gumroad.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on nothing in code, see below |
 | B11 | The companion window: the assisted handoff shown beside the marketplace's own editor, in a pop-out that touches nothing on the marketplace's page. See `docs/companion-window.md` and `docs/decisions/0010`. **Planned 12 September 2026 at the founder's request, not opened**; conditional on evidence from A8 and B2a, see below |
+| B12 | Import a live listing: an inward read per `api` adapter, listing-URL resolution inside the adapter, a reviewed mapping to a canonical product, fetched images, the `import` snapshot, and the claim that makes a second import a navigation. See `docs/listing-import.md`. **Planned 12 September 2026 at the founder's request, not opened**; opens after Gate A passes, see below |
 
 ### B1, what was built and what is still owed
 
@@ -622,6 +623,59 @@ What B10 changes elsewhere in this file:
 - **Decision 2 is resolved.** The email it recommended survives as decision 27, asking
   something else.
 - **Gate A does not widen.** Gumroad is in Gate B.
+
+### B12, what is planned and what it opens on
+
+Planned on 12 September 2026 at the founder's request and not built. The plan is
+`docs/listing-import.md`. **The number skips B11**, which the companion window took when it
+was planned the same day; step ids are names here, not positions, and the note under B3
+covers why.
+
+What it is, in one sentence: the second way into Fanwise, for the creator who already sells —
+one listing on a connected channel, read back and turned into a canonical product Fanwise did
+not compose.
+
+Scope, when it opens:
+
+- `import` on the adapter contract, present only where a provider can be read back: URL
+  parsing inside the adapter, a Zod-validated read, and a pure mapping to a proposal. One new
+  capability, `importListing`, with the honesty tests it inherits.
+- The review screen: what the marketplace has beside what Fanwise will store, with the
+  unmapped fields shown rather than dropped quietly, and the creator confirming before
+  anything reaches `products`.
+- Images fetched into the A2 asset pipeline. The deliverable is never fetched and never
+  faked; readiness says it is missing, because it is.
+- One migration: `snapshot_type` gains `import`. No new table.
+- One route, `/[slug]/import`, reserved in `lib/slug.ts` in the same commit, and
+  `components/onboarding/first-run.tsx` passing the href its **Import a live listing** control
+  has been waiting for since 11 September 2026.
+- Unit, database and integration tests as `docs/listing-import.md` §14 lists them; journey 15.
+
+**B12 opens after Gate A passes**, and that condition is the one worth defending. The
+first-run screen would otherwise offer two doors of equal weight, and the door Fanwise is
+being built to prove is the other one: import is how a creator who already sells starts
+faster, not how anyone learns whether a Fanwise-composed listing is good enough to leave up.
+It also needs decision 29 answered, and it runs into decision 21, which it partly answers —
+an imported listing Fanwise has never written to is the one listing that can be forgotten
+honestly, because forgetting it strands nothing.
+
+**B12's exit test** is journey 15, with one clause that carries it: the listing must be one
+**Fanwise did not create**. Importing a listing Fanwise published reads its own shape back and
+proves only that the round trip closes. A stranger's listing, with their category and their
+idea of a description, is what the mapping either survives or does not.
+
+What B12 changes elsewhere in this file:
+
+- **Gate A does not widen.** B12 is in Gate B and is not in the gate's exit test. It waits on
+  that gate rather than joining it.
+- **A7 is untouched.** Publish Everywhere publishes what is in Fanwise and does not care how
+  it arrived.
+- **B5 and B7 are adjacent and are not this.** B5 ingests transactions, B7 imports CSV, and
+  B12 imports one listing. Three different things that the word import would happily blur.
+- **C1 inherits nothing new.** The connection is the billing event and it already happened;
+  a creator who imports thirty listings has connected one channel.
+- **No new channel, no new credential, no new application.** This is the first planned step
+  in Gate B that adds no marketplace.
 
 **B3 is vacant on purpose.** Creative Market moved to A8 and the remaining steps keep their
 numbers, because step ids are names here, not positions — `docs/data-model.md`,
