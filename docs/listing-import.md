@@ -375,7 +375,7 @@ disconnection rule behaves as section 10 settles it.
 matter: a listing that is gone, a listing on another shop, an expired credential, and a rate
 limit.
 
-**E2E, journey 14.** Added to `docs/testing.md` when this was planned. It is a genuinely new
+**E2E, journey 15.** Added to `docs/testing.md` when this was planned. It is a genuinely new
 path and not a variation of an existing one: it starts at a marketplace listing rather than
 at an upload, and it is the only journey where a product enters Fanwise already sold
 somewhere. B11 added no journey for the opposite reason, and the two arguments are the same
@@ -430,7 +430,7 @@ finding: import is worth less than it looks and the review screen is the product
 ## 17. What this changes elsewhere
 
 - **`docs/roadmap.md`** gains B12 under Gate B, opening after Gate A passes.
-- **`docs/testing.md`** gains journey 14, and the count in `CLAUDE.md` moves with it, as it
+- **`docs/testing.md`** gains journey 15, and the count in `CLAUDE.md` moves with it, as it
   did for journey 11.
 - **`docs/decisions/0002`** gains item 29, and item 21 gains the consequence in section 10.
 - **`docs/channel-adapters.md`** gains the import capability, when the step opens rather than

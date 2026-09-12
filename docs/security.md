@@ -294,3 +294,50 @@ collapse at once.
 6. `storage.objects` policies read the workspace id from the first path segment,
    via `storage_object_workspace_id()`. The cast is deliberately total: a
    malformed path returns null and denies, rather than raising.
+
+## The public web
+
+Added 12 September 2026 with the public creator pages. These are the first surfaces
+in Fanwise that answer a request from somebody with no account, and the rules that
+keep them safe are different in kind from the rest of this document.
+
+**The public read path is blind to who is asking.** `lib/supabase/public.ts` builds a
+client with the anon key and no cookie jar, and every public page renders through it.
+That is not a performance choice. `createClient()` reads the request's cookies, so a
+signed-in creator visiting their own `/@handle` would be `authenticated` there and the
+member policies would hand them their own drafts — the page would look correct to the
+one person who cannot tell. Rendering as `anon` makes "is this safe to serve to
+anyone" a question with one answer rather than a property of whoever rendered it
+first.
+
+**A 404 is a privacy guarantee here, not a convenience.** A draft profile, a draft
+product, and a URL that never existed all answer with the same status and the same
+words, so nothing confirms what a creator is working on. Two things broke this during
+development and both were invisible to a signed-in developer:
+
+- A `NextResponse.rewrite()` in the proxy fixes the response status at 200, and the
+  rewritten page's `notFound()` does not replace it. The rewrite is therefore a
+  `beforeFiles` rewrite in `next.config.ts`, which resolves through the router.
+- A route-level `loading.tsx` commits the response before the page has decided
+  anything. Loading states on public pages are nested inside the page instead, around
+  the query rather than around the route.
+
+Anything that begins a response before the page has resolved will reintroduce both.
+
+**Unpublishing means the pictures go too.** Public images are served by route handlers
+that re-derive, per request and as `anon`, that the page they belong to is still
+published, and only then mint a short signed URL. Buckets stay private. A public
+bucket would have left a creator's avatar and product shots fetchable by URL after
+they took the page down, which is not what anybody means by unpublish.
+
+**Outbound links are the feature and therefore the attack surface.** Every href on a
+public page is validated at render by `safeExternalUrl` — https only, no credentials
+in the authority, no control characters smuggling a scheme past the check — and
+carries `noopener noreferrer nofollow`. Without `noopener`, a marketplace listing
+edited by whoever owns that shop can navigate the Fanwise page that opened it.
+
+**The public pages render per request.** ISR was the obvious setting and was removed:
+with a rewrite in play, which of `/@handle` and `/profile/handle` the route cache keys
+on is not something to bet a privacy guarantee on, and `revalidatePath()` can only
+name one of them. The cache returns when its invalidation is proven rather than
+assumed.

@@ -1,7 +1,7 @@
 import type { ChannelAdapter } from "./types"
 import { randomBytes } from "node:crypto"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { clientEnv } from "@/lib/env"
+import { appUrl } from "@/lib/env"
 
 /**
  * OAuth state, as a single-use database row.
@@ -39,7 +39,7 @@ const TTL_MS = 5 * 60 * 1000
  * from there is a build error, not a style problem.
  */
 export function appOrigin(): string {
-  return clientEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "")
+  return appUrl().replace(/\/$/, "")
 }
 
 export function callbackUrl(channelKey: string): string {

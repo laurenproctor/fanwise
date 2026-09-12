@@ -92,7 +92,9 @@ export default function PrivacyPage() {
           <h2>7. Cookies and local storage</h2>
           <p>
             Fanwise uses a session cookie to keep you signed in and local storage for preferences
-            such as the light/dark view. No third-party advertising or cross-site tracking cookies.
+            such as the light/dark view. We count page views with Vercel Web Analytics, which sets
+            no cookies and does not identify you across sites. No third-party advertising or
+            cross-site tracking cookies.
           </p>
         </section>
         <section>

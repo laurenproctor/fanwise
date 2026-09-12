@@ -46,6 +46,27 @@ export function clientEnv(): ClientEnv {
   return cachedClient
 }
 
+/**
+ * NEXT_PUBLIC_APP_URL alone.
+ *
+ * clientEnv() validates the three public variables together, which is right for
+ * anything that goes on to talk to Supabase and wrong for a caller that needs
+ * only the origin. robots.txt is prerendered at build time and reads nothing
+ * else, so a build environment holding the app URL but not the Supabase pair
+ * should produce a robots file rather than failing the export over two
+ * variables that route never touches. Vercel's Preview environment is exactly
+ * that environment.
+ */
+export function appUrl(): string {
+  const parsed = clientSchema
+    .pick({ NEXT_PUBLIC_APP_URL: true })
+    .safeParse({ NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL })
+  if (!parsed.success) {
+    throw new Error("Invalid public environment variables:\n" + format(parsed.error))
+  }
+  return parsed.data.NEXT_PUBLIC_APP_URL
+}
+
 export function serverEnv(): ServerEnv {
   if (typeof window !== "undefined") {
     throw new Error("serverEnv() was called in the browser. Server secrets never cross that line.")

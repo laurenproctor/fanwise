@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test"
 import { productUrl, signOut, signUpAndCreateWorkspace } from "./support"
 
+/** The root not-found page's headline. Both cases below must show exactly this. */
+const NOT_FOUND_HEADLINE = "This listing didn’t make it to the marketplace."
+
 /**
  * Journey 9. Never skipped, never quarantined, never marked flaky.
  * See docs/testing.md: if this fails the product is broken in the way that
@@ -20,7 +23,7 @@ test("workspace A cannot reach workspace B by URL", async ({ page }) => {
   const response = await page.goto(`/${b.slug}`)
 
   expect(response?.status()).toBe(404)
-  await expect(page.getByText("This page does not exist")).toBeVisible()
+  await expect(page.getByRole("heading", { level: 1, name: NOT_FOUND_HEADLINE })).toBeVisible()
 
   // Nothing of Bob's leaks: not the workspace name in the header chrome, not
   // his slug, not a member row.
@@ -39,7 +42,7 @@ test("a workspace that never existed is indistinguishable from one that is not y
   // Same status and same words as the case above. A different answer here would
   // confirm to a prober which slugs are real.
   expect(response?.status()).toBe(404)
-  await expect(page.getByText("This page does not exist")).toBeVisible()
+  await expect(page.getByRole("heading", { level: 1, name: NOT_FOUND_HEADLINE })).toBeVisible()
 })
 
 test("workspace A cannot reach workspace B's product by URL", async ({ page }) => {

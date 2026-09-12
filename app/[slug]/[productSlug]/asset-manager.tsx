@@ -3,7 +3,8 @@
 import { useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { FormError } from "@/components/ui/form-error"
-import { createUploadIntent, deleteAssetAction, finalizeUploadAction } from "@/lib/products/actions"
+import { deleteAssetAction } from "@/lib/products/actions"
+import { uploadProductFile } from "@/lib/products/upload-client"
 import {
   ASSET_STATE_LABELS,
   ASSET_TYPES,
@@ -84,30 +85,12 @@ export function AssetManager({
 
   /** One file. False once it has failed and the error is already on screen. */
   async function uploadOne(file: File) {
-    const result = await createUploadIntent(workspaceSlug, {
-      productId,
-      assetType,
-      filename: file.name,
-      byteSize: file.size,
-    })
+    const result = await uploadProductFile({ workspaceSlug, productId, assetType, file })
 
-    if ("error" in result) {
+    if (result.error) {
       setError(result.error)
       return false
     }
-
-    const response = await fetch(result.intent.signedUrl, {
-      method: "PUT",
-      body: file,
-      headers: { "content-type": file.type || "application/octet-stream" },
-    })
-
-    if (!response.ok) {
-      setError("The upload did not complete. Try again.")
-      return false
-    }
-
-    await finalizeUploadAction(workspaceSlug, result.intent.assetId)
     return true
   }
 

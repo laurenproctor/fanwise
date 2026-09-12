@@ -100,7 +100,9 @@ test("a signed-in unknown path renders the not-found page under the nonce policy
   const response = await page.goto("/this-workspace-does-not-exist")
   expect(response?.status()).toBe(404)
   expect(response?.headers()["content-security-policy"]).toMatch(/'nonce-/)
-  await expect(page.getByRole("heading", { name: "This page does not exist" })).toBeVisible()
-  await expect(page.getByRole("link", { name: "Back to your workspace" })).toBeVisible()
+  await expect(
+    page.getByRole("heading", { name: "This listing didn’t make it to the marketplace." }),
+  ).toBeVisible()
+  await expect(page.getByRole("link", { name: "Go to dashboard" })).toBeVisible()
   expect(errors).toEqual([])
 })
