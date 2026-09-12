@@ -16,18 +16,35 @@ const PAGES = [
   ["/privacy", "Privacy Policy"],
 ] as const
 
+/** Where each page's own nav sends its call to action. */
+const CALLS_TO_ACTION: Record<string, string> = {
+  "/about": "Get started",
+  "/marketplaces": "Get started",
+  "/how-it-works": "Get started",
+  "/pricing": "Start free",
+}
+
 test("every marketing page is reachable without an account", async ({ page }) => {
   for (const [path, heading] of PAGES) {
     const response = await page.goto(path)
     expect(response?.status(), `${path} status`).toBe(200)
     await expect(page).toHaveURL(new RegExp(`${path === "/" ? "/" : path}$`))
     await expect(page.getByRole("heading", { name: new RegExp(heading) }).first()).toBeVisible()
-  }
-})
 
-test("the nav reaches every page it links to", async ({ page }) => {
-  // Loaded fresh per link rather than walked with goBack(), so a failure names
-  // the link that is wrong instead of the one after it.
+    // Every Get started on the site reaches the account form: the one thing the
+    // marketing site is for. Asserted on the rendered link rather than by a click
+    // per page; one real click through follows below.
+    const cta = CALLS_TO_ACTION[path]
+    if (cta) {
+      await expect(
+        page.locator("nav").first().getByRole("link", { name: cta, exact: true }),
+        `${path} nav ${cta}`,
+      ).toHaveAttribute("href", "/sign-up")
+    }
+  }
+
+  // The nav reaches every page it links to. Clicked, so a failure names the
+  // link that is wrong and proves client navigation lands on a rendered page.
   for (const [label, path] of [
     ["Marketplaces", "/marketplaces"],
     ["How it works", "/how-it-works"],
@@ -38,20 +55,20 @@ test("the nav reaches every page it links to", async ({ page }) => {
     await expect(page).toHaveURL(new RegExp(`${path}$`))
     await expect(page.locator("h1")).toBeVisible()
   }
-})
 
-test("the pricing calculator does the arithmetic the billing model states", async ({ page }) => {
-  await page.goto("/pricing")
+  /*
+    The pricing calculator does the arithmetic the billing model states: $9 base
+    plus $6 a marketplace, and annual is ten months for twelve. The calculator
+    keeps its own constants, so tests/unit/marketing.test.ts pins them to
+    lib/billing/rules.ts; this is what a visitor's clicks do with them.
+  */
   const readout = page.locator(".fw-stepper__readout")
-
-  // $9 base plus $6 a marketplace, per docs/billing.md.
   await expect(readout).toContainText("2 marketplaces")
   await expect(readout).toContainText("$21")
 
   await page.getByLabel("Add a marketplace").click()
   await expect(readout).toContainText("$27")
 
-  // Annual is ten months for twelve: $90 and $60.
   await page.getByRole("button", { name: "Annual" }).click()
   await expect(readout).toContainText("$270")
   await expect(readout).toContainText("per year")
@@ -67,42 +84,19 @@ test("the pricing calculator does the arithmetic the billing model states", asyn
   for (let i = 0; i < 10; i++) await page.getByLabel("Remove a marketplace").click()
   await expect(readout).toContainText("Storefront only")
   await expect(readout).toContainText("$90")
-})
 
-test("the landing picker prices the shops a visitor selects", async ({ page }) => {
+  // The landing picker prices the shops a visitor selects.
   await page.goto("/")
   const total = page.locator(".fw-picker__total")
   await expect(total).toContainText("$21 per month")
-
   await page.getByRole("button", { name: "Envato", exact: true }).click()
   await expect(total).toContainText("$27 per month")
-})
 
-test("/start sends a visitor to the real account form", async ({ page }) => {
-  // The mockups are published, so a link written against them still points here.
-  await page.goto("/start")
-  await expect(page).toHaveURL(/\/sign-up$/)
-  await expect(page.getByRole("heading", { name: "Create an account" })).toBeVisible()
-})
-
-test("every Get started on the site reaches the account form", async ({ page }) => {
-  // The one thing the marketing site is for. A CTA that lands on a form which
-  // cannot create an account is the failure this replaced.
-  for (const [path, label] of [
-    ["/about", "Get started"],
-    ["/marketplaces", "Get started"],
-    ["/how-it-works", "Get started"],
-    ["/pricing", "Start free"],
-  ] as const) {
-    await page.goto(path)
-    await page.locator("nav").first().getByRole("link", { name: label, exact: true }).click()
-    await expect(page, `${path} nav ${label}`).toHaveURL(/\/sign-up$/)
-  }
-
-  // And the landing's closing band, which used to hold the form itself.
-  await page.goto("/")
+  // And the landing's closing band, which used to hold the form itself, reaches
+  // the real account form. /start's redirect to it is tests/unit/marketing.test.ts.
   await page.locator(".fw-signup-card").getByRole("link", { name: "Get started" }).click()
   await expect(page).toHaveURL(/\/sign-up$/)
+  await expect(page.getByRole("heading", { name: "Create an account" })).toBeVisible()
 })
 
 test("the light and dark view survives a navigation", async ({ page }) => {

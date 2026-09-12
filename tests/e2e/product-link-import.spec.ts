@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { routes } from "@/lib/routes"
-import { signUpAndCreateWorkspace } from "./support"
+import { newCreator } from "./support"
 
 /**
  * Importing a product from a public link, in a browser.
@@ -13,11 +13,18 @@ import { signUpAndCreateWorkspace } from "./support"
  * a stronger test than a browser hitting a live site, and it does not go quiet
  * when somebody else's server has an outage.
  *
- * What only a browser can answer is what this covers: the route is reachable
- * while signed in and not otherwise, a pasted link really does create an import
- * and land on it, the failure a creator actually sees has a way out of it, and
+ * What only a browser can answer is what this covers: a pasted link really
+ * does create an import and land on it, the failure a creator actually sees has
+ * a way out of it, a second paste of the same page opens the same import, and
  * the screen widens without scrolling sideways at the widths the rest of the
  * suite uses.
+ *
+ * Below the browser: every refused link shape and its message is
+ * tests/unit/import-machine.test.ts; that a signed-out visitor is turned away
+ * from both import routes is tests/unit/proxy.test.ts; that no route but the
+ * importer asks for the wide canvas is tests/unit/import-screen.test.ts; and
+ * that one workspace cannot read, insert or update another's import is
+ * tests/db/product-import.test.ts.
  *
  * The one link it pastes is under `.invalid`, which RFC 2606 reserves and no
  * resolver will ever answer. So the job runs the whole way through — action,
@@ -31,26 +38,17 @@ const UNREACHABLE = "https://fanwise-import.invalid/a-product"
 /** The widths tests/e2e/catalog.spec.ts already uses, plus a wide desktop. */
 const WIDTHS = [320, 390, 768, 1280, 1600]
 
-test("a signed-out visitor cannot reach the importer", async ({ page }) => {
-  await page.goto(routes.importProduct("someone-elses-studio"))
-  await expect(page).toHaveURL(/\/sign-in/)
-})
-
-test("a signed-out visitor cannot reach somebody's import", async ({ page }) => {
-  await page.goto("/someone-elses-studio/new/link/11111111-1111-4111-8111-111111111111")
-  await expect(page).toHaveURL(/\/sign-in/)
-})
-
-test("an import id from another workspace is not found rather than forbidden", async ({ page }) => {
-  // Indistinguishable from an id that was never real, which is what stops a
-  // probe confirming one.
-  const { slug } = await signUpAndCreateWorkspace(page, "impt", "Tenancy Studio")
-  await page.goto(`/${slug}/new/link/11111111-1111-4111-8111-111111111111`)
-  await expect(page.getByText(/not found/i).first()).toBeVisible()
-})
+/** The left padding of `<main>`, in pixels. */
+function gutter(page: import("@playwright/test").Page): Promise<number> {
+  return page.evaluate(() => {
+    const main = document.querySelector("main")
+    if (!main) throw new Error("no main")
+    return Number.parseFloat(getComputedStyle(main).paddingLeft)
+  })
+}
 
 test("the importer opens from the new-product page and says what it is", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "imp1", "Import Studio")
+  const { slug } = await newCreator(page, "imp1", "Import Studio")
 
   await page.goto(routes.newProduct(slug))
   await page.getByRole("link", { name: "Import a product from a link" }).click()
@@ -70,30 +68,42 @@ test("the importer opens from the new-product page and says what it is", async (
 
   // What Fanwise will and will not do, said before anything is pasted.
   await expect(page.getByText("Run, unpack or preview code it downloads.")).toBeVisible()
-})
 
-test("the bad shapes are refused before anything is fetched", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "imp2", "Validation Studio")
-  await page.goto(routes.importProduct(slug))
+  // A bad shape is refused in the form, before anything is fetched. Next's own
+  // route announcer is a role="alert" on every page, so the complaint is
+  // located by what it says rather than by its role alone.
+  await page.getByLabel("Product link").fill("http://example.com/a")
+  await page.getByRole("button", { name: "Analyze product" }).click()
+  await expect(page.getByRole("alert").filter({ hasText: "https links only" })).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`${slug}/new/link$`))
 
-  const field = page.getByLabel("Product link")
-  for (const [input, fragment] of [
-    ["http://example.com/a", "https links only"],
-    ["https://localhost/a", "cannot reach from the internet"],
-    ["https://example.com:8443/a", "standard https port"],
-  ] as const) {
-    await field.fill(input)
-    await page.getByRole("button", { name: "Analyze product" }).click()
-    // Next's own route announcer is a role="alert" on every page, so the
-    // complaint is located by what it says rather than by its role alone.
-    await expect(page.getByRole("alert").filter({ hasText: fragment })).toBeVisible()
-    // Nothing was imported, so the field is still a field.
-    await expect(page).toHaveURL(new RegExp(`${slug}/new/link$`))
+  // The screen widens without ever scrolling sideways, in either theme.
+  for (const theme of ["light", "dark"] as const) {
+    const toggle = page.getByRole("button", { name: `Switch to ${theme} mode` })
+    if (await toggle.isVisible()) await toggle.click()
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe(theme)
+
+    for (const width of WIDTHS) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect(page.getByRole("heading", { name: "Import a product", level: 1 })).toBeVisible()
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      )
+      expect(overflow, `${theme} at ${width}px scrolls sideways`).toBeLessThanOrEqual(0)
+    }
   }
+
+  // The gutters are the wide ones on a desktop and the narrow ones on a phone.
+  await page.setViewportSize({ width: 1280, height: 900 })
+  expect(await gutter(page)).toBeGreaterThanOrEqual(48)
+  await page.setViewportSize({ width: 1600, height: 900 })
+  expect(await gutter(page)).toBe(64)
+  await page.setViewportSize({ width: 390, height: 900 })
+  expect(await gutter(page)).toBe(24)
 })
 
 test("a pasted link becomes an import that survives a refresh", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "imp3", "Pipeline Studio")
+  const { slug } = await newCreator(page, "imp3", "Pipeline Studio")
   await page.goto(routes.importProduct(slug))
 
   await page.getByLabel("Product link").fill(UNREACHABLE)
@@ -115,12 +125,18 @@ test("a pasted link becomes an import that survives a refresh", async ({ page })
   await expect(page.getByRole("heading", { name: "That did not finish" })).toBeVisible()
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible()
   await expect(page.getByRole("link", { name: "Continue manually" })).toBeVisible()
+
+  // An import id that is not this workspace's is not found rather than
+  // forbidden: indistinguishable from an id that was never real, which is what
+  // stops a probe confirming one.
+  await page.goto(`/${slug}/new/link/11111111-1111-4111-8111-111111111111`)
+  await expect(page.getByText(/not found/i).first()).toBeVisible()
 })
 
 test("a failed import can be retried, and readiness never claims the source is done", async ({
   page,
 }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "imp4", "Retry Studio")
+  const { slug } = await newCreator(page, "imp4", "Retry Studio")
   await page.goto(routes.importProduct(slug))
 
   await page.getByLabel("Product link").fill(UNREACHABLE)
@@ -147,7 +163,7 @@ test("a failed import can be retried, and readiness never claims the source is d
 })
 
 test("importing the same link twice opens the import that exists", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "imp5", "Idempotent Studio")
+  const { slug } = await newCreator(page, "imp5", "Idempotent Studio")
 
   await page.goto(routes.importProduct(slug))
   await page.getByLabel("Product link").fill(UNREACHABLE)
@@ -167,65 +183,4 @@ test("importing the same link twice opens the import that exists", async ({ page
   // And exactly one product came of it.
   await page.goto(routes.workspace(slug))
   await expect(page.getByRole("link", { name: "A Product", exact: true })).toHaveCount(1)
-})
-
-test("the screen widens without ever scrolling sideways", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "imp6", "Width Studio")
-
-  for (const theme of ["light", "dark"] as const) {
-    for (const width of WIDTHS) {
-      await page.setViewportSize({ width, height: 900 })
-      await page.goto(routes.importProduct(slug))
-
-      const toggle = page.getByRole("button", { name: `Switch to ${theme} mode` })
-      if (await toggle.isVisible()) await toggle.click()
-
-      await expect(page.getByRole("heading", { name: "Import a product", level: 1 })).toBeVisible()
-
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      )
-      expect(overflow, `${theme} at ${width}px scrolls sideways`).toBeLessThanOrEqual(0)
-    }
-  }
-})
-
-test("the gutters are the wide ones on a desktop and the narrow ones on a phone", async ({
-  page,
-}) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "imp7", "Gutter Studio")
-  await page.goto(routes.importProduct(slug))
-
-  async function gutter(): Promise<number> {
-    return page.evaluate(() => {
-      const main = document.querySelector("main")
-      if (!main) throw new Error("no main")
-      return Number.parseFloat(getComputedStyle(main).paddingLeft)
-    })
-  }
-
-  await page.setViewportSize({ width: 1280, height: 900 })
-  expect(await gutter()).toBeGreaterThanOrEqual(48)
-
-  await page.setViewportSize({ width: 1600, height: 900 })
-  expect(await gutter()).toBe(64)
-
-  await page.setViewportSize({ width: 390, height: 900 })
-  expect(await gutter()).toBe(24)
-})
-
-test("no other route was widened", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "imp8", "Untouched Studio")
-  await page.setViewportSize({ width: 1600, height: 900 })
-
-  for (const route of [routes.workspace(slug), routes.newProduct(slug), routes.channels(slug)]) {
-    await page.goto(route)
-    const width = await page.evaluate(() => {
-      const main = document.querySelector("main")
-      if (!main) throw new Error("no main")
-      return main.getBoundingClientRect().width
-    })
-    // The reading column, unchanged: 1160 plus its own 24px gutters.
-    expect(width, `${route} was widened`).toBeLessThanOrEqual(1160)
-  }
 })

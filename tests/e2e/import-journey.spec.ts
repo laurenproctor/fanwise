@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { routes } from "@/lib/routes"
-import { signUpAndCreateWorkspace } from "./support"
+import { newCreator } from "./support"
 import {
   chooseLicense,
   confirmOwnership,
@@ -22,6 +22,12 @@ import {
  *
  * Readiness is asserted through `aria-valuenow` rather than the percentage,
  * because the count is what the rule is and the figure is display.
+ *
+ * Below the browser: that the only buyer file cannot be removed until its
+ * replacement is stored is tests/unit/import-deliverables.test.ts, against the
+ * action itself; that another workspace cannot read, insert, update, attest or
+ * license an import is tests/db/product-import.test.ts, and the address itself
+ * answers 404 under the workspace layout journey-09-tenancy.spec.ts proves.
  */
 
 const progressOf = (page: import("@playwright/test").Page) => page.getByRole("progressbar")
@@ -29,7 +35,7 @@ const reviewButton = (page: import("@playwright/test").Page) =>
   page.getByRole("button", { name: "Review marketplace drafts" })
 
 test("a creator goes from a pasted link to the marketplace drafts", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j1", "Journey Studio")
+  const { slug } = await newCreator(page, "j1", "Journey Studio")
 
   // 1 and 2: a supported link, analyzed, with a product draft behind it.
   const { importUrl } = await importAnalyzedSource(page, slug)
@@ -101,7 +107,7 @@ test("a creator goes from a pasted link to the marketplace drafts", async ({ pag
 test("the master listing stays canonical and the marketplace drafts derive from it", async ({
   page,
 }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j2", "Canonical Studio")
+  const { slug } = await newCreator(page, "j2", "Canonical Studio")
   await importAnalyzedSource(page, slug)
 
   await fillListing(page, {
@@ -119,7 +125,7 @@ test("the master listing stays canonical and the marketplace drafts derive from 
 })
 
 test("a private link offers a way out and never reads as imported", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j3", "Private Studio")
+  const { slug } = await newCreator(page, "j3", "Private Studio")
 
   await page.goto(routes.importProduct(slug))
   await page.getByLabel("Product link").fill("https://fanwise-import.invalid/private-thing")
@@ -138,37 +144,14 @@ test("a private link offers a way out and never reads as imported", async ({ pag
   await expect(page.getByRole("link", { name: "Continue manually" })).toBeVisible()
 })
 
-test("a failed replacement upload leaves the file that was already there", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j4", "Replace Studio")
-  await importAnalyzedSource(page, slug)
-
-  await openChecklistRow(page, "upload customer files")
-  await page.getByLabel(/Upload files/).setInputFiles(zipFile("original.zip"))
-  await expect(progressOf(page)).toHaveAttribute("aria-valuenow", "2", { timeout: 20_000 })
-  await expect(page.getByText("original.zip")).toBeVisible()
-
-  /*
-    The server refuses to remove the only measured file, which is what makes
-    replacing safe: there is no window in which a creator has no deliverable
-    because a replacement was accepted before it existed.
-  */
-  await page.getByRole("button", { name: "Remove original.zip" }).click()
-  await expect(
-    page.getByText("That is the only file buyers would receive. Upload its replacement first."),
-  ).toBeVisible()
-  await expect(page.getByText("original.zip")).toBeVisible()
-  await expect(progressOf(page)).toHaveAttribute("aria-valuenow", "2")
-
-  // With a second file stored, the first can go.
-  await page.getByLabel(/Upload a replacement/).setInputFiles(zipFile("replacement.zip"))
-  await expect(page.getByText("replacement.zip")).toBeVisible({ timeout: 20_000 })
-  await page.getByRole("button", { name: "Remove original.zip" }).click()
-  await expect(page.getByText("original.zip")).toBeHidden({ timeout: 20_000 })
-  await expect(progressOf(page)).toHaveAttribute("aria-valuenow", "2")
-})
-
+/**
+ * Also the phone journey: the whole of it runs at 390px, dialog included, and
+ * ends by checking the page never scrolls sideways and the gate's action sits
+ * wholly on screen.
+ */
 test("replacing the source keeps everything and shows what changed", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j5", "Swap Studio")
+  await page.setViewportSize({ width: 390, height: 844 })
+  const { slug } = await newCreator(page, "j5", "Swap Studio")
   const { importUrl } = await importAnalyzedSource(page, slug)
 
   // Work the creator has done, saved.
@@ -204,53 +187,15 @@ test("replacing the source keeps everything and shows what changed", async ({ pa
   await expect(page.getByText(/Recorded as Commercial use/)).toBeVisible()
   await openChecklistRow(page, "confirm ownership")
   await expect(page.getByText(/I created this product or have permission/)).toBeVisible()
-})
 
-test("another workspace cannot reach, read or act on an import", async ({ page, browser }) => {
-  const owner = await signUpAndCreateWorkspace(page, "j6a", "Owner Studio")
-  const { importUrl } = await importAnalyzedSource(page, owner.slug)
-
-  const other = await browser.newContext()
-  const stranger = await other.newPage()
-  await signUpAndCreateWorkspace(stranger, "j6b", "Stranger Studio")
-
-  // The same address, as somebody else. Not found, which is indistinguishable
-  // from an id that was never real.
-  await stranger.goto(importUrl)
-  await expect(stranger.getByText(/not found/i).first()).toBeVisible()
-  await expect(stranger.getByRole("heading", { name: "What Fanwise found" })).toBeHidden()
-
-  await other.close()
-})
-
-test("the whole flow works on a phone, without scrolling sideways", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 })
-  const { slug } = await signUpAndCreateWorkspace(page, "j7", "Phone Studio")
-  await importAnalyzedSource(page, slug)
-
-  await fillListing(page, {
-    name: "Pocket Sans",
-    price: "9",
-    description: "A face for small screens.",
-  })
-  await saveListing(page)
-
-  await openChecklistRow(page, "upload customer files")
-  await page.getByLabel(/Upload files/).setInputFiles(zipFile())
-  await expect(progressOf(page)).toHaveAttribute("aria-valuenow", "3", { timeout: 20_000 })
-
-  await chooseLicense(page)
-  await confirmOwnership(page)
-  await expect(progressOf(page)).toHaveAttribute("aria-valuenow", "5", { timeout: 20_000 })
-
-  // The action is reachable and fully on screen at this width.
+  // The action is reachable and fully on screen at this width, and nothing on
+  // the page pushes it sideways.
   const review = reviewButton(page)
   await review.scrollIntoViewIfNeeded()
   const box = await review.boundingBox()
   expect(box).toBeTruthy()
   expect(box!.x).toBeGreaterThanOrEqual(0)
   expect(box!.x + box!.width).toBeLessThanOrEqual(390)
-
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   )
