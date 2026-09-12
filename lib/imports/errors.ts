@@ -90,7 +90,7 @@ export const IMPORT_ERROR_MESSAGES: Record<ImportErrorCode, string> = {
   not_found: "Nothing is published at that link. It may have been deleted or renamed.",
   expired: "That link has expired. Publish it again and paste the new one.",
   unsupported_source:
-    "Fanwise cannot read that kind of link yet. It reads public web pages and published artifacts.",
+    "Fanwise could not read anything from that page. Some pages only show their content once a browser runs their code, and Fanwise never runs a page's code.",
   not_html: "That address is a file rather than a page, so there is nothing to read from it.",
   too_large: "That page is larger than Fanwise will read. Try a link to the page itself.",
   timeout: "That page did not answer in time. Nothing was saved, so trying again is safe.",
@@ -118,7 +118,7 @@ export const IMPORT_ERROR_RECOVERIES: Record<ImportErrorCode, readonly RecoveryA
   organization_only: ["publish_public_link", "paste_code", "upload_files", "continue_manually"],
   not_found: ["replace_link", "upload_files", "continue_manually"],
   expired: ["publish_public_link", "replace_link", "continue_manually"],
-  unsupported_source: ["replace_link", "upload_files", "continue_manually"],
+  unsupported_source: ["paste_code", "upload_files", "replace_link", "continue_manually"],
   not_html: ["replace_link", "upload_files", "continue_manually"],
   too_large: ["replace_link", "upload_files", "continue_manually"],
   timeout: ["retry", "continue_manually"],

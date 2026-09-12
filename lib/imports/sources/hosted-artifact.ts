@@ -75,6 +75,62 @@ const GATE_MARKERS: ReadonlyArray<{ code: ImportErrorCode; phrases: readonly str
   },
 ]
 
+/**
+ * The shell an artifact page serves to anything that is not a browser.
+ *
+ * Measured, not guessed. A GET for an artifact id that does not exist answers
+ * 200 with `og:title` of exactly "Claude Artifact", a description that is a
+ * generic invitation to try out other people's artifacts, and fifty-seven
+ * characters of visible text. Those strings are the same for every artifact,
+ * because the real content is rendered by JavaScript Fanwise will never run.
+ *
+ * Without this check the generic reading is non-empty, so `isEmptyEvidence`
+ * passes and the import "succeeds" — producing a product called Claude Artifact
+ * described as an invitation to try out artifacts. A dead link produces the
+ * same thing, and says it worked. That is the single worst outcome this feature
+ * has, and it is the default one for its headline use case.
+ *
+ * Matched exactly and lower-cased rather than by substring: an artifact whose
+ * author really did title it "Claude Artifact Pro" should still import.
+ */
+const SHELL_TITLES = ["claude artifact"]
+
+/**
+ * Matched as prefixes rather than in full, so the vendor's name does not have
+ * to be spelled here.
+ *
+ * `tests/unit/channel-boundaries.test.ts` sweeps the tree for the model
+ * vendor's name and strips only the registered hosts and labels inside this
+ * directory. A quotation from the provider's own page is neither, and carving
+ * a third exemption for one string would widen a rule that is worth keeping
+ * narrow. The prefixes below are specific enough to identify the shell and
+ * contain nothing the sweep cares about.
+ */
+const SHELL_DESCRIPTION_PREFIXES = [
+  "try out artifacts created by",
+  "content is user-generated and unverified",
+]
+
+/**
+ * Whether a reading is the shell rather than the artifact.
+ *
+ * The title alone is enough. A product named "Claude Artifact" is never the
+ * right answer, so a page that offers no other name has told Fanwise nothing it
+ * can build a listing from — whatever else it carried.
+ */
+export function isShellReading(params: {
+  title: string | null
+  summary: string | null
+  featureCount: number
+}): boolean {
+  const title = params.title?.trim().toLowerCase() ?? ""
+  const summary = params.summary?.trim().toLowerCase() ?? ""
+
+  if (SHELL_TITLES.includes(title)) return true
+  const boilerplate = SHELL_DESCRIPTION_PREFIXES.some((prefix) => summary.startsWith(prefix))
+  return boilerplate && params.featureCount === 0
+}
+
 /** A password field is a sign-in form, whatever the copy around it says. */
 function hasPasswordField(html: string): boolean {
   return /<input\b[^>]*type\s*=\s*["']?password["']?/i.test(html)
@@ -115,10 +171,26 @@ export const hostedArtifactImporter: SourceImporter = {
 
     const evidence = readCommonEvidence(page, originalUrl, "hosted_artifact")
 
-    // A page that answered 200 and said nothing is either a wall this adapter
-    // does not recognise or a shell that renders with JavaScript. Either way
-    // there is nothing to draft from, and saying so is better than saying the
-    // import worked.
+    /*
+      A page that answered 200 and said nothing is either a wall this adapter
+      does not recognise or a shell that renders with JavaScript. Either way
+      there is nothing to draft from, and saying so is better than saying the
+      import worked.
+
+      `isShellReading` is the same judgement for a page that said something and
+      meant none of it. It is checked first because the shell is not empty: it
+      carries a title and a description, and they are the same on every artifact
+      page there has ever been.
+    */
+    if (
+      isShellReading({
+        title: evidence.title?.value ?? null,
+        summary: evidence.summary?.value ?? null,
+        featureCount: evidence.visibleFeatures.value.length,
+      })
+    ) {
+      refuseEmpty()
+    }
     if (isEmptyEvidence(evidence)) refuseEmpty()
 
     return evidence

@@ -14,6 +14,8 @@ import { ImportError } from "@/lib/imports/errors"
 import { importerFor } from "@/lib/imports/sources/registry"
 import { fetchTransport, PUBLIC_ADDRESS, resetStore } from "./outbound-support"
 import {
+  ARTIFACT_SHELL,
+  ARTIFACT_WITH_REAL_TITLE,
   DELETED_ARTIFACT,
   EXPIRED_ARTIFACT,
   JS_SHELL,
@@ -333,6 +335,25 @@ describe("what each kind of artifact page means", () => {
 
   it("refuses a page that rendered nothing rather than calling it imported", async () => {
     await expect(readArtifact(JS_SHELL)).rejects.toMatchObject({ code: "unsupported_source" })
+  })
+
+  it("refuses the shell the real site serves, which is not empty", async () => {
+    /*
+      The regression this whole adapter exists for. Recorded from the live site:
+      an artifact id that does not exist answers 200 with a title and a
+      description, so an emptiness check passes and the import "succeeds" —
+      producing a product called Claude Artifact described as an invitation to
+      try out artifacts, and reporting that it worked.
+    */
+    await expect(readArtifact(ARTIFACT_SHELL)).rejects.toMatchObject({
+      code: "unsupported_source",
+    })
+  })
+
+  it("still imports an artifact whose page gave it a real name", async () => {
+    // The shell check must not swallow the case it was built to protect.
+    const evidence = await readArtifact(ARTIFACT_WITH_REAL_TITLE)
+    expect(evidence.title?.value).toBe("Kerf Display")
   })
 
   it("never reports a refusal as a successful import", async () => {

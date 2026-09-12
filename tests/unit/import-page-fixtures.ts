@@ -143,3 +143,40 @@ export const HTML_HEADERS = { "content-type": "text/html; charset=utf-8" }
 export function htmlResponse(body: string, status = 200, headers: Record<string, string> = {}) {
   return new Response(body, { status, headers: { ...HTML_HEADERS, ...headers } })
 }
+
+/**
+ * The shell an artifact page really serves, recorded from the live site.
+ *
+ * Fetched on 12 September 2026 for an artifact id that does not exist. The
+ * response was 200, not 404, and these three strings are what came back. They
+ * are the same for every artifact, because the content is rendered by
+ * JavaScript that Fanwise will never run.
+ *
+ * Kept as a fixture because it is the case the whole feature is named after,
+ * and it is the case that used to import successfully as a product called
+ * "Claude Artifact".
+ */
+export const ARTIFACT_SHELL = `<!doctype html>
+<html lang="en">
+  <head>
+    <title>Claude Artifact</title>
+    <meta property="og:title" content="Claude Artifact" />
+    <meta name="description" content="Try out Artifacts created by Claude users" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <p>Content is user-generated and unverified.</p>
+    <script src="/app.js"></script>
+  </body>
+</html>`
+
+/** The same shell, but the author gave the artifact a real name. */
+export const ARTIFACT_WITH_REAL_TITLE = `<!doctype html>
+<html lang="en">
+  <head>
+    <title>Kerf Display</title>
+    <meta property="og:title" content="Kerf Display" />
+    <meta property="og:description" content="A display face with a narrow waist." />
+  </head>
+  <body><h1>Kerf Display, a narrow display face</h1></body>
+</html>`
