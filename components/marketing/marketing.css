@@ -920,6 +920,12 @@
   justify-content: space-between;
   align-items: center;
   gap: 14px;
+  /* The badge drops under the name rather than pushing the card past its
+     column. "WooCommerce" plus "Storefront · Included" already did not fit on
+     one line at three columns, and the mark beside the name made the overrun
+     wide enough to see. Wrapping is the fix for both. */
+  flex-wrap: wrap;
+  row-gap: 10px;
 }
 
 .fw-shop__head h2 {
@@ -927,6 +933,36 @@
   font-size: 24px;
   font-weight: 400;
   letter-spacing: -0.028em;
+}
+
+/* The mark and the name travel together; the badge stays at the far edge. */
+.fw-shop__id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fw-shop__mark {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  /* Tint and border are set per shop, in the shop's own colour. */
+  border: 1px solid transparent;
+}
+
+/* A shop with no mark of its own. Quiet on purpose: it should read as an
+   absence, not as a logo nobody recognises. */
+.fw-shop__mark--plain {
+  border-color: var(--fw-rule);
+  background: var(--fw-paper-2);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--fw-ink-3);
 }
 
 .fw-badge {
@@ -2210,6 +2246,27 @@
   font-weight: 400;
   font-size: 18px;
   letter-spacing: -0.02em;
+}
+
+/* Smaller than the mark on a spec card: the rail is a glance, not a read, and
+   the cell is a third of the width. Tint and border are set per shop. */
+.fw-rail__mark {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  margin-bottom: 12px;
+}
+
+.fw-rail__mark--plain {
+  border-color: var(--fw-slab-rule);
+  background: var(--fw-slab-track);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fw-slab-ink-3);
 }
 
 .fw-rail__mode {

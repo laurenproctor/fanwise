@@ -3,7 +3,9 @@ import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
 import { listChannels, listConnections } from "@/lib/channels/queries"
 import { findAdapter } from "@/lib/channels/registry"
 import { CapabilityList } from "@/components/channels/capability-list"
+import { ChannelMark } from "@/components/channels/channel-mark"
 import { ConnectButton } from "@/components/channels/connect-button"
+import { InfoTip } from "@/components/ui/info-tip"
 import { countPublishedByConnection } from "@/lib/channels/queries"
 import { missingScopes } from "@/lib/channels/oauth"
 import { getBillingOverview } from "@/lib/billing/queries"
@@ -95,18 +97,41 @@ export default async function ChannelsPage({
               className="flex flex-col gap-5 rounded-[14px] border border-[var(--color-rule)] bg-[var(--color-card)] p-6"
             >
               <div className="flex items-start justify-between gap-4">
-                <div className="grid gap-1">
-                  <h2 className="font-display text-[22px] font-normal tracking-[-0.02em]">
-                    {channel.name}
-                  </h2>
-                  <span className="label-mono">
-                    {adapter.integrationType === "api" ? "Automatic" : "Assisted"}
-                  </span>
+                <div className="flex items-start gap-3">
+                  {/*
+                    The shop's own mark, keyed off the adapter rather than the
+                    row, so a channel seeded in the database but not registered
+                    here cannot put a logo on a card that is never rendered.
+                  */}
+                  <ChannelMark channelKey={adapter.key} channelName={channel.name} />
+                  <div className="grid gap-1">
+                    <h2 className="font-display text-[22px] font-normal tracking-[-0.02em]">
+                      {channel.name}
+                    </h2>
+                    <span className="flex items-baseline gap-1.5">
+                      <span className="label-mono">
+                        {adapter.integrationType === "api" ? "Automatic" : "Assisted"}
+                      </span>
+                      {/*
+                        The single most consequential word on the card. Someone
+                        who reads "Assisted" as "Automatic, eventually" will wait
+                        for a publish that is never coming.
+                      */}
+                      <InfoTip
+                        term={
+                          adapter.integrationType === "api" ? "automaticChannel" : "assistedChannel"
+                        }
+                      />
+                    </span>
+                  </div>
                 </div>
                 {connection ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--color-ok)] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-ok)]">
-                    <span className="h-[5px] w-[5px] rounded-full bg-current" aria-hidden />
-                    Connected
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--color-ok)] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-ok)]">
+                      <span className="h-[5px] w-[5px] rounded-full bg-current" aria-hidden />
+                      Connected
+                    </span>
+                    <InfoTip term="connection" />
                   </span>
                 ) : null}
               </div>

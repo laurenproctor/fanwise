@@ -107,8 +107,11 @@ test("the assisted channel never offers publishing, anywhere", async ({ page }) 
   await expect(page.getByRole("button", { name: "Rebuild" })).toBeVisible()
 
   // Not disabled. Absent. A greyed-out button still promises that the action
-  // will work one day, and on this channel it never will.
-  await expect(page.getByRole("button", { name: /publish/i })).toHaveCount(0)
+  // will work one day, and on this channel it never will. Anchored to the
+  // start of the name so it matches Publish and Republish, the actions, and
+  // not the glossary trigger "What not published means", which explains the
+  // state without offering to change it.
+  await expect(page.getByRole("button", { name: /^(re)?publish/i })).toHaveCount(0)
   await expect(page.getByText("Publishing arrives at step A7")).toHaveCount(0)
 })
 

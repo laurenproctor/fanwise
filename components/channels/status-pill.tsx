@@ -1,3 +1,4 @@
+import { InfoTip } from "@/components/ui/info-tip"
 import type { ListingLiveness } from "@/lib/publishing/manual-steps"
 import { LIVENESS_LABELS } from "@/lib/publishing/manual-steps"
 
@@ -25,20 +26,31 @@ const TONE: Record<ListingLiveness, string> = {
 
 export function StatusPill({ liveness }: { liveness: ListingLiveness }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${TONE[liveness]}`}
-    >
+    <span className="inline-flex items-center gap-1.5">
       <span
-        className={`h-[5px] w-[5px] rounded-full ${
-          liveness === "published_not_live"
-            ? "bg-[var(--color-warn)]"
-            : liveness === "failed"
-              ? "bg-[var(--color-bad)]"
-              : "bg-current"
-        }`}
-        aria-hidden
-      />
-      {LIVENESS_LABELS[liveness]}
+        className={`inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${TONE[liveness]}`}
+      >
+        <span
+          className={`h-[5px] w-[5px] rounded-full ${
+            liveness === "published_not_live"
+              ? "bg-[var(--color-warn)]"
+              : liveness === "failed"
+                ? "bg-[var(--color-bad)]"
+                : "bg-current"
+          }`}
+          aria-hidden
+        />
+        {LIVENESS_LABELS[liveness]}
+      </span>
+      {/*
+        Outside the pill rather than in it. The pill's border and text colour
+        carry the state, and threading a neutral icon through five colour
+        schemes buys a worse pill than leaving it alone.
+
+        The glossary is keyed by liveness, so a new state cannot be rendered
+        without someone writing down what it means.
+      */}
+      <InfoTip term={liveness} />
     </span>
   )
 }

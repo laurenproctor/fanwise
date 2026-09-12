@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { PUBLIC_PATHS, isPublic } from "@/proxy"
 import { marketingRoutes } from "@/lib/routes"
+import { RAIL } from "@/components/marketing/channels"
 import { RESERVED_WORKSPACE_SLUGS } from "@/lib/slug"
 
 const ROOT = join(__dirname, "..", "..")
@@ -52,6 +53,31 @@ describe("the marketing site is reachable", () => {
 
     expect(source).toContain("redirect(marketingRoutes.signUp)")
     expect(source).not.toMatch(/<form|<input/)
+  })
+
+  it("says the same thing about a shop as the mockup it was built from", () => {
+    /*
+      design/marketing/ is the source of truth for the visual system, and the
+      channel modes are one of the two things in those files that are accurate
+      rather than illustrative. So the rail on the page and the rail in the
+      mockup have to agree about what Fanwise can do for a shop.
+
+      They stopped agreeing once. Gumroad's product API shipped in April 2026,
+      B10 was planned on 11 September 2026, and the commit that moved it from
+      assisted to automatic updated the mockup and the feasibility doc and left
+      the page saying assisted. Nothing failed, and the public site quietly
+      undersold a channel.
+    */
+    const mockup = readFileSync(join(ROOT, "design", "marketing", "landing.html"), "utf8")
+
+    const drawn = [...mockup.matchAll(/<strong>([^<]+)<\/strong><span><i><\/i>\s*([^<]+)</g)].map(
+      (match) => [(match[1] ?? "").trim(), (match[2] ?? "").trim()] as const,
+    )
+
+    // If the mockup's markup is reshaped this stops matching, and a test that
+    // silently compares nothing is worse than no test.
+    expect(drawn.length).toBe(RAIL.length)
+    expect(drawn).toEqual(RAIL.map(([name, mode]) => [name, mode]))
   })
 
   it("keeps the root public without opening the workspace routes", () => {
