@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { PUBLIC_PATHS, isPublic } from "@/proxy"
 import { marketingRoutes } from "@/lib/routes"
+import { PRICING, estimate } from "@/lib/billing/rules"
 import { RAIL } from "@/components/marketing/channels"
 import { RESERVED_WORKSPACE_SLUGS } from "@/lib/slug"
 
@@ -89,5 +90,47 @@ describe("the marketing site is reachable", () => {
     expect(isPublic("/best-night")).toBe(false)
     expect(isPublic("/best-night/facette-typeface")).toBe(false)
     expect(isPublic("/onboarding")).toBe(false)
+  })
+})
+
+describe("the prices the marketing site shows", () => {
+  /**
+   * The pricing calculator and the landing picker are client components that
+   * keep their own constants rather than importing the billing model. What a
+   * visitor's clicks do with those constants is read in the browser, in
+   * marketing.spec.ts; that the constants are the billing model's is here, so
+   * the site cannot quietly advertise a price docs/billing.md does not charge.
+   */
+  function constant(source: string, name: string): number {
+    const match = source.match(new RegExp(`const ${name} = (\\d+)`))
+    expect(match, `${name} is not declared`).not.toBeNull()
+    return Number(match![1])
+  }
+
+  it("prices the calculator from the billing model, monthly and annual", () => {
+    const source = readFileSync(
+      join(ROOT, "components", "marketing", "pricing-calculator.tsx"),
+      "utf8",
+    )
+
+    expect(constant(source, "BASE_MONTHLY")).toBe(PRICING.month.base)
+    expect(constant(source, "EACH_MONTHLY")).toBe(PRICING.month.channel)
+    expect(constant(source, "BASE_ANNUAL")).toBe(PRICING.year.base)
+    expect(constant(source, "EACH_ANNUAL")).toBe(PRICING.year.channel)
+    // The arithmetic itself, and the floor at the included storefront.
+    expect(source).toContain("const total = base + each * count")
+    expect(estimate("month", 2)).toBe(21)
+    expect(estimate("year", 6)).toBe(450)
+    expect(estimate("year", 0)).toBe(90)
+  })
+
+  it("prices the landing picker from the billing model", () => {
+    const source = readFileSync(
+      join(ROOT, "components", "marketing", "marketplace-picker.tsx"),
+      "utf8",
+    )
+
+    expect(constant(source, "BASE")).toBe(PRICING.month.base)
+    expect(constant(source, "EACH")).toBe(PRICING.month.channel)
   })
 })

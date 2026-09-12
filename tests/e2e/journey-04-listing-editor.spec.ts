@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
-import { listingUrl, productUrl, signUpAndCreateWorkspace } from "./support"
+import { listingUrl, newCreator, productUrl } from "./support"
 
 /**
  * A4's exit test: a person hand-writes a listing per channel and sees
@@ -7,6 +7,12 @@ import { listingUrl, productUrl, signUpAndCreateWorkspace } from "./support"
  *
  * No AI is involved anywhere here, which is the point of the step. The creator
  * types, and each channel says exactly what it would reject.
+ *
+ * That a listing the channel would reject still saves is a schema and database
+ * rule: tests/unit/listing-editor.test.ts accepts it and
+ * tests/db/listing-editing.test.ts stores it. The words the channel uses for a
+ * link in a description, and the editor's note beside an unready listing, are
+ * tests/unit/listing-editor.test.ts too.
  */
 
 /**
@@ -56,9 +62,17 @@ async function createProductWithListings(page: Page, slug: string, name: string)
 }
 
 test("a creator hand-writes a listing and watches readiness resolve", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j4w", "Handwritten Studio")
+  const { slug } = await newCreator(page, "j4w", "Handwritten Studio")
   await connect(page, slug, "Mock Marketplace")
   await createProductWithListings(page, slug, "Aster Grotesk")
+
+  // A canonical title that differs from the product's name, so a pull below
+  // can only come from the canonical record.
+  await page.getByLabel("Canonical title").fill("The Canonical Title")
+  await page.getByRole("button", { name: "Save changes" }).click()
+  // The product form reports how long ago it saved ("Saved just now"); the
+  // listing editor's own indicator, asserted below, says exactly "Saved".
+  await expect(page.getByRole("status")).toHaveText(/^Saved/)
 
   await page.getByRole("link", { name: "Edit listing" }).first().click()
   await page.waitForURL(listingUrl(slug))
@@ -68,6 +82,12 @@ test("a creator hand-writes a listing and watches readiness resolve", async ({ p
   const bar = page.getByRole("progressbar")
   const before = Number(await bar.getAttribute("aria-valuenow"))
   expect(before).toBeLessThan(100)
+
+  // A field can be pulled from the canonical product on purpose: a title
+  // diverged by hand comes back from the canonical record on request.
+  await page.getByLabel("Title", { exact: true }).fill("Diverged by hand")
+  await page.getByRole("button", { name: "Use canonical title" }).click()
+  await expect(page.getByLabel("Title", { exact: true })).toHaveValue("The Canonical Title")
 
   // Readiness moves while typing, before anything is saved.
   await page.getByLabel("Title", { exact: true }).fill("Aster Grotesk Display")
@@ -91,34 +111,8 @@ test("a creator hand-writes a listing and watches readiness resolve", async ({ p
   expect(Number(await page.getByRole("progressbar").getAttribute("aria-valuenow"))).toBe(after)
 })
 
-test("a listing the channel would reject still saves, so the reason stays visible", async ({
-  page,
-}) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j4r", "Reject Studio")
-  await connect(page, slug, "Mock Marketplace")
-  await createProductWithListings(page, slug, "Unfinished Font")
-
-  await page.getByRole("link", { name: "Edit listing" }).first().click()
-  await page.waitForURL(/\/channels\/[^/]+$/)
-
-  // A description containing a link is exactly what this channel refuses.
-  await page
-    .getByLabel("Description", { exact: true })
-    .fill("Buy at https://example.com " + "y".repeat(200))
-  await expect(page.getByText("The description contains a link.")).toBeVisible()
-
-  await page.getByRole("button", { name: "Save listing" }).click()
-  await expect(page.getByRole("status")).toHaveText("Saved")
-
-  // Saved, and still refused. Refusing the save would have put the explanation
-  // behind the fix.
-  await page.reload()
-  await expect(page.getByText("The description contains a link.")).toBeVisible()
-  await expect(page.getByText("would reject it as it stands")).toBeVisible()
-})
-
 test("two channels judge the same hand-written copy differently", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j4t", "Two Verdict Studio")
+  const { slug } = await newCreator(page, "j4t", "Two Verdict Studio")
   await connect(page, slug, "Mock Storefront")
   await connect(page, slug, "Mock Marketplace")
   await createProductWithListings(page, slug, "Two Channel Font")
@@ -143,29 +137,4 @@ test("two channels judge the same hand-written copy differently", async ({ page 
   await page.goto(productPage)
   const titles = await page.locator("section p").allTextContents()
   expect(titles.filter((t) => t === "Only this channel")).toHaveLength(1)
-})
-
-test("a field can be pulled from the canonical product on purpose", async ({ page }) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "j4p", "Pull Studio")
-  await connect(page, slug, "Mock Storefront")
-
-  await page.goto(`/${slug}/new`)
-  await page.getByLabel("Product name").fill("Canonical Font")
-  await page.getByRole("button", { name: "Create product" }).click()
-  await waitForProductPage(page, slug)
-
-  await page.getByLabel("Canonical title").fill("The Canonical Title")
-  await page.getByRole("button", { name: "Save changes" }).click()
-  // The product form reports how long ago it saved, so this reads "Saved just
-  // now" and later "Saved 2 minutes ago". The listing editor's own indicator,
-  // asserted elsewhere in this file, still says exactly "Saved".
-  await expect(page.getByRole("status")).toHaveText(/^Saved/)
-
-  await page.getByRole("button", { name: "Build listing" }).click()
-  await page.getByRole("link", { name: "Edit listing" }).click()
-  await page.waitForURL(/\/channels\/[^/]+$/)
-
-  await page.getByLabel("Title", { exact: true }).fill("Diverged by hand")
-  await page.getByRole("button", { name: "Use canonical title" }).click()
-  await expect(page.getByLabel("Title", { exact: true })).toHaveValue("The Canonical Title")
 })

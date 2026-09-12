@@ -1,13 +1,13 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { expect, type Page } from "@playwright/test"
 import { routes } from "@/lib/routes"
+import { localAdmin } from "./support"
 
 /**
  * Getting an import to the state a successful read would have left it in.
  *
- * **Why this seeds rather than driving the UI.** Every other e2e file in this
- * suite goes through the browser for everything, and that is right. It cannot
- * work here: `lib/net/outbound.ts` refuses loopback and private addresses by
+ * **Why this seeds rather than driving the UI.** Past account setup (see
+ * `newCreator` in support.ts), every other e2e file goes through the browser
+ * for everything, and that is right. It cannot work here: `lib/net/outbound.ts` refuses loopback and private addresses by
  * design, so a fixture server on this machine is exactly what the reader is
  * built never to fetch, and the alternative — an environment flag that lets one
  * host through — would be a hole in the boundary that exists only because a
@@ -24,31 +24,8 @@ import { routes } from "@/lib/routes"
  * against the production boundary with a scripted socket.
  */
 
-/**
- * The local stack, from the environment the Playwright config prepared.
- *
- * Read rather than asked for: the config already runs `supabase status` once
- * per worker and exports the answer, and a second call from here means several
- * of them at the same instant, which the CLI does not survive.
- *
- * The local-only check is repeated anyway. These writes are real rows, and the
- * cost of being wrong about which project they land in is the accident the
- * config's own comment describes.
- */
-function localAdmin(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) {
-    throw new Error("The seed helper needs the local Supabase env the Playwright config exports.")
-  }
-  if (!/^https?:\/\/(127\.0\.0\.1|localhost)[:/]/.test(url)) {
-    throw new Error(`Refusing to seed against a non-local Supabase: ${url}`)
-  }
-  return createClient(url, key, { auth: { persistSession: false } })
-}
-
-let cached: SupabaseClient | null = null
-const admin = () => (cached ??= localAdmin())
+/** The local stack's service-role client; see `localAdmin` in support.ts. */
+const admin = localAdmin
 
 /** A reading of a page, in the shape `product_imports.evidence` holds. */
 export function evidenceFor(url: string) {

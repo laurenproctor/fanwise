@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test"
+import { expect, type Locator, type Page } from "@playwright/test"
 import { listingUrl, productUrl } from "./support"
 
 /**
@@ -92,8 +92,27 @@ export async function upload(page: Page, type: string, fixture: string, expected
   }).toPass({ timeout: 60_000 })
 }
 
-export async function writeListing(page: Page, slug: string) {
-  await page.getByRole("link", { name: "Edit listing" }).first().click()
+/**
+ * One channel's listing card on the product page, and nothing around it.
+ *
+ * Filtered on the other channel's name being absent and on the card's own Edit
+ * listing link being present, because the Publish Everywhere region is also a
+ * section and names skipped channels in its text.
+ */
+export function listingCard(page: Page, channelName: string, otherChannelName: string) {
+  return page
+    .locator("section")
+    .filter({ hasText: channelName })
+    .filter({ hasNotText: otherChannelName })
+    .filter({ has: page.getByRole("link", { name: "Edit listing" }) })
+}
+
+/**
+ * Writes a listing a channel will accept. `card` picks which one; without it,
+ * the first card on the page, which is the first channel connected.
+ */
+export async function writeListing(page: Page, slug: string, card?: Locator) {
+  await (card ?? page).getByRole("link", { name: "Edit listing" }).first().click()
   await page.waitForURL(listingUrl(slug))
 
   await page.getByLabel("Title", { exact: true }).fill("Aster Grotesk Display")
