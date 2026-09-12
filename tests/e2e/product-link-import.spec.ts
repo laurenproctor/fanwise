@@ -58,7 +58,7 @@ test("the importer opens from the new-product page and says what it is", async (
   await expect(page).toHaveURL(new RegExp(`${slug}/new/link$`))
   await expect(page.getByRole("heading", { name: "Import a product", level: 1 })).toBeVisible()
   await expect(
-    page.getByText("Turn any creator product link into an editable Fanwise listing."),
+    page.getByText("Turn a public product page into an editable Fanwise listing."),
   ).toBeVisible()
   await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toBeVisible()
 

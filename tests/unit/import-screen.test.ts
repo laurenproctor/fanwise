@@ -184,7 +184,7 @@ describe("the import page's frame", () => {
   it("says what it is, once, as the page's only h1", () => {
     expect(count(markup, "<h1")).toBe(1)
     expect(text).toContain("Import a product")
-    expect(text).toContain("Turn any creator product link into an editable Fanwise listing.")
+    expect(text).toContain("Turn a public product page into an editable Fanwise listing.")
   })
 
   it("puts the creator back in the catalog through a breadcrumb", () => {

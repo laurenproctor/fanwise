@@ -118,7 +118,13 @@ export const IMPORT_ERROR_RECOVERIES: Record<ImportErrorCode, readonly RecoveryA
   organization_only: ["publish_public_link", "paste_code", "upload_files", "continue_manually"],
   not_found: ["replace_link", "upload_files", "continue_manually"],
   expired: ["publish_public_link", "replace_link", "continue_manually"],
-  unsupported_source: ["paste_code", "upload_files", "replace_link", "continue_manually"],
+  /*
+    Only what is built. Pasting the code is the right answer for a page that
+    renders in a browser, and it is listed here the day it exists; until then a
+    row of "Not built yet" above the two working options makes a dead end out
+    of a path that has one.
+  */
+  unsupported_source: ["replace_link", "continue_manually"],
   not_html: ["replace_link", "upload_files", "continue_manually"],
   too_large: ["replace_link", "upload_files", "continue_manually"],
   timeout: ["retry", "continue_manually"],

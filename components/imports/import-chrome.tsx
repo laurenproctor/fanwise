@@ -50,7 +50,7 @@ export function ImportChrome({
           Import a product
         </h1>
         <p className="max-w-[52ch] text-[clamp(1rem,1.4vw,1.125rem)] leading-[1.5] text-[var(--color-ink-2)]">
-          Turn any creator product link into an editable Fanwise listing.
+          Turn a public product page into an editable Fanwise listing.
         </p>
       </header>
 
