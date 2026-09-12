@@ -51,6 +51,21 @@ export async function POST(
 
   void pruneExpiredStates().catch(() => {})
 
+  /*
+    Which of the four steps below failed, for the log.
+
+    The normalized code alone is not enough to act on. A provider that posts
+    its credential shows the failure on its own screen and then discards the
+    key, so the only record left is this line — and `code: 'unknown'` on a
+    route that calls a store, writes a row, seals a secret and enqueues a job
+    says nothing about which of those to look at.
+
+    The step's name is a constant from this file. Nothing derived from the
+    request joins it, because the request body held the store's keys and the
+    error may carry a provider response.
+  */
+  let step: "verify" | "connection" | "credentials" | "billing" = "verify"
+
   try {
     const verified = await grant.verify({
       accountHint: consumed.accountHint ?? "",
@@ -58,6 +73,7 @@ export async function POST(
       scopes: parsed.scopes,
     })
 
+    step = "connection"
     const admin = createAdminClient()
     const { data: connection, error: connectionError } = await admin
       .from("channel_connections")
@@ -82,18 +98,20 @@ export async function POST(
       throw new Error(`could not record the connection: ${connectionError?.message}`)
     }
 
+    step = "credentials"
     await storeConnectionCredentials({
       workspaceId: consumed.workspaceId,
       connectionId: connection.id,
       credentials: verified.credentials,
     })
 
+    step = "billing"
     await jobs.enqueue("sync_billing", { workspaceId: consumed.workspaceId })
   } catch (error) {
     // The body of this request held the store's keys. Only the normalized
-    // code is logged, and only a sentence goes back.
+    // code and the step's name are logged, and only a sentence goes back.
     const normalized = normalizeUnknown(error, adapter.name)
-    console.error("[oauth] grant refused", { channelKey, code: normalized.code })
+    console.error("[oauth] grant refused", { channelKey, step, code: normalized.code })
     return NextResponse.json({ error: normalized.message }, { status: 400 })
   }
 
