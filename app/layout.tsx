@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Archivo, Instrument_Sans, JetBrains_Mono } from "next/font/google"
+import { Analytics } from "@vercel/analytics/next"
 import { StrayFileDropGuard } from "@/components/ui/stray-file-drop-guard"
 import "./globals.css"
 
@@ -64,6 +65,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         */}
         <StrayFileDropGuard />
         {children}
+        {/*
+          Renders null and appends a same-origin script, /_vercel/insights/script.js,
+          so the nonce policy in lib/security/headers.ts admits it under 'self' with
+          no nonce to thread through. Its own Suspense boundary keeps the
+          useSearchParams read from opting a page out of prerendering. It only
+          reports from a Vercel deployment; a local build appends nothing.
+        */}
+        <Analytics />
       </body>
     </html>
   )
