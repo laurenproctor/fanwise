@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { constraintsFor, summarize } from "@/lib/channels/constraints"
 import { updateListingSchema, tagsSchema } from "@/lib/channels/schemas"
@@ -270,5 +272,69 @@ describe("client and server agree on readiness", () => {
     }
     expect(evaluate(getAdapter("mock_api"), draft, subject).readiness.ready).toBe(true)
     expect(evaluate(getAdapter("mock_assisted"), draft, subject).readiness.ready).toBe(false)
+  })
+})
+
+describe("a listing the channel would reject still says why", () => {
+  /**
+   * The browser test this replaces wrote a link into an assisted description,
+   * saved, reloaded, and read the reason back. The save half is the schema above
+   * and tests/db/listing-editing.test.ts; the reload half is the same evaluate()
+   * running on the stored row, which the block above proves agrees with itself.
+   * What is left is the reason in the channel's own words, and the editor saying
+   * the listing can be saved anyway.
+   */
+  const withLink = {
+    title: "Unfinished Font",
+    description: "Buy at https://example.com " + "y".repeat(200),
+    shortDescription: null,
+    seoTitle: null,
+    seoDescription: null,
+    price: 48,
+    currency: "USD",
+    category: "font",
+    tags: ["grotesque", "sans", "editorial"],
+    metadata: {},
+  }
+
+  it("names the link, and the listing is not ready", () => {
+    const { readiness, results } = evaluate(getAdapter("mock_assisted"), withLink, subject)
+
+    expect(readiness.ready).toBe(false)
+    expect(results.find((r) => r.key === "no_contact_details")).toMatchObject({
+      satisfied: false,
+      severity: "error",
+      message: "The description contains a link.",
+    })
+  })
+
+  it("is accepted for saving exactly as written", () => {
+    // The editor's payload, as the form posts it: strings, tags comma-joined.
+    const parsed = updateListingSchema.safeParse({
+      title: withLink.title,
+      description: withLink.description,
+      shortDescription: "",
+      seoTitle: null,
+      seoDescription: null,
+      category: withLink.category,
+      price: "48",
+      currency: "usd",
+      tags: withLink.tags.join(", "),
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  it("tells the creator the save is allowed and the channel would still refuse it", () => {
+    // The editor is a client component wired to the router and two actions, so
+    // the note and its condition are read from the source.
+    const source = readFileSync(
+      join(__dirname, "..", "..", "components", "channels", "listing-editor.tsx"),
+      "utf8",
+    )
+    const note = source.indexOf("would reject it as it stands.")
+    expect(note).toBeGreaterThan(0)
+    expect(
+      source.slice(source.lastIndexOf("{!evaluation.readiness.ready ? (", note), note),
+    ).toContain("You can save an unfinished listing. {adapter.name}")
   })
 })

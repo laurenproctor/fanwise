@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
-import { productUrl, signOut, signUpAndCreateWorkspace } from "./support"
+import { newCreator, productUrl } from "./support"
 import { routes } from "@/lib/routes"
 
 /**
@@ -22,6 +22,14 @@ import { routes } from "@/lib/routes"
  *   - A published product under a draft profile is not public. This is the one
  *     a creator gets wrong, and the one enforced in the database rather than
  *     in a component.
+ *
+ * Below the browser: every path the handle routing must leave alone, and every
+ * canonicalisation it performs, is tests/unit/public-routing.test.ts; that the
+ * proxy answers them with a 308 and turns a stranger away from the application
+ * is tests/unit/proxy.test.ts; every handle rule and its message is
+ * tests/unit/public-handles.test.ts; robots is tests/unit/robots.test.ts. What
+ * stays here is the rewrite, the redirects and the sitemap as a stranger meets
+ * them from a running server.
  */
 
 const SETUP_TIMEOUT = 20_000
@@ -91,7 +99,7 @@ async function setPagePublished(
 }
 
 test("a creator publishes a profile and a stranger reads it", async ({ page, browser }) => {
-  const creator = await signUpAndCreateWorkspace(page, "j14", "Northline Studio")
+  const creator = await newCreator(page, "j14", "Northline Studio")
 
   const handle = await createProfile(page, creator.slug)
   const productPath = await createProduct(page, creator.slug, "Aster Grotesk")
@@ -138,6 +146,20 @@ test("a creator publishes a profile and a stranger reads it", async ({ page, bro
   await visitor.getByRole("link", { name: "Northline Studio" }).first().click()
   await expect(visitor).toHaveURL(new RegExp(`/@${handle}$`))
 
+  // --- A crawler finds the address and not the rewrite target --------------
+  // Both files are fetched as a stranger: they were once behind the session
+  // check, which a crawler reads as "this site has no sitemap".
+  const sitemap = await visitor.goto("/sitemap.xml")
+  expect(sitemap?.status()).toBe(200)
+  const xml = (await sitemap?.text()) ?? ""
+  expect(xml).toContain(`/@${handle}`)
+  expect(xml).not.toContain("/profile/")
+  const robots = await visitor.goto("/robots.txt")
+  expect(robots?.status()).toBe(200)
+  expect(await robots?.text()).toContain("/profile/")
+
+  await visitor.goto(`/@${handle}`)
+
   // --- Nothing private is on the page ------------------------------------
   const body = (await visitor.locator("body").textContent()) ?? ""
   expect(body).not.toContain(creator.email)
@@ -149,46 +171,20 @@ test("a creator publishes a profile and a stranger reads it", async ({ page, bro
   await stranger.close()
 })
 
-test("the public URL keeps its shape, and the internal one is not a second address", async ({
-  page,
-  browser,
-}) => {
-  const creator = await signUpAndCreateWorkspace(page, "j14url", "Shape Studio")
-  const handle = await createProfile(page, creator.slug)
-  await setProfilePublished(page, creator.slug, true)
-
-  const stranger = await browser.newContext()
-  const visitor = await stranger.newPage()
-
-  // The address bar keeps the @ form; the rewrite is invisible.
-  await visitor.goto(`/@${handle}`)
-  expect(new URL(visitor.url()).pathname).toBe(`/@${handle}`)
-
-  // A capitalised handle folds onto the canonical one rather than serving a
-  // second copy of the page.
-  await visitor.goto(`/@${handle.toUpperCase()}`)
-  expect(new URL(visitor.url()).pathname).toBe(`/@${handle}`)
-
-  // A trailing slash, likewise.
-  await visitor.goto(`/@${handle}/`)
-  expect(new URL(visitor.url()).pathname).toBe(`/@${handle}`)
-
-  // And the internal rewrite target is not an address anybody can stay at.
-  await visitor.goto(`/profile/${handle}`)
-  expect(new URL(visitor.url()).pathname).toBe(`/@${handle}`)
-
-  // The canonical tag agrees with the address bar, so the two cannot be
-  // indexed separately.
-  const canonical = await visitor.locator('link[rel="canonical"]').getAttribute("href")
-  expect(canonical).toContain(`/@${handle}`)
-
-  await stranger.close()
-})
-
 test("renaming a handle leaves the old address working", async ({ page, browser }) => {
-  const creator = await signUpAndCreateWorkspace(page, "j14rename", "Moving Studio")
+  const creator = await newCreator(page, "j14rename", "Moving Studio")
   const before = await createProfile(page, creator.slug)
   await setProfilePublished(page, creator.slug, true)
+
+  // A reserved handle is refused while the creator types, and Save stays shut.
+  // Scoped to the field's own error node rather than to the words: the hint
+  // under the field uses them too, and Next's route announcer is a second
+  // role="alert" on every page. The other rules and their messages are
+  // tests/unit/public-handles.test.ts.
+  await page.goto(routes.publicProfileSettings(creator.slug))
+  await page.getByLabel("Handle").fill("fanwise")
+  await expect(page.locator('p[role="alert"]').first()).toHaveText(/reserved/i)
+  await expect(page.getByRole("button", { name: "Save public profile" })).toBeDisabled()
 
   const after = `moved-${Date.now().toString(36)}`.slice(0, 32)
   await setHandle(page, creator.slug, after)
@@ -206,11 +202,24 @@ test("renaming a handle leaves the old address working", async ({ page, browser 
   expect(new URL(visitor.url()).pathname).toBe(`/@${after}`)
   await expect(visitor.getByRole("heading", { name: "Moving Studio", level: 1 })).toBeVisible()
 
+  // The public URL keeps its shape. A capitalised handle and a trailing slash
+  // fold onto the canonical address rather than serving a second copy, and the
+  // internal rewrite target is not an address anybody can stay at.
+  for (const variant of [`/@${after.toUpperCase()}`, `/@${after}/`, `/profile/${after}`]) {
+    await visitor.goto(variant)
+    expect(new URL(visitor.url()).pathname, variant).toBe(`/@${after}`)
+  }
+
+  // The canonical tag agrees with the address bar, so the two cannot be
+  // indexed separately.
+  const canonical = await visitor.locator('link[rel="canonical"]').getAttribute("href")
+  expect(canonical).toContain(`/@${after}`)
+
   await stranger.close()
 })
 
 test("unpublishing removes the page from the public web", async ({ page, browser }) => {
-  const creator = await signUpAndCreateWorkspace(page, "j14unpub", "Vanishing Studio")
+  const creator = await newCreator(page, "j14unpub", "Vanishing Studio")
   const handle = await createProfile(page, creator.slug)
   const productPath = await createProduct(page, creator.slug, "Ephemeral Sans")
   await createPublicPage(page, productPath)
@@ -231,87 +240,6 @@ test("unpublishing removes the page from the public web", async ({ page, browser
     (await visitor.goto(`/@${handle}/ephemeral-sans`))?.status(),
     "the product goes with it",
   ).toBe(404)
-
-  await stranger.close()
-})
-
-test("a reserved or malformed handle is refused while the creator types", async ({ page }) => {
-  const creator = await signUpAndCreateWorkspace(page, "j14valid", "Careful Studio")
-  await createProfile(page, creator.slug)
-
-  await page.goto(routes.publicProfileSettings(creator.slug))
-  const handle = page.getByLabel("Handle")
-  const save = page.getByRole("button", { name: "Save public profile" })
-
-  // Scoped to the field's own error node, not to the text and not to the
-  // alert role. The hint under the field says "lowercase letters, numbers and
-  // hyphens" too — that is what the hint is for — so matching on the words
-  // finds both and proves neither, and Next's route announcer is a second
-  // element with role="alert" on every page.
-  const error = page.locator('p[role="alert"]').first()
-
-  await handle.fill("fanwise")
-  await expect(error).toHaveText(/reserved/i)
-  await expect(save).toBeDisabled()
-
-  await handle.fill("no")
-  await expect(error).toHaveText(/at least 3 characters/i)
-  await expect(save).toBeDisabled()
-
-  await handle.fill("Not A Handle")
-  await expect(error).toHaveText(/lowercase letters, numbers and hyphens/i)
-  await expect(save).toBeDisabled()
-
-  await handle.fill("north--line")
-  await expect(error).toHaveText(/cannot start or end with a hyphen/i)
-  await expect(save).toBeDisabled()
-
-  // And a valid one re-enables it.
-  await handle.fill(`careful-${Date.now().toString(36)}`.slice(0, 32))
-  await expect(save).toBeEnabled()
-})
-
-test("the marketing site and the application still resolve alongside the public web", async ({
-  page,
-  browser,
-}) => {
-  const creator = await signUpAndCreateWorkspace(page, "j14routes", "Coexist Studio")
-  const handle = await createProfile(page, creator.slug)
-  await setProfilePublished(page, creator.slug, true)
-
-  // The application, as the signed-in creator, at its unchanged address.
-  expect((await page.goto(routes.workspace(creator.slug)))?.status()).toBe(200)
-  await expect(page.getByRole("link", { name: "Products", exact: true })).toBeVisible()
-
-  await signOut(page)
-
-  const stranger = await browser.newContext()
-  const visitor = await stranger.newPage()
-
-  for (const path of ["/", "/pricing", "/how-it-works", "/terms", "/privacy", "/sign-in"]) {
-    const response = await visitor.goto(path)
-    expect(response?.status(), `${path} should still resolve`).toBe(200)
-  }
-
-  // The API and the static assets are untouched by the rewrite.
-  expect((await visitor.goto("/api/health"))?.status()).toBe(200)
-  expect((await visitor.goto("/theme.js"))?.status()).toBe(200)
-  expect((await visitor.goto("/robots.txt"))?.status()).toBe(200)
-
-  // The sitemap lists the published profile and excludes the internal path.
-  const sitemap = await visitor.goto("/sitemap.xml")
-  expect(sitemap?.status()).toBe(200)
-  const xml = (await sitemap?.text()) ?? ""
-  expect(xml).toContain(`/@${handle}`)
-  expect(xml).not.toContain("/profile/")
-
-  // And robots keeps crawlers off the rewrite target.
-  const robots = await (await visitor.goto("/robots.txt"))?.text()
-  expect(robots).toContain("/profile/")
-
-  // The private application still requires a session.
-  await visitor.goto(routes.workspace(creator.slug))
-  await expect(visitor).toHaveURL(/\/sign-in$/)
 
   await stranger.close()
 })

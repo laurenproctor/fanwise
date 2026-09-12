@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { signUpAndCreateWorkspace } from "./support"
+import { newCreator } from "./support"
 
 /**
  * The root not-found page, reached the way a stranger reaches it.
@@ -59,7 +59,7 @@ test("a signed-in creator on an unknown workspace gets the same page, hydrated a
     }
   })
 
-  await signUpAndCreateWorkspace(page, "nf", "Not Found Studio")
+  await newCreator(page, "nf", "Not Found Studio")
   errors.length = 0
 
   const response = await page.goto("/no-such-workspace-here")
