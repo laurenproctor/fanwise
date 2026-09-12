@@ -1,17 +1,21 @@
-import type { ListingDraft, RecoveryOption, SourceAnalysis, SourceSnapshot } from "../types"
+import type {
+  ListingDraft,
+  RecoveryOption,
+  SourceAnalysis,
+  SourceSnapshot,
+} from "@/lib/imports/types"
 
 /**
- * Typed sample data, standing in for ingestion that is not wired yet.
+ * Sample states, for rendering the screen without a database.
  *
- * Phase 5 of `docs/product-link-import.md` is this screen; phases 3 and 4 are
- * the adapters and the jobs that will really read a link. Until those exist the
- * screen is driven from here, which has two benefits worth keeping even after
- * they do: every state is reachable in a browser without a network, and every
- * test is deterministic without a mock server.
- *
- * Nothing here is invented about a real product. The analyzed fixtures describe
- * a sample the mockup itself used, and the timestamp is fixed so a render is
+ * These used to drive the screen itself, before the pipeline existed. They now
+ * do what they should always have done: give the component tests a settled
+ * import of each shape to render, with a fixed timestamp so a render is
  * byte-identical between runs.
+ *
+ * They live in `tests/` rather than in `lib/` deliberately. A module called
+ * "fixtures" sitting beside the real importers is how a later reader concludes
+ * that importing is still fake.
  */
 
 /** Fixed, so a rendered "Captured" line does not change between test runs. */

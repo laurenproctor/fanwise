@@ -12,8 +12,8 @@ import {
   type ImportState,
 } from "@/lib/imports/machine"
 import { validateSourceUrl } from "@/lib/imports/url"
-import { createFixtureAnalysisService, scenarioFor } from "@/lib/imports/service"
-import { FIXTURE_SCENARIOS } from "@/lib/imports/sources/fixtures"
+import type { SourceAnalysis } from "@/lib/imports/types"
+import { FIXTURE_SCENARIOS } from "./import-ui-fixtures"
 
 /**
  * The source panel's state machine.
@@ -292,37 +292,29 @@ describe("the pasted link, checked before anything is fetched", () => {
   })
 })
 
-describe("the fixture analysis service", () => {
-  const service = createFixtureAnalysisService({ stageDelayMs: 0 })
+describe("driving the machine from an asynchronous read", () => {
+  /*
+    A stand-in for the runner, which is what really reads a page. The reducer
+    does not know or care which it is talking to, and that is the property
+    worth holding: the stages arrive as events, the answer arrives as an event,
+    and nothing about the reader leaks into the state.
 
-  it("reports every stage in order before it answers", async () => {
-    const seen: AnalyzingStage[] = []
-    await service.analyze({ url: URL, onStage: (stage) => seen.push(stage) })
-    expect(seen).toEqual([...ANALYZING_STAGES])
-  })
+    The reader itself is tested against the production outbound boundary in
+    tests/unit/import-retrieval.test.ts.
+  */
+  async function read(
+    analysis: SourceAnalysis,
+    onStage: (stage: AnalyzingStage) => void,
+  ): Promise<SourceAnalysis> {
+    for (const stage of ANALYZING_STAGES) onStage(stage)
+    return analysis
+  }
 
-  it("resolves a recognised link and an ordinary page without a marker", async () => {
-    await expect(service.analyze({ url: URL })).resolves.toBe(FIXTURE_SCENARIOS.artifact)
-    await expect(service.analyze({ url: "https://example.com/x" })).resolves.toBe(
-      FIXTURE_SCENARIOS.webpage,
-    )
-  })
-
-  it("reaches every scenario through its marker, and only through it", () => {
-    for (const scenario of Object.keys(FIXTURE_SCENARIOS)) {
-      expect(scenarioFor(`https://example.com/fanwise-demo-${scenario}`)).toBe(scenario)
-    }
-    // A real link can never contain the marker by accident.
-    expect(scenarioFor("https://example.com/demo/failed")).toBe("webpage")
-  })
-
-  it("drives the reducer from empty to analyzed with nothing else in between", async () => {
+  it("walks empty to analyzed with nothing else in between", async () => {
     let state = run([{ type: "urlChanged", url: URL }, { type: "submitted" }, validationEvent(URL)])
-    const analysis = await service.analyze({
-      url: URL,
-      onStage: (stage) => {
-        state = importReducer(state, { type: "stageAdvanced", stage })
-      },
+
+    const analysis = await read(FIXTURE_SCENARIOS.artifact, (stage) => {
+      state = importReducer(state, { type: "stageAdvanced", stage })
     })
     state = importReducer(state, { type: "analysisSettled", analysis })
 
@@ -330,11 +322,13 @@ describe("the fixture analysis service", () => {
     expect(snapshotOf(state)?.title).toBe("Type Scale Studio")
   })
 
-  it("abandons a read that was aborted, rather than answering about it", async () => {
-    const controller = new AbortController()
-    controller.abort()
-    await expect(service.analyze({ url: URL, signal: controller.signal })).rejects.toThrow(
-      /abandoned/,
-    )
+  it("walks empty to a recovery when the read refuses", async () => {
+    let state = run([{ type: "urlChanged", url: URL }, { type: "submitted" }, validationEvent(URL)])
+
+    const analysis = await read(FIXTURE_SCENARIOS.login, () => {})
+    state = importReducer(state, { type: "analysisSettled", analysis })
+
+    expect(state.status).toBe("private")
+    expect("recoveries" in state && state.recoveries.length).toBeGreaterThan(0)
   })
 })

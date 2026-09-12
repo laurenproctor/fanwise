@@ -1,12 +1,15 @@
 import type { SourceKind } from "../types"
+import { genericWebImporter } from "./generic-web"
+import { claimsHost, hostedArtifactImporter } from "./hosted-artifact"
+import type { SourceImporter } from "./importer"
 
 /**
- * Which real services each generic source kind means.
+ * Which real services each generic source kind means, and who reads each one.
  *
- * **This file and `fixtures.ts` beside it are the only two in `lib/imports`
- * that name a service.** Everything else branches on `SourceKind`. That is the
- * same rule `lib/channels/registry.ts` holds for marketplaces and it exists for
- * the same reason: a name that leaks into the product domain is logic somewhere
+ * **This directory is the only place in the tree that names a service.**
+ * Everything else branches on `SourceKind`. That is the same rule
+ * `lib/channels/registry.ts` holds for marketplaces and it exists for the same
+ * reason: a name that leaks into the product domain is logic somewhere
  * branching on whose page it is reading, and the shape of the import stops
  * being general the moment it does.
  *
@@ -21,6 +24,10 @@ export interface SourceDescriptor {
   /**
    * Hostnames this kind claims, matched on the registrable suffix so that a
    * subdomain is claimed and `claude.ai.example.com` is not.
+   *
+   * Descriptive. The authority is the importer's own `claims`, and a unit test
+   * holds this table and that function to the same answer, so the two cannot
+   * drift into a UI that names one source and a reader that picks another.
    */
   readonly hosts: readonly string[]
   /**
@@ -53,22 +60,37 @@ export const SOURCE_LABELS: Record<SourceKind, string> = {
   webpage: "Public webpage",
 }
 
-function claims(descriptor: SourceDescriptor, hostname: string): boolean {
-  if (descriptor.hosts.length === 0) return true
-  return descriptor.hosts.some((host) => hostname === host || hostname.endsWith(`.${host}`))
-}
+/**
+ * The importers, in the order they are consulted.
+ *
+ * Order is the whole of provider detection: the first that claims a URL owns
+ * it, and the generic one claims everything, so it is last and the list is
+ * total. A unit test asserts both the order and the totality, because an
+ * importer inserted after the catch-all would never be reached and nothing
+ * else in the system would notice.
+ */
+export const SOURCE_IMPORTERS: readonly SourceImporter[] = [
+  hostedArtifactImporter,
+  genericWebImporter,
+]
 
 /**
- * Which kind a URL belongs to. Total: `webpage` is last and claims the rest.
+ * Which importer reads a URL. Never null: the last one claims everything.
  *
  * Takes a parsed URL rather than a string so that the caller has already been
- * through `validateSourceUrl` and this cannot be the thing that decides whether
- * a link is safe to read.
+ * through `validateSourceUrl`, and this cannot be the thing that decides
+ * whether a link is safe to open.
  */
+export function importerFor(url: URL): SourceImporter {
+  const found = SOURCE_IMPORTERS.find((importer) => importer.claims(url))
+  // The catch-all guarantees this, and the totality test keeps the guarantee.
+  // The fallback is here so the return type needs no assertion.
+  return found ?? genericWebImporter
+}
+
+/** Which kind a URL belongs to. Deterministic, pure, no network. */
 export function sourceKindFor(url: URL): SourceKind {
-  const hostname = url.hostname.toLowerCase()
-  const found = SOURCE_DESCRIPTORS.find((descriptor) => claims(descriptor, hostname))
-  return found?.kind ?? "webpage"
+  return importerFor(url).kind
 }
 
 export function descriptorFor(kind: SourceKind): SourceDescriptor {
@@ -76,3 +98,6 @@ export function descriptorFor(kind: SourceKind): SourceDescriptor {
   if (!found) throw new Error(`no descriptor for source kind ${kind}`)
   return found
 }
+
+/** Exported so the descriptor table's test can hold it to the adapter's answer. */
+export { claimsHost }

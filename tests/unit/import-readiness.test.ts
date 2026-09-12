@@ -13,7 +13,7 @@ import {
   markSuggestionsReviewed,
   setListingField,
 } from "@/lib/imports/draft"
-import { ANALYZED_ARTIFACT } from "@/lib/imports/sources/fixtures"
+import { ANALYZED_ARTIFACT } from "./import-ui-fixtures"
 import type { BuyerDeliverable, ListingDraft, SourceSnapshot } from "@/lib/imports/types"
 
 /**

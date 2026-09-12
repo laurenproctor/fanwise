@@ -100,3 +100,81 @@ export function validateSourceUrl(raw: string): UrlCheck {
   url.hostname = hostname
   return { ok: true, url: url.toString() }
 }
+
+/**
+ * Query parameters that describe how somebody arrived, not what they arrived at.
+ *
+ * Stripped before a URL becomes a dedupe key, so the same page pasted from a
+ * newsletter and from a browser bar is one import rather than two products.
+ * Prefix matches cover the `utm_*` family without listing it.
+ */
+const TRACKING_PARAMS = new Set([
+  "fbclid",
+  "gclid",
+  "dclid",
+  "gbraid",
+  "wbraid",
+  "msclkid",
+  "twclid",
+  "igshid",
+  "mc_cid",
+  "mc_eid",
+  "ref",
+  "ref_src",
+  "referrer",
+  "source",
+  "s_kwcid",
+  "_hsenc",
+  "_hsmi",
+  "vero_id",
+  "yclid",
+])
+
+const TRACKING_PREFIXES = ["utm_", "pk_", "piwik_", "matomo_", "ga_"]
+
+function isTracking(name: string): boolean {
+  const key = name.toLowerCase()
+  return TRACKING_PARAMS.has(key) || TRACKING_PREFIXES.some((prefix) => key.startsWith(prefix))
+}
+
+/**
+ * The form of a URL that answers "is this the same page as that one".
+ *
+ * This is a dedupe key and nothing else. It is never fetched — the URL that
+ * gets fetched is the validated one, exactly as the creator gave it — and it
+ * is never shown. Two rules follow from that and are worth stating because
+ * both are easy to get backwards later:
+ *
+ *   - **The path keeps its case.** A host is case-insensitive and a path is
+ *     not: `/Aster` and `/aster` are two pages on most servers, and folding
+ *     them together would merge two products a creator sells separately.
+ *   - **Query order does not matter, and query presence does.** The remaining
+ *     parameters are sorted so that `?a=1&b=2` and `?b=2&a=1` agree, and none
+ *     are dropped beyond the tracking list above: `?id=7` is which product.
+ *
+ * Takes the already-validated URL string, so this cannot be the thing that
+ * decides whether an address is safe to open.
+ */
+export function normalizeSourceUrl(validated: string): string {
+  const url = new URL(validated)
+
+  url.hash = ""
+  url.hostname = url.hostname.toLowerCase().replace(/\.$/, "")
+  url.username = ""
+  url.password = ""
+
+  const kept = [...url.searchParams.entries()]
+    .filter(([name]) => !isTracking(name))
+    .sort(([a, aValue], [b, bValue]) => a.localeCompare(b) || aValue.localeCompare(bValue))
+
+  url.search = ""
+  for (const [name, value] of kept) url.searchParams.append(name, value)
+
+  // A trailing slash on a directory-shaped path is the same page as without
+  // one, except at the root, where removing it produces a URL with no path.
+  if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
+    url.pathname = url.pathname.replace(/\/+$/, "")
+  }
+
+  return url.toString()
+}

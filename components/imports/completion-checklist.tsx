@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react"
 import { FIELD_INPUT_CLASS } from "@/components/ui/field"
-import { CUSTOM_LICENSE_ID, LICENSE_PRESETS, customLicense } from "@/lib/imports/deliverables"
+import { CUSTOM_LICENSE_ID, LICENSE_PRESETS, customLicense } from "@/lib/imports/licenses"
 import type { ImportReadiness, ImportStep, ImportStepKey } from "@/lib/imports/readiness"
 import type { BuyerDeliverable, LicenseSelection } from "@/lib/imports/types"
 

@@ -732,6 +732,93 @@ export type Database = {
           },
         ]
       }
+      product_imports: {
+        Row: {
+          accepted: Json
+          analyzed_at: string | null
+          content_hash: string | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          evidence: Json
+          id: string
+          normalized_url: string
+          product_id: string
+          prompt_version: string | null
+          provider: Database["public"]["Enums"]["import_provider"]
+          requested_by: string | null
+          resolved_url: string | null
+          retrieved_at: string | null
+          schema_version: string | null
+          source_url: string
+          status: Database["public"]["Enums"]["import_status"]
+          suggestions: Json
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          accepted?: Json
+          analyzed_at?: string | null
+          content_hash?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          evidence?: Json
+          id?: string
+          normalized_url: string
+          product_id: string
+          prompt_version?: string | null
+          provider: Database["public"]["Enums"]["import_provider"]
+          requested_by?: string | null
+          resolved_url?: string | null
+          retrieved_at?: string | null
+          schema_version?: string | null
+          source_url: string
+          status?: Database["public"]["Enums"]["import_status"]
+          suggestions?: Json
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          accepted?: Json
+          analyzed_at?: string | null
+          content_hash?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          evidence?: Json
+          id?: string
+          normalized_url?: string
+          product_id?: string
+          prompt_version?: string | null
+          provider?: Database["public"]["Enums"]["import_provider"]
+          requested_by?: string | null
+          resolved_url?: string | null
+          retrieved_at?: string | null
+          schema_version?: string | null
+          source_url?: string
+          status?: Database["public"]["Enums"]["import_status"]
+          suggestions?: Json
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_imports_product_fk"
+            columns: ["product_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "product_imports_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           archived_at: string | null
@@ -747,6 +834,8 @@ export type Database = {
           metadata: Json
           name: string
           product_type: Database["public"]["Enums"]["product_type"]
+          rights_confirmed_at: string | null
+          rights_confirmed_by: string | null
           short_description: string | null
           slug: string
           status: Database["public"]["Enums"]["product_status"]
@@ -769,6 +858,8 @@ export type Database = {
           metadata?: Json
           name: string
           product_type: Database["public"]["Enums"]["product_type"]
+          rights_confirmed_at?: string | null
+          rights_confirmed_by?: string | null
           short_description?: string | null
           slug: string
           status?: Database["public"]["Enums"]["product_status"]
@@ -791,6 +882,8 @@ export type Database = {
           metadata?: Json
           name?: string
           product_type?: Database["public"]["Enums"]["product_type"]
+          rights_confirmed_at?: string | null
+          rights_confirmed_by?: string | null
           short_description?: string | null
           slug?: string
           status?: Database["public"]["Enums"]["product_status"]
@@ -1481,6 +1574,15 @@ export type Database = {
       channel_integration_type: "api" | "assisted"
       channel_status: "available" | "coming_soon" | "unavailable"
       connection_status: "active" | "expired" | "revoked" | "error"
+      import_provider: "hosted_artifact" | "webpage"
+      import_status:
+        | "pending"
+        | "retrieving"
+        | "analyzing"
+        | "ready"
+        | "unavailable"
+        | "failed"
+        | "discarded"
       listing_status:
         | "draft"
         | "ready"
@@ -2231,6 +2333,16 @@ export const Constants = {
       channel_integration_type: ["api", "assisted"],
       channel_status: ["available", "coming_soon", "unavailable"],
       connection_status: ["active", "expired", "revoked", "error"],
+      import_provider: ["hosted_artifact", "webpage"],
+      import_status: [
+        "pending",
+        "retrieving",
+        "analyzing",
+        "ready",
+        "unavailable",
+        "failed",
+        "discarded",
+      ],
       listing_status: [
         "draft",
         "ready",

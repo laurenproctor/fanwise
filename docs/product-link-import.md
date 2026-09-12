@@ -4,9 +4,21 @@ The implementation plan for the **Import a product** screen: a creator pastes a 
 Fanwise reads what is publicly there, proposes a listing draft, and the creator completes
 five steps before any marketplace draft is offered.
 
-**Status: planned 12 September 2026 from an approved mockup. Not opened, not implemented.**
-Branch `feat/product-link-import`, cut from `origin/main` at `e0f5996`, in the worktree
-`../fanwise-product-link-import`.
+**Status: phases 1 to 5 built, 12 September 2026. Branch `feat/product-link-import`, not
+merged.** The screen, the schema, the adapters, the job and the draft generation are real and
+tested; what is still fixture-backed or absent is listed in §12. Phases 6 to 9 — the licence
+and rights surfaces beyond their readiness steps, buyer-file upload from this screen, and the
+docs housekeeping — are not built.
+
+**What is real:** a pasted link creates a product and an import row, a background job reads
+the page through `lib/net/outbound.ts` with redirects re-validated at every hop, two adapters
+extract evidence, pictures are fetched and measured into `product_assets`, a model composes a
+draft that a claims check refuses to let over-claim, and the row survives a refresh.
+
+**What is not:** no browser rendering, so a page that renders with JavaScript yields nothing
+and says so; no ZIP or pasted-code intake, so those two recoveries are marked not built; no
+malware scanning, so §12 records the operational requirement rather than pretending; buyer
+files are still uploaded on the product page rather than this one.
 
 ---
 
@@ -723,3 +735,52 @@ numbered **30 and above**, since 29 is B12's and #73 and #74 are both open.
 - **No marketplace reading.** That is B12 and it needs a connection.
 - **No screenshot service.** Images come from the page's own metadata or from the creator.
 - **No notification bell.** The mockup draws one; nothing is behind it.
+
+
+---
+
+## 12. What is real, and what is not
+
+Written at the end of the ingestion phase, because the gap between "the screen works" and
+"the pipeline works" is exactly where a reader is most likely to assume the wrong one.
+
+### Real
+
+| Thing | Where |
+|---|---|
+| Retrieval, with every hop re-validated | `lib/net/outbound.ts`, `lib/imports/retrieval/fetch-page.ts` |
+| Provider detection, deterministic and total | `lib/imports/sources/registry.ts` |
+| Two adapters | `sources/hosted-artifact.ts`, `sources/generic-web.ts` |
+| HTML reading, parse-never-render | `lib/imports/retrieval/html.ts` |
+| Preview images fetched, sniffed, measured, stored | `lib/imports/retrieval/fetch-asset.ts` |
+| Durable status across navigation and refresh | `product_imports`, `/[slug]/new/link/[importId]` |
+| Idempotency on workspace + normalized URL, and on content hash | the partial unique index, `hashEvidence` |
+| Draft generation with structured output | `lib/imports/compose.ts`, `draft-output.ts` |
+| The claims check | `lib/imports/claims.ts` |
+| Normalized failures with recoveries | `lib/imports/errors.ts` |
+
+### Not real, and named as such on the screen
+
+- **No browser rendering.** A page whose content is written by JavaScript reads as empty and
+  is refused with `unsupported_source`. This was the open question in §9 and the answer is
+  now in the code rather than in a guess: Fanwise reads markup, and a shell has none.
+- **Pasting code and uploading a ZIP** are offered as recoveries and marked *Not built yet*,
+  the way `components/onboarding/import-listing-action.tsx` marks its own promise.
+- **No malware scanning.** Nothing in this repository scans an uploaded file, and this step
+  adds none. **The operational requirement, recorded rather than implied:** before ZIP or
+  project intake ships, either an external scanner runs over `product-assets` before an
+  object is ever handed to a buyer, or every uploaded archive lands in a quarantine state
+  that Publish Everywhere refuses. A `quarantined` member on `asset_state` is the cheapest
+  version and it is not in this migration, because nothing yet produces a file this step
+  did not fetch and measure itself.
+- **Buyer files** are still uploaded on the product page. The checklist row acknowledges a
+  choice and does not yet mint an upload.
+- **HTTP is refused, not just discouraged.** The brief asked for http and https; the shared
+  outbound boundary is https-only and every channel adapter depends on that, so relaxing it
+  would weaken a boundary this feature does not own. An `http://` paste is refused with a
+  message telling the creator to paste the secure form.
+- **The provider keys are `hosted_artifact` and `webpage`**, not `claude_artifact` and
+  `generic_web`. The enum is generated into `lib/supabase/database.types.ts`, which the
+  vendor-name sweep in `tests/unit/channel-boundaries.test.ts` reads, and a vendor name there
+  would fail it. The mapping from key to service lives in `sources/registry.ts`, which is the
+  one directory allowed to know.

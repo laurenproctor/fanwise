@@ -1,7 +1,24 @@
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
-import { ImportScreen } from "@/app/[slug]/new/link/import-screen"
+
+/*
+  The detail screen is a client component: it reads the router to poll while a
+  job is working, and it calls server actions. Neither exists in a node test, so
+  both are replaced with the smallest thing that satisfies the import. What is
+  under test here is what the screen renders, and rendering touches neither.
+*/
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: () => {}, push: () => {}, replace: () => {} }),
+}))
+vi.mock("@/lib/imports/actions", () => ({
+  discardImportAction: async () => ({ error: null }),
+  retryImportAction: async () => ({ error: null }),
+  saveImportDraftAction: async () => ({ error: null }),
+}))
+
+import { ImportDetail } from "@/app/[slug]/new/link/[importId]/import-detail"
+import { ImportChrome } from "@/components/imports/import-chrome"
 import { CompletionChecklist } from "@/components/imports/completion-checklist"
 import { ImportFooter } from "@/components/imports/import-footer"
 import { ListingDraftForm } from "@/components/imports/listing-draft-form"
@@ -12,7 +29,7 @@ import { SourcePanel } from "@/components/imports/source-panel"
 import { emptyListingDraft, markSuggestionsReviewed } from "@/lib/imports/draft"
 import { importReducer, initialImportState, type ImportState } from "@/lib/imports/machine"
 import { importReadiness, type ImportReadinessInput } from "@/lib/imports/readiness"
-import { FIXTURE_SCENARIOS } from "@/lib/imports/sources/fixtures"
+import { FIXTURE_SCENARIOS } from "./import-ui-fixtures"
 import type { BuyerDeliverable, ListingDraft, SourceSnapshot } from "@/lib/imports/types"
 import { routes } from "@/lib/routes"
 
@@ -127,6 +144,23 @@ function inputs(overrides: Partial<ImportReadinessInput> = {}): ImportReadinessI
   }
 }
 
+/** The props the detail screen takes, with an analyzed import in them. */
+function detailProps() {
+  return {
+    workspaceSlug: SLUG,
+    importId: "11111111-1111-4111-8111-111111111111",
+    productSlug: "type-scale-studio",
+    state: STATES.analyzed!,
+    draft: ANALYZED_DRAFT,
+    deliverables: [] as const,
+    license: null,
+    rights: null,
+    missingInformation: [] as const,
+    withheld: [] as const,
+    aiUnavailable: false,
+  }
+}
+
 const COMPLETE = inputs({
   snapshot: SNAPSHOT,
   draft: markSuggestionsReviewed(ANALYZED_DRAFT),
@@ -137,8 +171,8 @@ const COMPLETE = inputs({
 
 /* ------------------------------------------------------------------- page */
 
-describe("the import page", () => {
-  const markup = render(createElement(ImportScreen, { workspaceSlug: SLUG, userId: USER }))
+describe("the import page's frame", () => {
+  const markup = render(createElement(ImportChrome, { workspaceSlug: SLUG }))
   const text = textOf(markup)
 
   it("says what it is, once, as the page's only h1", () => {
@@ -162,10 +196,23 @@ describe("the import page", () => {
     expect(markup).toContain('data-workspace-canvas="full"')
   })
 
-  it("opens on the empty source state, with nothing analyzed and nothing claimed", () => {
-    expect(text).toContain("Analyze product")
-    expect(text).toContain("0 of 5 steps complete")
-    expect(text).toContain("Complete 5 required items to continue.")
+  it("is the frame both import screens use, so the two cannot drift apart", () => {
+    // Rendered by the empty state and by the detail page. The assertion is
+    // that there is one of it; the two pages importing it is the mechanism.
+    expect(count(markup, "Import a product")).toBe(1)
+  })
+})
+
+describe("the import detail screen", () => {
+  const markup = render(createElement(ImportDetail, detailProps()))
+
+  it("renders the frame, the source, the readiness and the draft together", () => {
+    const text = textOf(markup)
+    expect(text).toContain("Import a product")
+    expect(text).toContain("Listing readiness")
+    expect(text).toContain("Listing draft")
+    expect(text).toContain("Complete your listing")
+    expect(text).toContain("Nothing publishes until you approve it.")
   })
 
   it("never renders a frame, an object or an injected html string", () => {
@@ -175,6 +222,34 @@ describe("the import page", () => {
     expect(markup).not.toContain("<iframe")
     expect(markup).not.toContain("<object")
     expect(markup).not.toContain("<embed")
+  })
+
+  it("names what the page did not say, when the draft found gaps", () => {
+    const withGaps = render(
+      createElement(ImportDetail, {
+        ...detailProps(),
+        missingInformation: ["What file formats a buyer receives"],
+      }),
+    )
+    expect(textOf(withGaps)).toContain("What the page did not say")
+    expect(textOf(withGaps)).toContain("What file formats a buyer receives")
+  })
+
+  it("says which fields were held back, and why, rather than dropping them silently", () => {
+    const withheld = render(
+      createElement(ImportDetail, { ...detailProps(), withheld: ["longDescription"] }),
+    )
+    const text = textOf(withheld)
+    expect(text).toContain("Held back")
+    expect(text).toContain("longDescription")
+    expect(text).toContain("a claim the page does not support")
+  })
+
+  it("says plainly when there was no model to draft with", () => {
+    const noModel = render(createElement(ImportDetail, { ...detailProps(), aiUnavailable: true }))
+    const text = textOf(noModel)
+    expect(text).toContain("No draft was composed")
+    expect(text).toContain("this deployment has no model configured")
   })
 })
 
@@ -700,7 +775,7 @@ describe("the marketplace review gate", () => {
 /* ------------------------------------------------------------ responsive */
 
 describe("the layout at the widths the repository already tests", () => {
-  const markup = render(createElement(ImportScreen, { workspaceSlug: SLUG, userId: USER }))
+  const markup = render(createElement(ImportDetail, detailProps()))
 
   it("stacks to one column by default and splits only when there is room", () => {
     // The repository's breakpoints are sm/md/lg/xl. The working area is one

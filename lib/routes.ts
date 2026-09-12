@@ -53,6 +53,16 @@ export const routes = {
    * they must not share a route.
    */
   importProduct: (workspace: string) => `/${workspace}/new/link`,
+  /**
+   * One import, addressable.
+   *
+   * The id is in the URL because the reading happens in a background job: a
+   * creator who closes the tab and comes back must land on the import that is
+   * still running rather than on an empty field. `lib/imports/queries.ts` is
+   * what makes that safe — the row is read through RLS, so an id belonging to
+   * another workspace is indistinguishable from one that does not exist.
+   */
+  productImport: (workspace: string, importId: string) => `/${workspace}/new/link/${importId}`,
   product: (workspace: string, product: string) => `/${workspace}/${product}`,
   productChannel: (workspace: string, product: string, connectionId: string) =>
     `/${workspace}/${product}/channels/${connectionId}`,
