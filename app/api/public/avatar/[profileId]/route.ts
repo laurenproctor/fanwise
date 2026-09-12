@@ -6,6 +6,10 @@ import { createAvatarUrl } from "@/lib/public/avatars"
 /**
  * A creator's avatar, on a public page.
  *
+ * Nobody is signed in, exactly as in the asset route beside it, and for the
+ * same reason: this is fetched by a visitor's browser from a page that has no
+ * account behind it.
+ *
  * Same shape and same reasoning as the asset route: the read that decides
  * whether this may be served is an `anon` select, so RLS answers it, and the
  * only profiles `anon` can see are published ones. An unpublished profile's

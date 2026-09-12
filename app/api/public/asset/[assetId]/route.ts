@@ -5,6 +5,12 @@ import { createPreviewUrl } from "@/lib/products/storage"
 /**
  * A product image, on a public page.
  *
+ * Nobody is signed in. This is reached by a stranger's browser, from a page
+ * that renders for the open web, and it must answer without a session — which
+ * is why it is on the proxy's public list. Nothing in the request is trusted:
+ * the asset id is not a capability, and what may be served is re-derived from
+ * the database on every request.
+ *
  * The sibling of `/[slug]/assets/[assetId]/preview`, and the difference is the
  * authorization. That route reads as the signed-in user and lets RLS decide;
  * this one reads as `anon` through a cookie-less client, so the only rows it

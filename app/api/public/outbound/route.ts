@@ -7,6 +7,11 @@ import { referrerHost } from "@/lib/public/urls"
 /**
  * Records that a visitor left a public product page for a channel.
  *
+ * Nobody is signed in. A beacon from a stranger's browser, carrying two ids
+ * and nothing else that is believed: every field this stores is re-derived
+ * server-side, and the page and channel it names are checked against an
+ * `anon` read before a row is written.
+ *
  * ## What is deliberately not here
  *
  * No IP address, no user agent, no cookie, no visitor or session identifier,

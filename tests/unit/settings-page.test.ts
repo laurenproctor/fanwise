@@ -9,8 +9,8 @@ import { describe, expect, it, vi } from "vitest"
  *
  * The browser half — dirty buttons, staged files, focus after a save — is
  * tests/e2e/journey-settings.spec.ts, because none of it is decidable from
- * static markup. This half is fast and pins what the page is made of: three
- * sections and no fourth, one save button per section with a name that says
+ * static markup. This half is fast and pins what the page is made of: four
+ * sections and no fifth, one save button per section with a name that says
  * which section it saves, and an address that is displayed rather than edited.
  *
  * The action modules are stubbed. They are "use server" files that reach for
@@ -316,9 +316,24 @@ describe("the settings page", () => {
    */
   const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")
 
-  it("renders three sections and no fourth", () => {
+  /**
+   * Public profile is a summary and a link, not a form. Its fields describe a
+   * page strangers read, and putting them in the same scroll as an email
+   * address is how somebody edits one believing it is the other, so the
+   * editing lives at app/[slug]/settings/public-profile. The section is here
+   * because "is my profile live" is checked far more often than it is edited.
+   */
+  it("renders four sections, in order, and no fifth", () => {
     const headings = [...code.matchAll(/heading="([^"]+)"/g)].map((m) => m[1])
-    expect(headings).toEqual(["Studio details", "Subscription", "Account"])
+    expect(headings).toEqual(["Studio details", "Public profile", "Subscription", "Account"])
+  })
+
+  it("links to the public profile page rather than editing it here", () => {
+    expect(code).toContain("routes.publicProfileSettings(workspace.slug)")
+    // The identity fields belong to the other page. None of them appears here.
+    for (const field of ["shortBio", "instagramUrl", "seoDescription"]) {
+      expect(code, `${field} should not be edited on the settings page`).not.toContain(field)
+    }
   })
 
   /**
