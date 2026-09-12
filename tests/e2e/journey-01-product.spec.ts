@@ -44,7 +44,10 @@ test("a creator signs up, gets a workspace, and creates a product", async ({ pag
   // And it appears in the catalog, which is the dashboard now rather than the
   // first-run screen.
   await page.goto(`/${slug}`)
-  await expect(page.getByRole("link", { name: "Aster Grotesk" })).toBeVisible()
+  // Exact: a catalog row carries two links to the same product, the name and
+  // the next action, and the action's accessible name ends with the product's
+  // so a screen reader can tell one row's action from another's.
+  await expect(page.getByRole("link", { name: "Aster Grotesk", exact: true })).toBeVisible()
   await expect(page.getByRole("heading", { level: 1, name: "Products" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "Your first product starts here." })).toHaveCount(
     0,

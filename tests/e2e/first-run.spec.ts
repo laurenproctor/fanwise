@@ -91,9 +91,18 @@ test("once a product exists the catalog is the normal dashboard", async ({ page 
   await page.goto(routes.workspace(slug))
   const main = page.getByRole("main")
   await expect(main.getByRole("heading", { level: 1, name: "Products" })).toBeVisible()
-  await expect(main.getByRole("link", { name: "New product" })).toBeVisible()
-  await expect(main.getByRole("table")).toHaveCount(1)
-  await expect(main.getByRole("link", { name: "Populated Grotesk" })).toBeVisible()
+  // The catalog's primary action, which is "Add product" rather than the first
+  // run's "Create first product". The populated view is a list rather than a
+  // table so that its four columns can stack on a phone without the stacking
+  // removing the semantics the table was for; tests/e2e/catalog.spec.ts holds
+  // the rest of it.
+  await expect(main.getByRole("link", { name: "Add product" })).toBeVisible()
+  await expect(main.getByRole("list", { name: "Products" })).toHaveCount(1)
+  // Exact, because each row carries two links to the same product: the name,
+  // and the next action, whose accessible name ends with the product's name so
+  // that a screen reader listing every link can tell one row's action from
+  // another's.
+  await expect(main.getByRole("link", { name: "Populated Grotesk", exact: true })).toBeVisible()
   await expect(page.getByRole("heading", { name: HEADING })).toHaveCount(0)
   await expect(page.getByText("Your path to publish")).toHaveCount(0)
 })
