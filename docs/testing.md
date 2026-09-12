@@ -120,6 +120,13 @@ URL, and is then attached to the product, rather than posted to the provider in 
 The journey exists to see that the attach happened, by reading the product back, before
 Fanwise reports it live.
 
+**B11 adds no journey.** The companion window planned on 12 September 2026 in
+`docs/companion-window.md` is journey 7 run in a second window, not a new path from empty
+workspace to live listing. Its own tests assert the handoff renders identically into a
+detached document and that the pop-out button is absent where the API is, and the rest is
+covered by journey 7 being run once with the companion open. A fourteenth number would
+imply a fourteenth path, and there is not one.
+
 **Password recovery is not one of the thirteen**, because it is not a step on the path from empty
 workspace to live listing. It is covered anyway, in two halves that meet at the token:
 `tests/db/password-recovery.test.ts` makes the same calls the confirm route makes, against the

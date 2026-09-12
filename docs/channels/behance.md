@@ -314,7 +314,8 @@ Two rules new here:
 - **Existing-project mode hides steps 1, 3 and 4** and says so, rather than showing them
   greyed out. Fanwise did not compose that project and should not look as if it had.
 
-The companion window in `docs/decisions/0010` applies here unchanged. Behance's Community
+The companion window in `docs/decisions/0010`, planned as B11 in `docs/companion-window.md`,
+applies here unchanged. Behance's Community
 Guidelines are one of the reasons it never touches the marketplace's page.
 
 ---

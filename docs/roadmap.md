@@ -356,6 +356,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B8 | WooCommerce: store authorization, adapter, draft, images, activate with the file verified, idempotency. See `docs/channels/woocommerce.md`. Added 8 September 2026 at the founder's request; **code complete the same day**, exit unrun, see below |
 | B9 | Behance: creative-field and category mapping, the project-and-asset package, two new image derivative specs, guided handoff in new-project and existing-project modes, mark submitted, project URL capture. See `docs/channels/behance.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on A8, see below |
 | B10 | Gumroad: OAuth with PKCE, adapter, presigned multipart file upload, draft then enable, covers and thumbnail, the compensating delete, a platform-wide create pace, idempotency. See `docs/channels/gumroad.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on nothing in code, see below |
+| B11 | The companion window: the assisted handoff shown beside the marketplace's own editor, in a pop-out that touches nothing on the marketplace's page. See `docs/companion-window.md` and `docs/decisions/0010`. **Planned 12 September 2026 at the founder's request, not opened**; conditional on evidence from A8 and B2a, see below |
 
 ### B1, what was built and what is still owed
 
@@ -573,6 +574,54 @@ references. Do not reuse B3 for something else.
 B2a is the half of the old B3 that could not move: the creator test that only means anything
 once AI composes the listing. It is lettered rather than numbered for the same reason the gap
 stays, and it is a test rather than a build step, which is why it carries no code scope.
+
+### B11, what is planned and what it opens on
+
+Planned on 12 September 2026 at the founder's request, after they chose a sidebar over an
+extension that fills in marketplace forms. The decision is `docs/decisions/0010`, still
+proposed; the build plan is `docs/companion-window.md`.
+
+What it is, in one sentence: the assisted handoff shown in a small always-on-top window
+beside the marketplace's editor, so the creator stops losing their place between two
+windows.
+
+Scope, when it opens:
+
+- A **Pop out** button on the handoff, rendered only where `documentPictureInPicture` exists.
+- The same handoff component, portalled into the pop-out's document, with the stylesheets
+  and the theme attribute copied across at open.
+- Clipboard and download behaviour proven from the second window, including the formatted
+  description Creative Market's editor needs.
+- Component tests, one E2E spec, and a line in `docs/testing.md` saying this is journey 7 in
+  the companion rather than a fourteenth journey.
+
+**No migration, no new table, no new server action, no new capability.** B11 is a layout. If
+it needs a schema change, something has been misread.
+
+**B11 is the first step in this file that opens on a finding rather than on a dependency.**
+It needs A8's handoff to exist, A8's exit run and the B2a creator test to have watched
+creators use it with the step order already right, and those creators to still lose their
+place between windows. `docs/channels/creative-market.md` §12 prescribes fixing the order
+first, and the order is the cheaper fix. If the finding never arrives, close
+`docs/companion-window.md` rather than leaving it open for somebody to build because it is
+there.
+
+The one thing it asks of a step that has not run yet: **A8 builds the handoff as one
+component that does not assume the width of a full page.** That costs a layout rule, not
+scope, and it is already written into `docs/channels/creative-market.md` §10. Build it as a
+page instead and B11 starts by refactoring a screen creators have already been tested
+against.
+
+**B11's exit test** is one creator carrying one real product through an assisted channel with
+the companion open, without returning to the Fanwise tab until they paste the URL, measured
+against the time and the lost-place finding from A8's own run. If neither improves, revert
+it: two ways to read the same handoff is worse than one.
+
+What B11 does not do, and a later session should not read into it: it never reads, writes or
+scripts a marketplace's page, and it holds no marketplace session. An extension side panel,
+form B in 0010, is not part of it and opens only if the pop-out is built and found wanting,
+with its own ADR and its own section in `docs/security.md` for the second authenticated
+client it would create.
 
 ## Gate C: a stranger can pay
 
