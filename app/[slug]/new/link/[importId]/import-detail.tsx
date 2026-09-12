@@ -74,6 +74,8 @@ export interface ImportDetailProps {
   productId: string
   /** What a re-read turned up that the previous reading did not. */
   changes: readonly EvidenceChange[]
+  /** A link, or text or a file the creator handed over. */
+  sourceMode: "link" | "content"
 }
 
 export function ImportDetail(props: ImportDetailProps) {
@@ -217,8 +219,9 @@ export function ImportDetail(props: ImportDetailProps) {
           onUrlChange={() => {}}
           onSubmit={() => {}}
           onReplaceLink={() => setReplacing(true)}
+          mode={props.sourceMode}
         />
-        {replacing ? (
+        {replacing && props.sourceMode === "link" ? (
           <ReplaceSourceDialog
             currentUrl={props.state.url}
             onCancel={() => setReplacing(false)}
@@ -255,14 +258,18 @@ export function ImportDetail(props: ImportDetailProps) {
                 )
               },
               manualHref: routes.product(props.workspaceSlug, props.productSlug),
+              pasteHref: `${routes.importProduct(props.workspaceSlug)}?from=text`,
             }}
+            mode={props.sourceMode}
           />
           {props.changes.length > 0 ? <SourceChanges changes={props.changes} /> : null}
-          {props.aiUnavailable ? <NoModelNotice /> : null}
+          {props.aiUnavailable ? <NoModelNotice mode={props.sourceMode} /> : null}
           {props.missingInformation.length > 0 ? (
-            <MissingInformation items={props.missingInformation} />
+            <MissingInformation items={props.missingInformation} mode={props.sourceMode} />
           ) : null}
-          {props.withheld.length > 0 ? <Withheld fields={props.withheld} /> : null}
+          {props.withheld.length > 0 ? (
+            <Withheld fields={props.withheld} mode={props.sourceMode} />
+          ) : null}
         </div>
 
         <div className="flex min-w-0 flex-col gap-8">
@@ -346,23 +353,31 @@ export function ImportDetail(props: ImportDetailProps) {
   )
 }
 
-function NoModelNotice() {
+function NoModelNotice({ mode }: { mode: "link" | "content" }) {
   return (
     <section className="flex flex-col gap-2 rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-card)] px-5 py-4">
       <h2 className="label-mono">No draft was composed</h2>
       <p className="text-[14px] leading-[1.55] text-[var(--color-ink-2)]">
-        Fanwise read the page and saved what it found, but this deployment has no model configured,
-        so nothing was proposed. The details are yours to write, and everything on the left is what
-        the page actually said.
+        Fanwise read the {mode === "link" ? "page" : "source"} and saved what it found, but this
+        deployment has no model configured, so nothing was proposed. The details are yours to write,
+        and everything on the left is what the {mode === "link" ? "page" : "source"} actually said.
       </p>
     </section>
   )
 }
 
-function MissingInformation({ items }: { items: readonly string[] }) {
+function MissingInformation({
+  items,
+  mode,
+}: {
+  items: readonly string[]
+  mode: "link" | "content"
+}) {
   return (
     <section className="flex flex-col gap-2 rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-card)] px-5 py-4">
-      <h2 className="label-mono">What the page did not say</h2>
+      <h2 className="label-mono">
+        {mode === "link" ? "What the page did not say" : "What the source did not say"}
+      </h2>
       <ul className="flex flex-col gap-1.5">
         {items.map((item) => (
           <li key={item} className="flex items-start gap-2.5">
@@ -385,14 +400,14 @@ function MissingInformation({ items }: { items: readonly string[] }) {
  * suggest a description" and no reason concludes the feature is broken; one who
  * sees why concludes, correctly, that it was being careful.
  */
-function Withheld({ fields }: { fields: readonly string[] }) {
+function Withheld({ fields, mode }: { fields: readonly string[]; mode: "link" | "content" }) {
   return (
     <section className="flex flex-col gap-2 rounded-[16px] border border-[var(--color-warn)] bg-[var(--color-card)] px-5 py-4">
       <h2 className="label-mono">Held back</h2>
       <p className="text-[14px] leading-[1.55] text-[var(--color-ink-2)]">
         Fanwise did not offer a suggestion for {fields.join(", ")}, because what it wrote made a
-        claim the page does not support — about files, compatibility, licensing, support, ownership
-        or resale. Those are yours to state.
+        claim the {mode === "link" ? "page" : "source"} does not support — about files,
+        compatibility, licensing, support, ownership or resale. Those are yours to state.
       </p>
     </section>
   )

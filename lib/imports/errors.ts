@@ -48,6 +48,10 @@ export const IMPORT_ERROR_CODES = [
   "ai_unavailable",
   /** Anything that escaped the mapping. Always logged, never explained away. */
   "internal",
+  /** A handed-over file that could not be opened: damaged, locked, or not what it said. */
+  "unreadable_file",
+  /** A handed-over file that opened and holds no text, such as a scanned document. */
+  "no_text",
 ] as const
 
 export type ImportErrorCode = (typeof IMPORT_ERROR_CODES)[number]
@@ -104,6 +108,10 @@ export const IMPORT_ERROR_MESSAGES: Record<ImportErrorCode, string> = {
     "Fanwise read the page but has no model configured to draft from it. The details are yours to write.",
   internal:
     "Fanwise could not finish reading that link. Nothing was saved, so trying again is safe.",
+  unreadable_file:
+    "Fanwise could not open that file. It may be damaged, or locked with a password. Nothing inside it was run.",
+  no_text:
+    "That file has no text Fanwise can read. A scanned document is a picture of words rather than words, so paste the text instead.",
 }
 
 /**
@@ -119,12 +127,11 @@ export const IMPORT_ERROR_RECOVERIES: Record<ImportErrorCode, readonly RecoveryA
   not_found: ["replace_link", "upload_files", "continue_manually"],
   expired: ["publish_public_link", "replace_link", "continue_manually"],
   /*
-    Only what is built. Pasting the code is the right answer for a page that
-    renders in a browser, and it is listed here the day it exists; until then a
-    row of "Not built yet" above the two working options makes a dead end out
-    of a path that has one.
+    Pasting the text is the right answer for a page that renders in a browser:
+    Fanwise will never run the page, but it can read what the page says once a
+    creator copies it out.
   */
-  unsupported_source: ["replace_link", "continue_manually"],
+  unsupported_source: ["replace_link", "paste_code", "continue_manually"],
   not_html: ["replace_link", "upload_files", "continue_manually"],
   too_large: ["replace_link", "upload_files", "continue_manually"],
   timeout: ["retry", "continue_manually"],
@@ -134,6 +141,8 @@ export const IMPORT_ERROR_RECOVERIES: Record<ImportErrorCode, readonly RecoveryA
   provider_error: ["retry", "continue_manually"],
   ai_unavailable: ["retry", "continue_manually"],
   internal: ["retry", "continue_manually"],
+  unreadable_file: ["paste_code", "continue_manually"],
+  no_text: ["paste_code", "continue_manually"],
 }
 
 /**

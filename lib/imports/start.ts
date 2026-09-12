@@ -12,6 +12,10 @@ import {
 import { emptyMetadataFor } from "@/lib/products/metadata"
 import { sourceKindFor } from "./sources/registry"
 import { normalizeSourceUrl, validateSourceUrl } from "./url"
+import { looksLikeCode } from "./retrieval/plain-text"
+import { sanitizeText } from "./retrieval/html"
+import { removeStoredSource } from "./source-storage"
+import type { ContentSourceKind } from "./types"
 
 /**
  * Starting an import, as the signed-in member.
@@ -66,6 +70,10 @@ export function provisionalName(url: URL): string {
   const looksLikeAName = /[a-z]/i.test(cleaned) && cleaned.length <= 60 && cleaned.length >= 3
   const base = looksLikeAName ? cleaned : url.hostname.replace(/^www\./, "")
 
+  return titleCase(base)
+}
+
+function titleCase(base: string): string {
   return (
     base
       .split(" ")
@@ -140,6 +148,106 @@ export async function startImport(params: {
     "import_source",
     { workspaceId, importId: data.id },
     // The delivery key, per lib/publishing/start.ts: one hand-off per row.
+    { idempotencyKey: `${data.id}:0` },
+  )
+
+  return { kind: "started", importId: data.id, productSlug: created.slug }
+}
+
+/**
+ * A first name for a product made from something handed over.
+ *
+ * The file's name without its extension, when there is a file; the first line
+ * of a paste, when it reads like a name; otherwise what the thing was. Like
+ * `provisionalName`, this is the creator's own material rearranged and never an
+ * inference, and it is replaced when they accept a title.
+ */
+export function provisionalContentName(params: {
+  kind: ContentSourceKind
+  filename: string | null
+  firstLine: string | null
+}): string {
+  if (params.filename) {
+    const stem = sanitizeText(
+      params.filename.replace(/\.[A-Za-z0-9]{1,8}$/, "").replace(/[-_+]+/g, " "),
+      200,
+    )
+    if (/[a-z]/i.test(stem) && stem.length >= 3) return titleCase(stem).slice(0, 200)
+  }
+
+  const line = params.firstLine ? sanitizeText(params.firstLine.replace(/^#+\s*/, ""), 200) : ""
+  if (line.length >= 3 && line.length <= 80 && /[a-z]/i.test(line) && !looksLikeCode(line)) {
+    return line
+  }
+
+  return params.kind === "pdf_document"
+    ? "Imported document"
+    : params.kind === "html_document"
+      ? "Imported HTML"
+      : "Pasted text"
+}
+
+/**
+ * Starting an import from a paste or an upload that is already in storage.
+ *
+ * The object was written before this runs — by the server for a paste, by the
+ * browser through a signed URL for a file — and measured, so what is recorded
+ * here is a fact about bytes that exist. There is no dedupe: a paste has no
+ * stable identity the way a link does, and pasting again is how a creator
+ * tries again.
+ *
+ * If the product or the row cannot be made, the stored object is removed, so a
+ * failed start leaves nothing behind that nothing points at.
+ */
+export async function startContentImport(params: {
+  supabase: SupabaseClient<Database>
+  workspaceId: string
+  userId: string
+  kind: ContentSourceKind
+  sourcePath: string
+  filename: string | null
+  byteSize: number
+  firstLine: string | null
+  queue?: JobQueue
+}): Promise<StartImportOutcome> {
+  const { supabase, workspaceId, userId, kind, sourcePath, queue = jobs } = params
+
+  const name = provisionalContentName({
+    kind,
+    filename: params.filename,
+    firstLine: params.firstLine,
+  })
+  const created = await createProduct(supabase, workspaceId, name)
+  if (!created) {
+    await removeStoredSource(sourcePath).catch(() => undefined)
+    return { kind: "error", message: "That product could not be created. Try again." }
+  }
+
+  const { data, error } = await supabase
+    .from("product_imports")
+    .insert({
+      workspace_id: workspaceId,
+      product_id: created.id,
+      provider: kind,
+      source_path: sourcePath,
+      source_filename: params.filename,
+      source_byte_size: params.byteSize,
+      requested_by: userId,
+      status: "pending",
+    })
+    .select("id")
+    .single()
+
+  if (error || !data) {
+    await supabase.from("products").delete().eq("id", created.id).eq("workspace_id", workspaceId)
+    await removeStoredSource(sourcePath).catch(() => undefined)
+    console.error("[imports] could not create the content import", { error })
+    return { kind: "error", message: "That import could not be started. Try again." }
+  }
+
+  await queue.enqueue(
+    "import_source",
+    { workspaceId, importId: data.id },
     { idempotencyKey: `${data.id}:0` },
   )
 
