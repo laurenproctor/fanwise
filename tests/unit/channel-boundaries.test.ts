@@ -3,6 +3,7 @@ import { join, relative, sep } from "node:path"
 import { describe, expect, it } from "vitest"
 import { CHANNEL_KEYS, CAPABILITY_KEYS } from "@/lib/channels/types"
 import { CAPABILITY_METHODS, listAdapters } from "@/lib/channels/registry"
+import { SOURCE_DESCRIPTORS } from "@/lib/imports/sources/registry"
 
 /**
  * The architectural invariants of A3, enforced rather than reviewed.
@@ -137,6 +138,35 @@ function isSanctionedForVendor(path: string): boolean {
   return rel.startsWith("lib/ai/providers/") || rel.startsWith("tests/")
 }
 
+/**
+ * The names of the things a product can be imported *from*.
+ *
+ * One of them shares a word with the model vendor, and the two mean entirely
+ * different things: `lib/ai/providers` talks to a model, and
+ * `lib/imports/sources` reads a public web page that happens to be hosted on a
+ * domain with the same name in it. The rule above is about the first and would
+ * otherwise fail on the second.
+ *
+ * So these are removed before the sweep, in that one directory only, exactly
+ * as `claude.md` is removed everywhere for the same class of reason — a
+ * reference to a thing that is not a model. Derived from the registry rather
+ * than typed here, so a source added later is covered without this file
+ * changing, and scoped to the directory so that naming an import source
+ * anywhere else still fails.
+ *
+ * The names are not thereby unguarded: `tests/unit/import-source-boundaries.test.ts`
+ * is what keeps them inside `lib/imports/sources/`.
+ */
+const IMPORT_SOURCE_NAMES: readonly string[] = [
+  ...SOURCE_DESCRIPTORS.flatMap((descriptor) => descriptor.hosts),
+  ...SOURCE_DESCRIPTORS.map((descriptor) => descriptor.label),
+].map((name) => name.toLowerCase())
+
+function withoutImportSourceNames(rel: string, contents: string): string {
+  if (!rel.startsWith("lib/imports/sources/")) return contents
+  return IMPORT_SOURCE_NAMES.reduce((text, name) => text.split(name).join(""), contents)
+}
+
 describe("model vendor names stay inside the provider layer", () => {
   it("no vendor name appears outside lib/ai/providers", () => {
     const offenders: string[] = []
@@ -145,9 +175,13 @@ describe("model vendor names stay inside the provider layer", () => {
       if (isSanctionedForVendor(file)) continue
       // The instruction file is named after the vendor. A comment pointing a
       // reader at CLAUDE.md is a reference to a file, not to a model.
-      const contents = readFileSync(file, "utf8")
-        .toLowerCase()
-        .replace(/claude\.md/g, "")
+      const rel = relative(ROOT, file).split(sep).join("/")
+      const contents = withoutImportSourceNames(
+        rel,
+        readFileSync(file, "utf8")
+          .toLowerCase()
+          .replace(/claude\.md/g, ""),
+      )
       for (const term of AI_VENDOR_TERMS) {
         if (contents.includes(term)) offenders.push(`${relative(ROOT, file)} mentions ${term}`)
       }

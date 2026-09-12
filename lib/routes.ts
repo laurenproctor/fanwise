@@ -42,6 +42,17 @@ export const routes = {
   /** The catalog. A workspace's home is the list of what it sells. */
   workspace: (workspace: string) => `/${workspace}`,
   newProduct: (workspace: string) => `/${workspace}/new`,
+  /**
+   * Importing a product from a link.
+   *
+   * Under `/new` rather than at `/<workspace>/import`. Two reasons: `new` is
+   * already in `RESERVED_PRODUCT_SLUGS`, so nesting here reserves no further
+   * word in the product-slug namespace; and `/import` is wanted by a different
+   * feature with the same English name, importing a listing already sold on a
+   * connected channel (`docs/listing-import.md`). One word, two features, and
+   * they must not share a route.
+   */
+  importProduct: (workspace: string) => `/${workspace}/new/link`,
   product: (workspace: string, product: string) => `/${workspace}/${product}`,
   productChannel: (workspace: string, product: string, connectionId: string) =>
     `/${workspace}/${product}/channels/${connectionId}`,

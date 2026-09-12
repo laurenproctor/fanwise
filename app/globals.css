@@ -145,6 +145,71 @@ body {
   }
 }
 
+/*
+ * A route that needs the whole window rather than the reading-width column.
+ *
+ * Opt-in, from the page's own root element, and nothing else in the app sets
+ * the attribute — so no other route moves. The alternative was a route group
+ * with a layout of its own, which would have had to repeat the signed-in and
+ * workspace-membership checks in app/[slug]/layout.tsx. A duplicated tenancy
+ * check is a tenancy check that drifts; one selector cannot.
+ *
+ * The header above <main> stays. It is the tenancy boundary's visible half and
+ * the only way out of the page, so a route that wants width is given width
+ * rather than given a shell with no exit.
+ *
+ * The gutter is 4vw between a 1.5rem floor and a 4rem ceiling: 48px at a
+ * 1200px window, 64px from 1600px up, and never less than the 24px the rest of
+ * the app uses on a phone.
+ */
+main:has(> [data-workspace-canvas="full"]) {
+  max-width: none;
+  padding-inline: clamp(1.5rem, 4vw, 4rem);
+  padding-block: 2rem 0;
+}
+
+/*
+ * The bar shown while a link is being read.
+ *
+ * Indeterminate, and that is the whole point: the work has no knowable length,
+ * so a determinate bar would be a number the screen invented. This travels to
+ * say something is happening and never claims a position. Under reduced motion
+ * it stops travelling and holds a quiet band instead, because the stage list
+ * beside it already carries the information in words.
+ */
+.import-indeterminate {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-rule-2);
+}
+
+.import-indeterminate::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inline-size: 40%;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  animation: import-indeterminate 1.6s ease-in-out infinite;
+}
+
+@keyframes import-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .import-indeterminate::after {
+    animation: none;
+    inline-size: 100%;
+    opacity: 0.35;
+  }
+}
+
 /* Mono is the voice of anything the system knows rather than says. */
 .label-mono {
   font-family: var(--font-mono);
