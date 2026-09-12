@@ -117,7 +117,7 @@ export function StudioDetailsForm({
       return
     }
     if (file.size > MAX_ICON_BYTES) {
-      reject("That image is over 2 MB. Choose a smaller one.")
+      reject("That image is over 4 MB. Choose a smaller one.")
       return
     }
 
@@ -215,7 +215,7 @@ export function StudioDetailsForm({
           <input type="hidden" name="removeIcon" value={removeIcon ? "true" : "false"} />
 
           <p id={iconHintId} className="text-[13px] text-[var(--color-ink-3)]">
-            PNG, JPG or WebP. Maximum 2 MB.
+            PNG, JPG or WebP. Maximum 4 MB.
             {pick ? ` ${pick.file.name} is ready to save.` : ""}
             {removeIcon ? " The icon will be removed when you save." : ""}
           </p>

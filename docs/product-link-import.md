@@ -863,8 +863,8 @@ screen as the link, chosen by `?from=`:
 |---|---|---|---|
 | Link | pastes a public URL | `hosted_artifact` or `webpage` | nothing; fetched |
 | Paste text | pastes words, notes or code, up to 200,000 characters | `pasted_text` | `.txt` |
-| PDF | uploads a `.pdf`, up to 20 MB | `pdf_document` | `.pdf` |
-| HTML | uploads an `.html` file up to 2 MB, or pastes markup | `html_document` | `.html` |
+| PDF | uploads a `.pdf`, up to 4.8 MB | `pdf_document` | `.pdf` |
+| HTML | uploads an `.html` file up to 4.8 MB, or pastes markup | `html_document` | `.html` |
 
 A pasted text that is a whole HTML document (a doctype or an `<html>` element at the top) is
 read as HTML, because a creator copying an artifact's code has handed over markup.

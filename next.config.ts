@@ -67,6 +67,16 @@ const config: NextConfig = {
     }
   },
   allowedDevOrigins: tunnelHost(),
+  experimental: {
+    serverActions: {
+      // Workspace icons and profile avatars are posted to server actions, at up
+      // to 4 MiB each (MAX_ICON_BYTES, MAX_AVATAR_BYTES). The default is 1 MB,
+      // which refused them long before those checks could. This leaves room
+      // for multipart overhead and the form's other fields while staying under
+      // Vercel's 4.5 MB request body limit, which no setting here can raise.
+      bodySizeLimit: 4_400_000,
+    },
+  },
   // sharp ships prebuilt native binaries. Bundling it breaks the binding
   // resolution, so it stays external to the server build.
   serverExternalPackages: ["sharp"],
