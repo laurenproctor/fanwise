@@ -381,6 +381,49 @@ question about what survives a disconnection, and decide before C1 rather than a
 then the UI says the connection cannot be disconnected and why, rather than offering a button
 whose only outcome is the refusal.
 
+**Importing makes this sharper, and answers a slice of it.** Planning B12 on 12 September
+2026 walked straight into this refusal: a creator who imports eleven Etsy listings to try
+Fanwise out could not then disconnect Etsy, and at C1 that means billed forever for a channel
+they only ever read from. But an imported listing Fanwise has never published or updated is
+the one case where forgetting is honest — Fanwise did not create the marketplace object, has
+not changed it, and deleting the row restores the world to exactly what it was before the
+import. Nothing is stranded, because nothing was attached. `docs/listing-import.md` §10
+proposes exactly that much and no more: a listing with zero Fanwise writes may be forgotten,
+every other listing keeps the refusal unchanged, and the counter that decides it is
+maintained by the publish and update paths rather than inferred later. It is a slice, not the
+answer; delisting, archiving and the snapshot question in entry 10 are all still open.
+
+### 29. What an imported listing is allowed to tell the FactSheet
+
+Raised on 12 September 2026 by the B12 plan, `docs/listing-import.md` §11. It must be
+answered before that step opens, and it is the only thing in the plan that could quietly
+break an invariant.
+
+Import is the first way for text nobody at Fanwise has validated to reach a canonical field.
+Invariant 5 says AI may never introduce a factual claim absent from the FactSheet, and the
+FactSheet is derived from the canonical product. So if an imported description lands in
+`canonical_description`, every claim in it — "236 glyphs", "includes a commercial license",
+"works in every app" — is now a fact the validator will happily let a generation restate on a
+different channel. The validator would be working perfectly. The claim got into the FactSheet
+from a marketplace, and Fanwise would be repeating a stranger's copy as its own verified
+fact.
+
+- **Imported copy is channel copy.** It lands on `channel_listings` for the channel it came
+  from and goes no further on its own. The canonical product receives the structured facts —
+  name, price, currency, type — plus whatever copy the creator explicitly promotes on the
+  review screen, with the control defaulted off and the screen saying that promoted text
+  becomes something Fanwise may restate elsewhere.
+- **Imported copy is the creator's copy, so treat it as canonical.** Simpler, and one fewer
+  screen. It also means the first generation after an import can assert anything the
+  marketplace listing asserted, which is the failure above.
+- **Validate inward.** Run the factuality validator against the imported description before
+  accepting it. This cannot work: there is no FactSheet to validate against until the product
+  exists, and the product is what is being created.
+
+**Recommendation:** the first. It is the cheapest of the three, it holds invariant 5 without
+weakening it, and it puts the one judgement a machine cannot make — is this sentence true
+about my product — in front of the only person who knows.
+
 ### 23. Is a second owned storefront included
 
 Raised on 8 September 2026 by the WooCommerce assessment in `docs/channel-feasibility.md`.

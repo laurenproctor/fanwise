@@ -481,3 +481,38 @@ That last has no precedent in this model. Gumroad returns a file's canonical URL
 upload, and an update that does not resend it deletes the file. So `metadata.files` is not a
 cache: losing it would make the next update remove the buyer's download, and the adapter
 refuses an update whose stored files disagree with the product's rather than guess.
+
+## B12: importing a live listing
+
+Planned 12 September 2026, not built. The migration lands with B12. The plan is
+`docs/listing-import.md`.
+
+**No new table, and no new column.** Import writes the rows publishing already writes, from
+the other direction: one `products` row, one `channel_listings` row with its
+`external_listing_id` claimed, `product_assets` rows for the images, and one snapshot. If
+this step grows a table, something has been misread.
+
+`snapshot_type` gains one member, `import`, and that is the whole migration. The snapshot
+holds the provider's payload as it arrived, before any mapping, and it is insert-only like
+every other: it is the only record of what the marketplace said on the day, and the answer to
+every later question about where a canonical field came from.
+
+`channel_listings.metadata.import` holds `{ importedAt, sourceUrl, unmappedFields, writes }`.
+`unmappedFields` is what the review screen showed the creator as dropped — a marketplace
+concept with no canonical home is named there rather than discarded silently. `writes` counts
+the publishes and updates Fanwise has since made to the listing, and it is maintained by
+those paths rather than derived afterwards, because it decides whether the listing may be
+forgotten at disconnection: a listing imported and never written to can be, since forgetting
+it restores the world to before the import. Decision 21.
+
+The imported listing reads `status = published` and `status_source = verified`, which is
+honest — Fanwise read it on the channel — and it is the first `verified` row in the model
+that no publication produced. Nothing downstream needs to tell the two apart; anything that
+did would be asking about provenance, and provenance is what the `import` snapshot is for.
+
+**What import may not write is a canonical field nobody confirmed.** The provider payload
+reaches `products` only through a person accepting it on the review screen, which is
+architecture invariant 1 held at the one place in the plan where a marketplace's shape flows
+inward. Imported copy that the creator does not promote stays on the listing, where it is
+copy for one channel rather than a fact the FactSheet would let AI restate on another.
+Decision 29.

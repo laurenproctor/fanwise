@@ -15,8 +15,8 @@ the wrong one is how this suite passes while proving nothing.
 handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
 AI failure.
 
-**E2E** — the thirteen journeys below, plus two step exit tests against the mock channels
-rather than against the thirteen:
+**E2E** — the fourteen journeys below, plus two step exit tests against the mock channels
+rather than against the fourteen:
 
 - `journey-03-channels.spec.ts` (A3): one product, two independent listings, and no publish
   affordance anywhere on the assisted channel.
@@ -72,7 +72,7 @@ content arrives, so `waitForURL` can return while the loading boundary is still 
 and a locator that counts elements then finds none. Follow it with a wait on real content —
 the product heading, usually.
 
-## The thirteen journeys
+## The fourteen journeys
 
 1. Signup, workspace, product. *(complete at A2)*
 2. Product to AI Shopify listing, approved. *(composition ran live at B1; the review loop
@@ -105,6 +105,9 @@ the product heading, usually.
 13. Connect Gumroad, publish a product with its covers and its file, confirm it is
     purchasable. *(planned at B10, not built; needs a registered Gumroad OAuth application and
     a seller account, decision 27)*
+14. Import a live listing, then publish the imported product to a second channel.
+    *(planned at B12, not built; opens after Gate A passes, and the listing it imports must
+    be one Fanwise did not create, see `docs/listing-import.md`)*
 
 Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, the product
 is broken in the way that matters most.
@@ -128,7 +131,21 @@ URL, and is then attached to the product, rather than posted to the provider in 
 The journey exists to see that the attach happened, by reading the product back, before
 Fanwise reports it live.
 
-**Password recovery is not one of the thirteen**, because it is not a step on the path from empty
+**Journey 14 was added on 12 September 2026**, when importing a live listing was planned as
+B12. It is the only journey that does not begin in Fanwise. Every other path starts with an
+upload or a form and ends at a marketplace; this one starts at a marketplace listing the
+creator already sells and ends with that product published somewhere else. That is a
+fourteenth path rather than a variation, and it is the test this list applies to every
+candidate: a second view of a screen that already has a journey does not earn a number, and
+a different way into the product does.
+
+The clause that makes it worth running is in `docs/listing-import.md` §15: the listing must
+be one Fanwise did not create. A listing Fanwise published, imported back, only proves the
+round trip closes. What the mapping has to survive is a stranger's category, a stranger's
+tags and a stranger's line breaks. The journey also runs the import twice, because the second
+import is a navigation to the product that already exists and not an error.
+
+**Password recovery is not one of the fourteen**, because it is not a step on the path from empty
 workspace to live listing. It is covered anyway, in two halves that meet at the token:
 `tests/db/password-recovery.test.ts` makes the same calls the confirm route makes, against the
 real auth server, and proves the link is single use; `tests/e2e/password-recovery.spec.ts`
