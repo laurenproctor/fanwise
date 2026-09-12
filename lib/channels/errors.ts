@@ -52,6 +52,36 @@ export function isRetryable(code: NormalizedErrorCode): boolean {
   return RETRYABLE.has(code)
 }
 
+/**
+ * The in-call tier of the retry policy. ADR 0005, decision 8.
+ *
+ * Asked inside an adapter's HTTP client, within one job attempt: was this
+ * request momentarily unlucky? The horizon is seconds. The other tier, whether
+ * the channel is having a bad quarter of an hour, is minutes long and belongs
+ * to lib/publishing/retry.ts, which the runner reads.
+ *
+ * These live here rather than in each client because what to do about a
+ * normalized code is one product decision. All three clients carried their own
+ * copy of the same constant and the same doubling backoff, agreeing only
+ * because each was written by copying the last, which is one policy in three
+ * places until somebody edits one of them.
+ *
+ * What is shared is the curve and the number of attempts. A provider that says
+ * how long to wait is believed instead, and the hint arrives already in
+ * milliseconds and already bounded by the client that parsed it: Shopify reads
+ * a restore rate in points per second and allows 5s, Etsy reads Retry-After in
+ * seconds and allows 10s. Those ceilings differ because the providers do, and
+ * flattening them here would quietly change what Etsy waits.
+ */
+export const IN_CALL_MAX_ATTEMPTS = 3
+
+const IN_CALL_BACKOFF_CAP_MS = 5_000
+
+export function inCallBackoffMs(attempt: number, hintMs: number | null = null): number {
+  if (hintMs !== null && hintMs > 0) return hintMs
+  return Math.min(IN_CALL_BACKOFF_CAP_MS, 250 * 2 ** (attempt - 1))
+}
+
 export interface NormalizedError {
   code: NormalizedErrorCode
   /**

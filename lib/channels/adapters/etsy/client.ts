@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { ChannelError } from "@/lib/channels/errors"
+import { ChannelError, IN_CALL_MAX_ATTEMPTS, inCallBackoffMs } from "@/lib/channels/errors"
 import { API_BASE } from "./config"
 import { fail, httpError, malformed, transportError, type EtsyErrorBody } from "./errors"
 
@@ -13,8 +13,6 @@ import { fail, httpError, malformed, transportError, type EtsyErrorBody } from "
  * answer is validated with Zod before anything reads it (rule 6), and the
  * failures worth retrying are retried with bounded backoff.
  */
-
-const MAX_ATTEMPTS = 3
 
 const errorBodySchema = z.object({
   error: z.string().optional(),
@@ -48,10 +46,18 @@ export interface EtsyClient {
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
-function backoffMs(attempt: number, retryAfter: string | null): number {
+/**
+ * Etsy's own answer to "how long should I wait", in milliseconds.
+ *
+ * Retry-After arrives in seconds and is believed up to ten of them, which is
+ * longer than the shared curve's ceiling on purpose: Etsy's rate limit is per
+ * application rather than per shop, so waiting exactly as long as it asks is
+ * cheaper for every tenant than asking again sooner.
+ */
+function retryAfterMs(retryAfter: string | null): number | null {
   const hinted = retryAfter ? Number(retryAfter) : NaN
-  if (Number.isFinite(hinted) && hinted > 0) return Math.min(10_000, hinted * 1000)
-  return Math.min(5_000, 250 * 2 ** (attempt - 1))
+  if (!Number.isFinite(hinted) || hinted <= 0) return null
+  return Math.min(10_000, hinted * 1000)
 }
 
 export function createEtsyClient(options: EtsyClientOptions): EtsyClient {
@@ -63,7 +69,7 @@ export function createEtsyClient(options: EtsyClientOptions): EtsyClient {
       const url = /^https?:\/\//.test(path) ? path : `${API_BASE}/${path}`
       let lastError: ChannelError | null = null
 
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+      for (let attempt = 1; attempt <= IN_CALL_MAX_ATTEMPTS; attempt += 1) {
         // The key and the token are used here and nowhere else. Never logged,
         // never in an error: errors carry the response body, which is Etsy's.
         const headers: Record<string, string> = {
@@ -88,8 +94,8 @@ export function createEtsyClient(options: EtsyClientOptions): EtsyClient {
           response = await doFetch(url, { method, headers, body: payload })
         } catch (error) {
           lastError = new ChannelError(transportError(error))
-          if (attempt === MAX_ATTEMPTS) throw lastError
-          await sleep(backoffMs(attempt, null))
+          if (attempt === IN_CALL_MAX_ATTEMPTS) throw lastError
+          await sleep(inCallBackoffMs(attempt))
           continue
         }
 
@@ -103,9 +109,9 @@ export function createEtsyClient(options: EtsyClientOptions): EtsyClient {
             // Not JSON. The text stands.
           }
           const error = new ChannelError(httpError(response.status, parsedBody))
-          if (!error.normalized.retryable || attempt === MAX_ATTEMPTS) throw error
+          if (!error.normalized.retryable || attempt === IN_CALL_MAX_ATTEMPTS) throw error
           lastError = error
-          await sleep(backoffMs(attempt, response.headers.get("retry-after")))
+          await sleep(inCallBackoffMs(attempt, retryAfterMs(response.headers.get("retry-after"))))
           continue
         }
 

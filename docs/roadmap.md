@@ -1,10 +1,17 @@
 # Roadmap
 
-**Current step: A6 is done. Its exit ran on 11 September 2026 against the live shop
-`Fanwise`: connect, publish, and an active listing in one job, with four of the five §13
-questions in `docs/channels/etsy.md` settled; see "The A6 exit run" below. A7 is next and not
-yet opened. B1, B2 and B8 are also on `main`, each code complete with its exit unrun; see
-their sections under Gate B.** A5 is done; all three exit clauses ran against a live Shopify
+**Current step: A7 is code complete on `feat/a7-publish-everywhere`, its exit unrun.** One
+click plans a run from the channel registry, starts a job per channel that can take the
+product, names every channel it skipped and why, records the run in `workspace_events`, and
+re-attempts a retryable failure three times over twenty-one minutes before it stops. The
+exit — one action, two live URLs, one failure recovered without duplicates — needs a live
+Shopify and a live Etsy, and is a run a person does by hand. ADR 0005 was accepted to build
+it, with the stamp-and-search create guard deferred.
+
+**A6 is done.** Its exit ran on 11 September 2026 against the live shop `Fanwise`: connect,
+publish, and an active listing in one job, with four of the five §13 questions in
+`docs/channels/etsy.md` settled; see "The A6 exit run" below. B1, B2 and B8 are also on
+`main`, each code complete with its exit unrun; see their sections under Gate B. A5 is done; all three exit clauses ran against a live Shopify
 store. What remains of Gate A: A7 has its two live channels, Shopify and Etsy, and is blocked
 on nothing; A8 waits on a Creative Market seller login; and the gate's own exit — an outside
 creator, unassisted — waits on a real portfolio to hand them.
