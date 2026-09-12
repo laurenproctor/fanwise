@@ -59,12 +59,18 @@ export async function signUp(page: Page, label: string): Promise<{ email: string
   return { email, slug }
 }
 
-/** Renames a workspace through Settings and returns to its catalog. */
+/**
+ * Renames a workspace through Settings and returns to its catalog.
+ *
+ * The settings h1 is "Studio settings" rather than the workspace name, so the
+ * save is confirmed by the section's own status line. That is the assertion the
+ * page actually makes about a save having landed.
+ */
 export async function renameWorkspace(page: Page, slug: string, name: string): Promise<void> {
   await page.goto(routes.settings(slug))
   await page.getByLabel("Workspace name").fill(name)
-  await page.getByRole("button", { name: "Save name" }).click()
-  await expect(page.getByRole("heading", { level: 1, name, exact: true })).toBeVisible({
+  await page.getByRole("button", { name: "Save studio details" }).click()
+  await expect(page.getByText("Studio details saved.")).toBeVisible({
     timeout: SETUP_TIMEOUT,
   })
 

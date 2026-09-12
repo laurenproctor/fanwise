@@ -1036,6 +1036,7 @@ export type Database = {
       workspaces: {
         Row: {
           created_at: string
+          icon_path: string | null
           id: string
           name: string
           owner_user_id: string
@@ -1044,6 +1045,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          icon_path?: string | null
           id?: string
           name: string
           owner_user_id: string
@@ -1052,6 +1054,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          icon_path?: string | null
           id?: string
           name?: string
           owner_user_id?: string
@@ -1069,6 +1072,7 @@ export type Database = {
         Args: { p_name: string; p_slug: string }
         Returns: {
           created_at: string
+          icon_path: string | null
           id: string
           name: string
           owner_user_id: string
@@ -1091,6 +1095,7 @@ export type Database = {
         Args: { p_name: string; p_slug: string }
         Returns: {
           created_at: string
+          icon_path: string | null
           id: string
           name: string
           owner_user_id: string
