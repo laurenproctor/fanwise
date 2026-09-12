@@ -99,7 +99,7 @@ describe("reading a page", () => {
   it("refuses anything that is not a page", async () => {
     scriptHosts(
       () =>
-        new Response("PK", {
+        new Response(Buffer.from([0x50, 0x4b, 0x03, 0x04]), {
           status: 200,
           headers: { "content-type": "application/zip" },
         }),

@@ -195,6 +195,27 @@ describe("nothing in the import feature can run what it imported", () => {
     ])
   })
 
+  it("stays readable: no source file carries a literal control character", () => {
+    /*
+      A formatter rewrites `\u0000` in a regex literal into the byte it denotes.
+      The file then contains a real NUL, git calls it binary, and the diff for
+      the one module that decides what a stranger's text may contain becomes
+      unreviewable. It happened here once. `retrieval/html.ts` now builds those
+      classes with `new RegExp` from an ASCII string, and this is what keeps the
+      whole feature that way.
+    */
+    const offenders: string[] = []
+    // Built from a string for the same reason retrieval/html.ts does it: a
+    // regex literal here would itself carry the characters it is looking for.
+    const control = new RegExp("[\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]")
+
+    for (const file of FILES) {
+      if (control.test(readFileSync(file, "utf8"))) offenders.push(relPath(file))
+    }
+
+    expect(offenders).toEqual([])
+  })
+
   it("fetches nothing from the browser", () => {
     /*
       Every read of a stranger's URL happens server-side through
