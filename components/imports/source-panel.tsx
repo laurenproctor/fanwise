@@ -27,15 +27,17 @@ const TONES: Record<string, RecoveryTone> = {
 export function SourcePanel({
   state,
   handlers,
+  mode = "link",
 }: {
   state: ImportState
   handlers: RecoveryHandlers
+  mode?: "link" | "content"
 }) {
   switch (state.status) {
     case "analyzed":
       return <SourcePreview snapshot={state.snapshot} />
     case "analyzing":
-      return <AnalyzingPanel stage={state.stage} />
+      return <AnalyzingPanel stage={state.stage} mode={mode} />
     case "private":
     case "notFound":
     case "unsupported":
@@ -46,10 +48,11 @@ export function SourcePanel({
           message={state.message}
           recoveries={state.recoveries}
           handlers={handlers}
+          mode={mode}
         />
       )
     case "empty":
     case "validating":
-      return <SourcePlaceholder />
+      return <SourcePlaceholder mode={mode} />
   }
 }

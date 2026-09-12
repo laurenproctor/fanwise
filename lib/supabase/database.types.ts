@@ -742,7 +742,7 @@ export type Database = {
           error_message: string | null
           evidence: Json
           id: string
-          normalized_url: string
+          normalized_url: string | null
           previous_content_hash: string | null
           previous_evidence: Json | null
           product_id: string
@@ -752,7 +752,10 @@ export type Database = {
           resolved_url: string | null
           retrieved_at: string | null
           schema_version: string | null
-          source_url: string
+          source_byte_size: number | null
+          source_filename: string | null
+          source_path: string | null
+          source_url: string | null
           status: Database["public"]["Enums"]["import_status"]
           suggestions: Json
           updated_at: string
@@ -767,7 +770,7 @@ export type Database = {
           error_message?: string | null
           evidence?: Json
           id?: string
-          normalized_url: string
+          normalized_url?: string | null
           previous_content_hash?: string | null
           previous_evidence?: Json | null
           product_id: string
@@ -777,7 +780,10 @@ export type Database = {
           resolved_url?: string | null
           retrieved_at?: string | null
           schema_version?: string | null
-          source_url: string
+          source_byte_size?: number | null
+          source_filename?: string | null
+          source_path?: string | null
+          source_url?: string | null
           status?: Database["public"]["Enums"]["import_status"]
           suggestions?: Json
           updated_at?: string
@@ -792,7 +798,7 @@ export type Database = {
           error_message?: string | null
           evidence?: Json
           id?: string
-          normalized_url?: string
+          normalized_url?: string | null
           previous_content_hash?: string | null
           previous_evidence?: Json | null
           product_id?: string
@@ -802,7 +808,10 @@ export type Database = {
           resolved_url?: string | null
           retrieved_at?: string | null
           schema_version?: string | null
-          source_url?: string
+          source_byte_size?: number | null
+          source_filename?: string | null
+          source_path?: string | null
+          source_url?: string | null
           status?: Database["public"]["Enums"]["import_status"]
           suggestions?: Json
           updated_at?: string
@@ -1598,7 +1607,12 @@ export type Database = {
       channel_integration_type: "api" | "assisted"
       channel_status: "available" | "coming_soon" | "unavailable"
       connection_status: "active" | "expired" | "revoked" | "error"
-      import_provider: "hosted_artifact" | "webpage"
+      import_provider:
+        | "hosted_artifact"
+        | "webpage"
+        | "pasted_text"
+        | "pdf_document"
+        | "html_document"
       import_status:
         | "pending"
         | "retrieving"
@@ -2357,7 +2371,13 @@ export const Constants = {
       channel_integration_type: ["api", "assisted"],
       channel_status: ["available", "coming_soon", "unavailable"],
       connection_status: ["active", "expired", "revoked", "error"],
-      import_provider: ["hosted_artifact", "webpage"],
+      import_provider: [
+        "hosted_artifact",
+        "webpage",
+        "pasted_text",
+        "pdf_document",
+        "html_document",
+      ],
       import_status: [
         "pending",
         "retrieving",

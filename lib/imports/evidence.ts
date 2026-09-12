@@ -22,7 +22,18 @@ import { SOURCE_KINDS } from "./types"
  */
 
 /** Where a value was read. Ordered loosely by how much the author meant it. */
-export const EVIDENCE_ORIGINS = ["og", "twitter", "meta", "jsonld", "dom", "header"] as const
+export const EVIDENCE_ORIGINS = [
+  "og",
+  "twitter",
+  "meta",
+  "jsonld",
+  "dom",
+  "header",
+  /** The words of a pasted text or a document. */
+  "document",
+  /** A document's own metadata, such as a PDF's title property. */
+  "properties",
+] as const
 export type EvidenceOrigin = (typeof EVIDENCE_ORIGINS)[number]
 
 export const evidenceOriginSchema = z.enum(EVIDENCE_ORIGINS)
@@ -76,10 +87,15 @@ export type SourceAsset = z.infer<typeof sourceAssetSchema>
 
 export const productSourceEvidenceSchema = z.object({
   provider: z.enum(SOURCE_KINDS),
-  /** As the creator pasted it, after the shape check. Provenance, never a deliverable. */
-  originalUrl: z.string().max(2048),
-  /** Where the body came from, after every redirect was re-validated. */
-  resolvedUrl: z.string().max(2048),
+  /**
+   * As the creator pasted it, after the shape check. Provenance, never a
+   * deliverable. Absent for a source that was handed over rather than linked.
+   */
+  originalUrl: z.string().max(2048).optional(),
+  /** Where the body came from, after every redirect was re-validated. Absent likewise. */
+  resolvedUrl: z.string().max(2048).optional(),
+  /** What the creator called an uploaded file. Display only, never a path. */
+  sourceName: z.string().max(255).optional(),
   retrievedAt: z.iso.datetime(),
 
   title: observed(z.string().trim().min(1).max(500)).optional(),
@@ -101,6 +117,18 @@ export const productSourceEvidenceSchema = z.object({
    * Fanwise ever reads.
    */
   publicDemoAvailable: z.boolean(),
+  /**
+   * The running text of a pasted text or a document, in reading order, cut at
+   * a fixed length.
+   *
+   * Only handed-over sources carry it. A document's substance is its prose, not
+   * its headings, and a draft composed from twelve bullet points of a forty
+   * page guide would be a draft about the table of contents. Link imports keep
+   * the reading they shipped with, so their hashes and prompts do not move.
+   */
+  bodyText: observed(z.string().trim().min(1).max(20_000)).optional(),
+  /** How many pages a document had, when it had pages. */
+  pageCount: z.number().int().positive().optional(),
   /** The language the page declared, when it declared one. */
   language: z.string().max(35).optional(),
   contentHash: z.string().regex(/^[0-9a-f]{64}$/),
@@ -126,13 +154,18 @@ export function hashEvidence(
 ): string {
   const material = {
     provider: evidence.provider,
-    resolvedUrl: evidence.resolvedUrl,
+    resolvedUrl: evidence.resolvedUrl ?? null,
     title: evidence.title?.value ?? null,
     summary: evidence.summary?.value ?? null,
     visibleFeatures: evidence.visibleFeatures.value,
     productType: evidence.productType?.value ?? null,
     assets: evidence.previewAssets.map((asset) => asset.sourceUrl).sort(),
     language: evidence.language ?? null,
+    // Added only when present, so a link import hashes exactly as it did before
+    // these fields existed and a refresh does not mistake that for a change.
+    ...(evidence.sourceName !== undefined ? { sourceName: evidence.sourceName } : {}),
+    ...(evidence.bodyText ? { bodyText: evidence.bodyText.value } : {}),
+    ...(evidence.pageCount !== undefined ? { pageCount: evidence.pageCount } : {}),
   }
   return createHash("sha256").update(JSON.stringify(material)).digest("hex")
 }

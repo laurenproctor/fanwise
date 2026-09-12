@@ -1,6 +1,7 @@
 import {
   ANALYZING_STAGES,
   ANALYZING_STAGE_LABELS,
+  CONTENT_ANALYZING_STAGE_LABELS,
   type AnalyzingStage,
 } from "@/lib/imports/machine"
 
@@ -17,8 +18,15 @@ import {
  * next one has started — the reader never reports its own completion, because
  * the last stage's end is the answer arriving, and that is a different event.
  */
-export function AnalyzingPanel({ stage }: { stage: AnalyzingStage }) {
+export function AnalyzingPanel({
+  stage,
+  mode = "link",
+}: {
+  stage: AnalyzingStage
+  mode?: "link" | "content"
+}) {
   const current = ANALYZING_STAGES.indexOf(stage)
+  const labels = mode === "link" ? ANALYZING_STAGE_LABELS : CONTENT_ANALYZING_STAGE_LABELS
 
   return (
     <section
@@ -26,7 +34,7 @@ export function AnalyzingPanel({ stage }: { stage: AnalyzingStage }) {
       className="flex flex-col gap-5 rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-card)] px-6 py-7"
     >
       <h2 id="import-analyzing-heading" className="label-mono">
-        Reading the link
+        {mode === "link" ? "Reading the link" : "Reading your source"}
       </h2>
 
       <div className="import-indeterminate h-[4px] w-full rounded-full" aria-hidden />
@@ -56,7 +64,7 @@ export function AnalyzingPanel({ stage }: { stage: AnalyzingStage }) {
               <span
                 className={`text-[14px] ${running ? "text-[var(--color-ink)]" : "text-[var(--color-ink-2)]"}`}
               >
-                {ANALYZING_STAGE_LABELS[name]}
+                {labels[name]}
               </span>
               {/* The state as a word, so none of this depends on the colour. */}
               <span className="label-mono ml-auto">
@@ -68,8 +76,9 @@ export function AnalyzingPanel({ stage }: { stage: AnalyzingStage }) {
       </ol>
 
       <p className="text-[13px] leading-[1.55] text-[var(--color-ink-2)]">
-        Fanwise reads the page from its own servers, signed out, and stores what it finds. It never
-        runs anything it downloads.
+        {mode === "link"
+          ? "Fanwise reads the page from its own servers, signed out, and stores what it finds. It never runs anything it downloads."
+          : "Fanwise reads it on its own servers and stores what it finds. It never runs anything inside it."}
       </p>
     </section>
   )

@@ -174,6 +174,9 @@ export function evidenceCorpus(evidence: ProductSourceEvidence): string {
     evidence.summary?.value ?? "",
     ...evidence.visibleFeatures.value,
     evidence.productType?.value ?? "",
+    // A document's prose is what it said. A claim it makes in paragraph four is
+    // still its claim, and the creator can find it there.
+    evidence.bodyText?.value ?? "",
   ]
     .join(" \n ")
     .toLowerCase()

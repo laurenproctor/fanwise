@@ -265,7 +265,16 @@ export interface ReadAsset {
  * strings a stranger controls, and they are resolved and checked one at a time
  * by the asset fetcher against the same outbound boundary as the page itself.
  */
-export function readAssets(html: string, tags: readonly MetaTag[], base: string): ReadAsset[] {
+export function readAssets(
+  html: string,
+  tags: readonly MetaTag[],
+  /**
+   * The page's address, for resolving relative URLs. Null for markup a creator
+   * handed over, which has no address: a relative URL then resolves to nothing
+   * and is dropped, and only an absolute one is carried forward.
+   */
+  base: string | null,
+): ReadAsset[] {
   const found: ReadAsset[] = []
   const seen = new Set<string>()
 
@@ -273,7 +282,7 @@ export function readAssets(html: string, tags: readonly MetaTag[], base: string)
     if (!raw || found.length >= HTML_LIMITS.maxAssets) return
     let absolute: string
     try {
-      absolute = new URL(raw.trim(), base).toString()
+      absolute = (base === null ? new URL(raw.trim()) : new URL(raw.trim(), base)).toString()
     } catch {
       return
     }
@@ -357,4 +366,31 @@ function flatten(value: unknown): unknown[] {
   const record = value as Record<string, unknown>
   const graph = record["@graph"]
   return graph === undefined ? [record] : [record, ...flatten(graph)]
+}
+
+/**
+ * The words a document shows, in reading order, one block per line.
+ *
+ * Opaque elements are gone before this runs, so a script body cannot become
+ * prose. Block-level boundaries become line breaks, and the markup's own line
+ * breaks do not, so a paragraph wrapped at eighty columns in the source stays
+ * one paragraph. The boundary marker is a private-use character, removed from
+ * the input first, so the document cannot forge one.
+ */
+const BLOCK_BREAK = String.fromCharCode(0xe000)
+
+export function readVisibleText(html: string, maxLength: number): string {
+  const marked = stripOpaqueElements(html.split(BLOCK_BREAK).join(""))
+    .replace(/<head\b[\s\S]*?<\/head\s*>/gi, " ")
+    .replace(
+      /<(br|p|div|li|h[1-6]|tr|section|article|header|footer|blockquote|pre)\b[^>]*>|<\/(p|div|li|h[1-6]|tr|section|article|header|footer|blockquote|pre)\s*>/gi,
+      BLOCK_BREAK,
+    )
+  return marked
+    .split(BLOCK_BREAK)
+    .map((block) => sanitizeText(block, maxLength))
+    .filter((block) => block.length > 0)
+    .join("\n")
+    .slice(0, maxLength)
+    .trim()
 }

@@ -116,6 +116,7 @@ const RECOVERY_HANDLERS = {
   onReplaceLink: () => {},
   onRetry: () => {},
   manualHref: routes.newProduct(SLUG),
+  pasteHref: `${routes.importProduct(SLUG)}?from=text`,
 }
 
 const SNAPSHOT: SourceSnapshot = (() => {
@@ -162,6 +163,7 @@ function detailProps() {
     aiUnavailable: false,
     productId: "22222222-2222-4222-8222-222222222222",
     changes: [] as const,
+    sourceMode: "link" as const,
   }
 }
 
@@ -186,7 +188,9 @@ describe("the import page's frame", () => {
   it("says what it is, once, as the page's only h1", () => {
     expect(count(markup, "<h1")).toBe(1)
     expect(text).toContain("Import a product")
-    expect(text).toContain("Turn a public product page into an editable Fanwise listing.")
+    expect(text).toContain(
+      "Turn a product page, a document, or text you already have into an editable Fanwise listing.",
+    )
   })
 
   it("puts the creator back in the catalog through a breadcrumb", () => {
@@ -380,7 +384,7 @@ describe("every source state", () => {
     // it is named once. It was named twice before anybody looked at the screen.
     expect(count(markup, "Claude Artifact")).toBe(1)
     // A snapshot, not a subscription, said where a creator will look for it.
-    expect(text).toContain("Fanwise does not re-read this link")
+    expect(text).toContain("Fanwise does not re-read this source")
   })
 
   it("gives every unhappy state a heading, a reason and a way out", () => {

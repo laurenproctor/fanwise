@@ -525,3 +525,120 @@ describe("the previous reading", () => {
     expect(error).not.toBeNull()
   })
 })
+
+describe("imports from pasted text and uploaded files", () => {
+  /*
+    A handed-over source is a stored object rather than a URL, and the job reads
+    it with the service role, which ignores storage policies. So the database
+    has to be the thing that stops a member pointing their own import at another
+    workspace's object — the one check here that guards a tenant boundary
+    rather than tidiness.
+  */
+  const upload = "11111111-1111-4111-8111-111111111111"
+  const pathFor = (workspaceId: string, ext = "pdf") =>
+    `${workspaceId}/import-sources/${upload}.${ext}`
+
+  async function createContentImport(
+    actor: Actor,
+    productId: string,
+    fields: Record<string, unknown>,
+  ) {
+    return actor.client
+      .from("product_imports")
+      .insert({
+        workspace_id: actor.workspaceId,
+        product_id: productId,
+        provider: "pdf_document",
+        requested_by: actor.userId,
+        status: "pending",
+        ...fields,
+      })
+      .select("id")
+      .single()
+  }
+
+  it("accepts a file stored under the member's own workspace, with no URL", async () => {
+    const product = await createProduct(alice, "Alice PDF", "alice-pdf")
+    const { error } = await createContentImport(alice, product, {
+      source_path: pathFor(alice.workspaceId),
+      source_filename: "aster.pdf",
+      source_byte_size: 1024,
+    })
+    expect(error).toBeNull()
+  })
+
+  it("refuses a path under another workspace's prefix", async () => {
+    const product = await createProduct(bob, "Bob Borrowed", "bob-borrowed")
+    const { error } = await createContentImport(bob, product, {
+      source_path: pathFor(alice.workspaceId),
+    })
+    expect(error?.code).toBe("23514")
+  })
+
+  it("refuses a path the server would never build", async () => {
+    const product = await createProduct(alice, "Alice Odd Path", "alice-odd-path")
+    for (const path of [
+      `${alice.workspaceId}/import-sources/../${bob.workspaceId}/x.pdf`,
+      `${alice.workspaceId}/${aliceProductId}/${upload}.pdf`,
+      `${alice.workspaceId}/import-sources/${upload}.exe`,
+    ]) {
+      const { error } = await createContentImport(alice, product, { source_path: path })
+      expect(error?.code, path).toBe("23514")
+    }
+  })
+
+  it("holds a row to exactly one source", async () => {
+    const product = await createProduct(alice, "Alice Both", "alice-both")
+
+    // A file import with a URL as well.
+    const both = await createContentImport(alice, product, {
+      source_path: pathFor(alice.workspaceId),
+      source_url: "https://example.com/both",
+      normalized_url: "https://example.com/both",
+    })
+    expect(both.error?.code).toBe("23514")
+
+    // A file import with nothing to read.
+    const neither = await createContentImport(alice, product, {})
+    expect(neither.error?.code).toBe("23514")
+
+    // A link import with a stored object.
+    const link = await alice.client.from("product_imports").insert({
+      workspace_id: alice.workspaceId,
+      product_id: product,
+      provider: "webpage",
+      source_url: "https://example.com/link-with-file",
+      normalized_url: "https://example.com/link-with-file",
+      source_path: pathFor(alice.workspaceId),
+      status: "pending",
+    })
+    expect(link.error?.code).toBe("23514")
+  })
+
+  it("does not dedupe pastes: the same text twice is two drafts", async () => {
+    const first = await createContentImport(alice, await createProduct(alice, "P1", "paste-one"), {
+      provider: "pasted_text",
+      source_path: pathFor(alice.workspaceId, "txt"),
+    })
+    const second = await createContentImport(alice, await createProduct(alice, "P2", "paste-two"), {
+      provider: "pasted_text",
+      source_path: pathFor(alice.workspaceId, "txt"),
+    })
+    expect(first.error).toBeNull()
+    expect(second.error).toBeNull()
+  })
+
+  it("stores the two new ways a file can be unreadable", async () => {
+    const product = await createProduct(alice, "Alice Scan", "alice-scan")
+    const { data } = await createContentImport(alice, product, {
+      source_path: pathFor(alice.workspaceId),
+    })
+    for (const code of ["unreadable_file", "no_text"]) {
+      const { error } = await adminClient()
+        .from("product_imports")
+        .update({ status: "unavailable", error_code: code, error_message: "m" })
+        .eq("id", data!.id)
+      expect(error, code).toBeNull()
+    }
+  })
+})

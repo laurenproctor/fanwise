@@ -6,7 +6,19 @@ import { createClient } from "@/lib/supabase/server"
 import { jobs } from "@/lib/jobs"
 import { routes } from "@/lib/routes"
 import { toJson } from "./json"
-import { startImport } from "./start"
+import { z } from "zod"
+import { startContentImport, startImport } from "./start"
+import {
+  SOURCE_LIMITS,
+  createSourceUploadUrl,
+  maxBytesFor,
+  measureStoredSource,
+  removeStoredSource,
+  sourcePathFor,
+  storePastedSource,
+} from "./source-storage"
+import { isContentSourceKind } from "./types"
+import { isWholeHtmlDocument } from "./paste"
 import { getImport, listDeliverables } from "./queries"
 import { CUSTOM_LICENSE_ID, RIGHTS_ATTESTATION_VERSION, licenseEntry, versionFor } from "./licenses"
 import { importReadiness } from "./readiness"
@@ -80,6 +92,175 @@ export async function startImportAction(
   redirect(routes.productImport(workspaceSlug, outcome.importId))
 }
 
+/* ------------------------------------------------- handed-over sources */
+
+/**
+ * Paste text or HTML, get an import.
+ *
+ * The server writes the paste to private storage itself, so the bytes the job
+ * reads are exactly the bytes that arrived here. Redirects on success, like
+ * pasting a link.
+ */
+export async function startPastedImportAction(
+  workspaceSlug: string,
+  _prev: ImportActionState,
+  formData: FormData,
+): Promise<ImportActionState> {
+  const content = String(formData.get("content") ?? "")
+  const requested = formData.get("kind") === "html_document" ? "html_document" : "pasted_text"
+
+  if (content.trim().length === 0) {
+    return {
+      error: requested === "html_document" ? "Paste the HTML first." : "Paste some text first.",
+    }
+  }
+  if (content.length > SOURCE_LIMITS.maxPasteCharacters) {
+    return {
+      error:
+        requested === "html_document"
+          ? "That is more than Fanwise will take as a paste. Save it as an .html file and upload it instead."
+          : "That is more than Fanwise will take as a paste. Paste the part that describes the product.",
+    }
+  }
+
+  const { supabase, user, workspace } = await requireWorkspace(workspaceSlug)
+  const kind =
+    requested === "pasted_text" && isWholeHtmlDocument(content) ? "html_document" : requested
+
+  const path = sourcePathFor(workspace.id, crypto.randomUUID(), kind)
+  let byteSize: number
+  try {
+    byteSize = await storePastedSource(path, content)
+  } catch (error) {
+    console.error("[imports] could not store the paste", { error })
+    return { error: "That could not be saved. Try again." }
+  }
+
+  const outcome = await startContentImport({
+    supabase,
+    workspaceId: workspace.id,
+    userId: user.id,
+    kind,
+    sourcePath: path,
+    filename: null,
+    byteSize,
+    firstLine: kind === "pasted_text" ? (content.trim().split("\n")[0] ?? null) : null,
+  })
+
+  if (outcome.kind === "invalid" || outcome.kind === "error") return { error: outcome.message }
+
+  revalidatePath(routes.workspace(workspaceSlug))
+  redirect(routes.productImport(workspaceSlug, outcome.importId))
+}
+
+const fileKindSchema = z.enum(["pdf_document", "html_document"])
+
+const FILE_EXTENSIONS: Record<z.infer<typeof fileKindSchema>, RegExp> = {
+  pdf_document: /\.pdf$/i,
+  html_document: /\.html?$/i,
+}
+
+const sourceUploadSchema = z.object({
+  kind: fileKindSchema,
+  filename: z.string().trim().min(1).max(255),
+  byteSize: z.number().int().positive(),
+})
+
+export type SourceUploadIntent = { uploadId: string; signedUrl: string } | { error: string }
+
+/** A creator-readable sentence for a file this kind will not take. */
+function fileRefusal(kind: z.infer<typeof fileKindSchema>, filename: string, byteSize: number) {
+  if (!FILE_EXTENSIONS[kind].test(filename)) {
+    return kind === "pdf_document" ? "Choose a .pdf file." : "Choose an .html file."
+  }
+  const max = maxBytesFor(kind)
+  if (byteSize > max) {
+    return `That file is larger than ${Math.round(max / (1024 * 1024))} MB, which is as much as Fanwise will read.`
+  }
+  return null
+}
+
+/**
+ * Ask to upload a PDF or an HTML file.
+ *
+ * Mints a signed upload URL for a path the server builds under this workspace.
+ * The browser's filename and size decide only whether to refuse early; the
+ * import is started on what storage says actually arrived.
+ */
+export async function createSourceUploadAction(
+  workspaceSlug: string,
+  input: unknown,
+): Promise<SourceUploadIntent> {
+  const parsed = sourceUploadSchema.safeParse(input)
+  if (!parsed.success) return { error: "That file cannot be uploaded." }
+
+  const refusal = fileRefusal(parsed.data.kind, parsed.data.filename, parsed.data.byteSize)
+  if (refusal) return { error: refusal }
+
+  const { workspace } = await requireWorkspace(workspaceSlug)
+  const uploadId = crypto.randomUUID()
+
+  try {
+    const signedUrl = await createSourceUploadUrl(
+      sourcePathFor(workspace.id, uploadId, parsed.data.kind),
+    )
+    return { uploadId, signedUrl }
+  } catch (error) {
+    console.error("[imports] could not mint a source upload URL", { error })
+    return { error: "That upload could not be started. Try again." }
+  }
+}
+
+const startUploadSchema = z.object({
+  kind: fileKindSchema,
+  uploadId: z.uuid(),
+  filename: z.string().trim().min(1).max(255),
+})
+
+/**
+ * Start an import from a file the browser has finished uploading.
+ *
+ * Returns the address to go to rather than redirecting, because this is called
+ * from a handler after an upload rather than from a form.
+ */
+export async function startUploadedImportAction(
+  workspaceSlug: string,
+  input: unknown,
+): Promise<{ href: string } | { error: string }> {
+  const parsed = startUploadSchema.safeParse(input)
+  if (!parsed.success) return { error: "That upload could not be found. Try again." }
+
+  const { supabase, user, workspace } = await requireWorkspace(workspaceSlug)
+  const { kind, uploadId } = parsed.data
+  const filename = parsed.data.filename.split(/[\\/]/).pop() ?? parsed.data.filename
+  const path = sourcePathFor(workspace.id, uploadId, kind)
+
+  const byteSize = await measureStoredSource(path)
+  if (byteSize === null) return { error: "That upload did not arrive. Try again." }
+
+  const refusal = fileRefusal(kind, filename, byteSize)
+  if (refusal) {
+    await removeStoredSource(path).catch(() => undefined)
+    return { error: refusal }
+  }
+
+  const outcome = await startContentImport({
+    supabase,
+    workspaceId: workspace.id,
+    userId: user.id,
+    kind,
+    sourcePath: path,
+    filename,
+    byteSize,
+    firstLine: null,
+  })
+
+  if (outcome.kind === "invalid" || outcome.kind === "error") return { error: outcome.message }
+
+  revalidatePath(routes.workspace(workspaceSlug))
+  return { href: routes.productImport(workspaceSlug, outcome.importId) }
+}
+
 /** Read the same link again. Only from a state where that could answer differently. */
 export async function retryImportAction(
   workspaceSlug: string,
@@ -144,6 +325,12 @@ export async function discardImportAction(
   if (error) {
     console.error("[imports] could not discard", { importId, error })
     return { error: "That could not be discarded. Try again." }
+  }
+
+  // A pasted or uploaded source has no use once its import is abandoned. Best
+  // effort: an object left behind is private, and wastes only space.
+  if (record.row.source_path) {
+    await removeStoredSource(record.row.source_path).catch(() => undefined)
   }
 
   // The import row cascades with the product, so the product is deleted last
@@ -454,6 +641,10 @@ export async function replaceSourceAction(
 
   const record = await getImport(supabase, workspace.id, importId)
   if (!record) return { error: "That import could not be found." }
+  // A paste or a file has no link to swap. Starting again is the way to change it.
+  if (isContentSourceKind(record.row.provider)) {
+    return { error: "This import was not made from a link, so there is no link to replace." }
+  }
 
   const normalizedUrl = normalizeSourceUrl(checked.url)
   if (normalizedUrl === record.row.normalized_url) {

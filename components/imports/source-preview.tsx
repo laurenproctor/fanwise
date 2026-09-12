@@ -85,7 +85,7 @@ export function SourcePreview({ snapshot }: { snapshot: SourceSnapshot }) {
         <ul className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[var(--color-rule)] px-5 py-4">
           <EvidenceItem
             label={SOURCE_LABELS[snapshot.sourceKind]}
-            hint="What kind of link this is."
+            hint="What kind of source this is."
           />
           {snapshot.facts.map((fact) => (
             <EvidenceItem
@@ -96,7 +96,7 @@ export function SourcePreview({ snapshot }: { snapshot: SourceSnapshot }) {
           ))}
           <EvidenceItem
             label={`Captured ${capturedLabel(snapshot.capturedAt)}`}
-            hint="A snapshot, not a subscription. Fanwise does not re-read this link."
+            hint="A snapshot, not a subscription. Fanwise does not re-read this source."
           />
         </ul>
       </div>

@@ -38,6 +38,13 @@ export const ANALYZING_STAGE_LABELS: Record<AnalyzingStage, string> = {
   extracting: "Pulling out the details",
 }
 
+/** The same stages, for a source that was pasted or uploaded rather than linked. */
+export const CONTENT_ANALYZING_STAGE_LABELS: Record<AnalyzingStage, string> = {
+  connecting: "Opening what you provided",
+  reading: "Reading the text",
+  extracting: "Pulling out the details",
+}
+
 export type ImportState =
   | { readonly status: "empty"; readonly url: string; readonly error: string | null }
   | { readonly status: "validating"; readonly url: string }

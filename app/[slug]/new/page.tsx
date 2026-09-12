@@ -38,7 +38,7 @@ export default async function NewProductPage({ params }: { params: Promise<{ slu
         >
           Import a product from a link
         </Link>{" "}
-        and Fanwise will fill in what it can.
+        — or from a PDF, an HTML file or text you paste — and Fanwise will fill in what it can.
       </p>
     </div>
   )

@@ -6,6 +6,7 @@ import { parseEvidence, type ProductSourceEvidence } from "./evidence"
 import { SOURCE_LABELS, descriptorFor } from "./sources/registry"
 import type { ImportRecord } from "./queries"
 import type { AnalyzingStage, ImportState } from "./machine"
+import { OBSERVATION_ORIGINS, isContentSourceKind, type ObservationOrigin } from "./types"
 import type {
   BuyerDeliverable,
   FieldOrigin,
@@ -41,8 +42,9 @@ const RECOVERY_LABELS: Record<RecoveryOption["action"], { label: string; descrip
     description: "Swap in a link anyone can open without signing in.",
   },
   paste_code: {
-    label: "Paste the code instead",
-    description: "Fanwise stores what you paste as a source file. It is never run.",
+    label: "Paste the text instead",
+    description:
+      "Copy the words, or the code, and paste them. Fanwise reads what you paste and never runs it.",
   },
   upload_files: {
     label: "Upload a ZIP or project",
@@ -73,11 +75,22 @@ const STAGE_FOR_STATUS: Record<string, AnalyzingStage> = {
  * that has a Share. The descriptor supplies that sentence and the generic one
  * stands in where it does not.
  */
+/** Recoveries that only mean something for a link. A file has no link to swap or publish. */
+const LINK_ONLY_RECOVERIES: readonly RecoveryOption["action"][] = [
+  "publish_public_link",
+  "replace_link",
+]
+
 export function recoveriesFor(record: ImportRecord): RecoveryOption[] {
   if (!record.errorCode) return []
   const hint = descriptorFor(record.row.provider).publishHint
+  const content = isContentSourceKind(record.row.provider)
 
-  return IMPORT_ERROR_RECOVERIES[record.errorCode].map((action) => {
+  const actions = IMPORT_ERROR_RECOVERIES[record.errorCode].filter(
+    (action) => !(content && LINK_ONLY_RECOVERIES.includes(action)),
+  )
+
+  return actions.map((action) => {
     const base = RECOVERY_LABELS[action]
     if (action === "publish_public_link" && hint) {
       return { action, label: base.label, description: hint }
@@ -93,7 +106,7 @@ export function snapshotFor(record: ImportRecord): SourceSnapshot | null {
 
   return {
     sourceKind: evidence.provider,
-    url: evidence.resolvedUrl,
+    url: evidence.resolvedUrl ?? sourceLabelFor(record),
     capturedAt: evidence.retrievedAt,
     title: evidence.title?.value ?? null,
     description: evidence.summary?.value ?? null,
@@ -103,11 +116,20 @@ export function snapshotFor(record: ImportRecord): SourceSnapshot | null {
       caption,
     })),
     facts: [
-      {
-        id: "visibility",
-        label: evidence.publicDemoAvailable ? "Readable without signing in" : "Not public",
-        origin: "header" as const,
-      },
+      isContentSourceKind(evidence.provider)
+        ? {
+            id: "visibility",
+            label:
+              evidence.pageCount !== undefined
+                ? `${evidence.pageCount} page${evidence.pageCount === 1 ? "" : "s"}, kept private`
+                : "Kept private",
+            origin: "document" as const,
+          }
+        : {
+            id: "visibility",
+            label: evidence.publicDemoAvailable ? "Readable without signing in" : "Not public",
+            origin: "header" as const,
+          },
       ...(evidence.previewAssets.some((asset) => asset.assetId)
         ? [
             {
@@ -121,8 +143,22 @@ export function snapshotFor(record: ImportRecord): SourceSnapshot | null {
   }
 }
 
+/**
+ * What to call a source on screen, where a link would show its address.
+ *
+ * The file's own name when there is one, so a creator recognises what they
+ * uploaded; the kind of thing it was when there is not, which is every paste.
+ */
+export function sourceLabelFor(record: ImportRecord): string {
+  if (record.row.source_url) return record.row.source_url
+  if (record.row.source_filename) return record.row.source_filename
+  return record.row.provider === "html_document"
+    ? "Pasted HTML"
+    : SOURCE_LABELS[record.row.provider]
+}
+
 export function stateFor(record: ImportRecord): ImportState {
-  const url = record.row.source_url
+  const url = sourceLabelFor(record)
 
   switch (record.row.status) {
     case "pending":
@@ -146,7 +182,13 @@ export function stateFor(record: ImportRecord): ImportState {
       const recoveries = recoveriesFor(record)
       const locked = code === "login_required" || code === "organization_only"
       if (locked) return { status: "private", url, reason: "login_required", message, recoveries }
-      if (code === "unsupported_source" || code === "not_html" || code === "too_large") {
+      if (
+        code === "unsupported_source" ||
+        code === "not_html" ||
+        code === "too_large" ||
+        code === "unreadable_file" ||
+        code === "no_text"
+      ) {
         return { status: "unsupported", url, message, recoveries }
       }
       return { status: "notFound", url, reason: "not_found", message, recoveries }
@@ -202,9 +244,9 @@ function originFor(
 }
 
 /** The evidence origins the screen knows, with the rest folded into `dom`. */
-function evidenceOrigin(origin: string): "og" | "twitter" | "meta" | "dom" | "header" {
-  return origin === "og" || origin === "twitter" || origin === "meta" || origin === "header"
-    ? origin
+function evidenceOrigin(origin: string): ObservationOrigin {
+  return (OBSERVATION_ORIGINS as readonly string[]).includes(origin)
+    ? (origin as ObservationOrigin)
     : "dom"
 }
 
