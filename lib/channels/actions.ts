@@ -11,8 +11,8 @@ import { findAdapter } from "./registry"
 import { updateListingSchema } from "./schemas"
 import { callbackUrl, createAuthorizationState, grantUrl } from "./oauth"
 import { codeChallenge, generateCodeVerifier } from "./pkce"
-import { jobs } from "@/lib/jobs"
 import type { AdapterSubject, ChannelListingDraft } from "./types"
+import { requestBillingSync } from "@/lib/billing/request-sync"
 
 export interface ActionState {
   error: string | null
@@ -113,7 +113,7 @@ export async function connectChannelAction(
     return { error: "That channel could not be connected. Try again." }
   }
 
-  await jobs.enqueue("sync_billing", { workspaceId: workspace.id })
+  await requestBillingSync(workspace.id)
 
   revalidatePath(routes.channels(workspaceSlug))
   return { error: null }
@@ -247,7 +247,7 @@ export async function disconnectChannelAction(
   }
 
   // The delete wrote the ledger row through the trigger; this carries it.
-  await jobs.enqueue("sync_billing", { workspaceId: workspace.id })
+  await requestBillingSync(workspace.id)
 
   revalidatePath(routes.channels(workspaceSlug))
   return { error: null }

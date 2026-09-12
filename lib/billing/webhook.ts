@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
-import { jobs } from "@/lib/jobs"
 import type { BillingGateway, SubscriptionSnapshot, WebhookEvent } from "./gateway"
+import { requestBillingSync } from "./request-sync"
 
 /**
  * What a provider event does to Fanwise's record.
@@ -103,7 +103,7 @@ async function applySubscription(subscription: SubscriptionSnapshot): Promise<We
 
   // Whatever the ledger holds pending now has a subscription to land on, or
   // has just lost one. Either way the sync job decides.
-  await jobs.enqueue("sync_billing", { workspaceId })
+  await requestBillingSync(workspaceId)
 
   return { handled: true, workspaceId }
 }
