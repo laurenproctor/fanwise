@@ -11,6 +11,18 @@ import { ProfileDetailsStep } from "./profile-details-step"
 
 export const metadata = { title: "Public profile · Fanwise" }
 
+/** Fields step 3 may send the creator back to, named in `?field=`. */
+const FOCUSABLE = new Set([
+  "handle",
+  "displayName",
+  "shortBio",
+  "website",
+  "instagram",
+  "behance",
+  "image",
+] as const)
+type FocusField = typeof FOCUSABLE extends Set<infer T> ? T : never
+
 /**
  * Step 1 of the public-profile builder: profile details.
  *
@@ -19,13 +31,18 @@ export const metadata = { title: "Public profile · Fanwise" }
  */
 export default async function ProfileBuilderDetailsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>
+  searchParams: Promise<{ field?: string | string[] }>
 }) {
   const user = await getCurrentUser()
   if (!user) redirect("/sign-in")
 
   const { slug } = await params
+  const { field } = await searchParams
+  const focusField =
+    typeof field === "string" && FOCUSABLE.has(field as FocusField) ? (field as FocusField) : null
   const workspace = await getWorkspaceBySlug(slug)
   if (!workspace) notFound()
 
@@ -39,7 +56,12 @@ export default async function ProfileBuilderDetailsPage({
       {ctx === null ? (
         <NoProfileYet workspaceSlug={workspace.slug} />
       ) : (
-        <DetailsStep workspaceSlug={workspace.slug} ctx={ctx} supabase={supabase} />
+        <DetailsStep
+          workspaceSlug={workspace.slug}
+          ctx={ctx}
+          supabase={supabase}
+          focusField={focusField}
+        />
       )}
     </div>
   )
@@ -49,7 +71,9 @@ async function DetailsStep({
   workspaceSlug,
   ctx,
   supabase,
+  focusField,
 }: {
+  focusField: FocusField | null
   workspaceSlug: string
   ctx: NonNullable<Awaited<ReturnType<typeof loadBuilderContext>>>
   supabase: Awaited<ReturnType<typeof createClient>>
@@ -64,6 +88,7 @@ async function DetailsStep({
       liveHandle={ctx.profile.handle}
       published={ctx.profile.status === "published"}
       initial={{ fields: draft.fields, revision: draft.revision, avatarUrl, stored }}
+      focusField={focusField}
     />
   )
 }

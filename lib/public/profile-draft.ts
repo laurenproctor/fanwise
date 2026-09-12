@@ -45,6 +45,11 @@ export interface ProfileDraft {
   avatarPath: string | null
   products: DraftProduct[]
   revision: number
+  /**
+   * When the stored draft last changed, or null for a draft never saved. Step 3
+   * sends it back with Publish so a draft edited after review is refused.
+   */
+  updatedAt: string | null
 }
 
 /**
@@ -90,6 +95,7 @@ export function seedDraftFromProfile(profile: PublicProfileRow): ProfileDraft {
     avatarPath: profile.avatar_path,
     products: [],
     revision: 0,
+    updatedAt: null,
   }
 }
 
@@ -109,6 +115,7 @@ export function draftFromRow(row: ProfileDraftRow): ProfileDraft {
     avatarPath: row.avatar_path,
     products: products.success ? products.data : [],
     revision: row.revision,
+    updatedAt: row.updated_at,
   }
 }
 

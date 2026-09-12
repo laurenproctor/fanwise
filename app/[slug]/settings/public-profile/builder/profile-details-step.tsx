@@ -76,11 +76,14 @@ export function ProfileDetailsStep({
   liveHandle,
   published,
   initial,
+  focusField = null,
 }: {
   workspaceSlug: string
   origin: string
   liveHandle: string
   published: boolean
+  /** A field step 3 sent the creator back to fix; focused and shown as touched on arrival. */
+  focusField?: keyof ProfileDraftFields | "image" | null
   initial: {
     fields: ProfileDraftFields
     revision: number
@@ -100,7 +103,9 @@ export function ProfileDetailsStep({
   }
 
   const [fields, setFields] = useState<ProfileDraftFields>(initial.fields)
-  const [touched, setTouched] = useState<Partial<Record<keyof ProfileDraftFields, boolean>>>({})
+  const [touched, setTouched] = useState<Partial<Record<keyof ProfileDraftFields, boolean>>>(
+    focusField && focusField !== "image" ? { [focusField]: true } : {},
+  )
   const [serverErrors, setServerErrors] = useState<DetailsErrors>({})
   const [saveStatus, setSaveStatus] = useState<AutosaveStatus>(initial.stored ? "saved" : "idle")
   const [availability, setAvailability] = useState<AvailabilityState>({ status: "untouched" })
@@ -156,6 +161,16 @@ export function ProfileDetailsStep({
     }
     return () => controller.dispose()
   }, [workspaceSlug, liveHandle])
+
+  // Arriving from step 3 with a named field: put the cursor where the fix goes.
+  useEffect(() => {
+    if (!focusField) return
+    const element = document.getElementById(ids[focusField])
+    element?.focus()
+    element?.scrollIntoView({ block: "center" })
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const manager = createImagePreviewManager({

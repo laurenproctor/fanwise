@@ -1,10 +1,10 @@
 "use client"
 
-import { useActionState, useEffect, useId, useRef, useState, useTransition } from "react"
+import { useActionState, useEffect, useId, useRef, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
-import { savePublicProductPageAction, setProductPagePublishedAction } from "@/lib/public/actions"
+import { savePublicProductPageAction } from "@/lib/public/actions"
 import { EMPTY_PAGE_STATE, type PublicProductPageState } from "@/lib/public/form-state"
 import { PUBLIC_SLUG_LIMITS, canonicalHandle, checkPublicSlug } from "@/lib/public/handles"
 import { publicRoutes, routes } from "@/lib/routes"
@@ -20,9 +20,9 @@ import type { PublicPageStatus } from "@/lib/public/types"
  * because a product renamed in Fanwise should be renamed on its public page
  * without them having to remember a second place.
  *
- * Publishing is its own button, separate from Save, for the same reason it is
- * on the profile: saving a description and putting a page on the internet are
- * different intentions.
+ * Whether the page is public is not decided here. The profile builder chooses
+ * which products a profile shows and publishes them together; this section
+ * edits what the page says, and reports where it stands.
  */
 
 export interface PublicPageFields {
@@ -42,7 +42,6 @@ export function PublicPageForm({
   appOrigin,
   status,
   profileStatus,
-  featured,
   page,
   images,
 }: {
@@ -52,7 +51,6 @@ export function PublicPageForm({
   appOrigin: string
   status: PublicPageStatus
   profileStatus: PublicPageStatus
-  featured: boolean
   page: PublicPageFields
   images: Array<{ id: string; filename: string; assetType: string }>
 }) {
@@ -61,12 +59,10 @@ export function PublicPageForm({
     action,
     EMPTY_PAGE_STATE,
   )
-  const [publishPending, startPublish] = useTransition()
 
   const savedSlug = state.saved?.slug ?? page.slug
 
   const [fields, setFields] = useState<PublicPageFields>({ ...page, slug: savedSlug })
-  const [isFeatured, setIsFeatured] = useState(featured)
   const statusRef = useRef<HTMLParagraphElement>(null)
 
   const ids = {
@@ -96,13 +92,11 @@ export function PublicPageForm({
   const slugError =
     (slugChanged && !slugCheck.ok ? slugCheck.message : null) ?? state.fieldErrors.slug ?? null
 
-  const dirty =
-    isFeatured !== featured ||
-    (Object.keys(fields) as Array<keyof PublicPageFields>).some((key) =>
-      key === "slug"
-        ? canonicalHandle(fields.slug) !== savedSlug.toLowerCase()
-        : fields[key] !== page[key],
-    )
+  const dirty = (Object.keys(fields) as Array<keyof PublicPageFields>).some((key) =>
+    key === "slug"
+      ? canonicalHandle(fields.slug) !== savedSlug.toLowerCase()
+      : fields[key] !== page[key],
+  )
 
   const canSave = dirty && slugCheck.ok && !pending
 
@@ -111,85 +105,46 @@ export function PublicPageForm({
       {/* Status and publishing ------------------------------------------- */}
       <div className="flex flex-col gap-4 rounded-[14px] border border-[var(--color-rule)] p-5">
         <div className="flex flex-wrap items-center gap-3">
-          <StatusPill published={published} />
+          <StatusPill published={published && profileStatus === "published"} />
           <p className="text-[14px] text-[var(--color-ink-2)]">
             {published
               ? profileStatus === "published"
-                ? "This page is live."
-                : "Published, but not visible: the profile itself is still a draft."
-              : "Only you can see this page."}
+                ? "Shown on your public profile."
+                : "Chosen for your profile, which isn't published."
+              : "Not on your public profile."}
           </p>
         </div>
 
         {/*
-          The honest case. A product page published under an unpublished
-          profile is not public, and the RLS policy that makes that true is
-          invisible from here — so the UI says it, and offers the one link
-          that fixes it, rather than letting a creator believe they have
-          shipped something they have not.
+          Whether a product appears on the profile, and where, is decided in
+          one place: the profile builder. A second switch here would let the
+          live profile show something its final preview did not.
         */}
-        {published && profileStatus !== "published" ? (
-          <p className="border-l-2 border-[var(--color-warn)] bg-[var(--color-paper-2)] py-2 pl-3 text-[14px] text-[var(--color-ink)]">
-            Nobody can reach this page until the profile is published.{" "}
-            <Link
-              href={`/${workspaceSlug}/settings/public-profile`}
-              className="underline underline-offset-4"
-            >
-              Publish your profile
-            </Link>
-            .
-          </p>
-        ) : null}
+        <p className="text-[14px] text-[var(--color-ink-2)]">
+          Choose which products appear on your profile, and their order, in{" "}
+          <Link
+            href={routes.publicProfileBuilderProducts(workspaceSlug)}
+            className="underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+          >
+            the profile builder
+          </Link>
+          . The details below apply wherever this page is shown.
+        </p>
 
         <div className="flex flex-wrap items-center gap-4">
-          <form
-            action={() => {
-              startPublish(async () => {
-                await setProductPagePublishedAction(workspaceSlug, productSlug, !published)
-              })
-            }}
-          >
-            <Button
-              type="submit"
-              variant={published ? "secondary" : "primary"}
-              disabled={publishPending}
+          {published && profileStatus === "published" ? (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[14px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
             >
-              {publishPending
-                ? published
-                  ? "Unpublishing…"
-                  : "Publishing…"
-                : published
-                  ? "Unpublish"
-                  : "Publish page"}
-            </Button>
-          </form>
-
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[14px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
-          >
-            {published ? "View public page" : "Preview"}
-            <span className="sr-only"> (opens in a new tab)</span>
-          </a>
-
+              View public page
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          ) : null}
           <CopyUrl url={url} />
         </div>
-
-        {/*
-          Preview is the public URL, and it only works once the page is
-          published. Saying so is better than a preview mode: a token-gated
-          preview of a page whose entire behaviour is "what a stranger sees"
-          would be showing the creator something no stranger can get, which is
-          precisely the thing they are trying to check.
-        */}
-        {!published ? (
-          <p className="text-[13px] text-[var(--color-ink-3)]">
-            Preview opens the public address, which returns Not found until this page is published.
-            Publish it to see it as a visitor does.
-          </p>
-        ) : null}
       </div>
 
       <form action={formAction} className="flex flex-col gap-7">
@@ -234,24 +189,6 @@ export function PublicPageForm({
           </p>
           <FieldError id={`${ids.slug}-error`} message={slugError} />
         </div>
-
-        {/* Featured --------------------------------------------------------- */}
-        <label className="flex max-w-[560px] items-start gap-3">
-          <input
-            type="checkbox"
-            name="featured"
-            value="true"
-            checked={isFeatured}
-            onChange={(event) => setIsFeatured(event.target.checked)}
-            className="mt-1 h-4 w-4 accent-[var(--color-accent)]"
-          />
-          <span className="flex flex-col gap-1">
-            <span className="text-[15px] text-[var(--color-ink)]">Feature on the profile</span>
-            <span className="text-[13px] text-[var(--color-ink-3)]">
-              Featured products appear in their own row above the full catalog.
-            </span>
-          </span>
-        </label>
 
         {/* Cover ------------------------------------------------------------ */}
         {images.length > 0 ? (

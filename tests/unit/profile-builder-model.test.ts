@@ -260,13 +260,18 @@ describe("the preview mapping", () => {
         hasAvatar: false,
         websiteUrl: "https://northline.com",
         instagramUrl: null,
+        behanceUrl: null,
         contactUrl: "mailto:private@northline.com",
         seoTitle: null,
         seoDescription: null,
         updatedAt: "",
       },
       [],
-      { avatarUrl: "/api/public/avatar/p", imageUrl: (id) => `/api/public/asset/${id}` },
+      {
+        avatarUrl: "/api/public/avatar/p",
+        imageUrl: (id) => `/api/public/asset/${id}`,
+        productHref: (slug) => `/@northline/${slug}`,
+      },
     )
     expect(Object.keys(fromPublic).sort()).toEqual(
       ["avatarUrl", "displayName", "handle", "initials", "links", "products", "shortBio"].sort(),

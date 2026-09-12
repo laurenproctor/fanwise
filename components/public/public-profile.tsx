@@ -143,7 +143,7 @@ export function PublicProfile({
         {profile.products.length > 0 ? (
           <ul className={`grid gap-5 ${shape.grid}`}>
             {profile.products.map((product) => (
-              <ProductTile key={product.key} product={product} />
+              <ProductTile key={product.key} product={product} interactive={interactive} />
             ))}
           </ul>
         ) : (
@@ -238,15 +238,24 @@ function SectionLink({
   )
 }
 
-function ProductTile({ product }: { product: PresentationProduct }) {
-  return (
-    <li className="flex min-w-0 flex-col gap-2">
+function ProductTile({
+  product,
+  interactive,
+}: {
+  product: PresentationProduct
+  interactive: boolean
+}) {
+  const linked = interactive && Boolean(product.href)
+  const body = (
+    <>
       <div className="aspect-[4/3] w-full overflow-hidden rounded-[8px] bg-[var(--color-paper-2)]">
         {product.imageUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element -- as Avatar. */
           <img
             src={product.imageUrl}
-            alt={product.imageAlt}
+            // Inside a link the title follows as text, so the image stays
+            // silent rather than making a screen reader say the name twice.
+            alt={linked ? "" : product.imageAlt}
             loading="lazy"
             decoding="async"
             className="h-full w-full object-cover"
@@ -255,8 +264,9 @@ function ProductTile({ product }: { product: PresentationProduct }) {
           // Intentional rather than an empty grey box: a creator should be able to
           // tell "no image yet" from "image still loading".
           <span
-            role="img"
-            aria-label={`${product.title} has no image`}
+            role={linked ? undefined : "img"}
+            aria-label={linked ? undefined : `${product.title} has no image`}
+            aria-hidden={linked ? true : undefined}
             data-missing-image
             className="flex h-full w-full items-center justify-center text-[var(--color-ink-3)]"
           >
@@ -278,6 +288,23 @@ function ProductTile({ product }: { product: PresentationProduct }) {
       </div>
       <span className="text-[15px] break-words text-[var(--color-ink)]">{product.title}</span>
       <span className="text-[13px] text-[var(--color-ink-3)]">{product.typeLabel}</span>
+    </>
+  )
+
+  // Same box either way, so the final preview and the public page lay out
+  // identically; only the public page makes the tile a link.
+  return (
+    <li className="min-w-0">
+      {linked ? (
+        <a
+          href={product.href!}
+          className="group flex flex-col gap-2 rounded-[8px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-accent)]"
+        >
+          {body}
+        </a>
+      ) : (
+        <div className="flex flex-col gap-2">{body}</div>
+      )}
     </li>
   )
 }

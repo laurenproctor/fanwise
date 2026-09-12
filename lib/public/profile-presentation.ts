@@ -31,6 +31,8 @@ export interface PresentationProduct {
   typeLabel: string
   imageUrl: string | null
   imageAlt: string
+  /** The product's public page. Set on the public route; absent in the builder's previews. */
+  href?: string | null
 }
 
 /** The draft's editable fields, as typed. */
@@ -72,14 +74,17 @@ export function presentationFromDraft(
 }
 
 /**
- * The same component, fed from the public read path. Unused by a route in this
- * phase; it exists so the shape is proven to fit both sides before the public
- * page adopts it at publication.
+ * The same component, fed from the public read path: what `/@handle` renders.
+ * Only published rows reach it, because the rows come from the anon client.
  */
 export function presentationFromPublicView(
-  profile: PublicProfileView & { behanceUrl?: string | null },
+  profile: PublicProfileView,
   cards: PublicProductCard[],
-  media: { avatarUrl: string | null; imageUrl: (assetId: string) => string },
+  media: {
+    avatarUrl: string | null
+    imageUrl: (assetId: string) => string
+    productHref: (slug: string) => string
+  },
 ): ProfilePresentation {
   return {
     handle: profile.handle,
@@ -98,6 +103,7 @@ export function presentationFromPublicView(
       typeLabel: card.typeLabel,
       imageUrl: card.coverAssetId ? media.imageUrl(card.coverAssetId) : null,
       imageAlt: card.coverAlt,
+      href: media.productHref(card.slug),
     })),
   }
 }

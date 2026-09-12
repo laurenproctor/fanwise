@@ -516,6 +516,22 @@ archived and at least one of its listings is `live` by the catalog's `liveness()
 (`lib/public/product-arrangement.ts`); an arranged product that later becomes
 ineligible keeps its entry and flag but is never previewed or published.
 
+**public_profile_publications** — id, public_profile_id, workspace_id, handle,
+draft_updated_at, snapshot (jsonb), published_by, published_at
+
+One immutable row per successful publish (20260912180000), written only by
+`publish_public_profile()`. **The live rows stay the published state**: the public route
+still reads `public_profiles` and `public_product_pages` through anon RLS, and never a
+draft. Publishing is that one security-definer function, one transaction: it locks the
+profile and draft, refuses a draft changed since review (PT409), claims the handle (a
+held one raises 23505 and rolls everything back), writes the profile columns, publishes
+exactly the draft's shown products in order with `featured` cleared, sets every other page
+under the profile back to draft, and records the snapshot. Publishing an unchanged draft
+again returns the existing publication and writes nothing. A never-published profile's
+old handle is not kept as a redirect; a published one's is. The builder is the only
+authority for which product pages a profile publishes; the product editor edits a page's
+copy, not its visibility.
+
 A **public profile is not a workspace**. A workspace is an operational container with
 a slug for `/<slug>`; a profile is a public identity with a handle for `/@<handle>`.
 They are separate fields on separate tables, and the handle is never derived from a

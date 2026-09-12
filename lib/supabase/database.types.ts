@@ -1210,6 +1210,47 @@ export type Database = {
           },
         ]
       }
+      public_profile_publications: {
+        Row: {
+          draft_updated_at: string
+          handle: string
+          id: string
+          public_profile_id: string
+          published_at: string
+          published_by: string | null
+          snapshot: Json
+          workspace_id: string
+        }
+        Insert: {
+          draft_updated_at: string
+          handle: string
+          id?: string
+          public_profile_id: string
+          published_at?: string
+          published_by?: string | null
+          snapshot: Json
+          workspace_id: string
+        }
+        Update: {
+          draft_updated_at?: string
+          handle?: string
+          id?: string
+          public_profile_id?: string
+          published_at?: string
+          published_by?: string | null
+          snapshot?: Json
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_profile_publications_profile_fk"
+            columns: ["public_profile_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
       public_profiles: {
         Row: {
           avatar_path: string | null
@@ -1577,6 +1618,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      publish_public_profile: {
+        Args: {
+          p_expected_draft_updated_at: string
+          p_product_ids: string[]
+          p_public_profile_id: string
+          p_values: Json
+        }
+        Returns: Json
       }
       release_public_handle: {
         Args: { p_new_handle: string; p_public_profile_id: string }

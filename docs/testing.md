@@ -105,10 +105,11 @@ the product heading, usually.
 13. Connect Gumroad, publish a product with its covers and its file, confirm it is
     purchasable. *(planned at B10, not built; needs a registered Gumroad OAuth application and
     a seller account, decision 27)*
-14. **A creator publishes a public profile and a stranger reads it.** *(built and running in
-    `tests/e2e/journey-14-public-pages.spec.ts`, with the permission half at
-    `tests/db/public-pages-tenancy.test.ts` and the routing table at
-    `tests/unit/public-routing.test.ts`)*
+14. **A creator builds and publishes a public profile, and a stranger reads it.** *(built and
+    running in `tests/e2e/journey-14-public-pages.spec.ts`, through the three-step profile
+    builder; the permission half is `tests/db/public-pages-tenancy.test.ts`,
+    `tests/db/profile-drafts-tenancy.test.ts` and `tests/db/profile-publication.test.ts`, and
+    the routing table `tests/unit/public-routing.test.ts`)*
 
 Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, the product
 is broken in the way that matters most.
@@ -143,6 +144,14 @@ a convenience. A draft profile must answer 404, and the two ways that broke duri
 development — a proxy rewrite pinning the response at 200, and a route-level `loading.tsx`
 committing the response before the page decided — were both invisible to a signed-in
 developer and to every other test in this suite.
+
+**Journey 14 was rebuilt on 12 September 2026** around the profile builder, when publishing
+moved from a live-row form and per-product switches to a draft published in one
+transaction. Its first test is now the builder's one end-to-end journey: details with a
+live preview, products chosen and reordered, a draft recovered after refresh, publish, the
+public page matching the final preview, an edit that stays a draft until "Publish updates",
+and another account refused the draft. Everything that journey passes through is also
+tested below the browser, so the journey asserts the path, not every rule on it.
 
 **Password recovery is not one of the fourteen**, because it is not a step on the path from empty
 workspace to live listing. It is covered anyway, in two halves that meet at the token:

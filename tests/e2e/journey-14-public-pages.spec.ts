@@ -1,274 +1,390 @@
-import { expect, test, type Page } from "@playwright/test"
-import { productUrl, signOut, signUpAndCreateWorkspace } from "./support"
+import { createClient } from "@supabase/supabase-js"
+import { expect, test, type Browser, type Page } from "@playwright/test"
+import { signOut, signUp, signUpAndCreateWorkspace } from "./support"
 import { routes } from "@/lib/routes"
 
 /**
- * Journey 14. A creator claims a public address, publishes a product to it, and
- * a stranger with no account reads the page.
+ * Journey 14. A creator builds a public profile, publishes it, and a stranger
+ * with no account reads it.
  *
- * The whole point of this journey is the second half. Everything before it is
- * setup done as a signed-in creator; the assertions that matter are made in a
- * browser context with no session at all, because a public page that only
- * works for the person who made it is the failure this feature is most likely
- * to have and the least likely to notice. `page.context().clearCookies()` is
- * not enough for that — a Server Component reads cookies at render — so the
- * anonymous half runs in its own context.
+ * The first test is the whole journey through the three-step builder: details
+ * with a live preview, products chosen and reordered, a draft recovered after
+ * a refresh, publish, the public page matching the final preview, an edit that
+ * stays a draft until "Publish updates", and a second account refused the
+ * first account's draft. It is deliberately the only builder journey; the
+ * rules it passes through are unit- and database-tested on their own
+ * (tests/unit/profile-builder-*.test.ts, tests/unit/profile-publish.test.ts,
+ * tests/db/profile-drafts-tenancy.test.ts, tests/db/profile-publication.test.ts).
  *
- * It also holds the two rules that make publishing safe:
+ * The rest hold the public web's routing contract — the address shape, renames,
+ * unpublishing, reserved handles, and coexistence with the app — using the
+ * builder only as setup.
  *
- *   - Nothing is public until somebody published it. A draft profile and a
- *     draft product both answer 404, with the same words a URL that never
- *     existed gets.
- *   - A published product under a draft profile is not public. This is the one
- *     a creator gets wrong, and the one enforced in the database rather than
- *     in a component.
+ * Every anonymous assertion runs in its own browser context:
+ * `page.context().clearCookies()` is not enough, because a Server Component
+ * reads cookies at render.
  */
 
 const SETUP_TIMEOUT = 20_000
 
-/** Claims a handle and returns it. The profile is left a draft. */
-async function createProfile(page: Page, slug: string): Promise<string> {
-  await page.goto(routes.publicProfileSettings(slug))
-  await page.getByRole("button", { name: "Create a public profile" }).click()
+// ---------------------------------------------------------------------------
+// Setup helpers
+// ---------------------------------------------------------------------------
 
-  await expect(page.getByRole("heading", { name: "Public profile", level: 1 })).toBeVisible({
+/**
+ * The local stack's service role, from the environment the Playwright config
+ * exports. Used only to put products live on a channel, which in the product
+ * is an adapter round trip this journey is not about.
+ */
+function localAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error("Journey 14 needs the local Supabase env the config exports.")
+  if (!/^https?:\/\/(127\.0\.0\.1|localhost)[:/]/.test(url)) {
+    throw new Error(`Refusing to seed against a non-local Supabase: ${url}`)
+  }
+  return createClient(url, key, { auth: { persistSession: false } })
+}
+
+/** Creates products with a verified, live listing each, so they are eligible for a profile. */
+async function seedLiveProducts(slug: string, names: string[]): Promise<void> {
+  const db = localAdmin()
+  const { data: workspace } = await db.from("workspaces").select("id").eq("slug", slug).single()
+  const { data: channels } = await db.from("channels").select("id, key")
+  const channelId = channels!.find((c) => c.key === "mock_api")!.id
+  const { data: connection, error: connectionError } = await db
+    .from("channel_connections")
+    .insert({
+      workspace_id: workspace!.id,
+      channel_id: channelId,
+      external_account_id: `j14-${slug}`,
+      status: "active",
+    })
+    .select("id")
+    .single()
+  if (connectionError) throw connectionError
+
+  for (const [index, name] of names.entries()) {
+    const productSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+    const { data: product, error } = await db
+      .from("products")
+      .insert({
+        workspace_id: workspace!.id,
+        name,
+        slug: productSlug,
+        product_type: "template",
+      })
+      .select("id")
+      .single()
+    if (error) throw error
+    const { error: listingError } = await db.from("channel_listings").insert({
+      workspace_id: workspace!.id,
+      product_id: product.id,
+      channel_id: channelId,
+      channel_connection_id: connection.id,
+      title: name,
+      status: "published",
+      status_source: "verified",
+      // Unique per channel across every workspace, so it carries the slug.
+      external_listing_id: `j14-${slug}-${index}`,
+      external_url: `https://example.com/${productSlug}`,
+    })
+    if (listingError) throw listingError
+  }
+}
+
+/** Opens step 1 from Settings, creating the profile if there is none. */
+async function openBuilder(page: Page, slug: string): Promise<void> {
+  await page.goto(routes.publicProfileSettings(slug))
+  const create = page.getByRole("button", { name: "Create a public profile" })
+  const edit = page.getByRole("link", { name: /Build your profile|Edit public profile/ })
+  // Wait for the page to decide which one it is showing before choosing.
+  await expect(create.or(edit)).toBeVisible({ timeout: SETUP_TIMEOUT })
+  if (await create.isVisible()) {
+    await create.click()
+  } else {
+    await edit.click()
+  }
+  await page.waitForURL(/\/settings\/public-profile\/builder$/)
+  await expect(page.getByRole("heading", { name: "Build your profile" })).toBeVisible({
     timeout: SETUP_TIMEOUT,
   })
+}
 
-  const handle = await page.getByLabel("Handle").inputValue()
-  expect(handle.length).toBeGreaterThan(2)
+/** From step 1, saves and walks through to step 3, then publishes. Returns the handle. */
+async function publishFromDetails(page: Page): Promise<string> {
+  const handle = await page.getByLabel("Studio address").inputValue()
+  await expect(page.getByText("Draft saved")).toBeVisible({ timeout: SETUP_TIMEOUT })
+  await page.getByRole("button", { name: "Continue" }).click()
+  await page.waitForURL(/\/builder\/products$/)
+  await page.getByRole("button", { name: "Continue" }).click()
+  await page.waitForURL(/\/builder\/publish$/)
+  await page.getByRole("button", { name: /^Publish (profile|updates)$/ }).click()
+  await expect(page.getByText(/Published\. Your profile is live\./)).toBeVisible({
+    timeout: SETUP_TIMEOUT,
+  })
   return handle
 }
 
-async function setHandle(page: Page, slug: string, handle: string): Promise<void> {
-  await page.goto(routes.publicProfileSettings(slug))
-  await page.getByLabel("Handle").fill(handle)
-  await page.getByRole("button", { name: "Save public profile" }).click()
-  await expect(page.getByText("Public profile saved.")).toBeVisible({ timeout: SETUP_TIMEOUT })
+/** A fresh profile, published with the suggested address. Returns the handle. */
+async function publishProfile(page: Page, slug: string): Promise<string> {
+  await openBuilder(page, slug)
+  // The suggestion is valid as it stands; typing a character and removing it
+  // makes the first autosave store the draft.
+  const address = page.getByLabel("Studio address")
+  const suggested = await address.inputValue()
+  await address.fill(`${suggested}x`)
+  await address.fill(suggested)
+  return publishFromDetails(page)
 }
 
-async function setProfilePublished(page: Page, slug: string, published: boolean): Promise<void> {
-  await page.goto(routes.publicProfileSettings(slug))
-  await page
-    .getByRole("button", { name: published ? "Publish profile" : "Unpublish", exact: true })
-    .click()
-  await expect(
-    page.getByText(published ? "Anyone with the link can see" : "Only you can see this profile"),
-  ).toBeVisible({ timeout: SETUP_TIMEOUT })
+async function stranger(browser: Browser) {
+  const context = await browser.newContext()
+  return { context, visitor: await context.newPage() }
 }
 
-/** Creates a product and returns its path in the application. */
-async function createProduct(page: Page, slug: string, name: string): Promise<string> {
-  await page.goto(routes.newProduct(slug))
-  await page.getByLabel("Product name").fill(name)
-  await page.getByRole("button", { name: "Create product" }).click()
-  await page.waitForURL(productUrl(slug))
-  return new URL(page.url()).pathname
-}
+const rowTitles = (page: Page) =>
+  page
+    .locator("[data-row-id]")
+    .evaluateAll((rows) =>
+      rows.map((row) => row.querySelector("span.text-\\[16px\\]")?.textContent?.trim() ?? ""),
+    )
 
-async function createPublicPage(page: Page, productPath: string): Promise<void> {
-  await page.goto(productPath)
-  await page.getByRole("button", { name: "Create a public page" }).click()
-  await expect(page.getByRole("button", { name: "Publish page" })).toBeVisible({
+/** Product titles as the shared renderer draws them, in order. */
+const renderedTitles = (scope: Page, within = "article") =>
+  scope.locator(`${within} #profile-products li span.text-\\[15px\\]`).allTextContents()
+
+// ---------------------------------------------------------------------------
+// The journey
+// ---------------------------------------------------------------------------
+
+test("a creator builds, publishes and updates a profile, and a stranger reads it", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(180_000)
+  await page.setViewportSize({ width: 1440, height: 1100 })
+
+  const creator = await signUpAndCreateWorkspace(page, "j14", "Northline Studio")
+  await seedLiveProducts(creator.slug, ["Aster Grotesk", "Campaign Kit", "Brand Workbook"])
+  const handle = `northline-${Date.now().toString(36)}`.slice(0, 32)
+  const preview = page.locator("article").first()
+
+  // 1. Settings → Public profile ------------------------------------------
+  await page.goto(routes.settings(creator.slug))
+  await page.getByRole("link", { name: "Set up a public profile" }).click()
+  await page.waitForURL(new RegExp(`${routes.publicProfileSettings(creator.slug)}$`))
+  await page.getByRole("button", { name: "Create a public profile" }).click()
+  await page.waitForURL(/\/builder$/)
+
+  // 2–3. Profile details, with the preview following the typing -----------
+  await page.getByLabel("Studio address").fill(handle)
+  await page.getByLabel("Studio name").fill("Northline Studio")
+  await page.getByLabel("Short introduction").fill("Independent type for expressive brands.")
+  await page.getByLabel("Website").fill("northline.example")
+
+  await expect(preview.getByRole("heading", { name: "Northline Studio" })).toBeVisible()
+  await expect(preview).toContainText("Independent type for expressive brands.")
+  await expect(page.getByText(`/@${handle}`).first()).toBeVisible()
+  await expect(page.getByText("Available", { exact: true })).toBeVisible({ timeout: SETUP_TIMEOUT })
+  await expect(page.getByText("Draft saved")).toBeVisible({ timeout: SETUP_TIMEOUT })
+
+  // 4–5. Manage products: hide one, move one --------------------------------
+  await page.getByRole("button", { name: "Continue" }).click()
+  await page.waitForURL(/\/builder\/products$/)
+  await expect(page.getByText("3 of 3 selected")).toBeVisible()
+
+  await page.getByRole("switch", { name: "Show Brand Workbook on your profile" }).click()
+  await expect(page.getByText("2 of 3 selected")).toBeVisible()
+
+  const before = await rowTitles(page)
+  const last = before.filter((t) => t !== "Brand Workbook").at(-1)!
+  await page.getByRole("button", { name: new RegExp(`^Reorder ${last}`) }).focus()
+  await page.keyboard.press("Home")
+  const arranged = await rowTitles(page)
+  expect(arranged[0]).toBe(last)
+  const expectedOrder = arranged.filter((t) => t !== "Brand Workbook")
+  await expect.poll(() => renderedTitles(page)).toEqual(expectedOrder)
+  await expect(page.getByText("Draft saved")).toBeVisible({ timeout: SETUP_TIMEOUT })
+
+  // 6. Refresh recovers the draft -------------------------------------------
+  await page.reload()
+  await expect(page.getByText("2 of 3 selected")).toBeVisible()
+  expect(await rowTitles(page)).toEqual(arranged)
+
+  // 7. Preview and publish --------------------------------------------------
+  await page.getByRole("button", { name: "Continue" }).click()
+  await page.waitForURL(/\/builder\/publish$/)
+  await expect(page.getByRole("heading", { name: "Your profile is ready" })).toBeVisible()
+  const finalPreview = await renderedTitles(page)
+  expect(finalPreview).toEqual(expectedOrder)
+
+  const { context, visitor } = await stranger(browser)
+  expect((await visitor.goto(`/@${handle}`))?.status(), "nothing is public before Publish").toBe(
+    404,
+  )
+
+  // 8. Publish ----------------------------------------------------------------
+  await page.getByRole("button", { name: "Publish profile" }).click()
+  await expect(page.getByText("Published. Your profile is live.")).toBeVisible({
     timeout: SETUP_TIMEOUT,
   })
-}
+  await expect(page.getByRole("link", { name: /View public profile/ })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible()
 
-async function setPagePublished(
-  page: Page,
-  productPath: string,
-  published: boolean,
-): Promise<void> {
-  await page.goto(productPath)
-  await page
-    .getByRole("button", { name: published ? "Publish page" : "Unpublish", exact: true })
-    .click()
-  await expect(
-    page.getByText(
-      published ? /This page is live|Published, but not visible/ : /Only you can see this page/,
-    ),
-  ).toBeVisible({ timeout: SETUP_TIMEOUT })
-}
-
-test("a creator publishes a profile and a stranger reads it", async ({ page, browser }) => {
-  const creator = await signUpAndCreateWorkspace(page, "j14", "Northline Studio")
-
-  const handle = await createProfile(page, creator.slug)
-  const productPath = await createProduct(page, creator.slug, "Aster Grotesk")
-  await createPublicPage(page, productPath)
-
-  // --- Nothing is public yet -------------------------------------------
-  const stranger = await browser.newContext()
-  const visitor = await stranger.newPage()
-
-  const draftProfile = await visitor.goto(`/@${handle}`)
-  expect(draftProfile?.status(), "a draft profile is not public").toBe(404)
-  await expect(visitor.getByText("This page does not exist")).toBeVisible()
-  // Nothing of the studio leaks through the 404.
-  await expect(visitor.getByText("Northline Studio")).toHaveCount(0)
-
-  // --- A published product under a draft profile is still not public ----
-  await setPagePublished(page, productPath, true)
-
-  const orphan = await visitor.goto(`/@${handle}/aster-grotesk`)
-  expect(orphan?.status(), "a published page under a draft profile is not public").toBe(404)
-  await expect(visitor.getByText("Aster Grotesk")).toHaveCount(0)
-
-  // The editor says so rather than letting the creator believe otherwise.
-  await page.goto(productPath)
-  await expect(page.getByText("Published, but not visible")).toBeVisible()
-
-  // --- Publishing the profile opens both, with no second write ----------
-  await setProfilePublished(page, creator.slug, true)
-
+  // 9–10. The public page matches the final preview ---------------------------
   const live = await visitor.goto(`/@${handle}`)
   expect(live?.status()).toBe(200)
   await expect(visitor.getByRole("heading", { name: "Northline Studio", level: 1 })).toBeVisible()
-  await expect(visitor.getByRole("link", { name: /Aster Grotesk/ })).toBeVisible()
-
-  // The product page too, reached the way a visitor reaches it.
-  await visitor
-    .getByRole("link", { name: /Aster Grotesk/ })
-    .first()
-    .click()
-  await expect(visitor).toHaveURL(new RegExp(`/@${handle}/aster-grotesk$`))
-  await expect(visitor.getByRole("heading", { name: "Aster Grotesk", level: 1 })).toBeVisible()
-
-  // Back to the creator, through the breadcrumb.
-  await visitor.getByRole("link", { name: "Northline Studio" }).first().click()
-  await expect(visitor).toHaveURL(new RegExp(`/@${handle}$`))
-
-  // --- Nothing private is on the page ------------------------------------
+  await expect(visitor.locator("article")).toContainText("Independent type for expressive brands.")
+  expect(await renderedTitles(visitor)).toEqual(finalPreview)
+  expect(await visitor.locator("article").textContent()).not.toContain("Brand Workbook")
   const body = (await visitor.locator("body").textContent()) ?? ""
   expect(body).not.toContain(creator.email)
   expect(body).not.toContain(creator.slug)
-  for (const word of ["Sign out", "Settings", "Billing", "Subscription"]) {
-    expect(body, `${word} belongs to the application, not to a public page`).not.toContain(word)
-  }
+  for (const word of ["Sign out", "Billing", "Subscription"]) expect(body).not.toContain(word)
 
-  await stranger.close()
+  // 11–13. An edit stays a draft ----------------------------------------------
+  await page.getByRole("link", { name: "Edit profile" }).click()
+  await page.waitForURL(/\/builder$/)
+  await page.getByLabel("Short introduction").fill("Type, updated.")
+  await expect(page.getByText("Draft saved")).toBeVisible({ timeout: SETUP_TIMEOUT })
+
+  await visitor.reload()
+  await expect(visitor.locator("article")).toContainText("Independent type for expressive brands.")
+  await expect(visitor.locator("article")).not.toContainText("Type, updated.")
+
+  // 14–15. Publish updates changes the live page --------------------------------
+  await page.getByRole("button", { name: "Continue" }).click()
+  await page.waitForURL(/\/builder\/products$/)
+  await page.getByRole("button", { name: "Continue" }).click()
+  await page.waitForURL(/\/builder\/publish$/)
+  await page.getByRole("button", { name: "Publish updates" }).click()
+  await expect(page.getByText("Published. Your profile is live.")).toBeVisible({
+    timeout: SETUP_TIMEOUT,
+  })
+
+  await visitor.reload()
+  await expect(visitor.locator("article")).toContainText("Type, updated.")
+  await context.close()
+
+  // 16. Another account cannot reach this draft ---------------------------------
+  const other = await browser.newContext()
+  const intruder = await other.newPage()
+  await signUp(intruder, "j14-intruder")
+  for (const path of [
+    routes.publicProfileBuilder(creator.slug),
+    routes.publicProfileBuilderPublish(creator.slug),
+  ]) {
+    const response = await intruder.goto(path)
+    expect(response?.status(), `${path} is not another account's to open`).toBe(404)
+    await expect(intruder.locator("body")).not.toContainText("Type, updated.")
+  }
+  const probe = await intruder.request.get(
+    routes.publicProfileHandleAvailability(creator.slug, "x-y-z"),
+  )
+  expect(probe.status()).toBe(404)
+  await other.close()
+
+  // And signed out, the builder is behind sign-in.
+  const { context: anonContext, visitor: anon } = await stranger(browser)
+  await anon.goto(routes.publicProfileBuilder(creator.slug))
+  await expect(anon).toHaveURL(/\/sign-in$/)
+  await anonContext.close()
 })
+
+// ---------------------------------------------------------------------------
+// The public web's routing contract
+// ---------------------------------------------------------------------------
 
 test("the public URL keeps its shape, and the internal one is not a second address", async ({
   page,
   browser,
 }) => {
   const creator = await signUpAndCreateWorkspace(page, "j14url", "Shape Studio")
-  const handle = await createProfile(page, creator.slug)
-  await setProfilePublished(page, creator.slug, true)
+  const handle = await publishProfile(page, creator.slug)
 
-  const stranger = await browser.newContext()
-  const visitor = await stranger.newPage()
+  const { context, visitor } = await stranger(browser)
 
-  // The address bar keeps the @ form; the rewrite is invisible.
   await visitor.goto(`/@${handle}`)
   expect(new URL(visitor.url()).pathname).toBe(`/@${handle}`)
 
-  // A capitalised handle folds onto the canonical one rather than serving a
-  // second copy of the page.
   await visitor.goto(`/@${handle.toUpperCase()}`)
   expect(new URL(visitor.url()).pathname).toBe(`/@${handle}`)
 
-  // A trailing slash, likewise.
   await visitor.goto(`/@${handle}/`)
   expect(new URL(visitor.url()).pathname).toBe(`/@${handle}`)
 
-  // And the internal rewrite target is not an address anybody can stay at.
   await visitor.goto(`/profile/${handle}`)
   expect(new URL(visitor.url()).pathname).toBe(`/@${handle}`)
 
-  // The canonical tag agrees with the address bar, so the two cannot be
-  // indexed separately.
   const canonical = await visitor.locator('link[rel="canonical"]').getAttribute("href")
   expect(canonical).toContain(`/@${handle}`)
 
-  await stranger.close()
+  await context.close()
 })
 
-test("renaming a handle leaves the old address working", async ({ page, browser }) => {
+test("renaming a published handle leaves the old address working", async ({ page, browser }) => {
   const creator = await signUpAndCreateWorkspace(page, "j14rename", "Moving Studio")
-  const before = await createProfile(page, creator.slug)
-  await setProfilePublished(page, creator.slug, true)
+  const before = await publishProfile(page, creator.slug)
 
   const after = `moved-${Date.now().toString(36)}`.slice(0, 32)
-  await setHandle(page, creator.slug, after)
+  await openBuilder(page, creator.slug)
+  await page.getByLabel("Studio address").fill(after)
+  await publishFromDetails(page)
 
-  const stranger = await browser.newContext()
-  const visitor = await stranger.newPage()
-
-  // The new address serves the page.
-  const fresh = await visitor.goto(`/@${after}`)
-  expect(fresh?.status()).toBe(200)
+  const { context, visitor } = await stranger(browser)
+  expect((await visitor.goto(`/@${after}`))?.status()).toBe(200)
   await expect(visitor.getByRole("heading", { name: "Moving Studio", level: 1 })).toBeVisible()
 
-  // The old one still resolves, to the new address rather than to a 404.
   await visitor.goto(`/@${before}`)
   expect(new URL(visitor.url()).pathname).toBe(`/@${after}`)
-  await expect(visitor.getByRole("heading", { name: "Moving Studio", level: 1 })).toBeVisible()
-
-  await stranger.close()
+  await context.close()
 })
 
-test("unpublishing removes the page from the public web", async ({ page, browser }) => {
+test("unpublishing removes the profile and its product pages from the public web", async ({
+  page,
+  browser,
+}) => {
   const creator = await signUpAndCreateWorkspace(page, "j14unpub", "Vanishing Studio")
-  const handle = await createProfile(page, creator.slug)
-  const productPath = await createProduct(page, creator.slug, "Ephemeral Sans")
-  await createPublicPage(page, productPath)
-  await setPagePublished(page, productPath, true)
-  await setProfilePublished(page, creator.slug, true)
+  await seedLiveProducts(creator.slug, ["Ephemeral Sans"])
+  const handle = await publishProfile(page, creator.slug)
 
-  const stranger = await browser.newContext()
-  const visitor = await stranger.newPage()
-
+  const { context, visitor } = await stranger(browser)
   expect((await visitor.goto(`/@${handle}`))?.status()).toBe(200)
   expect((await visitor.goto(`/@${handle}/ephemeral-sans`))?.status()).toBe(200)
 
-  await setProfilePublished(page, creator.slug, false)
+  await page.goto(routes.publicProfileSettings(creator.slug))
+  await page.getByRole("button", { name: "Unpublish" }).click()
+  await expect(page.getByText("Only you can see this profile")).toBeVisible({
+    timeout: SETUP_TIMEOUT,
+  })
 
-  // Both, from one write. The product page was never unpublished itself.
   expect((await visitor.goto(`/@${handle}`))?.status(), "the profile is gone").toBe(404)
   expect(
     (await visitor.goto(`/@${handle}/ephemeral-sans`))?.status(),
     "the product goes with it",
   ).toBe(404)
-
-  await stranger.close()
+  await context.close()
 })
 
-test("a reserved or malformed handle is refused while the creator types", async ({ page }) => {
+test("a reserved or malformed address is refused while the creator types", async ({ page }) => {
   const creator = await signUpAndCreateWorkspace(page, "j14valid", "Careful Studio")
-  await createProfile(page, creator.slug)
+  await openBuilder(page, creator.slug)
 
-  await page.goto(routes.publicProfileSettings(creator.slug))
-  const handle = page.getByLabel("Handle")
-  const save = page.getByRole("button", { name: "Save public profile" })
+  const address = page.getByLabel("Studio address")
 
-  // Scoped to the field's own error node, not to the text and not to the
-  // alert role. The hint under the field says "lowercase letters, numbers and
-  // hyphens" too — that is what the hint is for — so matching on the words
-  // finds both and proves neither, and Next's route announcer is a second
-  // element with role="alert" on every page.
-  const error = page.locator('p[role="alert"]').first()
+  await address.fill("fanwise")
+  await expect(page.getByText(/reserved by Fanwise/i)).toBeVisible()
 
-  await handle.fill("fanwise")
-  await expect(error).toHaveText(/reserved/i)
-  await expect(save).toBeDisabled()
+  await address.fill("north.line")
+  await expect(page.getByText(/lowercase letters, numbers and hyphens only/i)).toBeVisible()
 
-  await handle.fill("no")
-  await expect(error).toHaveText(/at least 3 characters/i)
-  await expect(save).toBeDisabled()
+  await address.fill("north--line")
+  await expect(page.getByText(/cannot start or end with a hyphen/i)).toBeVisible()
 
-  await handle.fill("Not A Handle")
-  await expect(error).toHaveText(/lowercase letters, numbers and hyphens/i)
-  await expect(save).toBeDisabled()
-
-  await handle.fill("north--line")
-  await expect(error).toHaveText(/cannot start or end with a hyphen/i)
-  await expect(save).toBeDisabled()
-
-  // And a valid one re-enables it.
-  await handle.fill(`careful-${Date.now().toString(36)}`.slice(0, 32))
-  await expect(save).toBeEnabled()
+  await address.fill(`careful-${Date.now().toString(36)}`.slice(0, 32))
+  await expect(page.getByText("Available", { exact: true })).toBeVisible({ timeout: SETUP_TIMEOUT })
 })
 
 test("the marketing site and the application still resolve alongside the public web", async ({
@@ -276,42 +392,35 @@ test("the marketing site and the application still resolve alongside the public 
   browser,
 }) => {
   const creator = await signUpAndCreateWorkspace(page, "j14routes", "Coexist Studio")
-  const handle = await createProfile(page, creator.slug)
-  await setProfilePublished(page, creator.slug, true)
+  const handle = await publishProfile(page, creator.slug)
 
-  // The application, as the signed-in creator, at its unchanged address.
   expect((await page.goto(routes.workspace(creator.slug)))?.status()).toBe(200)
   await expect(page.getByRole("link", { name: "Products", exact: true })).toBeVisible()
 
   await signOut(page)
 
-  const stranger = await browser.newContext()
-  const visitor = await stranger.newPage()
+  const { context, visitor } = await stranger(browser)
 
   for (const path of ["/", "/pricing", "/how-it-works", "/terms", "/privacy", "/sign-in"]) {
     const response = await visitor.goto(path)
     expect(response?.status(), `${path} should still resolve`).toBe(200)
   }
 
-  // The API and the static assets are untouched by the rewrite.
   expect((await visitor.goto("/api/health"))?.status()).toBe(200)
   expect((await visitor.goto("/theme.js"))?.status()).toBe(200)
   expect((await visitor.goto("/robots.txt"))?.status()).toBe(200)
 
-  // The sitemap lists the published profile and excludes the internal path.
   const sitemap = await visitor.goto("/sitemap.xml")
   expect(sitemap?.status()).toBe(200)
   const xml = (await sitemap?.text()) ?? ""
   expect(xml).toContain(`/@${handle}`)
   expect(xml).not.toContain("/profile/")
 
-  // And robots keeps crawlers off the rewrite target.
   const robots = await (await visitor.goto("/robots.txt"))?.text()
   expect(robots).toContain("/profile/")
 
-  // The private application still requires a session.
   await visitor.goto(routes.workspace(creator.slug))
   await expect(visitor).toHaveURL(/\/sign-in$/)
 
-  await stranger.close()
+  await context.close()
 })

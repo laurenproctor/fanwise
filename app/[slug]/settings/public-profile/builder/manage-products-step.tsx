@@ -446,8 +446,9 @@ function ProductRow({
         aria-checked={shown}
         aria-label={`Show ${product.title} on your profile`}
         aria-describedby={eligible ? undefined : reasonId}
-        // An ineligible product cannot be shown, and its stored choice is kept as is.
-        disabled={!eligible}
+        // An ineligible product cannot be switched on. One still switched on can
+        // be switched off, which is what step 3 asks for before publishing.
+        disabled={!eligible && !row.visible}
         onClick={onToggle}
         className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50 ${
           shown

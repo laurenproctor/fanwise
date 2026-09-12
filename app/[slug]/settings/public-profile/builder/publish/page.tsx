@@ -1,15 +1,24 @@
 import { notFound, redirect } from "next/navigation"
-import { ButtonLink } from "@/components/ui/button"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
-import { routes } from "@/lib/routes"
+import { createClient } from "@/lib/supabase/server"
+import { loadBuilderContext } from "@/lib/public/draft-store"
+import { checkDetailsStep } from "@/lib/public/profile-draft"
+import { normalizeHandleInput } from "@/lib/public/handles"
+import { loadPublishState } from "@/lib/public/publish-state"
+import { appOrigin } from "@/lib/channels/oauth"
+import { publicRoutes, routes } from "@/lib/routes"
 import { BuilderHeader } from "../builder-header"
+import { PublishStep } from "../publish-step"
 
 export const metadata = { title: "Public profile · Fanwise" }
 
 /**
- * Step 3, Preview and publish. Not built in this phase: step 2's Continue
- * lands here so the flow has a real destination, and the page says plainly
- * that nothing has been published.
+ * Step 3 of the builder: preview and publish.
+ *
+ * Everything shown is computed on the server from the stored draft: the
+ * readiness issues, the address check, which selected products are still
+ * eligible. A draft that was never saved goes back to step 1, because there is
+ * nothing here to review.
  */
 export default async function ProfileBuilderPublishPage({
   params,
@@ -23,21 +32,37 @@ export default async function ProfileBuilderPublishPage({
   const workspace = await getWorkspaceBySlug(slug)
   if (!workspace) notFound()
 
+  const supabase = await createClient()
+  const ctx = await loadBuilderContext(supabase, workspace.slug)
+  if (!ctx) redirect(routes.publicProfileBuilder(workspace.slug))
+
+  const state = await loadPublishState(supabase, ctx, workspace.slug)
+  if (!state.stored || state.draft.updatedAt === null) {
+    redirect(routes.publicProfileBuilder(workspace.slug))
+  }
+
+  const handle = normalizeHandleInput(state.draft.fields.handle)
+
   return (
     <div className="flex w-full flex-col gap-10 pb-24">
       <BuilderHeader workspaceSlug={workspace.slug} current={3} />
-      <section className="flex flex-col items-start gap-5 rounded-[16px] border border-dashed border-[var(--color-rule)] px-6 py-12">
-        <span className="label-mono">Coming next</span>
-        <h2 className="font-display max-w-[24ch] text-[28px] leading-[1.1] font-light tracking-[-0.03em]">
-          Previewing and publishing is on its way
-        </h2>
-        <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
-          Your profile details and product choices are saved as a draft. Nothing has been published.
-        </p>
-        <ButtonLink href={routes.publicProfileBuilderProducts(workspace.slug)} variant="secondary">
-          Back to products
-        </ButtonLink>
-      </section>
+      <PublishStep
+        workspaceSlug={workspace.slug}
+        origin={appOrigin()}
+        presentation={state.presentation}
+        issues={state.readiness.issues}
+        summary={{
+          detailsComplete: Object.keys(checkDetailsStep(state.draft.fields)).length === 0,
+          selectedCount: state.presentation.products.length,
+          publicPath: publicRoutes.profile(handle),
+        }}
+        expectedDraftUpdatedAt={state.draft.updatedAt}
+        live={{
+          status: state.live.status,
+          handle: state.live.handle,
+          hasUnpublishedChanges: state.live.hasUnpublishedChanges,
+        }}
+      />
     </div>
   )
 }

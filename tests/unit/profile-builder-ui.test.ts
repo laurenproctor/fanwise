@@ -20,6 +20,10 @@ import { presentationFromDraft } from "@/lib/public/profile-presentation"
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: () => {}, refresh: () => {}, replace: () => {} }),
 }))
+vi.mock("@/lib/public/publish-actions", () => ({
+  publishProfileAction: vi.fn(),
+  unpublishProfileAction: vi.fn(),
+}))
 vi.mock("@/lib/public/draft-actions", () => ({
   saveProfileDraftAction: vi.fn(),
   uploadProfileDraftAvatarAction: vi.fn(),
@@ -352,12 +356,23 @@ describe("step 2, manage products", () => {
     expect(textOf(markup)).toMatch(/up or down arrow keys/)
   })
 
-  it("explains an ineligible product and disables its switch", () => {
+  it("explains an ineligible product; its switch can turn it off but never on", () => {
     const markup = renderStep(ARRANGED)
     expect(textOf(markup)).toContain("Not live in a connected shop right now")
-    expect(markup).toMatch(
-      /role="switch"[^>]*aria-label="Show Minimal Portfolio Template on your profile"[^>]*disabled=""/,
+    const selected =
+      /<button[^>]*role="switch"[^>]*aria-label="Show Minimal Portfolio Template on your profile"[^>]*>/.exec(
+        markup,
+      )![0]
+    expect(selected).not.toContain('disabled=""')
+
+    const off = renderStep(
+      ARRANGED.map((entry) => (entry.productId === pid(4) ? { ...entry, visible: false } : entry)),
     )
+    const cleared =
+      /<button[^>]*role="switch"[^>]*aria-label="Show Minimal Portfolio Template on your profile"[^>]*>/.exec(
+        off,
+      )![0]
+    expect(cleared).toContain('disabled=""')
   })
 
   it("shows an intentional placeholder for a product with no image, in the row and the preview", () => {
