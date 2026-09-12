@@ -25,10 +25,18 @@ test("a new creator signs up and lands in a provisioned workspace", async ({ pag
     "page",
   )
 
-  // Membership moved to settings when the catalog took the root.
+  /**
+   * Settings names the page rather than the workspace, so the provisioned name
+   * is asserted where it is now editable and where the shell shows it. The
+   * members table it used to check is gone: every workspace has exactly one
+   * owner and no way to invite anybody, so the section listed one row saying
+   * "you". The ownership model is unchanged and tests/db/tenancy.test.ts is
+   * where it is proven.
+   */
   await page.goto(routes.settings(slug))
-  await expect(page.getByRole("heading", { level: 1, name: "My studio" })).toBeVisible()
-  await expect(page.getByRole("cell", { name: "owner" })).toBeVisible()
+  await expect(page.getByRole("heading", { level: 1, name: "Studio settings" })).toBeVisible()
+  await expect(page.getByLabel("Workspace name")).toHaveValue("My studio")
+  await expect(page.getByRole("banner").getByText("My studio")).toBeVisible()
   await expect(page.getByRole("link", { name: "Settings", exact: true })).toHaveAttribute(
     "aria-current",
     "page",

@@ -1,3 +1,4 @@
+import { brotliCompressSync, deflateSync, gzipSync } from "node:zlib"
 import { describe, expect, it, vi } from "vitest"
 import { embeddedIpv4, isBlockedAddress } from "@/lib/net/addresses"
 import {
@@ -413,6 +414,109 @@ describe("the body is capped", () => {
     )
     expect(error.kind).toBe("body_too_large")
     expect(signal!.aborted).toBe(true)
+  })
+})
+
+describe("a compressed answer is decoded", () => {
+  /*
+    A server may compress whether or not it was asked to. The store B8's exit
+    runs against answers its REST index gzipped even when the request says
+    `Accept-Encoding: identity`, and before this the adapter was handed the raw
+    deflate stream, failed to parse it, and reported that the provider had
+    answered in a shape it did not recognise. The connection was refused and
+    the log pointed at the wrong thing entirely.
+  */
+
+  function compressed(payload: string, coding: "gzip" | "deflate" | "br") {
+    const encode = { gzip: gzipSync, deflate: deflateSync, br: brotliCompressSync }[coding]
+    const packed = encode(Buffer.from(payload))
+    const transport: Transport = async () => ({
+      status: 200,
+      headers: new Headers({ "content-type": "application/json", "content-encoding": coding }),
+      body: (async function* () {
+        yield packed
+      })(),
+    })
+    return { transport, packed }
+  }
+
+  it.each(["gzip", "deflate", "br"] as const)("reads a %s body", async (coding) => {
+    const { transport } = compressed(JSON.stringify({ name: "House of Proctor" }), coding)
+    const response = await outboundFetch(
+      "https://shop.example.com/wp-json/",
+      {},
+      { resolve: publicV4(), transport },
+    )
+    await expect(response.json()).resolves.toEqual({ name: "House of Proctor" })
+  })
+
+  it("leaves an uncompressed body alone, and identity means uncompressed", async () => {
+    const cases: Record<string, string>[] = [
+      { "content-type": "application/json" },
+      { "content-type": "application/json", "content-encoding": "identity" },
+    ]
+    for (const headers of cases) {
+      const { transport } = answering(200, '{"id":1}', headers)
+      const response = await outboundFetch(
+        "https://shop.example.com/",
+        {},
+        { resolve: publicV4(), transport },
+      )
+      await expect(response.json()).resolves.toEqual({ id: 1 })
+    }
+  })
+
+  it("does not describe the body it hands back as still encoded", async () => {
+    // A caller that believed content-encoding would decode twice, and one that
+    // believed the compressed content-length would truncate.
+    const { transport } = compressed('{"id":1}', "gzip")
+    const response = await outboundFetch(
+      "https://shop.example.com/",
+      {},
+      { resolve: publicV4(), transport },
+    )
+    expect(response.headers.get("content-encoding")).toBeNull()
+    expect(response.headers.get("content-length")).toBeNull()
+    expect(response.headers.get("content-type")).toBe("application/json")
+  })
+
+  it("caps the decompressed size, not just the compressed one", async () => {
+    // The whole reason this needs a guard: a small gzip that expands past the
+    // cap must be refused, or the cap is decorative.
+    const bomb = "a".repeat(5_000_000)
+    const { transport, packed } = compressed(bomb, "gzip")
+    expect(packed.byteLength).toBeLessThan(100_000)
+
+    const error = await refusal(
+      outboundFetch(
+        "https://shop.example.com/",
+        {},
+        { resolve: publicV4(), transport, maxBodyBytes: 100_000 },
+      ),
+    )
+    expect(error.kind).toBe("body_too_large")
+  })
+
+  it("refuses an encoding it cannot read rather than passing the bytes on", async () => {
+    const { transport } = answering(200, "whatever", {
+      "content-type": "application/json",
+      "content-encoding": "exotic",
+    })
+    const error = await refusal(
+      outboundFetch("https://shop.example.com/", {}, { resolve: publicV4(), transport }),
+    )
+    expect(error.kind).toBe("network")
+  })
+
+  it("refuses a body that is not the encoding it claims", async () => {
+    const { transport } = answering(200, "not gzip at all", {
+      "content-type": "application/json",
+      "content-encoding": "gzip",
+    })
+    const error = await refusal(
+      outboundFetch("https://shop.example.com/", {}, { resolve: publicV4(), transport }),
+    )
+    expect(error.kind).toBe("network")
   })
 })
 

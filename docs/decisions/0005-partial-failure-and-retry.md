@@ -1,8 +1,9 @@
 # ADR 0005: What a half-published product is called, and who retries what
 
-**Status:** proposed, 8 September 2026. Drafted unattended so that A7 does not open with
-these two questions unanswered; every recommendation below is the founder's to accept,
-amend or overrule.
+**Status:** accepted, 11 September 2026, with one amendment. Decision 7 stands as written.
+Decision 8 stands except for the stamp-and-search create guard, which is deferred past A7's
+first cut: what ships is the create exception alone, so a transport failure on a create is
+retried by neither tier. Built at A7; see "What was decided" at the foot of this file.
 **Date:** September 2026
 **Blocks:** A7, Publish Everywhere. Its exit test is "one action, two live URLs, one failure
 recovered without duplicates", and both halves of that sentence need these words.
@@ -370,3 +371,24 @@ The three choices most worth a second opinion:
    alone (never retry a create) shipped first; that removes the duplicate and leaves the
    creator's Try again able to create a second product only after a lost response, which is
    the case the stamp exists to close.
+
+---
+
+## What was decided, 11 September 2026
+
+1. **Three re-attempts, 1, 5 and 15 minutes**, as proposed. `REATTEMPT_DELAYS_MS` in
+   `lib/publishing/retry.ts` is the schedule, and `tests/unit/publish-retry.test.ts` holds it
+   to twelve requests over twenty-one minutes in the worst case.
+2. **No product-level word**, as proposed. `planRun` reports sent, failed or skipped per
+   channel, `runSummary` is a count, and the migration adds no status column anywhere. A test
+   asserts that no summary contains "partially".
+3. **The create guard is deferred.** `planReattempt` refuses to re-attempt a `network`
+   failure on a `publish`, the one kind that creates the external object, so Fanwise never
+   creates twice by itself. What stays open is the creator's own Try again after a lost
+   response: it can still make a second product, and closing it needs the stamp on three
+   adapters plus a live verification each. Owed before Gate A's exit run goes to an outside
+   creator.
+
+What A7 built on these: `workspace_events` as the activity log, `publication_jobs.run_id` to
+group one click's jobs, the runner's delayed re-attempt path, and the collapse of three
+copies of the in-call retry into `lib/channels/errors.ts`.

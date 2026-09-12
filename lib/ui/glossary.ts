@@ -32,9 +32,20 @@ export const GLOSSARY = {
     label: "Product",
     body: "The one record in Fanwise that is the truth about a thing you sell. Every channel listing starts as a copy of it, and editing a listing never edits the product back. Change something everywhere by changing it here and rebuilding the listings.",
   },
-  productStatus: {
+
+  // ----------------------------------------------------------------- catalog
+
+  liveChannels: {
+    label: "Live channels",
+    body: "How many channels a buyer can actually reach this product on right now. A channel that holds the product but cannot sell it yet is not counted here, and neither is one that is still publishing, failed, or has a listing nobody has sent. Open the product to see every channel and what each one is waiting for.",
+  },
+  catalogStatus: {
     label: "Status",
-    body: "Where the product stands inside Fanwise. It says nothing about whether the product is on sale anywhere — a product can be complete here and published nowhere. Per-channel state is on the product's channel cards.",
+    body: "What is outstanding on this product, counted rather than summarised. Fanwise never calls a product published or half-published, because publication happens per channel: the count says how many listings need something, and the line under it says which channels they are.",
+  },
+  nextAction: {
+    label: "Next action",
+    body: "The one thing most worth doing about this product next, chosen from its listings and its files. It always opens the product, because that is where every control lives: publishing, retrying and the steps a channel leaves to you. A row with nothing to press is waiting on a background job rather than on you.",
   },
 
   // ---------------------------------------------------------------- channels

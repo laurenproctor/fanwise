@@ -33,6 +33,23 @@ const AUTHENTICATED_MAY_EXECUTE = new Set([
   "is_workspace_owner(p_workspace_id uuid)", // read by RLS policies
   "uuid_or_null(p_value text)", // read by the storage.objects policies
   "storage_object_workspace_id(p_name text)", // read by the storage.objects policies
+  // read by the public-profile-avatars policies on storage.objects
+  "storage_object_profile_workspace_id(p_name text)",
+  /*
+    RPC, called by a server action as the signed-in creator. Each changes a
+    public identifier and writes its redirect in one transaction, which is the
+    reason they are functions rather than two statements: a rename split in
+    two leaves a window where the old address is dead, and a failure in the
+    second half leaves it dead for good.
+
+    Both are security definer and both re-check is_workspace_member()
+    themselves. That is not belt and braces — security definer means the
+    function's own privileges apply once it is running, so without the check
+    the grant below would let any signed-in user rename any handle.
+    tests/db/public-pages-tenancy.test.ts holds that line from the outside.
+  */
+  "release_public_handle(p_public_profile_id uuid, p_new_handle text)",
+  "release_public_product_slug(p_public_product_page_id uuid, p_new_slug text)",
 ])
 
 /**
@@ -48,6 +65,13 @@ const TRIGGER_ONLY = [
   "enforce_asset_immutability",
   "enforce_listing_status_source",
   "enforce_snapshot_immutability",
+  // The public handle and slug namespaces. Each spans a live table and its
+  // history table, which no single unique index can express, so a trigger
+  // checks it from both sides.
+  "check_handle_available",
+  "check_history_handle_available",
+  "check_product_slug_available",
+  "check_history_product_slug_available",
 ] as const
 
 /** PostgREST's answer for a function that is not in its schema cache. */

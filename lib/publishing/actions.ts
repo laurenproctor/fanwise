@@ -13,6 +13,9 @@ import { mergeManualSteps, readyToActivate } from "./manual-steps"
 import { awaitingReview } from "@/lib/ai/review"
 import { approveListing } from "@/lib/ai/approve"
 import { startPublication } from "./start"
+import { listChannels, listConnections, listProductListings } from "@/lib/channels/queries"
+import { planRun, runInputs, runSummary } from "./run"
+import { recordEvent } from "./events"
 
 /**
  * Publishing, from the creator's side.
@@ -397,4 +400,165 @@ export async function completeManualStepAction(
   }
 
   return { error: null, notice: `Taking the product live on ${adapter.name}.`, activating: true }
+}
+
+/**
+ * Publish Everywhere: one click, one job per channel that can take one.
+ *
+ * The deciding is in ./run and is a pure function over plain facts, so every
+ * case it can produce is tested without a database. What is left here is the
+ * part that needs the world: reading the channels, the connections and the
+ * listings, then starting the jobs the plan names.
+ *
+ * Three things this deliberately does not do.
+ *
+ * It does not retry the run as a unit. A failed channel is retried on its own
+ * card, because the other channels' outcomes stand and re-running them would
+ * be a no-op the idempotency key refuses anyway.
+ *
+ * It does not write a status on the product. A product is never published; its
+ * listings are (ADR 0005), so what comes back is a count and the per-channel
+ * cards say the rest.
+ *
+ * And it does not skip a channel silently. Everything Fanwise knows about is in
+ * the plan with a reason attached, including channels this workspace has never
+ * connected, which is what stops "publish everywhere" from quietly meaning
+ * "publish to the two you set up in March".
+ */
+export async function publishEverywhereAction(
+  workspaceSlug: string,
+  productId: string,
+): Promise<PublishState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data: productRow } = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", productId)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+
+  if (!productRow) return { error: "That product could not be found.", notice: null }
+  const product = productRow as Product
+
+  const [channels, connections, listings] = await Promise.all([
+    listChannels(),
+    listConnections(workspace.id),
+    listProductListings(product, workspace.id),
+  ])
+
+  // The same mapping the product page uses to decide what the button says, so
+  // the button and the action cannot disagree about what one click will do.
+  const plan = planRun(runInputs({ channels, connections, listings }))
+  const runId = crypto.randomUUID()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Written before anything is started, and naming every channel including the
+  // ones nothing will be done about. A run that is interrupted halfway still
+  // leaves a record of what it set out to do.
+  await recordEvent(supabase, {
+    workspaceId: workspace.id,
+    type: "publish_run_started",
+    productId: product.id,
+    runId,
+    actorUserId: user?.id ?? null,
+    payload: {
+      starts: plan.starts.map((start) => ({ channel: start.channelName, kind: start.kind })),
+      skips: plan.skips.map((skip) => ({ channel: skip.channelName, reason: skip.reason })),
+    },
+  })
+
+  let started = 0
+  const refused: string[] = []
+
+  for (const start of plan.starts) {
+    /*
+     * Loaded one listing at a time rather than in a single query. A product is
+     * on a handful of channels, and loadListing is the same path the
+     * single-channel publish takes: the same subject, the same approval stamp,
+     * the same idempotency key. A faster bespoke query here would be a second
+     * way to build the same thing, and the two would drift.
+     */
+    const loaded = await loadListing(supabase, workspace.id, start.listingId)
+    if (!loaded) {
+      refused.push(start.channelName)
+      continue
+    }
+
+    const { listing, subject } = loaded
+
+    // The click is the approval, stamped before the send, exactly as it is on a
+    // single channel. docs/ai-merchandising.md: no first generation reaches a
+    // marketplace without a person saying so, and this is them saying so for
+    // every channel at once.
+    if (awaitingReview(listing)) {
+      const approved = await approveListing({
+        supabase,
+        workspaceId: workspace.id,
+        listingId: listing.id,
+      })
+      if (approved.kind === "error") {
+        refused.push(start.channelName)
+        continue
+      }
+    }
+
+    const draft = listingToDraft(listing)
+    const outcome = await startPublication(
+      start.kind === "update"
+        ? {
+            supabase,
+            workspaceId: workspace.id,
+            listingId: listing.id,
+            kind: "update",
+            draft,
+            images: imagesFingerprint(subject),
+            generation: listing.publish_generation,
+            runId,
+          }
+        : {
+            supabase,
+            workspaceId: workspace.id,
+            listingId: listing.id,
+            kind: "publish",
+            draft,
+            generation: listing.publish_generation,
+            runId,
+          },
+    )
+
+    if (outcome.kind === "error") {
+      refused.push(start.channelName)
+      continue
+    }
+
+    // Only a publish moves the listing, and only once a job exists behind it.
+    // An update leaves the row alone: the product is live while the write is in
+    // flight, and saying otherwise would report a live product as not live.
+    if (start.kind === "publish" && (outcome.kind === "started" || outcome.kind === "retried")) {
+      await supabase
+        .from("channel_listings")
+        .update({ status: "publishing" })
+        .eq("id", listing.id)
+        .eq("workspace_id", workspace.id)
+    }
+
+    started += 1
+  }
+
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
+
+  const summary = runSummary(plan)
+  if (refused.length > 0) {
+    return {
+      error: `${refused.join(", ")} could not be started. The rest are on their way.`,
+      notice: summary,
+      sending: started > 0,
+    }
+  }
+
+  return { error: null, notice: summary, sending: started > 0 }
 }

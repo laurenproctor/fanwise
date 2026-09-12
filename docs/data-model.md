@@ -290,7 +290,30 @@ rather it went away.
 
 ## A7: orchestration
 
-**workspace_events** — append-only activity log. Never updated, never deleted.
+Built. Migration `20260911224831_publish_everywhere_runs`.
+
+**workspace_events** — append-only activity log: id, workspace_id, event_type, product_id,
+channel_listing_id, run_id, actor_user_id, payload, created_at.
+
+Never updated, never deleted, and not by the service role either. Three lines enforce that:
+members hold `select` and `insert` only, no policy exists for the other two verbs, and a
+trigger refuses both whatever the role. It is the shape `listing_snapshots` earned the hard
+way, for the same reason — a log its own writer can edit afterwards is not evidence of
+anything.
+
+`event_type` is text with a format check rather than an enum, because the set of things worth
+logging grows with every step and an enum puts a migration between a new event and the code
+that writes it. `lib/publishing/events.ts` owns the vocabulary. Both tenant boundaries are
+composite foreign keys, to `products (id, workspace_id)` and
+`channel_listings (id, workspace_id)`.
+
+**`publication_jobs.run_id`** — nullable, and permanently so. It groups the jobs one Publish
+Everywhere click created, and a single-channel publish belongs to no run. Not a foreign key:
+a run is not a row, it is the id those jobs share.
+
+**There is no product-level publish status, by decision.** A product is never published; its
+listings are (ADR 0005). A run reports per channel and counts the results, and a query that
+wants to know how much of a product is live counts listings by liveness at read time.
 
 ## B1: AI
 
@@ -458,3 +481,101 @@ That last has no precedent in this model. Gumroad returns a file's canonical URL
 upload, and an update that does not resend it deletes the file. So `metadata.files` is not a
 cache: losing it would make the next update remove the buyer's download, and the adapter
 refuses an update whose stored files disagree with the product's rather than guess.
+
+## Public creator pages
+
+Built. Migration `20260912010000_public_creator_pages`.
+
+The first tables in Fanwise that `anon` may read. Everything else in this document
+describes data one workspace can see; this section describes data the open web can
+see, and the differences are the parts worth reading twice.
+
+**public_profiles** — id, workspace_id, handle (citext, unique), display_name,
+short_bio, location, avatar_path, website_url, instagram_url, contact_url, status,
+seo_title, seo_description, published_at, created_at, updated_at
+
+A **public profile is not a workspace**. A workspace is an operational container with
+a slug for `/<slug>`; a profile is a public identity with a handle for `/@<handle>`.
+They are separate fields on separate tables, and the handle is never derived from a
+name that can change underneath it.
+
+One profile per workspace is a **V1 limit expressed as a droppable index**,
+`public_profiles_one_per_workspace_idx`, not a modelling assumption. Nothing else in
+the schema assumes it; drop that one index and a workspace owns several.
+
+The handle character set is lowercase ASCII letters, digits and single internal
+hyphens, and the narrowness is not tidiness. A handle is an identity claim rendered
+in someone else's typeface, and a set that admits Unicode admits Cyrillic `а`, Greek
+`ο`, a zero-width joiner between two letters — each producing a handle a reader
+cannot distinguish from an existing one and a database treats as new. ASCII cannot
+express that attack.
+
+Note the cast in `public_profiles_handle_format`: `~` on a **citext** operand is the
+case-*insensitive* match, so an uncast `handle ~ '^[a-z0-9...]'` accepts `NorthLine`.
+The constraint reads as though it forbids uppercase and does not. `workspaces.slug`
+and `products.slug` carry the same shape and are deployed; they are unaffected in
+practice because `lib/slug.ts` lowercases before insert, but the constraint there is
+weaker than it looks.
+
+**public_handle_history** — id, public_profile_id, workspace_id, handle (unique),
+created_at
+
+A handle a profile has released. `/@old-handle` permanently redirects to the current
+one, so a link printed in somebody's portfolio does not rot. That makes uniqueness a
+rule **spanning two tables**, which no single unique index can express, so a trigger
+enforces it from both sides. Rows are written only by `release_public_handle()`,
+which changes the handle and records the old one in one transaction.
+
+**public_product_pages** — id, workspace_id, public_profile_id, product_id, slug
+(citext), status, featured, display_order, title_override, summary_override,
+description_override, cover_asset_id, seo_title, seo_description, published_at,
+created_at, updated_at
+
+Inherits from `products`; the override columns are the deliberate exceptions rather
+than a copy of the record. Unique on `(public_profile_id, slug)` and on
+`(public_profile_id, product_id)`: one public page per product, so a product cannot
+compete with itself for a search result.
+
+The tenant boundary is a foreign key, as it is on `product_assets`. The profile, the
+product and the cover asset are each referenced as an `(id, workspace_id)` pair, so a
+member cannot point their own workspace's public page at another workspace's product.
+
+**public_product_slug_history** — the same redirect model one level down, scoped to
+the profile rather than globally.
+
+**public_outbound_clicks** — id, workspace_id, public_profile_id,
+public_product_page_id, channel_id, occurred_at, referrer_host, campaign
+
+Deliberately thin, and the absences are the design: no IP, no user agent, no cookie,
+no visitor or session identifier, and the referrer reduced to a bare host before it is
+stored. Enough to tell a creator which channel a page drives; not enough to
+reconstruct anybody's browsing. **No grant to `anon` at all** — a route handler writes
+with the service role after checking the page is genuinely published, so a table that
+accepts anonymous writes never exists.
+
+### What `anon` may read, and how much of it
+
+Nothing is public until somebody published it. Both tables are born `draft`, and a
+published product page is additionally gated on its parent profile being published,
+so unpublishing a profile takes every product beneath it — and their canonical
+`products`, `product_assets` and `channel_listings` rows — out of public view in one
+write.
+
+A public product page renders facts from `products`, `product_assets` and
+`channel_listings`, none of which had ever been readable by `anon`. A policy alone
+would have been the wrong tool, for the reason recorded above about credentials:
+**RLS filters rows, never columns**. So `anon` holds **column-level SELECT grants** —
+a named list per table, which makes `select *` a permission error rather than a wide
+read — and the policies then restrict those columns to genuinely published rows. Both
+halves are load-bearing. `storage_path`, `channel_connection_id`, `status` and
+`archived_at` are among the columns deliberately absent.
+
+Those policies are `to anon` and not `to anon, authenticated`, because `authenticated`
+already holds all-column SELECT on those tables: adding that role to a permissive
+policy would hand a signed-in member every column of another workspace's product the
+moment it was published. The public read path never runs as `authenticated` —
+`lib/supabase/public.ts` is cookie-less by construction.
+
+`anon` executes **no function in `public`**. The published-ness gate is an inline
+subquery naming `status = 'published'` explicitly, rather than the tidier security
+definer helper, precisely so that stays true.

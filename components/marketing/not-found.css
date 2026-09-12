@@ -1,0 +1,442 @@
+/**
+ * The not-found page.
+ *
+ * Its own file rather than more of marketing.css, which transcribes the handoff
+ * and is diffed against it; this page is not in the handoff. It is scoped under
+ * `.fw` all the same and speaks only in the `--fw-` tokens that file defines,
+ * so both themes follow the shared palette and nothing here is a new colour.
+ *
+ * Four arrangements of one piece of markup:
+ *
+ *   below 560px    stacked, the drawing a 2 by 2
+ *   560 to 767px   stacked, the full 3 by 3
+ *   768 to 879px   side by side, the 2 by 2 again, because the column is narrow
+ *   880px and up   side by side, the full 3 by 3
+ *
+ * Every arrangement keeps the 404 tile and the broken route beside it.
+ */
+
+.fw-nf {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 56px;
+  padding-block: 40px 88px;
+}
+
+@media (min-width: 768px) {
+  .fw-nf {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    column-gap: clamp(40px, 5vw, 72px);
+    align-items: center;
+    padding-block: 64px 120px;
+  }
+}
+
+/* ------------------------------------------------------------------ copy -- */
+
+.fw-nf__title {
+  font-size: clamp(34px, 9vw, 52px);
+  line-height: 1.06;
+}
+
+@media (min-width: 768px) {
+  .fw-nf__title {
+    font-size: clamp(36px, 4.6vw, 58px);
+  }
+}
+
+/* Qualified by `.fw`, because `.fw p { margin: 0 }` would otherwise win. */
+.fw .fw-nf__lede {
+  max-width: 38ch;
+  margin-top: 22px;
+  color: var(--fw-ink-2);
+  font-size: 17px;
+}
+
+.fw-nf__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 36px;
+}
+
+.fw-nf__actions .fw-btn {
+  min-height: 48px;
+}
+
+/* A phone gets two full-width targets rather than two pills that might wrap unevenly. */
+@media (max-width: 479px) {
+  .fw-nf__actions {
+    flex-direction: column;
+  }
+
+  .fw-nf__actions .fw-btn {
+    width: 100%;
+  }
+}
+
+.fw-nf__quiet {
+  display: inline-block;
+  margin-top: 22px;
+  padding-block: 8px;
+  color: var(--fw-ink-2);
+  font-size: 15px;
+  text-decoration: underline;
+  text-decoration-color: var(--fw-rule-hover);
+  text-underline-offset: 5px;
+}
+
+.fw-nf__quiet:hover {
+  color: var(--fw-ink);
+  text-decoration-color: currentColor;
+}
+
+/* --------------------------------------------------------------- drawing -- */
+
+.fw-nf-grid {
+  --nf-col-gap: 48px;
+  --nf-row-gap: 26px;
+  --nf-line: color-mix(in srgb, var(--fw-ink-3) 55%, transparent);
+
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    "pa pb pc"
+    "a b c"
+    "d x e"
+    "f g h";
+  column-gap: var(--nf-col-gap);
+  row-gap: var(--nf-row-gap);
+  width: 100%;
+  max-width: 560px;
+}
+
+@media (min-width: 768px) {
+  .fw-nf-grid {
+    justify-self: end;
+  }
+}
+
+/* Beside the copy on a tablet-width window the 3 by 3 is narrow: tighter rows, fewer bars. */
+@media (min-width: 880px) and (max-width: 1079px) {
+  .fw-nf-grid {
+    --nf-col-gap: 40px;
+    --nf-row-gap: 22px;
+  }
+
+  .fw-nf-grid .fw-nf-pill__dot,
+  .fw-nf-grid .fw-nf-bar--long {
+    display: none;
+  }
+}
+
+@media (max-width: 559px), (min-width: 768px) and (max-width: 879px) {
+  .fw-nf-grid {
+    --nf-col-gap: 44px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "pa pc"
+      "a c"
+      "x e";
+    max-width: 380px;
+  }
+
+  .fw-nf-grid .fw-nf-cell--pb,
+  .fw-nf-grid .fw-nf-cell--b,
+  .fw-nf-grid .fw-nf-cell--d,
+  .fw-nf-grid .fw-nf-cell--f,
+  .fw-nf-grid .fw-nf-cell--g,
+  .fw-nf-grid .fw-nf-cell--h {
+    display: none;
+  }
+
+  /* Nothing sits below the tile for its line to reach. */
+  .fw-nf-grid .fw-nf-tile::after {
+    display: none;
+  }
+}
+
+.fw-nf-cell--pa {
+  grid-area: pa;
+}
+.fw-nf-cell--pb {
+  grid-area: pb;
+}
+.fw-nf-cell--pc {
+  grid-area: pc;
+}
+.fw-nf-cell--a {
+  grid-area: a;
+}
+.fw-nf-cell--b {
+  grid-area: b;
+}
+.fw-nf-cell--c {
+  grid-area: c;
+}
+.fw-nf-cell--d {
+  grid-area: d;
+}
+.fw-nf-cell--x {
+  grid-area: x;
+}
+.fw-nf-cell--e {
+  grid-area: e;
+}
+.fw-nf-cell--f {
+  grid-area: f;
+}
+.fw-nf-cell--g {
+  grid-area: g;
+}
+.fw-nf-cell--h {
+  grid-area: h;
+}
+
+/* A destination. The line under it runs through the row gap to the card below. */
+.fw-nf-pill {
+  position: relative;
+  justify-self: center;
+  align-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px 4px 4px;
+  border: 1px solid var(--fw-rule);
+  border-radius: var(--radius-pill);
+  background: var(--fw-card);
+  color: var(--fw-ink);
+  font-size: 12.5px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.fw-nf-pill::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 1px;
+  height: var(--nf-row-gap);
+  background: var(--nf-line);
+}
+
+.fw-nf-pill__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+}
+
+.fw-nf-pill__mark--plain {
+  border-color: var(--fw-rule);
+  background: var(--fw-paper-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fw-ink-3);
+}
+
+.fw-nf-pill__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--fw-ok);
+}
+
+/* A product, drawn the way components/public/product-card.tsx draws one with no cover. */
+.fw-nf-card,
+.fw-nf-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--fw-rule);
+  border-radius: 14px;
+  background: var(--fw-card);
+}
+
+.fw-nf-card__thumb {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  border-bottom: 1px solid var(--fw-rule);
+  border-radius: 13px 13px 0 0;
+  background: var(--fw-paper-2);
+}
+
+.fw-nf-card__type {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fw-ink-3);
+}
+
+.fw-nf-card__body {
+  display: grid;
+  gap: 7px;
+  padding: 11px 12px 12px;
+}
+
+.fw-nf-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.fw-nf-bar {
+  display: block;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--fw-rule);
+}
+
+.fw-nf-bar--long {
+  width: 74%;
+}
+
+.fw-nf-bar--short {
+  width: 46%;
+}
+
+.fw-nf-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+}
+
+.fw-nf-dot--live {
+  background: var(--fw-ok);
+}
+
+.fw-nf-dot--pending {
+  background: var(--fw-accent);
+  opacity: 0.55;
+}
+
+/* Healthy routes: solid hairlines through the gap to the neighbouring card. */
+.fw-nf-line--down::after,
+.fw-nf-line--right::after {
+  content: "";
+  position: absolute;
+  background: var(--nf-line);
+}
+
+.fw-nf-line--down::after {
+  top: 100%;
+  left: 50%;
+  width: 1px;
+  height: calc(var(--nf-row-gap) + 1px);
+}
+
+.fw-nf-line--right::after {
+  top: 50%;
+  left: 100%;
+  width: calc(var(--nf-col-gap) + 1px);
+  height: 1px;
+}
+
+/* ------------------------------------------------------------------ tile -- */
+
+.fw-nf-tile {
+  border-color: var(--fw-accent);
+  background: var(--fw-accent);
+  color: var(--fw-paper);
+}
+
+.fw-nf-tile__code {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: 0;
+  aspect-ratio: 4 / 3;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 8vw, 44px);
+  font-weight: 300;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 880px) and (max-width: 1079px) {
+  .fw-nf-tile__code {
+    font-size: 32px;
+  }
+}
+
+.fw-nf-bar--on-tile {
+  background: color-mix(in srgb, var(--fw-paper) 38%, transparent);
+}
+
+/* Hollow where every other card is filled: the listing that has nowhere to be. */
+.fw-nf-dot--missing {
+  border: 1.5px solid var(--fw-paper);
+}
+
+/*
+ * The broken route. It leaves the tile, stops at a little under half the gap,
+ * and the endpoint waits on its own short of the card it was meant to reach.
+ */
+.fw-nf-break {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: var(--nf-col-gap);
+  height: 0;
+}
+
+.fw-nf-break__line {
+  position: absolute;
+  top: -0.75px;
+  left: 0;
+  width: 50%;
+  height: 1.5px;
+  background: repeating-linear-gradient(to right, var(--fw-accent) 0 4px, transparent 4px 7px);
+  transform-origin: left center;
+  animation: fwNfDraw 650ms cubic-bezier(0.2, 0.7, 0.2, 1) 250ms both;
+}
+
+.fw-nf-break__end {
+  position: absolute;
+  top: -4.5px;
+  left: calc(70% - 4.5px);
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--fw-accent);
+  border-radius: var(--radius-pill);
+  background: var(--fw-paper);
+  animation: fwNfDetach 260ms ease-out 820ms both;
+}
+
+@keyframes fwNfDraw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes fwNfDetach {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fw-nf-break__line,
+  .fw-nf-break__end {
+    animation: none;
+  }
+}

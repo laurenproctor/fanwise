@@ -13,7 +13,7 @@ import {
 import { findAdapter } from "@/lib/channels/registry"
 import { normalizeUnknown } from "@/lib/channels/errors"
 import { routes } from "@/lib/routes"
-import { jobs } from "@/lib/jobs"
+import { requestBillingSync } from "@/lib/billing/request-sync"
 
 /**
  * The OAuth callback, for every channel that has one.
@@ -161,7 +161,7 @@ export async function GET(
     // A new connection row is a billing event, written by the trigger in the
     // same statement as the row. A reconnect is an update and wrote none, and
     // the sync then finds nothing to do.
-    await jobs.enqueue("sync_billing", { workspaceId: consumed.workspaceId })
+    await requestBillingSync(consumed.workspaceId)
   } catch (error) {
     // Nothing from here reaches the browser except a normalized sentence. The
     // thrown value may hold a provider body, and the request that produced it

@@ -15,14 +15,17 @@ explicitly requested.
 
 ## Current step
 
-**Step: A6 (Etsy: OAuth with PKCE, adapter, images, the digital file, activate, idempotency)
-is done. Its exit ran on 11 September 2026 against a live shop: connect, publish, and listing
-4573259073 active in one job. Four of the five questions in `docs/channels/etsy.md` §13 are
-settled; the fifth, refresh-token rotation, waits on the first refresh. A7 (Publish
-Everywhere) is next and not yet opened, with Shopify and Etsy as its two live channels. B1,
-B2 and B8 are on `main`; B8's exit needs a live WooCommerce store, which needs no approval.
-Gate A is not passed; A8 resumes when a Creative Market login exists.** See `docs/roadmap.md`. Implement the current
-step only. Do not build ahead.
+**Step: A7 (Publish Everywhere: run planning, per-channel outcomes, the activity log, the
+re-attempt schedule) is merged, exit unrun. The exit — one action, two live URLs, one
+failure recovered without duplicates — needs a live Shopify and a live Etsy in one click,
+which is a run a person does by hand. A6 is done; its exit ran on 11 September 2026 against
+a live shop, and the fifth question in `docs/channels/etsy.md` §13, refresh-token rotation,
+still waits on the first refresh. Two things shipped outside the step order and are not part
+of any gate: first-run onboarding on 11 September 2026 as PR #61, and the public creator
+pages (`/@handle`) on 12 September 2026 as PR #72, migration applied and live. B1, B2 and B8
+are on `main`; B8's exit needs a live WooCommerce store, which needs no approval. Gate A is
+not passed; A8 waits on a Creative Market seller login and the questions in that spec's
+§13.** See `docs/roadmap.md`. Implement the current step only. Do not build ahead.
 
 ## Architecture invariants
 
@@ -95,9 +98,17 @@ Use these words in code, UI and docs, consistently.
 | Sale event | A normalized transaction |
 | Readiness | Deterministic validation of publishability |
 | FactSheet | The typed, derived set of facts AI is allowed to state |
+| Public profile | A creator's public identity on the open web, at `/@handle`. Separate from the workspace: a workspace is an operational container, a profile is a public identity, and the model allows a workspace to own several |
+| Public page | The public showcase for one product, at `/@handle/<slug>`. Inherits from the canonical product; its own columns are deliberate overrides, never a copy |
+| Run | One Publish Everywhere action and the per-channel outcomes it produced |
+| Skipped | A connected channel a run did not attempt, always with a reason |
 
 In the UI say **Publish**, not Submit. Say **Channels**, not Marketplaces. Say **Product**,
 not Item. The central action is **Publish Everywhere**.
+
+A product is never described as published, partially published or unpublished. Listings are.
+A run says what it did per channel and counts the results; "partially published" is banned
+from code, UI and docs, because no listing was ever partially anything (ADR 0005).
 
 ## Pricing model
 
@@ -144,7 +155,7 @@ Integration: mock Shopify, Etsy, WooCommerce, Anthropic and Stripe. Cover OAuth 
 handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
 AI failure.
 
-E2E: the thirteen journeys in `docs/testing.md`. Journey 9 (workspace A cannot reach
+E2E: the fourteen journeys in `docs/testing.md`. Journey 9 (workspace A cannot reach
 workspace B) must never be skipped.
 
 ## Definition of done

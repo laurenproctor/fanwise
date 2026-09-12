@@ -1,13 +1,25 @@
 # Roadmap
 
-**Current step: A6 is done. Its exit ran on 11 September 2026 against the live shop
-`Fanwise`: connect, publish, and an active listing in one job, with four of the five §13
-questions in `docs/channels/etsy.md` settled; see "The A6 exit run" below. A7 is next and not
-yet opened. B1, B2 and B8 are also on `main`, each code complete with its exit unrun; see
-their sections under Gate B.** A5 is done; all three exit clauses ran against a live Shopify
+**Current step: A7 is merged, its exit unrun.** One
+click plans a run from the channel registry, starts a job per channel that can take the
+product, names every channel it skipped and why, records the run in `workspace_events`, and
+re-attempts a retryable failure three times over twenty-one minutes before it stops. The
+exit — one action, two live URLs, one failure recovered without duplicates — needs a live
+Shopify and a live Etsy, and is a run a person does by hand. ADR 0005 was accepted to build
+it, with the stamp-and-search create guard deferred.
+
+**A6 is done.** Its exit ran on 11 September 2026 against the live shop `Fanwise`: connect,
+publish, and an active listing in one job, with four of the five §13 questions in
+`docs/channels/etsy.md` settled; see "The A6 exit run" below. B1, B2 and B8 are also on
+`main`, each code complete with its exit unrun; see their sections under Gate B. A5 is done; all three exit clauses ran against a live Shopify
 store. What remains of Gate A: A7 has its two live channels, Shopify and Etsy, and is blocked
 on nothing; A8 waits on a Creative Market seller login; and the gate's own exit — an outside
 creator, unassisted — waits on a real portfolio to hand them.
+
+**Two things shipped outside the step order**, both at the founder's direction and neither
+part of a gate: first-run onboarding on 11 September 2026 as PR #61, and the public creator
+pages on 12 September 2026 as PR #72. See "The public creator pages" below for what the
+second one means for Gate A's exit test, which is a question still open.
 **Gate A is not passed.** Gate A's exit test is still owed before Gate B's is attempted. See
 "Reordering" below.
 
@@ -322,6 +334,52 @@ subject with no connection metadata, so every build and update snapshot's
 action never had the gap, which is why the publish went through, and the build snapshot for
 this listing records the warning as unsatisfied. Fixed with this record.
 
+## The public creator pages, 12 September 2026
+
+Shipped outside the step order as PR #72, merged at `039716d`, deployed, and the hosted
+migration `20260912010000_public_creator_pages` applied the same day. Not part of any gate.
+
+A creator claims a handle and gets `/@handle`, with `/@handle/<product-slug>` beneath it:
+one public address gathering everything they sell, and a route out to whichever channel a
+visitor prefers. Fanwise takes no payment there and holds no cart. Five tables, RLS from
+birth, and `anon`'s first read access in the product — narrowed by column-level grants, so
+`select *` on `products`, `product_assets` or `channel_listings` is a permission error
+rather than a wide read.
+
+Nothing is public until somebody publishes it, and a published product under an unpublished
+profile is not public. That rule lives in the database, not in a component.
+
+Three things are worth carrying forward, because each was invisible until something tripped
+over it:
+
+- **A `NextResponse.rewrite()` in the proxy pins the response status at 200.** The rewritten
+  page's `notFound()` never reaches the browser, so a *draft* profile answered `200 OK` with
+  the not-found body. `/@handle` is therefore a `beforeFiles` rewrite in `next.config.ts`,
+  which resolves through the router and keeps the page's own 404.
+- **A route-level `loading.tsx` breaks the same 404 from the other side**, because its
+  Suspense boundary commits the response before the page has decided anything. Loading
+  states on public pages are nested inside the page.
+- **supabase-js reads are cached by Next underneath a route's own revalidation.** The
+  sitemap served a pre-publish answer across two full rebuilds, with no error anywhere;
+  Vercel persists that cache across deployments, so redeploying would not have cleared it.
+  `createPublicClient()` sets `cache: "no-store"`, and any new public read path must too.
+
+**It was merged before the hosted migration ran, deliberately.** With the five tables absent
+the feature is invisible rather than broken: the settings and product-editor sections render
+their empty states, `/@anything` answers 404 rather than 500, and the sitemap falls back to
+the marketing routes. That was verified by dropping the tables locally and driving the app,
+then confirmed on production between the deploy and the migration.
+
+**Open question for Gate A.** The gate's exit is "an outside creator, unassisted, takes one
+of their real products from signup to a live listing." A public profile is arguably now part
+of what that creator sees, and it is not in the gate's definition. Decide before the gate
+run, not during it.
+
+**Not built, deliberately:** collection pages (`/@handle/collections/<slug>` is reserved in
+the slug namespace and routes into the public tree, but no page answers it) and any UI over
+the outbound-click log, which records rows and shows them nowhere. Both would be building
+ahead.
+
 ## Reordering, 7 September 2026
 
 "Nothing after a gate begins until the gate passes" is the rule at the top of this file, and
@@ -593,7 +651,7 @@ Scope, when it opens:
 - Clipboard and download behaviour proven from the second window, including the formatted
   description Creative Market's editor needs.
 - Component tests, one E2E spec, and a line in `docs/testing.md` saying this is journey 7 in
-  the companion rather than a fourteenth journey.
+  the companion rather than a fifteenth journey.
 
 **No migration, no new table, no new server action, no new capability.** B11 is a layout. If
 it needs a schema change, something has been misread.
@@ -674,6 +732,20 @@ the row. Journey 10 in `docs/testing.md`.
 Not part of any gate. `design/marketing/` holds the published mockups; when the public site
 ships it should be its own deployment, not a route in this app. Do not mix marketing pages
 into `app/` while the gates are in progress.
+
+**That last sentence no longer describes the repository, and the gap is worth naming rather
+than quietly leaving.** `app/(marketing)/` already serves seven routes — about, how-it-works,
+marketplaces, pricing, privacy, start, terms — and since 12 September 2026 `app/profile/`
+serves the public creator pages as well.
+
+The creator pages are a different thing from marketing pages and could not be a separate
+deployment: they render tenant data, through RLS, from the same database and the same
+product model, and splitting them out would mean a second service holding the anon key and
+duplicating the adapter registry. The marketing routes have no such excuse.
+
+So the rule stands for marketing and has already been broken for it. Either move those seven
+routes out or retire the sentence; leaving it as advice nobody follows is the worst of the
+three.
 
 ## Deliberately out of scope for V1
 

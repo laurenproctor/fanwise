@@ -1,5 +1,6 @@
 import { promises as dns } from "node:dns"
 import { isIP } from "node:net"
+import { brotliDecompressSync, gunzipSync, inflateSync } from "node:zlib"
 import { isBlockedAddress, type Family, type ResolvedAddress } from "./addresses"
 
 export type { Family, ResolvedAddress } from "./addresses"
@@ -20,8 +21,14 @@ export type { Family, ResolvedAddress } from "./addresses"
  *   3. The connection is made to the address that was checked. The transport
  *      never resolves the name again, so a record that changes between the
  *      check and the connect (DNS rebinding) changes nothing.
- *   4. No redirect is followed. A 3xx is an error, so a credential sent to
- *      one origin is never re-sent to another.
+ *   4. No redirect is followed unless the caller asks for a budget, and a
+ *      followed hop is not a shortcut past any of the above: the `Location` is
+ *      re-validated and re-resolved from scratch, so a redirect into a private
+ *      address is refused exactly as a direct request to it would be. Any
+ *      header that carries a secret is dropped the moment the origin changes,
+ *      so a credential sent to one origin is never re-sent to another. With
+ *      no budget — the default, and what every channel adapter uses — a 3xx
+ *      is still an error.
  *   5. A connect timeout, a deadline for the whole exchange, and a cap on the
  *      body. A slow or enormous answer is an error, not a stuck job.
  *
@@ -107,13 +114,34 @@ export interface OutboundOptions {
   responseTimeoutMs?: number
   /** The most body the caller will be handed. */
   maxBodyBytes?: number
+  /**
+   * How many redirects to follow. Zero, the default, refuses them.
+   *
+   * Opt-in rather than on, because every caller until the link importer was an
+   * authenticated API client, and for those a 3xx is either a misconfiguration
+   * or somebody trying to move a bearer token to a host of their choosing.
+   * Reading a page a creator pasted is the one case where a redirect is
+   * ordinary: shorteners, canonical hosts and trailing slashes all produce one.
+   */
+  maxRedirects?: number
 }
 
 export const OUTBOUND_DEFAULTS = {
   connectTimeoutMs: 10_000,
   responseTimeoutMs: 30_000,
   maxBodyBytes: 5 * 1024 * 1024,
+  maxRedirects: 0,
 } as const
+
+/**
+ * Request headers that must never survive a change of origin.
+ *
+ * Lower-cased, compared lower-cased. Nothing in this repository sends any of
+ * them through here today; they are dropped anyway, because the cost of being
+ * wrong about that later is a credential handed to whoever controls the
+ * redirect.
+ */
+const ORIGIN_BOUND_HEADERS = new Set(["authorization", "cookie", "proxy-authorization"])
 
 const REDIRECT = new Set([301, 302, 303, 307, 308])
 const NO_BODY = new Set([204, 205, 304])
@@ -256,64 +284,199 @@ async function pin(url: URL, resolve: Resolver): Promise<ResolvedAddress> {
   return addresses[0]!
 }
 
-export async function outboundFetch(
+/** What a request actually did, for a caller that needs to record it. */
+export interface OutboundResult {
+  response: Response
+  /**
+   * The URL the body actually came from. Differs from the input only when a
+   * redirect was followed, and it is what provenance should record: the page
+   * a creator was shown is the one at the end of the chain.
+   */
+  resolvedUrl: string
+  /** Every hop taken, in order, final URL last. Empty when none were. */
+  redirects: string[]
+}
+
+/**
+ * One request, with the whole policy applied, and a record of where it went.
+ *
+ * `outboundFetch` is this without the record, and is what every caller that
+ * does not follow redirects uses.
+ */
+export async function outboundRequest(
   input: string,
   init: OutboundInit = {},
   options: OutboundOptions = {},
-): Promise<Response> {
-  const url = validateOutboundUrl(input)
+): Promise<OutboundResult> {
   const resolve = options.resolve ?? defaults.resolve
   const transport = options.transport ?? defaults.transport ?? (await loadDefaultTransport())
   const connectTimeoutMs = options.connectTimeoutMs ?? OUTBOUND_DEFAULTS.connectTimeoutMs
   const responseTimeoutMs = options.responseTimeoutMs ?? OUTBOUND_DEFAULTS.responseTimeoutMs
   const maxBodyBytes = options.maxBodyBytes ?? OUTBOUND_DEFAULTS.maxBodyBytes
-  const hostname = literalHostname(url)!
+  const maxRedirects = options.maxRedirects ?? OUTBOUND_DEFAULTS.maxRedirects
 
-  const pinned = await pin(url, resolve)
-
+  /*
+    One deadline for the whole exchange, redirects included. A per-hop deadline
+    would let a chain of slow-but-not-timing-out hops run for as long as the
+    budget allows multiplied by the number of hops, which is the shape of a
+    stuck job that no single timeout ever fires on.
+  */
   const controller = new AbortController()
+  let deadlineHost = literalHostname(validateOutboundUrl(input)) ?? "the host"
   const deadline = setTimeout(() => {
-    controller.abort(new OutboundError("timeout", `${hostname} did not answer in time`))
+    controller.abort(new OutboundError("timeout", `${deadlineHost} did not answer in time`))
   }, responseTimeoutMs)
 
   try {
-    let response: TransportResponse
-    try {
-      response = await transport({
-        url,
-        address: pinned.address,
-        family: pinned.family,
-        method: init.method ?? "GET",
-        headers: init.headers ?? {},
-        ...(init.body === undefined ? {} : { body: init.body }),
-        connectTimeoutMs,
-        signal: controller.signal,
-      })
-    } catch (error) {
-      throw asOutboundError(error, controller.signal, hostname)
+    let url = validateOutboundUrl(input)
+    let headers = { ...(init.headers ?? {}) }
+    const redirects: string[] = []
+
+    // <= so that a budget of n follows n redirects and refuses the (n+1)th.
+    for (let hop = 0; hop <= maxRedirects; hop += 1) {
+      const hostname = literalHostname(url)!
+      deadlineHost = hostname
+
+      /*
+        Resolved and checked on every hop, never once for the chain. This is
+        the whole defence against a redirect into a private address, and it is
+        also why a DNS record that changes between hops cannot help: each hop
+        connects to the address this call checked.
+      */
+      const pinned = await pin(url, resolve)
+
+      let response: TransportResponse
+      try {
+        response = await transport({
+          url,
+          address: pinned.address,
+          family: pinned.family,
+          method: init.method ?? "GET",
+          headers,
+          ...(init.body === undefined ? {} : { body: init.body }),
+          connectTimeoutMs,
+          signal: controller.signal,
+        })
+      } catch (error) {
+        throw asOutboundError(error, controller.signal, hostname)
+      }
+
+      if (REDIRECT.has(response.status)) {
+        if (hop === maxRedirects) {
+          const error = new OutboundError(
+            "redirect",
+            maxRedirects === 0
+              ? `${hostname} redirected the request`
+              : `${hostname} redirected more times than allowed`,
+          )
+          controller.abort(error)
+          throw error
+        }
+
+        const location = response.headers.get("location")
+        if (!location) {
+          throw new OutboundError("network", `${hostname} redirected without saying where`)
+        }
+
+        let next: URL
+        try {
+          next = new URL(location, url)
+        } catch {
+          throw new OutboundError("invalid_url", `${hostname} redirected to an unusable address`)
+        }
+
+        // The full entry check again, not a subset: scheme, credentials, port
+        // and hostname all have to hold for the new URL on its own terms.
+        const validated = validateOutboundUrl(next.toString())
+
+        if (validated.origin !== url.origin) {
+          headers = Object.fromEntries(
+            Object.entries(headers).filter(
+              ([name]) => !ORIGIN_BOUND_HEADERS.has(name.toLowerCase()),
+            ),
+          )
+        }
+
+        // The body of a redirect is not the answer and may still be large.
+        await drain(response.body, maxBodyBytes, controller, hostname)
+
+        url = validated
+        redirects.push(validated.toString())
+        continue
+      }
+
+      if (response.status < 200 || response.status > 599) {
+        throw new OutboundError("network", `${hostname} answered with an unusable status`)
+      }
+
+      const declared = Number(response.headers.get("content-length") ?? "")
+      if (Number.isFinite(declared) && declared > maxBodyBytes) {
+        controller.abort(new OutboundError("body_too_large", `${hostname} answered with too much`))
+        throw new OutboundError("body_too_large", `${hostname} answered with too much`)
+      }
+
+      const body = await collect(response.body, maxBodyBytes, controller, hostname)
+      const decoded = decode(body, response.headers.get("content-encoding"), maxBodyBytes, hostname)
+
+      /*
+        The body handed back is decoded, so the headers that described it
+        encoded would be lies. A caller that trusted either would decode twice
+        or truncate.
+      */
+      const outHeaders = new Headers(response.headers)
+      outHeaders.delete("content-encoding")
+      outHeaders.delete("content-length")
+
+      return {
+        response: new Response(NO_BODY.has(response.status) ? null : decoded, {
+          status: response.status,
+          headers: outHeaders,
+        }),
+        resolvedUrl: url.toString(),
+        redirects,
+      }
     }
 
-    if (REDIRECT.has(response.status)) {
-      controller.abort(new OutboundError("redirect", `${hostname} redirected the request`))
-      throw new OutboundError("redirect", `${hostname} redirected the request`)
-    }
-    if (response.status < 200 || response.status > 599) {
-      throw new OutboundError("network", `${hostname} answered with an unusable status`)
-    }
-
-    const declared = Number(response.headers.get("content-length") ?? "")
-    if (Number.isFinite(declared) && declared > maxBodyBytes) {
-      controller.abort(new OutboundError("body_too_large", `${hostname} answered with too much`))
-      throw new OutboundError("body_too_large", `${hostname} answered with too much`)
-    }
-
-    const body = await collect(response.body, maxBodyBytes, controller, hostname)
-    return new Response(NO_BODY.has(response.status) ? null : body, {
-      status: response.status,
-      headers: response.headers,
-    })
+    // Unreachable: the loop either returns or throws on its last iteration.
+    throw new OutboundError("redirect", "the request redirected more times than allowed")
   } finally {
     clearTimeout(deadline)
+  }
+}
+
+export async function outboundFetch(
+  input: string,
+  init: OutboundInit = {},
+  options: OutboundOptions = {},
+): Promise<Response> {
+  const { response } = await outboundRequest(input, init, options)
+  return response
+}
+
+/**
+ * Reads and discards a body, holding it to the same cap as a kept one.
+ *
+ * A redirect's body is not the answer, but nothing stops a server sending a
+ * gigabyte with one, and a socket left unread is a socket left open.
+ */
+async function drain(
+  body: AsyncIterable<Uint8Array>,
+  maxBodyBytes: number,
+  controller: AbortController,
+  hostname: string,
+): Promise<void> {
+  let received = 0
+  try {
+    for await (const chunk of body) {
+      received += chunk.byteLength
+      if (received > maxBodyBytes) {
+        const error = new OutboundError("body_too_large", `${hostname} answered with too much`)
+        controller.abort(error)
+        throw error
+      }
+    }
+  } catch (error) {
+    throw asOutboundError(error, controller.signal, hostname)
   }
 }
 
@@ -339,6 +502,81 @@ async function collect(
     throw asOutboundError(error, controller.signal, hostname)
   }
   return Buffer.concat(chunks)
+}
+
+/**
+ * A compressed answer, decompressed.
+ *
+ * Not an optimization. A server may compress whether or not it was asked to:
+ * a WordPress store behind a page cache answers its REST index gzipped even
+ * when the request says `Accept-Encoding: identity`, and the bytes that
+ * arrive are then not JSON, not UTF-8, and not anything an adapter's schema
+ * can read. The adapter sees a shape it does not recognise and reports that
+ * the provider answered strangely, which sends whoever reads the log looking
+ * in the wrong place entirely.
+ *
+ * **The cap is applied to the decompressed size, not the compressed one.**
+ * A few kilobytes of gzip can become gigabytes, so `maxOutputLength` stops
+ * the inflate at the same limit `collect` holds the wire to, and the overrun
+ * is reported as what it is rather than as a broken stream.
+ *
+ * An encoding that is not understood is refused rather than passed through.
+ * Handing an adapter bytes it cannot read while telling it they are fine is
+ * how this arrived in the first place.
+ */
+/**
+ * zlib answers with a Buffer over Node's shared pool. A `Response` body needs
+ * a view that owns its buffer, so the decoded bytes are copied out of the pool
+ * once. The uncompressed path never reaches here and never pays for it.
+ */
+function own(buffer: Buffer): Uint8Array<ArrayBuffer> {
+  const copy = new Uint8Array(new ArrayBuffer(buffer.byteLength))
+  copy.set(buffer)
+  return copy
+}
+
+function decode(
+  body: Buffer<ArrayBuffer>,
+  encoding: string | null,
+  maxBodyBytes: number,
+  hostname: string,
+): Uint8Array<ArrayBuffer> {
+  // A comma list is legal; the last coding applied is the outermost, and
+  // nothing here has ever needed to unwrap more than one.
+  const codings = (encoding ?? "")
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter((part) => part.length > 0 && part !== "identity")
+
+  if (codings.length === 0) return body
+  if (codings.length > 1) {
+    throw new OutboundError("network", `${hostname} answered in more encodings than one`)
+  }
+
+  const limit = { maxOutputLength: maxBodyBytes }
+  try {
+    switch (codings[0]) {
+      case "gzip":
+      case "x-gzip":
+        return own(gunzipSync(body, limit))
+      case "deflate":
+        return own(inflateSync(body, limit))
+      case "br":
+        return own(brotliDecompressSync(body, limit))
+      default:
+        throw new OutboundError(
+          "network",
+          `${hostname} answered in an encoding Fanwise cannot read`,
+        )
+    }
+  } catch (error) {
+    if (error instanceof OutboundError) throw error
+    // zlib raises a RangeError once the output passes maxOutputLength.
+    if (error instanceof RangeError) {
+      throw new OutboundError("body_too_large", `${hostname} answered with too much`)
+    }
+    throw new OutboundError("network", `${hostname} answered in an encoding it did not keep to`)
+  }
 }
 
 /**

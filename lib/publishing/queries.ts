@@ -3,6 +3,33 @@ import type { Database } from "@/lib/supabase/database.types"
 import type { ManualStepRow } from "./manual-steps"
 
 export type PublicationJob = Database["public"]["Tables"]["publication_jobs"]["Row"]
+export type WorkspaceEvent = Database["public"]["Tables"]["workspace_events"]["Row"]
+
+/**
+ * What has happened to one product, newest first.
+ *
+ * Read as the signed-in user, so RLS does the tenant filtering here as
+ * everywhere else. Bounded, because an activity log is useful while it is
+ * readable: the last twenty lines answer "what did that button do", and older
+ * than that is a question nobody has asked yet.
+ */
+export async function listProductEvents(
+  workspaceId: string,
+  productId: string,
+  limit = 20,
+): Promise<WorkspaceEvent[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("workspace_events")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("product_id", productId)
+    .order("created_at", { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return data ?? []
+}
 
 /**
  * What the publish surfaces need to read, for a whole product at once.

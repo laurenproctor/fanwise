@@ -1,5 +1,6 @@
 import type { NextConfig } from "next"
 import { baselineHeaders, environmentFrom } from "./lib/security/headers"
+import { PUBLIC_INTERNAL_PREFIX } from "./lib/routes"
 
 /**
  * The host the dev server may serve its own dev resources to.
@@ -32,6 +33,38 @@ const config: NextConfig = {
   // dynamic routes, so the proxy sets it. lib/security/headers.ts owns both.
   async headers() {
     return [{ source: "/(.*)", headers: baselineHeaders(environmentFrom(process.env)) }]
+  },
+  /**
+   * The public creator pages: `/@handle` and `/@handle/<anything>`.
+   *
+   * This is a config rewrite rather than a `NextResponse.rewrite()` in the
+   * proxy, and the difference is the status code. A proxy rewrite produces a
+   * response whose status is the proxy's own — 200 — and the rewritten page's
+   * status does not replace it. So `notFound()` on a profile that does not
+   * exist rendered the not-found page with `200 OK`: the right words, the
+   * wrong answer, and a crawler would index "This page does not exist" as a
+   * live page. A config rewrite resolves through the router instead, so the
+   * page's own 404 is the response's 404.
+   *
+   * `beforeFiles`, so it is checked before the filesystem and before the
+   * `app/[slug]` dynamic segment, which would otherwise match `@handle` and
+   * send a signed-out visitor to the sign-in page.
+   *
+   * The canonical redirects — a capitalised handle, a trailing slash, a direct
+   * hit on the internal path — stay in the proxy, because they depend on
+   * comparing a path against its own lowercase form, which a static pattern
+   * cannot express. lib/public/routing.ts owns that decision and a unit test
+   * holds these patterns and that function to the same table.
+   */
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: "/@:handle", destination: `${PUBLIC_INTERNAL_PREFIX}/:handle` },
+        { source: "/@:handle/:path*", destination: `${PUBLIC_INTERNAL_PREFIX}/:handle/:path*` },
+      ],
+      afterFiles: [],
+      fallback: [],
+    }
   },
   allowedDevOrigins: tunnelHost(),
   // sharp ships prebuilt native binaries. Bundling it breaks the binding

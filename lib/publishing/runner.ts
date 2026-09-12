@@ -12,7 +12,10 @@ import type {
   PublishResult,
 } from "@/lib/channels/types"
 import type { Product, ProductAsset } from "@/lib/products/types"
+import { jobs } from "@/lib/jobs"
 import { sentFingerprint } from "./idempotency"
+import { planReattempt } from "./retry"
+import { recordEvent } from "./events"
 import type { PublicationKind } from "./idempotency"
 import { imagesFingerprint } from "@/lib/channels/images"
 
@@ -48,6 +51,8 @@ interface LoadedJob {
   kind: PublicationKind
   channel_listing_id: string
   attempt_count: number
+  /** Set when one Publish Everywhere click started this job. */
+  run_id: string | null
 }
 
 /** The adapter method a job kind maps to. Absent means the channel cannot. */
@@ -84,7 +89,7 @@ export async function runPublication(payload: RunPublicationPayload): Promise<vo
     .eq("id", publicationJobId)
     .eq("workspace_id", workspaceId)
     .in("status", ["pending", "failed"])
-    .select("id, kind, channel_listing_id, attempt_count")
+    .select("id, kind, channel_listing_id, attempt_count, run_id")
     .maybeSingle()
 
   if (claimError) {
@@ -132,12 +137,44 @@ async function execute(
   workspaceId: string,
   job: LoadedJob,
 ): Promise<void> {
-  const finish = (fields: Record<string, unknown>) =>
-    admin
+  // Filled in once the listing is loaded, so an event written on the way out
+  // can name the product without a second query. Null until then, which is the
+  // honest value for the failures that happen before the listing is found.
+  let productId: string | null = null
+
+  const finish = async (fields: Record<string, unknown>) => {
+    await admin
       .from("publication_jobs")
       .update({ completed_at: new Date().toISOString(), ...fields })
       .eq("id", job.id)
       .eq("workspace_id", workspaceId)
+
+    /*
+     * A job that belongs to a run leaves one line in the activity log when it
+     * settles, which is what lets a creator read a run back after the tab is
+     * closed. Only here, at a terminal outcome: a scheduled re-attempt has not
+     * settled anything and writing "failed" for it would be untrue for the
+     * quarter of an hour before it succeeds.
+     *
+     * A job nobody grouped writes nothing. Its own row is already the record,
+     * and an activity log that repeats every single publish is one nobody
+     * reads.
+     */
+    if (job.run_id) {
+      await recordEvent(admin, {
+        workspaceId,
+        type: "publish_run_job_settled",
+        productId,
+        listingId: job.channel_listing_id,
+        runId: job.run_id,
+        payload: {
+          kind: job.kind,
+          status: fields.status ?? null,
+          errorCode: fields.normalized_error_code ?? null,
+        },
+      })
+    }
+  }
 
   const { data: listingRow, error: listingError } = await admin
     .from("channel_listings")
@@ -158,6 +195,7 @@ async function execute(
   const { channel, ...listing } = listingRow as ChannelListing & {
     channel: { id: string; key: string; name: string }
   }
+  productId = listing.product_id
 
   const adapter = findAdapter(channel.key)
   const method = adapter ? methodFor(adapter, job.kind) : undefined
@@ -297,7 +335,52 @@ async function execute(
      */
     if (normalized.code === "external_object_missing") {
       await forgetExternalObject(admin, workspaceId, listing)
-    } else if (job.kind === "publish") {
+    }
+
+    /*
+     * Before telling the creator, try again.
+     *
+     * A7 promises a failure recovered without duplicates, and a creator who
+     * pressed Publish and closed the tab should not come back to a listing
+     * that gave up on a 503 and waited for them since. The schedule and the
+     * one operation it refuses to repeat are in ./retry.
+     *
+     * Nothing new is inserted. The row is the same row, its idempotency key is
+     * untouched, and the claim that picks it up again is the same
+     * compare-and-swap that picked it up the first time: `pending` is one of
+     * the statuses that claim accepts. The listing stays `publishing`, because
+     * "waiting to ask the channel again" is not a distinction a creator needs
+     * from "waiting for the channel", and every extra word costs a pill, a
+     * meaning and a test (ADR 0005).
+     */
+    const attempts = job.attempt_count + 1
+    const reattempt = planReattempt({ code: normalized.code, kind: job.kind, attempts })
+
+    if (reattempt.reattempt) {
+      await admin
+        .from("publication_jobs")
+        .update({
+          status: "pending",
+          started_at: null,
+          normalized_error_code: normalized.code,
+          normalized_error_message: normalized.message,
+          provider_response: (normalized.raw ?? null) as never,
+        })
+        .eq("id", job.id)
+        .eq("workspace_id", workspaceId)
+
+      // Keyed on the attempt, like every other hand-off: the delivery key asks
+      // whether this attempt has been queued, never whether the operation may
+      // happen, which is the database key's question and is already answered.
+      await jobs.enqueue(
+        "publish_listing",
+        { workspaceId, publicationJobId: job.id },
+        { idempotencyKey: `${job.id}:${attempts}`, delayMs: reattempt.delayMs },
+      )
+      return
+    }
+
+    if (normalized.code !== "external_object_missing" && job.kind === "publish") {
       // A failed publish leaves nothing on the provider, so the listing goes
       // back to failed. A failed update or activate does not: the product is
       // still there and still published, and marking the listing failed would

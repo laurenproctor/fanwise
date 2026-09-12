@@ -15,8 +15,8 @@ the wrong one is how this suite passes while proving nothing.
 handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
 AI failure.
 
-**E2E** — the thirteen journeys below, plus two step exit tests against the mock channels
-rather than against the thirteen:
+**E2E** — the fourteen journeys below, plus two step exit tests against the mock channels
+rather than against the fourteen:
 
 - `journey-03-channels.spec.ts` (A3): one product, two independent listings, and no publish
   affordance anywhere on the assisted channel.
@@ -25,6 +25,13 @@ rather than against the thirteen:
 - `journey-05-publish.spec.ts` (A5): a product publishes, and clicking Publish again creates
   nothing. Run against the mock API channel, because the e2e suite has no live Shopify
   connection; A5's exit ran by hand against the live store, see `docs/roadmap.md`.
+- `journey-05-publish-everywhere.spec.ts` (A7): one click starts every channel that can take
+  the product, names each channel it skipped and why, and a second run sends nothing again.
+  The activity log is asserted after a reload, because a run is a record rather than a
+  screen. The exit's "two live URLs" needs two live channels and is a run a person does by
+  hand; the recovery half is proved in `tests/unit/publish-retry.test.ts` and
+  `tests/db/publication-idempotency.test.ts`, where a failure can be made to happen on
+  demand. Both publish specs share their setup through `tests/e2e/publish-support.ts`.
 
 **B1's validator is proved twice.** `tests/unit/factuality.test.ts` is the vocabulary: every
 way a model could state a number, a format, a compatibility or a claim the facts do not
@@ -65,7 +72,7 @@ content arrives, so `waitForURL` can return while the loading boundary is still 
 and a locator that counts elements then finds none. Follow it with a wait on real content —
 the product heading, usually.
 
-## The thirteen journeys
+## The fourteen journeys
 
 1. Signup, workspace, product. *(complete at A2)*
 2. Product to AI Shopify listing, approved. *(composition ran live at B1; the review loop
@@ -75,9 +82,10 @@ the product heading, usually.
 4. Connect Etsy, publish. *(ran by hand on 11 September 2026 against the live shop, see
    `docs/roadmap.md`; the OAuth flow and the adapter are covered in
    `tests/unit/etsy-oauth.test.ts` and `tests/unit/etsy-adapter.test.ts`)*
-5. Publish to Shopify and Etsy in one action. *(A7's exit needs any two live channels, and
-   Shopify and Etsy are both live as of 11 September 2026; WooCommerce, once connected, is a
-   third the action includes)*
+5. Publish to Shopify and Etsy in one action. *(code complete at A7 and proved against the
+   mock channels in `tests/e2e/journey-05-publish-everywhere.spec.ts`. The exit needs any two
+   live channels, and Shopify and Etsy are both live as of 11 September 2026; WooCommerce,
+   once connected, is a third the action includes. Unrun against live channels)*
 6. Publication failure, correction, retry, no duplicate.
 7. Generate a Creative Market submission package.
 8. Analytics shows an ingested sale.
@@ -97,6 +105,10 @@ the product heading, usually.
 13. Connect Gumroad, publish a product with its covers and its file, confirm it is
     purchasable. *(planned at B10, not built; needs a registered Gumroad OAuth application and
     a seller account, decision 27)*
+14. **A creator publishes a public profile and a stranger reads it.** *(built and running in
+    `tests/e2e/journey-14-public-pages.spec.ts`, with the permission half at
+    `tests/db/public-pages-tenancy.test.ts` and the routing table at
+    `tests/unit/public-routing.test.ts`)*
 
 Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, the product
 is broken in the way that matters most.
@@ -120,14 +132,26 @@ URL, and is then attached to the product, rather than posted to the provider in 
 The journey exists to see that the attach happened, by reading the product back, before
 Fanwise reports it live.
 
+**Journey 14 was added on 12 September 2026**, with the public creator pages. It is the
+first journey whose assertions are made with no session at all, and that is the whole point
+of it: every other journey signs somebody in first, so a page that renders only for the
+person who made it would pass all of them. The anonymous half runs in its own browser
+context rather than clearing cookies, because a Server Component reads cookies at render.
+
+It is also the only journey that asserts a status code as a privacy property rather than as
+a convenience. A draft profile must answer 404, and the two ways that broke during
+development — a proxy rewrite pinning the response at 200, and a route-level `loading.tsx`
+committing the response before the page decided — were both invisible to a signed-in
+developer and to every other test in this suite.
+
 **B11 adds no journey.** The companion window planned on 12 September 2026 in
 `docs/companion-window.md` is journey 7 run in a second window, not a new path from empty
 workspace to live listing. Its own tests assert the handoff renders identically into a
 detached document and that the pop-out button is absent where the API is, and the rest is
-covered by journey 7 being run once with the companion open. A fourteenth number would
-imply a fourteenth path, and there is not one.
+covered by journey 7 being run once with the companion open. A fifteenth number would
+imply a fifteenth path, and there is not one.
 
-**Password recovery is not one of the thirteen**, because it is not a step on the path from empty
+**Password recovery is not one of the fourteen**, because it is not a step on the path from empty
 workspace to live listing. It is covered anyway, in two halves that meet at the token:
 `tests/db/password-recovery.test.ts` makes the same calls the confirm route makes, against the
 real auth server, and proves the link is single use; `tests/e2e/password-recovery.spec.ts`

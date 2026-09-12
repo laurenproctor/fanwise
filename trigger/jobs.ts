@@ -56,3 +56,13 @@ export const syncBilling = task({
   retry: { maxAttempts: 3, minTimeoutInMs: 5_000, factor: 2 },
   run: async (payload: JobPayloads["sync_billing"]) => handlers.sync_billing(payload),
 })
+
+export const importSource = task({
+  id: "import_source",
+  // Same shape as publish and generate: the runner claims the row by
+  // compare-and-swap and records its own outcome, including every way a page
+  // can refuse to be read. A retry here would re-read a page that already
+  // answered, and the creator's retry button is the honest way to ask again.
+  retry: { maxAttempts: 1 },
+  run: async (payload: JobPayloads["import_source"]) => handlers.import_source(payload),
+})
