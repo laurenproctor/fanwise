@@ -62,6 +62,14 @@ export const PUBLIC_PATHS = [
   // session this list would otherwise demand is not merely unnecessary: a
   // public page's images must load for a visitor who will never have one.
   "/api/public",
+  // The two files a crawler fetches before anything else. Both were behind the
+  // session check, so an anonymous request for either was answered with a 307
+  // to /sign-in — which a crawler reads as "this site has no sitemap and no
+  // robots policy". Neither is visible from inside the application, because a
+  // signed-in developer gets the real file. Found by an end-to-end test that
+  // asked for the sitemap as a stranger.
+  "/sitemap.xml",
+  "/robots.txt",
 ]
 
 /**
@@ -161,12 +169,20 @@ export default async function proxy(request: NextRequest) {
     return decorate(NextResponse.redirect(url, 308))
   }
 
+  /*
+    A canonical public address is passed straight through. The rewrite onto
+    /profile/<handle> is a `beforeFiles` rewrite in next.config.ts, not a
+    NextResponse.rewrite() here, because a proxy rewrite fixes the response
+    status at 200 and the page's own notFound() then never reaches the
+    browser as a 404. See the note on `rewrites` in next.config.ts.
+
+    What still returns here is the session work below being skipped: a public
+    page renders as `anon` and has no use for a session even when one exists.
+  */
   if (publicRoute.kind === "rewrite") {
-    const url = request.nextUrl.clone()
-    url.pathname = publicRoute.to
     const headers = new Headers(request.headers)
     if (nonce) headers.set("content-security-policy", policy)
-    return decorate(NextResponse.rewrite(url, { request: { headers } }))
+    return decorate(NextResponse.next({ request: { headers } }))
   }
 
   let response = forward()

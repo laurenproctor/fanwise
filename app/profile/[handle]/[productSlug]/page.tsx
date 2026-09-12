@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { Suspense } from "react"
 import Link from "next/link"
 import { notFound, permanentRedirect } from "next/navigation"
 import { PublicShell } from "@/components/public/public-shell"
@@ -29,7 +30,25 @@ import { appOrigin } from "@/lib/channels/oauth"
  * never existed gets, so nothing here confirms what is being worked on.
  */
 
-export const revalidate = 300
+/**
+ * Rendered per request, deliberately, with no full-route cache.
+ *
+ * The obvious setting here is a few minutes of ISR, and it was that until an
+ * end-to-end test unpublished a profile and the page kept answering 200. The
+ * reason is the rewrite: a request arrives at `/@handle` and is rewritten to
+ * `/profile/handle`, and which of those two the route cache is keyed on is not
+ * something this code should be betting a privacy guarantee on.
+ * `revalidatePath()` can only name one of them.
+ *
+ * "Unpublishing takes a page off the public web, now" is the promise the
+ * publish switch makes, and it is a privacy promise rather than a freshness
+ * one. A cache that might serve an unpublished profile for another four
+ * minutes is not a tuning question, so the cache is off until the invalidation
+ * is proven rather than assumed. The reads behind a page are four indexed
+ * queries; when that stops being cheap enough, the fix is a cache keyed on
+ * something this file controls, plus a test that unpublishes and asserts 404.
+ */
+export const dynamic = "force-dynamic"
 
 interface Params {
   params: Promise<{ handle: string; productSlug: string }>
@@ -108,9 +127,6 @@ export default async function PublicProductPage({ params, searchParams }: Params
   const { c: campaign } = await searchParams
 
   const canonical = publicUrl(appOrigin(), publicRoutes.product(profile.handle, product.slug))
-  const siblings = (await loadProfileCatalog(profile.id))
-    .filter((p) => p.slug !== product.slug)
-    .slice(0, 3)
 
   const details = [
     product.formats.length > 0 ? { term: "File formats", value: product.formats.join(", ") } : null,
@@ -319,29 +335,20 @@ export default async function PublicProductPage({ params, searchParams }: Params
           </div>
         )}
 
-        {siblings.length > 0 ? (
-          <section
-            aria-labelledby="more"
-            className="flex flex-col gap-6 border-t border-[var(--color-rule)] pt-12"
-          >
-            <div className="flex flex-wrap items-baseline justify-between gap-4">
-              <h2 id="more" className="font-display text-[26px] tracking-[-0.03em]">
-                More from {profile.displayName}
-              </h2>
-              <Link
-                href={publicRoutes.profile(profile.handle)}
-                className="text-[14px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
-              >
-                View all
-              </Link>
-            </div>
-            <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {siblings.map((sibling) => (
-                <ProductCard key={sibling.slug} handle={profile.handle} product={sibling} />
-              ))}
-            </ul>
-          </section>
-        ) : null}
+        {/*
+          Streamed, so the catalog query does not hold up the product itself.
+          Nested rather than a route-level loading.tsx for the reason in
+          components/public/catalog-section.tsx: a boundary above the page
+          commits the response before notFound() can set a 404.
+        */}
+        <Suspense fallback={null}>
+          <MoreFromCreator
+            profileId={profile.id}
+            handle={profile.handle}
+            displayName={profile.displayName}
+            excludeSlug={product.slug}
+          />
+        </Suspense>
       </div>
     </PublicShell>
   )
@@ -395,6 +402,55 @@ function productJsonLd(product: PublicProductView, canonical: string): string {
     character to every JSON parser.
   */
   return JSON.stringify(node).replace(/</g, "\\u003c")
+}
+
+/**
+ * Three more from the same creator, or nothing at all.
+ *
+ * Renders nothing rather than an empty heading when this is the creator's
+ * only product: a "More from Northline Studio" heading over a blank strip
+ * reads as a page that failed to load.
+ */
+async function MoreFromCreator({
+  profileId,
+  handle,
+  displayName,
+  excludeSlug,
+}: {
+  profileId: string
+  handle: string
+  displayName: string
+  excludeSlug: string
+}) {
+  const siblings = (await loadProfileCatalog(profileId))
+    .filter((p) => p.slug !== excludeSlug)
+    .slice(0, 3)
+
+  if (siblings.length === 0) return null
+
+  return (
+    <section
+      aria-labelledby="more"
+      className="flex flex-col gap-6 border-t border-[var(--color-rule)] pt-12"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-4">
+        <h2 id="more" className="font-display text-[26px] tracking-[-0.03em]">
+          More from {displayName}
+        </h2>
+        <Link
+          href={publicRoutes.profile(handle)}
+          className="text-[14px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+        >
+          View all
+        </Link>
+      </div>
+      <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {siblings.map((sibling) => (
+          <ProductCard key={sibling.slug} handle={handle} product={sibling} />
+        ))}
+      </ul>
+    </section>
+  )
 }
 
 function formatDate(value: string): string {

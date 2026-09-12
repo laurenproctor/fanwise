@@ -1,13 +1,13 @@
 import type { Metadata } from "next"
 import { notFound, permanentRedirect } from "next/navigation"
+import { Suspense } from "react"
 import { PublicShell } from "@/components/public/public-shell"
+import { CatalogSection, CatalogSkeleton } from "@/components/public/catalog-section"
 import { PublicAvatar } from "@/components/public/public-image"
-import { ProfileCatalog } from "@/components/public/profile-catalog"
-import { ProductCard } from "@/components/public/product-card"
 import { ShareButton } from "@/components/public/share-button"
 import { ButtonLink } from "@/components/ui/button"
 import { initialsOf } from "@/lib/public/avatars"
-import { loadProfileCatalog, resolveProfile } from "@/lib/public/queries"
+import { resolveProfile } from "@/lib/public/queries"
 import { displayHost } from "@/lib/public/urls"
 import { publicRoutes, publicUrl } from "@/lib/routes"
 import { appOrigin } from "@/lib/channels/oauth"
@@ -27,7 +27,25 @@ import { appOrigin } from "@/lib/channels/oauth"
  * the data is fetched rather than a rule anybody has to follow.
  */
 
-export const revalidate = 300
+/**
+ * Rendered per request, deliberately, with no full-route cache.
+ *
+ * The obvious setting here is a few minutes of ISR, and it was that until an
+ * end-to-end test unpublished a profile and the page kept answering 200. The
+ * reason is the rewrite: a request arrives at `/@handle` and is rewritten to
+ * `/profile/handle`, and which of those two the route cache is keyed on is not
+ * something this code should be betting a privacy guarantee on.
+ * `revalidatePath()` can only name one of them.
+ *
+ * "Unpublishing takes a page off the public web, now" is the promise the
+ * publish switch makes, and it is a privacy promise rather than a freshness
+ * one. A cache that might serve an unpublished profile for another four
+ * minutes is not a tuning question, so the cache is off until the invalidation
+ * is proven rather than assumed. The reads behind a page are four indexed
+ * queries; when that stops being cheap enough, the fix is a cache keyed on
+ * something this file controls, plus a test that unpublishes and asserts 404.
+ */
+export const dynamic = "force-dynamic"
 
 interface Params {
   params: Promise<{ handle: string }>
@@ -80,9 +98,6 @@ export default async function PublicProfilePage({ params }: Params) {
   if (resolution.kind === "missing") notFound()
 
   const profile = resolution.value
-  const products = await loadProfileCatalog(profile.id)
-
-  const featured = products.filter((p) => p.featured)
   const canonical = publicUrl(appOrigin(), publicRoutes.profile(profile.handle))
 
   return (
@@ -151,67 +166,21 @@ export default async function PublicProfilePage({ params }: Params) {
       </div>
 
       <div className="mx-auto flex w-full max-w-[1160px] flex-col gap-14 px-5 pt-12 sm:px-8">
-        {products.length === 0 ? (
-          <EmptyCatalog displayName={profile.displayName} />
-        ) : (
-          <>
-            {featured.length > 0 ? (
-              <section aria-labelledby="featured" className="flex flex-col gap-6">
-                <div className="flex items-baseline justify-between gap-4">
-                  <h2 id="featured" className="font-display text-[26px] tracking-[-0.03em]">
-                    Featured
-                  </h2>
-                  <p className="text-[14px] text-[var(--color-ink-3)]">
-                    Curated by {profile.displayName}.
-                  </p>
-                </div>
-                <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {featured.map((product, index) => (
-                    <ProductCard
-                      key={product.slug}
-                      handle={profile.handle}
-                      product={product}
-                      priority={index < 3}
-                    />
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-
-            <section aria-labelledby="catalog" className="flex flex-col gap-6">
-              <h2 id="catalog" className="font-display text-[26px] tracking-[-0.03em]">
-                {featured.length > 0 ? "All products" : "Products"}
-              </h2>
-              {/*
-                The full catalog, featured items included. A visitor scanning
-                "All products" for something they saw a moment ago should find
-                it there, rather than learning that "all" excluded the three at
-                the top.
-              */}
-              <ProfileCatalog handle={profile.handle} products={products} />
-            </section>
-          </>
-        )}
+        {/*
+          Nested here rather than in a loading.tsx beside this file. A
+          route-level boundary starts the response before the page has decided
+          anything, which turned a draft profile's 404 into a 200. See the
+          docblock in components/public/catalog-section.tsx.
+        */}
+        <Suspense fallback={<CatalogSkeleton />}>
+          <CatalogSection
+            profileId={profile.id}
+            handle={profile.handle}
+            displayName={profile.displayName}
+          />
+        </Suspense>
       </div>
     </PublicShell>
-  )
-}
-
-/**
- * A published profile with nothing on it yet.
- *
- * This is a real and reasonable state — claiming a handle before the catalog
- * is ready is the sensible order to do things in — so it reads as a page that
- * is waiting rather than a page that is broken.
- */
-function EmptyCatalog({ displayName }: { displayName: string }) {
-  return (
-    <div className="flex flex-col items-start gap-4 rounded-[16px] border border-dashed border-[var(--color-rule)] px-6 py-14">
-      <span className="label-mono">Nothing published yet</span>
-      <p className="max-w-prose text-[16px] text-[var(--color-ink-2)]">
-        {displayName} has not published any products here yet. Check back soon.
-      </p>
-    </div>
   )
 }
 
