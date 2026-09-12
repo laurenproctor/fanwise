@@ -21,6 +21,9 @@ import { CONTENT_SOURCE_KINDS, SOURCE_KINDS, isContentSourceKind } from "@/lib/i
 import { recoveriesFor, sourceLabelFor, stateFor } from "@/lib/imports/view"
 import type { ImportRecord } from "@/lib/imports/queries"
 import { buildPdf } from "./import-pdf-fixture"
+import { createElement } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
+import { SourcePanel } from "@/components/imports/source-panel"
 
 /**
  * Importing from text, a PDF or an HTML file.
@@ -413,5 +416,37 @@ describe("what the model and the claims check see", () => {
         contentHash: "0".repeat(64),
       }),
     ).not.toContain("Source:")
+  })
+})
+
+describe("the recovery a file is offered, on screen", () => {
+  it("links pasting the text to the paste form, and offers no link to replace", () => {
+    const record = {
+      row: {
+        provider: "html_document",
+        status: "unavailable",
+        source_url: null,
+        source_filename: "artifact.html",
+      },
+      errorCode: "unsupported_source",
+      errorMessage: "Fanwise could not read anything from that page.",
+    } as unknown as ImportRecord
+    const markup = renderToStaticMarkup(
+      createElement(SourcePanel, {
+        state: stateFor(record),
+        mode: "content",
+        handlers: {
+          onReplaceLink: () => {},
+          onRetry: () => {},
+          manualHref: "/studio/manual",
+          pasteHref: "/studio/new/link?from=text",
+        },
+      }),
+    )
+    expect(markup).toContain("Fanwise cannot read that")
+    expect(markup).toContain('href="/studio/new/link?from=text"')
+    expect(markup).toContain("Paste the text instead")
+    expect(markup).not.toContain("Paste a different link")
+    expect(markup).not.toContain("Not built yet")
   })
 })

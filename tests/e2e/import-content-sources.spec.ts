@@ -14,10 +14,10 @@ import { signUpAndCreateWorkspace } from "./support"
  * already says plainly.
  *
  * What the readers do with awkward input is covered in
- * tests/unit/import-content-sources.test.ts. This covers the path a creator
- * takes and the two things only a browser shows: that a handed-over source is
- * never offered a link to replace, and that "paste the text instead" goes
- * somewhere.
+ * tests/unit/import-content-sources.test.ts, and the recovery a file is offered
+ * is rendered there too. Two journeys stay here because only the integrated
+ * path proves them: a paste goes through the action, storage and the job to the
+ * screen, and a PDF goes through a signed upload the browser makes itself.
  */
 
 const IMPORT_URL = (slug: string) => new RegExp(`${slug}/new/link/[0-9a-f-]{36}$`)
@@ -66,31 +66,4 @@ test("an uploaded PDF becomes an import titled from the document", async ({ page
   })
   await expect(page.getByText("aster-specimen.pdf")).toBeVisible()
   await expect(page.getByText("1 page, kept private")).toBeVisible()
-})
-
-test("an HTML file that is only script is refused with a way to paste instead", async ({
-  page,
-}) => {
-  const { slug } = await signUpAndCreateWorkspace(page, "impt3", "Shell Studio")
-  await page.goto(`${routes.importProduct(slug)}?from=html`)
-
-  await page.getByLabel("HTML file").setInputFiles({
-    name: "artifact.html",
-    mimeType: "text/html",
-    buffer: Buffer.from(
-      '<!doctype html><html><head><title>App</title></head><body><div id="root"></div><script>render()</script></body></html>',
-    ),
-  })
-  await page.getByRole("button", { name: "Analyze HTML file" }).click()
-
-  await expect(page).toHaveURL(IMPORT_URL(slug), { timeout: 20_000 })
-  await expect(page.getByRole("heading", { name: "Fanwise cannot read that" })).toBeVisible({
-    timeout: 30_000,
-  })
-  // Link-only recoveries are not offered for a file.
-  await expect(page.getByRole("button", { name: "Paste a different link" })).toHaveCount(0)
-
-  await page.getByRole("link", { name: "Paste the text instead" }).click()
-  await expect(page).toHaveURL(/from=text$/)
-  await expect(page.getByLabel("Product text")).toBeVisible()
 })
