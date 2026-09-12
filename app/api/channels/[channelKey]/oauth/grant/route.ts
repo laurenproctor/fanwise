@@ -5,7 +5,7 @@ import { storeConnectionCredentials } from "@/lib/credentials"
 import { consumeAuthorizationState, pruneExpiredStates } from "@/lib/channels/oauth"
 import { findAdapter } from "@/lib/channels/registry"
 import { normalizeUnknown } from "@/lib/channels/errors"
-import { jobs } from "@/lib/jobs"
+import { requestBillingSync } from "@/lib/billing/request-sync"
 
 /**
  * The grant endpoint, for every channel whose provider posts the credential.
@@ -52,19 +52,19 @@ export async function POST(
   void pruneExpiredStates().catch(() => {})
 
   /*
-    Which of the four steps below failed, for the log.
+    Which of the three steps below failed, for the log.
 
     The normalized code alone is not enough to act on. A provider that posts
     its credential shows the failure on its own screen and then discards the
     key, so the only record left is this line — and `code: 'unknown'` on a
-    route that calls a store, writes a row, seals a secret and enqueues a job
-    says nothing about which of those to look at.
+    route that calls a store, writes a row and seals a secret says nothing
+    about which of those to look at.
 
     The step's name is a constant from this file. Nothing derived from the
     request joins it, because the request body held the store's keys and the
     error may carry a provider response.
   */
-  let step: "verify" | "connection" | "credentials" | "billing" = "verify"
+  let step: "verify" | "connection" | "credentials" = "verify"
 
   try {
     const verified = await grant.verify({
@@ -104,9 +104,6 @@ export async function POST(
       connectionId: connection.id,
       credentials: verified.credentials,
     })
-
-    step = "billing"
-    await jobs.enqueue("sync_billing", { workspaceId: consumed.workspaceId })
   } catch (error) {
     // The body of this request held the store's keys. Only the normalized
     // code and the step's name are logged, and only a sentence goes back.
@@ -114,6 +111,14 @@ export async function POST(
     console.error("[oauth] grant refused", { channelKey, step, code: normalized.code })
     return NextResponse.json({ error: normalized.message }, { status: 400 })
   }
+
+  /*
+    Outside the try, and after the answer is already decided. The credential is
+    sealed and the connection is real; the sync only carries that to the biller,
+    and it cannot fail this request. A store told "no" here throws its key away,
+    and it would be throwing away a key that works.
+  */
+  await requestBillingSync(consumed.workspaceId)
 
   return NextResponse.json({ ok: true })
 }

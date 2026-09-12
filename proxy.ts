@@ -59,27 +59,36 @@ export const PUBLIC_PATHS = [
 ]
 
 /**
- * Public by shape rather than by name.
+ * Routes a provider calls. No page belongs here.
  *
- * One entry, and it is not a page. A channel's grant route receives the
- * provider's server-to-server POST: `docs/security.md` and the route's own
- * docblock both say nobody is signed in on that POST and nothing in it is
- * trusted. It authenticates by consuming a state Fanwise minted, exactly once,
- * and by proving the credential against the account the state row names — a
- * stronger check than a session cookie, and a session cookie is not on offer,
- * because the sender is the store's server and not anybody's browser.
+ * Each of these is reached by another company's server, which holds no Fanwise
+ * session and never will, and each authenticates itself by something stronger
+ * than a cookie. `docs/security.md` and both route docblocks say the same
+ * sentence: nobody is signed in, and nothing in the request is trusted.
  *
- * Guarding it does not make it safer, it makes it unreachable: the grant POST
- * was answered with a 307 to /sign-in, so the credential never arrived and no
- * such store could finish connecting. The first attempt died earlier still, on
- * the store's own SSL check, which is why this was never seen.
+ *   - A channel's **grant** route consumes a state Fanwise minted, exactly
+ *     once, then proves the credential by calling the account the state row
+ *     names. Keys for some other store are refused.
+ *   - The billing **webhook** verifies the provider's signature over the raw
+ *     bytes before a field is read, and records the event by the provider's
+ *     own id so a redelivery collides at the database.
  *
- * Anchored at both ends, and the channel key may not contain a slash, so this
- * opens exactly one route per channel and nothing beneath it. The callback is
- * deliberately not here: the creator returns to it in their own browser, with
- * their session, and it only ever reports.
+ * Guarding either does not make it safer, it makes it unreachable. Both were
+ * answering with a 307 to /sign-in: the grant threw away the store's consumer
+ * keys, and the webhook would have thrown away every subscription event.
+ * Neither failure is visible from inside Fanwise — the sender sees the
+ * redirect and Fanwise sees nothing at all — which is why both survived this
+ * long and why the sweep that found the second one checked every route.
+ *
+ * Anchored at both ends, and a channel key may not contain a slash, so these
+ * open exactly the routes named and nothing beneath them. A channel's callback
+ * is deliberately absent: the creator returns to it in their own browser,
+ * carrying their session, and it only ever reports.
  */
-export const PUBLIC_PATTERNS = [/^\/api\/channels\/[^/]+\/oauth\/grant$/]
+export const PUBLIC_PATTERNS = [
+  /^\/api\/channels\/[^/]+\/oauth\/grant$/,
+  /^\/api\/billing\/webhook$/,
+]
 
 export function isPublic(pathname: string): boolean {
   return (
