@@ -97,6 +97,8 @@ Use these words in code, UI and docs, consistently.
 | Sale event | A normalized transaction |
 | Readiness | Deterministic validation of publishability |
 | FactSheet | The typed, derived set of facts AI is allowed to state |
+| Public profile | A creator's public identity on the open web, at `/@handle`. Separate from the workspace: a workspace is an operational container, a profile is a public identity, and the model allows a workspace to own several |
+| Public page | The public showcase for one product, at `/@handle/<slug>`. Inherits from the canonical product; its own columns are deliberate overrides, never a copy |
 | Run | One Publish Everywhere action and the per-channel outcomes it produced |
 | Skipped | A connected channel a run did not attempt, always with a reason |
 
@@ -152,7 +154,7 @@ Integration: mock Shopify, Etsy, WooCommerce, Anthropic and Stripe. Cover OAuth 
 handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
 AI failure.
 
-E2E: the thirteen journeys in `docs/testing.md`. Journey 9 (workspace A cannot reach
+E2E: the fourteen journeys in `docs/testing.md`. Journey 9 (workspace A cannot reach
 workspace B) must never be skipped.
 
 ## Definition of done

@@ -15,8 +15,8 @@ the wrong one is how this suite passes while proving nothing.
 handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
 AI failure.
 
-**E2E** — the thirteen journeys below, plus two step exit tests against the mock channels
-rather than against the thirteen:
+**E2E** — the fourteen journeys below, plus two step exit tests against the mock channels
+rather than against the fourteen:
 
 - `journey-03-channels.spec.ts` (A3): one product, two independent listings, and no publish
   affordance anywhere on the assisted channel.
@@ -72,7 +72,7 @@ content arrives, so `waitForURL` can return while the loading boundary is still 
 and a locator that counts elements then finds none. Follow it with a wait on real content —
 the product heading, usually.
 
-## The thirteen journeys
+## The fourteen journeys
 
 1. Signup, workspace, product. *(complete at A2)*
 2. Product to AI Shopify listing, approved. *(composition ran live at B1; the review loop
@@ -105,6 +105,10 @@ the product heading, usually.
 13. Connect Gumroad, publish a product with its covers and its file, confirm it is
     purchasable. *(planned at B10, not built; needs a registered Gumroad OAuth application and
     a seller account, decision 27)*
+14. **A creator publishes a public profile and a stranger reads it.** *(built and running in
+    `tests/e2e/journey-14-public-pages.spec.ts`, with the permission half at
+    `tests/db/public-pages-tenancy.test.ts` and the routing table at
+    `tests/unit/public-routing.test.ts`)*
 
 Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, the product
 is broken in the way that matters most.
@@ -128,7 +132,19 @@ URL, and is then attached to the product, rather than posted to the provider in 
 The journey exists to see that the attach happened, by reading the product back, before
 Fanwise reports it live.
 
-**Password recovery is not one of the thirteen**, because it is not a step on the path from empty
+**Journey 14 was added on 12 September 2026**, with the public creator pages. It is the
+first journey whose assertions are made with no session at all, and that is the whole point
+of it: every other journey signs somebody in first, so a page that renders only for the
+person who made it would pass all of them. The anonymous half runs in its own browser
+context rather than clearing cookies, because a Server Component reads cookies at render.
+
+It is also the only journey that asserts a status code as a privacy property rather than as
+a convenience. A draft profile must answer 404, and the two ways that broke during
+development — a proxy rewrite pinning the response at 200, and a route-level `loading.tsx`
+committing the response before the page decided — were both invisible to a signed-in
+developer and to every other test in this suite.
+
+**Password recovery is not one of the fourteen**, because it is not a step on the path from empty
 workspace to live listing. It is covered anyway, in two halves that meet at the token:
 `tests/db/password-recovery.test.ts` makes the same calls the confirm route makes, against the
 real auth server, and proves the link is single use; `tests/e2e/password-recovery.spec.ts`
