@@ -58,8 +58,34 @@ export const PUBLIC_PATHS = [
   "/api/health",
 ]
 
+/**
+ * Public by shape rather than by name.
+ *
+ * One entry, and it is not a page. A channel's grant route receives the
+ * provider's server-to-server POST: `docs/security.md` and the route's own
+ * docblock both say nobody is signed in on that POST and nothing in it is
+ * trusted. It authenticates by consuming a state Fanwise minted, exactly once,
+ * and by proving the credential against the account the state row names — a
+ * stronger check than a session cookie, and a session cookie is not on offer,
+ * because the sender is the store's server and not anybody's browser.
+ *
+ * Guarding it does not make it safer, it makes it unreachable: the grant POST
+ * was answered with a 307 to /sign-in, so the credential never arrived and no
+ * such store could finish connecting. The first attempt died earlier still, on
+ * the store's own SSL check, which is why this was never seen.
+ *
+ * Anchored at both ends, and the channel key may not contain a slash, so this
+ * opens exactly one route per channel and nothing beneath it. The callback is
+ * deliberately not here: the creator returns to it in their own browser, with
+ * their session, and it only ever reports.
+ */
+export const PUBLIC_PATTERNS = [/^\/api\/channels\/[^/]+\/oauth\/grant$/]
+
 export function isPublic(pathname: string): boolean {
-  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
+  return (
+    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
+    PUBLIC_PATTERNS.some((pattern) => pattern.test(pathname))
+  )
 }
 
 export default async function proxy(request: NextRequest) {
