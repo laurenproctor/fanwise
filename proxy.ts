@@ -10,6 +10,7 @@ import {
   marketingPolicy,
   marketingReportOnlyPolicy,
 } from "@/lib/security/headers"
+import { resolvePublicRoute } from "@/lib/public/routing"
 import type { Database } from "@/lib/supabase/database.types"
 
 /**
@@ -56,6 +57,11 @@ export const PUBLIC_PATHS = [
   "/reset-password",
   "/auth",
   "/api/health",
+  // Images and the outbound-click beacon for the public creator pages. Every
+  // one of them re-derives what it may serve from an `anon` read, so the
+  // session this list would otherwise demand is not merely unnecessary: a
+  // public page's images must load for a visitor who will never have one.
+  "/api/public",
 ]
 
 /**
@@ -126,6 +132,41 @@ export default async function proxy(request: NextRequest) {
       )
     }
     return response
+  }
+
+  /*
+    The public web, decided before anything else and before the session is
+    touched at all.
+
+    It comes first for two reasons. A public page must render for a visitor
+    with no account, so it cannot fall through to the redirect at the bottom of
+    this function; and it has no use for a session even when one exists, so
+    resolving one would be a round trip to the auth server on every visit to a
+    page whose content does not depend on the answer.
+
+    That is also why nothing below this block can leak into a public page. The
+    rewrite returns here, so the Supabase client is never constructed and no
+    cookie is read. lib/supabase/public.ts then renders the page as `anon`,
+    which is what makes the response the same for everyone and therefore safe
+    to cache. See lib/public/routing.ts for why a rewrite is required at all.
+  */
+  const publicRoute = resolvePublicRoute(request.nextUrl.pathname)
+
+  if (publicRoute.kind === "redirect") {
+    const url = request.nextUrl.clone()
+    url.pathname = publicRoute.to
+    // 308, not 307: these are canonicalisations — a capitalised handle, a
+    // trailing slash, the internal path — and they are permanent facts about
+    // the address, not about this request. A search engine should fold them.
+    return decorate(NextResponse.redirect(url, 308))
+  }
+
+  if (publicRoute.kind === "rewrite") {
+    const url = request.nextUrl.clone()
+    url.pathname = publicRoute.to
+    const headers = new Headers(request.headers)
+    if (nonce) headers.set("content-security-policy", policy)
+    return decorate(NextResponse.rewrite(url, { request: { headers } }))
   }
 
   let response = forward()

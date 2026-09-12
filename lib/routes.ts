@@ -47,9 +47,57 @@ export const routes = {
     `/${workspace}/${product}/channels/${connectionId}`,
   channels: (workspace: string) => `/${workspace}/channels`,
   settings: (workspace: string) => `/${workspace}/settings`,
+  publicProfileSettings: (workspace: string) => `/${workspace}/settings/public-profile`,
   assetDownload: (workspace: string, assetId: string) => `/${workspace}/assets/${assetId}/download`,
   assetPreview: (workspace: string, assetId: string) => `/${workspace}/assets/${assetId}/preview`,
 } as const
+
+/**
+ * The public web, which is a different namespace from everything above.
+ *
+ * A workspace slug occupies the first path segment; a public handle occupies
+ * the first path segment *prefixed with `@`*, which no slug can be, because
+ * `@` is not in the slug character set. The two therefore cannot collide at
+ * the URL level no matter what anybody names anything.
+ *
+ * They can still collide in the *router*, which is a separate problem and a
+ * subtler one: `app/[slug]` is a dynamic segment, and a dynamic segment
+ * matches `@northline-studio` as happily as it matches `best-night`. The proxy
+ * is what keeps them apart, by rewriting `/@handle` onto `publicInternal()`
+ * before the router is consulted at all. See proxy.ts.
+ *
+ * `publicInternal()` is the destination of that rewrite and never an address
+ * Fanwise advertises. A request that arrives at it directly is answered with a
+ * permanent redirect to the canonical form, so the two paths cannot both be
+ * indexed.
+ */
+export const publicRoutes = {
+  profile: (handle: string) => `/@${handle}`,
+  product: (handle: string, slug: string) => `/@${handle}/${slug}`,
+  /** Reserved shape. No page answers it yet; the slug namespace already knows. */
+  collection: (handle: string, slug: string) => `/@${handle}/collections/${slug}`,
+} as const
+
+/**
+ * Where the proxy sends a public URL. Internal; never rendered into a page.
+ *
+ * Takes the handle rather than the public path, because the `@` is exactly
+ * what is being stripped: `/@northline/aster` becomes `/profile/northline/aster`.
+ * The prefix is a real segment in the route tree — an underscore-prefixed
+ * folder is excluded from routing altogether and a route group contributes no
+ * segment, so neither can be a rewrite destination — which is why `profile` is
+ * in RESERVED_WORKSPACE_SLUGS.
+ */
+export const PUBLIC_INTERNAL_PREFIX = "/profile"
+
+export function publicInternal(handle: string, ...rest: string[]): string {
+  return [PUBLIC_INTERNAL_PREFIX, handle, ...rest].join("/")
+}
+
+/** An absolute URL, for metadata, sharing and the sitemap. */
+export function publicUrl(origin: string, path: string): string {
+  return new URL(path, origin).toString()
+}
 
 /** The three places the workspace header navigates between. */
 export type WorkspaceSection = "products" | "channels" | "settings"
