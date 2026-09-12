@@ -29,7 +29,7 @@ export function JourneySteps() {
               className="hidden h-px min-w-6 flex-1 bg-[var(--color-rule)] sm:block"
             />
           ) : null}
-          <span className="flex min-w-0 shrink-0 items-start gap-3">
+          <span className="flex min-w-0 items-start gap-3 lg:shrink-0">
             <span
               aria-hidden
               className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-[13px] font-medium ${
