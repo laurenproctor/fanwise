@@ -121,7 +121,12 @@ export function useRecorder(onRecorded: (recording: Recording) => void) {
     const mimeType = pickType()
     let active: MediaRecorder
     try {
-      active = new MediaRecorder(media, mimeType ? { mimeType } : undefined)
+      // Speech needs little: 48 kbps keeps a ten-minute recording near 3.6 MB,
+      // which one transcription request carries comfortably.
+      active = new MediaRecorder(media, {
+        ...(mimeType ? { mimeType } : {}),
+        audioBitsPerSecond: 48_000,
+      })
     } catch {
       media.getTracks().forEach((track) => track.stop())
       setState({ kind: "failed" })

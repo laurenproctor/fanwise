@@ -1,29 +1,28 @@
 import type { TranscriptionProvider } from "./types"
+import { createCloudflareTranscriber } from "./providers/cloudflare"
+import { readCloudflareConfig } from "./providers/cloudflare/config"
 
 /**
  * Which transcription provider this deployment has.
  *
- * **None, today.** No vendor adapter is installed: the model provider this
- * application already uses does not transcribe audio, and choosing a second
- * vendor adds a processor of creators' voices to the privacy policy, which is a
- * decision for the founder rather than for a pull request. Until one exists the
- * composer says that transcription is not available, and a recording is never
- * shown as transcribed.
+ * Chosen by credentials, like the model provider: Cloudflare Workers AI
+ * (Whisper large-v3-turbo) when `CLOUDFLARE_ACCOUNT_ID` and
+ * `CLOUDFLARE_AI_API_TOKEN` are both set, and none otherwise — in which case
+ * the composer says transcription is not available, and a recording is never
+ * shown as transcribed. The vendor's name lives in `./providers` and nowhere
+ * else; callers receive a `TranscriptionProvider`.
  *
- * An adapter, when one is chosen, goes in `./providers/<vendor>` and is
- * selected here by the presence of its key, the way `lib/ai/providers` selects
- * the model.
- *
- * The one exception is the end-to-end suite, which needs a recording to reach
- * "Transcribed" without a microphone or a vendor. It is switched on by an
- * explicit variable, and only against a local database, so a deployment cannot
- * turn it on by accident: a hosted project's URL fails the second check.
+ * The end-to-end suite needs a recording to reach "Transcribed" without a
+ * microphone or a vendor. It is switched on by an explicit variable, and only
+ * against a local database, so a deployment cannot turn it on by accident.
  */
 
 export function getTranscriptionProvider(
   env: Record<string, string | undefined> = process.env,
 ): TranscriptionProvider | null {
   if (isTestTranscriptionEnabled(env)) return testTranscriptionProvider
+  const cloudflare = readCloudflareConfig(env)
+  if (cloudflare) return createCloudflareTranscriber(cloudflare)
   return null
 }
 

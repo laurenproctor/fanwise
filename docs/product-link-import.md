@@ -959,7 +959,7 @@ All in `lib/imports/limits.ts`.
 | PDF | 20 MB; text of the first 40 pages |
 | HTML | 2 MB |
 | Running text per source in evidence | 20,000 characters |
-| Recording | 25 MB and ten minutes, stopped automatically at ten |
+| Recording | 10 MB and ten minutes, stopped automatically at ten; captured at 48 kbps (~3.6 MB for ten minutes) |
 
 ### Session and sources
 
@@ -1006,17 +1006,28 @@ import removes every source object. See `docs/security.md`, "Import sources and 
 
 ### Transcription
 
-`lib/ai/transcription` is a provider abstraction with **no vendor configured**. Choosing one adds a
-processor of creators' voices to the privacy policy and is the founder's decision; an adapter
-goes in `lib/ai/transcription/providers/<vendor>` and is selected by its key in `index.ts`.
-Until then a recording is refused as `transcription_unavailable`, and the composer says so. The
+`lib/ai/transcription` is a provider abstraction. The one adapter is **Cloudflare Workers AI,
+Whisper large-v3-turbo** (`lib/ai/transcription/providers/cloudflare`), chosen by the founder on
+12 September 2026 for its recurring free allowance: 10,000 Neurons a day, about 214 audio
+minutes, then $0.0005 per minute. It is selected when `CLOUDFLARE_ACCOUNT_ID` and
+`CLOUDFLARE_AI_API_TOKEN` are both set — on the Trigger.dev worker, where the job runs, and on
+Vercel, where the composer checks that transcription is configured. The request carries the
+base64 audio and nothing else; the response is validated with Zod; 401/403 map to
+`not_configured`, 400/413/422 to unreadable audio, 429/5xx and network failures to
+`provider_unavailable`. Cloudflare's Workers AI data-usage terms say customer content is not used
+for training and is not stored unless a storage product is used.
+
+Without both variables a recording is refused as `transcription_unavailable`, and the composer
+says so. The
 e2e suite enables a fixed transcript with `FANWISE_E2E_FAKE_TRANSCRIPTION=1`, which is refused
 against any non-local database. The microphone is allowed for this origin only
 (`Permissions-Policy: microphone=(self)`).
 
 ### Known limitations
 
-- No transcription vendor, so voice works end to end only in the test suite until one is chosen.
+- The Cloudflare adapter is tested against a scripted response only; the first real recording
+  on a configured deployment is its live check. Cloudflare's per-request audio size limit is
+  not documented, which is why recordings are captured at 48 kbps and capped at 10 MB.
 - No OCR, no images from PDFs, and no clean-up job for staged sources abandoned in a closed tab.
 - Conflicts are detected for four fact kinds with narrow patterns; others fall to the claims
   check and the creator's review.

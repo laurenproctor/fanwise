@@ -314,9 +314,12 @@ voice recordings a creator hands over. What holds:
 5. **The microphone is this origin's only.** `Permissions-Policy` is `microphone=(self)`; every
    other origin and every frame is refused, and the browser still asks the creator. Recording
    starts only when Record is pressed.
-6. **Transcription is server-side and vendor-neutral.** `lib/ai/transcription` receives audio and
-   its sniffed type and nothing else. No vendor is configured today; the composer says so rather
-   than showing a recording as transcribed. The suite's fixed transcript is enabled only by
+6. **Transcription is server-side.** `lib/ai/transcription` receives audio and its sniffed type
+   and nothing else, and sends it to Cloudflare Workers AI (Whisper) when `CLOUDFLARE_ACCOUNT_ID`
+   and `CLOUDFLARE_AI_API_TOKEN` are set. The token is scoped to Workers AI, read server-side
+   only and never logged. Without it the composer says transcription is not available rather
+   than showing a recording as transcribed. The vendor's name is held to
+   `lib/ai/transcription/providers/` by `tests/unit/channel-boundaries.test.ts`. The suite's fixed transcript is enabled only by
    `FANWISE_E2E_FAKE_TRANSCRIPTION=1` against a local database.
 
 ## The public web

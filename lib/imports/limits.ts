@@ -19,7 +19,12 @@ export const IMPORT_LIMITS = {
   maxHtmlBytes: 2 * 1024 * 1024,
   /** Characters of running text carried from one source into evidence. */
   maxBodyText: 20_000,
-  maxAudioBytes: 25 * 1024 * 1024,
+  /**
+   * A recording is sent to the transcription provider in one request, base64
+   * inside JSON, so it is kept small: the recorder captures speech at 48 kbps,
+   * which puts ten minutes near 3.6 MB, well inside this.
+   */
+  maxAudioBytes: 10 * 1024 * 1024,
   /** Ten minutes. A recording is auto-stopped here, and refused beyond it. */
   maxAudioMs: 10 * 60 * 1000,
 } as const
