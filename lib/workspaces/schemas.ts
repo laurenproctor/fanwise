@@ -15,10 +15,23 @@ export const workspaceSlugSchema = z
   .max(SLUG_LIMITS.max, `Slugs are at most ${SLUG_LIMITS.max} characters.`)
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Use lowercase letters, numbers and single hyphens.")
 
-/** The one field an owner edits in Settings. The slug does not follow it. */
-export const renameWorkspaceSchema = z.object({ name: workspaceNameSchema })
+/**
+ * The Studio details section. The slug is not here and is not editable: it is
+ * the address, and an address does not move because a name did. See the note in
+ * app/[slug]/settings/page.tsx for what changing it would cost.
+ */
+export const studioDetailsSchema = z.object({ name: workspaceNameSchema })
 
 export const emailSchema = z.email("Enter a valid email address.")
+
+/** Personal identity, kept separate from the studio's. */
+export const personNameSchema = z.string().trim().max(60, "Keep it under 60 characters.")
+
+export const accountDetailsSchema = z.object({
+  firstName: personNameSchema,
+  lastName: personNameSchema,
+  email: emailSchema,
+})
 
 // Supabase Auth's own floor is 6. Ours is higher because raising it later
 // strands existing accounts.
@@ -32,7 +45,8 @@ export const credentialsSchema = z.object({
   password: passwordSchema,
 })
 
-export type RenameWorkspaceInput = z.infer<typeof renameWorkspaceSchema>
+export type StudioDetailsInput = z.infer<typeof studioDetailsSchema>
+export type AccountDetailsInput = z.infer<typeof accountDetailsSchema>
 export type CredentialsInput = z.infer<typeof credentialsSchema>
 
 export const passwordResetRequestSchema = z.object({ email: emailSchema })

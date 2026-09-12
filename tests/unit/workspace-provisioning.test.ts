@@ -91,6 +91,7 @@ describe("provisionPersonalWorkspace", () => {
     name: FALLBACK_WORKSPACE_NAME,
     slug: "my-studio-aaaa",
     owner_user_id: "00000000-0000-0000-0000-000000000002",
+    icon_path: null,
     created_at: "2026-09-11T00:00:00Z",
     updated_at: "2026-09-11T00:00:00Z",
   }
