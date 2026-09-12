@@ -98,10 +98,7 @@ function snapshot(overrides: Partial<SourceSnapshot> = {}): SourceSnapshot {
         caption: "Base size, scale ratio, preview.",
       },
     ],
-    facts: [
-      { id: "kind", label: "Claude Artifact", origin: "dom" },
-      { id: "visibility", label: "Public preview", origin: "header" },
-    ],
+    facts: [{ id: "visibility", label: "Public preview", origin: "header" }],
     ...overrides,
   }
 }
@@ -126,10 +123,7 @@ export const ANALYZED_WEBPAGE: SourceAnalysis = {
         caption: "A six-weight grotesque for screens.",
       },
     ],
-    facts: [
-      { id: "kind", label: "Public webpage", origin: "dom" },
-      { id: "visibility", label: "Readable without signing in", origin: "header" },
-    ],
+    facts: [{ id: "visibility", label: "Readable without signing in", origin: "header" }],
   }),
   draft: draft({
     title: { value: "Aster Grotesk", origin: { kind: "observed", from: "og" } },

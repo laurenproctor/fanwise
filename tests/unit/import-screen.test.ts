@@ -292,8 +292,10 @@ describe("every source state", () => {
     const text = textOf(markup)
 
     expect(text).toContain("Type Scale Studio")
-    expect(text).toContain("Claude Artifact")
     expect(text).toContain("Captured Sep 12, 2026")
+    // The kind is derived from the snapshot rather than carried as a fact, so
+    // it is named once. It was named twice before anybody looked at the screen.
+    expect(count(markup, "Claude Artifact")).toBe(1)
     // A snapshot, not a subscription, said where a creator will look for it.
     expect(text).toContain("Fanwise does not re-read this link")
   })
@@ -482,6 +484,39 @@ describe("the completion checklist", () => {
     const markup = checklist(inputs())
 
     expect(textOf(markup)).toContain("Add a source")
+    expect(markup).toContain('href="#import-source-region"')
+  })
+
+  it("opens one control at a time, and it is the next step's", () => {
+    // Every panel open at once is a file picker, three license options and an
+    // attestation stacked under a heading that says what is left, which is the
+    // one thing a checklist has to stay readable enough to say.
+    const markup = checklist({ ...COMPLETE, deliverables: [], license: null, rights: null })
+
+    expect(count(markup, 'aria-expanded="true"')).toBe(1)
+    expect(count(markup, 'aria-expanded="false"')).toBe(2)
+    // Buyer files is the next step, so its control is the open one.
+    expect(textOf(markup)).toContain("Upload files")
+    expect(textOf(markup)).not.toContain("Extended commercial")
+  })
+
+  it("names each toggle for its own step", () => {
+    const markup = checklist(inputs())
+
+    for (const label of [
+      "Show upload customer files",
+      "Show choose license",
+      "Show confirm ownership",
+    ]) {
+      expect(markup, label).toContain(`aria-label="${label}"`)
+    }
+  })
+
+  it("gives a step with no panel no toggle at all", () => {
+    // Source and listing are acted on elsewhere; their row is a signpost, and a
+    // signpost does not expand.
+    const markup = checklist(inputs())
+    expect(markup).not.toContain('aria-label="Show add a source"')
     expect(markup).toContain('href="#import-source-region"')
   })
 

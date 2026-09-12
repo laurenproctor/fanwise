@@ -181,22 +181,19 @@ export function ListingDraftForm({
         </span>
       </DraftField>
 
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
-          <OriginBadge origin={draft.tags.origin} field={LISTING_FIELD_LABELS.tags} />
-        </div>
-        {/*
-          The channel listing editor's tag field, reused rather than rewritten.
-          It carries its own label, its own glossary tip and its own count, and
-          a second comma-separated tag field on a second screen would be a
-          second set of rules about what a tag is.
-        */}
-        <TagInput
-          name="tags"
-          defaultValue={[...draft.tags.value]}
-          onChange={(tags) => onFieldChange("tags", tags)}
-        />
-      </div>
+      {/*
+        The channel listing editor's tag field, reused rather than rewritten. It
+        carries its own label, its own glossary tip and its own count, and a
+        second comma-separated tag field on a second screen would be a second set
+        of rules about what a tag is. Its `annotation` slot is what puts the
+        provenance marker beside the label rather than floating above it.
+      */}
+      <TagInput
+        name="tags"
+        defaultValue={[...draft.tags.value]}
+        onChange={(tags) => onFieldChange("tags", tags)}
+        annotation={<OriginBadge origin={draft.tags.origin} field={LISTING_FIELD_LABELS.tags} />}
+      />
 
       {awaiting.length > 0 ? (
         <ReviewAcknowledgment fields={awaiting} onConfirm={onReviewSuggestions} />

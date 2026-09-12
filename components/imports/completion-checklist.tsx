@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { FIELD_INPUT_CLASS } from "@/components/ui/field"
 import { CUSTOM_LICENSE_ID, LICENSE_PRESETS, customLicense } from "@/lib/imports/deliverables"
 import type { ImportReadiness, ImportStep, ImportStepKey } from "@/lib/imports/readiness"
@@ -24,6 +24,22 @@ import type { BuyerDeliverable, LicenseSelection } from "@/lib/imports/types"
  * Exactly one row is marked `Next step`, and it is `readiness.nextStep`: the
  * first incomplete step, so there can never be two. Every other incomplete row
  * is marked `Required`, because each one blocks.
+ *
+ * **One row's control is open at a time**, and by default it is the next step's.
+ * Every control open at once is three license options, a file picker and an
+ * attestation stacked under a heading that says what is left, and the list of
+ * what is left stops being readable — which is the one job a checklist has.
+ *
+ * Which row that is has one rule: the creator's own choice if they have made
+ * one, and otherwise the next step. So the list opens on the thing to do
+ * without anybody choosing anything, advances as steps are satisfied, and stops
+ * moving the moment a creator opens a row themselves.
+ *
+ * The consequence worth naming: satisfying the open step advances the list, so
+ * the control that satisfied it collapses. That is the intended reading — the
+ * row keeps a `Done` badge, it is one chevron from being reopened, and the
+ * alternative is a `Next step` badge pointing at one row while a finished one
+ * sits open below it.
  */
 
 /**
@@ -59,6 +75,9 @@ export function CompletionChecklist({
     (step) => ACTIONABLE_HERE.includes(step.key) || !step.complete,
   )
 
+  const [opened, setOpened] = useState<ImportStepKey | null>(null)
+  const openKey = opened ?? readiness.nextStep
+
   return (
     <section
       aria-labelledby="import-checklist-heading"
@@ -85,6 +104,8 @@ export function CompletionChecklist({
               key={step.key}
               step={step}
               isNext={readiness.nextStep === step.key}
+              isOpen={openKey === step.key}
+              onToggle={() => setOpened(openKey === step.key ? null : step.key)}
               deliverables={deliverables}
               license={license}
               handlers={handlers}
@@ -99,16 +120,23 @@ export function CompletionChecklist({
 function ChecklistRow({
   step,
   isNext,
+  isOpen,
+  onToggle,
   deliverables,
   license,
   handlers,
 }: {
   step: ImportStep
   isNext: boolean
+  isOpen: boolean
+  onToggle: () => void
   deliverables: readonly BuyerDeliverable[]
   license: LicenseSelection | null
   handlers: ChecklistHandlers
 }) {
+  const panelId = useId()
+  const hasPanel = ACTIONABLE_HERE.includes(step.key)
+
   return (
     <li
       aria-current={isNext ? "step" : undefined}
@@ -158,9 +186,57 @@ function ChecklistRow({
             {step.blockedBy}
           </span>
         ) : null}
-        <RowControl step={step} deliverables={deliverables} license={license} handlers={handlers} />
+        {hasPanel && !isOpen ? null : (
+          <div id={hasPanel ? panelId : undefined}>
+            <RowControl
+              step={step}
+              deliverables={deliverables}
+              license={license}
+              handlers={handlers}
+            />
+          </div>
+        )}
       </span>
+
+      {hasPanel ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          /*
+            Named for the step, not "Expand". A column of identical toggles is a
+            column a screen reader user cannot tell apart, which is the same
+            mistake as an unlabelled icon one step later.
+          */
+          aria-label={`${isOpen ? "Hide" : "Show"} ${step.action.toLowerCase()}`}
+          className="ml-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-2)] transition-colors hover:bg-[var(--color-paper-2)] hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+        >
+          <ChevronGlyph open={isOpen} />
+        </button>
+      ) : null}
     </li>
+  )
+}
+
+function ChevronGlyph({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+      className={open ? "rotate-180" : ""}
+    >
+      <path
+        d="m4 6 4 4 4-4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }
 

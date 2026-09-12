@@ -22,10 +22,19 @@ const ARTIFACT = "https://claude.ai/code/artifact/3f2e8c4e-7d4b-4e9b-b9a1-2c9f4e
 /** The widths tests/e2e/catalog.spec.ts already uses, plus a wide desktop. */
 const WIDTHS = [320, 390, 768, 1280, 1600]
 
+/**
+ * Paste a link and wait for the read to settle.
+ *
+ * Waits for the analyzing pill to go rather than for "Replace link" to appear:
+ * that control is there throughout the analyzing state too, so waiting on it
+ * returns while the stages are still running and every assertion after it is
+ * racing them.
+ */
 async function analyze(page: import("@playwright/test").Page, url: string) {
   await page.getByLabel("Product link").fill(url)
   await page.getByRole("button", { name: "Analyze product" }).click()
   await expect(page.getByText("Replace link")).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText("Analyzing", { exact: true })).toBeHidden({ timeout: 15_000 })
 }
 
 test("a signed-out visitor cannot reach the importer", async ({ page }) => {
@@ -69,18 +78,26 @@ test("readiness climbs one step at a time and opens the gate at five of five", a
   await expect(progress).toHaveAttribute("aria-valuenow", "2")
   await expect(page.getByText("2 of 5 steps complete")).toBeVisible()
 
-  await page
-    .getByLabel("Upload files")
-    .setInputFiles({
-      name: "buyer-files.zip",
-      mimeType: "application/zip",
-      buffer: Buffer.from("x"),
-    })
+  await page.getByLabel("Upload files").setInputFiles({
+    name: "buyer-files.zip",
+    mimeType: "application/zip",
+    buffer: Buffer.from("x"),
+  })
   await expect(progress).toHaveAttribute("aria-valuenow", "3")
 
-  await page.getByRole("radio", { name: /Commercial use/ }).check()
+  // click() rather than check(): choosing satisfies the step, so the list moves
+  // on to the last one and this panel closes behind it. The outcome is the
+  // readiness, not the radio.
+  await page.getByRole("radio", { name: /Commercial use/ }).click()
   await expect(progress).toHaveAttribute("aria-valuenow", "4")
 
+  // The finished row stays listed, marked done, one chevron from being changed.
+  await page.getByRole("button", { name: "Show choose license" }).click()
+  await expect(page.getByRole("radio", { name: /Commercial use/ })).toBeChecked()
+
+  // Opening it by hand stops the list advancing on its own, so the last step is
+  // opened the same way.
+  await page.getByRole("button", { name: "Show confirm ownership" }).click()
   await page.getByRole("button", { name: "I have the right to sell this" }).click()
   await expect(progress).toHaveAttribute("aria-valuenow", "5")
   await expect(page.getByText("Nothing left. Every required item is done.")).toBeVisible()
@@ -105,14 +122,12 @@ test("marketplace review cannot be reached below five of five, even by clicking 
   await page.getByRole("button", { name: /I have checked/ }).click()
 
   // Still inert at four of five, which is 80% and looks nearly done.
-  await page
-    .getByLabel("Upload files")
-    .setInputFiles({
-      name: "buyer-files.zip",
-      mimeType: "application/zip",
-      buffer: Buffer.from("x"),
-    })
-  await page.getByRole("radio", { name: /Commercial use/ }).check()
+  await page.getByLabel("Upload files").setInputFiles({
+    name: "buyer-files.zip",
+    mimeType: "application/zip",
+    buffer: Buffer.from("x"),
+  })
+  await page.getByRole("radio", { name: /Commercial use/ }).click()
   await expect(page.getByText("80%")).toBeVisible()
   await expect(review).toHaveAttribute("aria-disabled", "true")
   await review.click({ force: true })
