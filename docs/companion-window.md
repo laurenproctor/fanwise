@@ -212,7 +212,7 @@ present in the second window's document, copies one field, and closes it. If dri
 Document PiP window proves unreliable under Playwright, assert up to the API call and cover
 the rest in the manual run rather than writing a test that passes for the wrong reason.
 
-**Journey.** This is **not a fifteenth journey.** It is journey 7 run in the companion
+**Journey.** This is **not a new numbered journey.** It is journey 7 run in the companion
 window, and `docs/testing.md` gets a line saying so. A new journey number would imply a new
 path from empty workspace to live listing, and there is not one.
 

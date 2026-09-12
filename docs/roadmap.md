@@ -651,7 +651,7 @@ Scope, when it opens:
 - Clipboard and download behaviour proven from the second window, including the formatted
   description Creative Market's editor needs.
 - Component tests, one E2E spec, and a line in `docs/testing.md` saying this is journey 7 in
-  the companion rather than a fifteenth journey.
+  the companion rather than a new numbered journey.
 
 **No migration, no new table, no new server action, no new capability.** B11 is a layout. If
 it needs a schema change, something has been misread.
