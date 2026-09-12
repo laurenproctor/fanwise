@@ -61,6 +61,18 @@ const PUBLIC_PREFIX = "@"
 const SEGMENT = /^[A-Za-z0-9._~-]+$/
 
 /**
+ * The two segments that are path syntax rather than names.
+ *
+ * `.` and `.` twice both satisfy SEGMENT — a dot is a legal character in a
+ * segment — and both mean something to a path resolver. Left in, `/@a/../b`
+ * assembles into the rewrite target `/profile/a/../b`. Next normalises that
+ * before routing today, so nothing visibly breaks, which is exactly why this
+ * is worth refusing here: the safety of the rewrite target should not be a
+ * property of whoever consumes it. Found by a test, not by inspection.
+ */
+const TRAVERSAL = new Set([".", ".."])
+
+/**
  * Decides what to do with one pathname.
  *
  * Order matters: the internal prefix is checked first, so a request for
@@ -86,7 +98,9 @@ export function resolvePublicRoute(pathname: string): PublicRouteDecision {
   const hadTrailingSlash = pathname.length > 2 && pathname.endsWith("/")
   const segments = withoutPrefix.replace(/\/+$/, "").split("/")
 
-  if (segments.some((segment) => !SEGMENT.test(segment))) return { kind: "pass" }
+  if (segments.some((segment) => !SEGMENT.test(segment) || TRAVERSAL.has(segment))) {
+    return { kind: "pass" }
+  }
 
   // Lowercase is the canonical form of every public address, so `/@Northline`
   // is not a second page: it is a permanent redirect to the one page. The same

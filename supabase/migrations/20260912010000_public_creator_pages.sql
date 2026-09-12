@@ -85,12 +85,19 @@ create table public.public_profiles (
   -- those produces a handle that is visually indistinguishable from an existing
   -- one and distinct to the database. ASCII cannot express that attack.
   --
-  -- Uppercase is excluded by the same expression rather than folded, so the
-  -- stored value is already the canonical URL form and no caller has to
-  -- remember to lowercase it. citext then makes the *comparison*
-  -- case-insensitive, which is what stops `/@Northline` claiming a second row.
+  -- Uppercase is excluded rather than folded, so the stored value is already
+  -- the canonical URL form and no caller has to remember to lowercase it
+  -- before putting it in a link or a canonical tag. citext then makes the
+  -- *comparison* case-insensitive, which is what stops `/@Northline` claiming
+  -- a second row.
+  --
+  -- Note the cast. `~` on a citext operand is the case-INSENSITIVE match, so
+  -- `handle ~ '^[a-z0-9...]'` accepts `NorthLine` — the pattern looks like it
+  -- forbids uppercase and does not. Casting to text first restores the
+  -- case-sensitive operator and makes the constraint mean what it reads as.
+  -- Found by a test that asserted the refusal and got a successful update.
   constraint public_profiles_handle_format
-    check (handle ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+    check (handle::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   constraint public_profiles_handle_length
     check (length(handle::text) between 3 and 32),
 
@@ -229,8 +236,11 @@ create table public.public_product_pages (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
+  -- Cast to text for the same reason as the handle above: `~` on citext is
+  -- the case-insensitive operator, and an uncast pattern would admit
+  -- `Aster-Grotesk` into a column whose whole job is to be a canonical URL.
   constraint public_product_pages_slug_format
-    check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+    check (slug::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   constraint public_product_pages_slug_length
     check (length(slug::text) between 3 and 64),
 
