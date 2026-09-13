@@ -339,7 +339,12 @@ const createSchema = z.object({
   stagedSourceIds: z.array(z.uuid()).max(IMPORT_LIMITS.maxSources),
 })
 
-export type CreateDraftResult = { error: string; existingHref?: string } | { href: string }
+/**
+ * Ids, never addresses. The browser builds the address to go to from a route
+ * helper and an id it has checked is a uuid, so nothing it navigates to is a
+ * string that came back over the network.
+ */
+export type CreateDraftResult = { error: string; existingImportId?: string } | { importId: string }
 
 /**
  * "Create draft".
@@ -415,10 +420,10 @@ export async function createImportDraftAction(
   if (outcome.kind === "link_in_use") {
     return {
       error: outcome.message,
-      existingHref: routes.productImport(workspaceSlug, outcome.importId),
+      existingImportId: outcome.importId,
     }
   }
 
   revalidatePath(routes.workspace(workspaceSlug))
-  return { href: routes.productImport(workspaceSlug, outcome.importId) }
+  return { importId: outcome.importId }
 }

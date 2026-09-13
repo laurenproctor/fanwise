@@ -19,6 +19,7 @@ import {
   stagedSourceStatusesAction,
 } from "@/lib/imports/composer-actions"
 import { uploadComposerSource } from "@/lib/products/upload-client"
+import { routes } from "@/lib/routes"
 import { SourcePill } from "./source-pill"
 import { useRecorder, type Recording } from "./use-recorder"
 
@@ -41,6 +42,10 @@ import { useRecorder, type Recording } from "./use-recorder"
  */
 
 const POLL_MS = 1_500
+
+/** An import id is a uuid; anything else is not somewhere to navigate. */
+const isImportId = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 
 let keyCounter = 0
 const nextKey = () => `source-${Date.now().toString(36)}-${(keyCounter += 1)}`
@@ -296,14 +301,23 @@ export function UniversalComposer({ workspaceSlug }: { workspaceSlug: string }) 
     if ("error" in result) {
       setSubmitting(false)
       setSubmitError(
-        result.existingHref
-          ? { message: result.error, href: result.existingHref }
+        result.existingImportId && isImportId(result.existingImportId)
+          ? {
+              message: result.error,
+              href: routes.productImport(workspaceSlug, result.existingImportId),
+            }
           : { message: result.error },
       )
       dispatch({ type: "announced", message: result.error })
       return
     }
-    startTransition(() => router.push(result.href))
+    if (!isImportId(result.importId)) {
+      setSubmitting(false)
+      setSubmitError({ message: "That draft could not be opened. Try again." })
+      return
+    }
+    const href = routes.productImport(workspaceSlug, result.importId)
+    startTransition(() => router.push(href))
   }, [gate, router, state.sources, submissionId, submitting, text, typed, workspaceSlug])
 
   /* ----------------------------------------------------------------- drop */
