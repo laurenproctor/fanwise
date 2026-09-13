@@ -1806,6 +1806,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      remove_import_deliverable: {
+        Args: { p_asset_id: string; p_product_id: string }
+        Returns: string[]
+      }
       storage_object_profile_workspace_id: {
         Args: { p_name: string }
         Returns: string

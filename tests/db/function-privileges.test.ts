@@ -55,6 +55,15 @@ const AUTHENTICATED_MAY_EXECUTE = new Set([
     own RLS; tests/db/product-import-sources.test.ts holds that from outside.
   */
   "create_import_session(p_workspace_id uuid, p_submission_id uuid, p_product_name text, p_product_slug text, p_product_metadata jsonb, p_provider import_provider, p_source_url text, p_normalized_url text, p_url_display_name text, p_pasted_text text, p_staged_source_ids uuid[])",
+  /*
+    RPC, called by the import screen's remove action as the signed-in creator.
+    The last-ready-buyer-file check and the delete in one transaction, locked
+    per product, so two removals at once cannot both pass the check. Security
+    invoker: every statement inside runs under the caller's own RLS, so it
+    needs no membership check of its own.
+    tests/db/import-deliverable-removal.test.ts holds that from outside.
+  */
+  "remove_import_deliverable(p_product_id uuid, p_asset_id uuid)",
   "release_public_handle(p_public_profile_id uuid, p_new_handle text)",
   "release_public_product_slug(p_public_product_page_id uuid, p_new_slug text)",
   /*
