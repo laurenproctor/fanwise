@@ -64,15 +64,17 @@ test("a link and an HTML file make one draft, and the failed link says so", asyn
     ),
   })
   await expect(pills.getByText("canvas-tote.html")).toBeVisible()
-  await expect(pills.getByText("Ready")).toHaveCount(2, { timeout: 20_000 })
+  await expect(pills.getByText("Ready", { exact: true })).toHaveCount(2, { timeout: 20_000 })
 
   await page.getByRole("button", { name: "Create draft" }).click()
   await expect(page).toHaveURL(IMPORT_URL(slug), { timeout: 20_000 })
 
   const sources = page.getByRole("region", { name: /Your sources/ })
   await expect(sources.getByText("canvas-tote.html")).toBeVisible({ timeout: 30_000 })
-  await expect(sources.getByText("Read")).toBeVisible({ timeout: 30_000 })
-  await expect(sources.getByText("Needs attention")).toBeVisible({ timeout: 30_000 })
+  await expect(sources.getByText("Read", { exact: true })).toBeVisible({ timeout: 30_000 })
+  await expect(sources.getByText("Needs attention", { exact: true })).toBeVisible({
+    timeout: 30_000,
+  })
   // The draft was still built from the source that read.
   await expect(page.getByRole("heading", { name: "What Fanwise found" })).toBeVisible({
     timeout: 30_000,
