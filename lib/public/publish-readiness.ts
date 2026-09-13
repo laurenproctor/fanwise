@@ -1,6 +1,6 @@
 import { classifyHandle } from "./handles"
 import { isShown, type ArrangementRow, type Ineligibility } from "./product-arrangement"
-import { LINK_PARSERS, type ProfileLinkKind } from "./profile-links"
+import { LINK_PARSERS, parseContact, type ProfileLinkKind } from "./profile-links"
 import {
   checkDetailsStep,
   type DetailsField,
@@ -45,6 +45,10 @@ export interface PublishValues {
   website_url: string
   instagram_url: string
   behance_url: string
+  /** Empty removes the location from the live profile. */
+  location: string
+  /** `mailto:` or https, or empty to remove the Contact button. */
+  contact_url: string
 }
 
 export interface PublishPlan {
@@ -145,10 +149,17 @@ export function evaluateReadiness(input: {
         website_url: linkUrl("website", input.fields.website),
         instagram_url: linkUrl("instagram", input.fields.instagram),
         behance_url: linkUrl("behance", input.fields.behance),
+        location: input.fields.location.trim(),
+        contact_url: contactUrl(input.fields.contact),
       },
       productIds: input.rows.filter(isShown).map((row) => row.product.id),
     },
   }
+}
+
+function contactUrl(raw: string): string {
+  const parsed = parseContact(raw)
+  return parsed.kind === "valid" ? parsed.url : ""
 }
 
 function linkUrl(kind: ProfileLinkKind, raw: string): string {
@@ -170,9 +181,30 @@ export function snapshotOf(plan: PublishPlan, avatarPath: string | null) {
     website_url: orNull(plan.values.website_url),
     instagram_url: orNull(plan.values.instagram_url),
     behance_url: orNull(plan.values.behance_url),
+    location: orNull(plan.values.location),
+    contact_url: orNull(plan.values.contact_url),
     avatar_path: avatarPath,
     product_ids: plan.productIds,
   }
+}
+
+/**
+ * A recorded snapshot, with the two fields older publications never carried.
+ *
+ * `location` and `contact_url` joined the snapshot on 13 September 2026. The
+ * publish function before that never wrote either column, so for a
+ * publication without those keys the live row's current values are exactly
+ * what was published. Filling them from the live row keeps an unchanged
+ * profile reading as published rather than "changes to publish".
+ * `publish_public_profile()` makes the same allowance when it decides whether
+ * a republish is a no-op, in 20260913020000.
+ */
+export function snapshotWithLiveDefaults(
+  recorded: unknown,
+  live: { location: string | null; contact_url: string | null },
+): unknown {
+  if (!recorded || typeof recorded !== "object" || Array.isArray(recorded)) return recorded
+  return { location: live.location, contact_url: live.contact_url, ...recorded }
 }
 
 export function sameSnapshot(a: unknown, b: unknown): boolean {

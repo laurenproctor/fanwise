@@ -528,6 +528,17 @@ archived and at least one of its listings is `live` by the catalog's `liveness()
 (`lib/public/product-arrangement.ts`); an arranged product that later becomes
 ineligible keeps its entry and flag but is never previewed or published.
 
+`location` and `contact` (20260913020000) are the two optional step 1 fields, added
+back after the builder shipped without them. `contact` is a bare email address or a
+web page; publication writes it to `public_profiles.contact_url` as `mailto:` or https,
+and an empty field removes the Contact button. The migration backfilled both from the
+live row into drafts that already existed, because an empty draft column would
+otherwise have erased a creator's location or contact link on their next publish. A
+publication recorded before that migration has no `location` or `contact_url` key in
+its snapshot; both the publish function's no-op check and the builder's "changes to
+publish" state fill those keys from the live row, which the previous publish function
+never wrote.
+
 **public_profile_publications** — id, public_profile_id, workspace_id, handle,
 draft_updated_at, snapshot (jsonb), published_by, published_at
 

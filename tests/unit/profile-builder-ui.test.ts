@@ -12,7 +12,8 @@ import { presentationFromDraft } from "@/lib/public/profile-presentation"
  * What static markup can decide: that the preview is the shared component and
  * shows exactly what the fields say, that desktop is the default and the
  * mobile layout is a different layout, that every field has a label, and that
- * no email field or email icon exists anywhere. Typing into a field is a
+ * email reaches a profile only through the optional Contact button — never as
+ * a link icon. Typing into a field is a
  * browser event, so the per-keystroke half is the pure mapping these renders
  * are fed from, tested in profile-builder-model.test.ts.
  */
@@ -48,6 +49,8 @@ const FIELDS: ProfileDraftFields = {
   website: "laurenproctor.com",
   instagram: "@laurenproctor",
   behance: "behance.net/laurenproctor",
+  location: "",
+  contact: "",
 }
 
 function present(fields: Partial<ProfileDraftFields> = {}, avatarUrl: string | null = null) {
@@ -159,29 +162,56 @@ describe("the live preview", () => {
   })
 })
 
-describe("no email anywhere in the builder", () => {
-  it("renders no email field, mailto link or email icon", () => {
-    const step = renderToStaticMarkup(
+describe("location and the Contact button", () => {
+  const step = (fields: Partial<ProfileDraftFields>) =>
+    renderToStaticMarkup(
       createElement(ProfileDetailsStep, {
         workspaceSlug: "laurens-studio",
         origin: "https://fanwise.com",
         liveHandle: "lauren-proctor",
         published: false,
-        initial: { fields: FIELDS, revision: 0, avatarUrl: null, stored: true },
+        initial: { fields: { ...FIELDS, ...fields }, revision: 0, avatarUrl: null, stored: true },
       }),
     )
-    expect(step).not.toMatch(/type="email"/)
-    expect(step).not.toMatch(/mailto:/i)
-    expect(step).not.toMatch(/data-link="email"/)
-    expect(textOf(step)).not.toMatch(/\bemail\b/i)
+
+  it("offers both as optional fields, and says what leaving them empty does", () => {
+    const text = textOf(step({}))
+    expect(text).toContain("Location (optional)")
+    expect(text).toContain("Contact button (optional)")
+    expect(text).toContain("Leave it empty to show no location.")
+    expect(text).toContain("Leave it empty to show no button.")
   })
 
-  it("has no email glyph in the shared component's source", () => {
+  it("offers Remove only when there is a contact to remove", () => {
+    expect(textOf(step({ contact: "" }))).not.toContain("Remove contact button")
+    expect(textOf(step({ contact: "hello@laurenproctor.com" }))).toContain("Remove contact button")
+  })
+
+  it("previews neither when both are empty", () => {
+    const markup = renderPreview({ location: "", contact: "" })
+    expect(markup).not.toContain("data-contact")
+    expect(textOf(markup)).not.toContain("Contact")
+  })
+
+  it("previews both when set, with the Contact button inert inside the preview", () => {
+    const markup = renderPreview({
+      location: "Brooklyn, New York",
+      contact: "hello@laurenproctor.com",
+    })
+    expect(textOf(markup)).toContain("Brooklyn, New York")
+    expect(markup).toContain("data-contact")
+    // A preview never navigates, so the button carries no href.
+    expect(markup).not.toMatch(/<a[^>]*data-contact/)
+    expect(markup).not.toContain("mailto:")
+  })
+
+  it("never draws email as a link icon, in the builder or the shared component", () => {
+    expect(step({ contact: "hello@laurenproctor.com" })).not.toMatch(/data-link="email"/)
     const source = readFileSync(
       join(__dirname, "..", "..", "components", "public", "public-profile.tsx"),
       "utf8",
     )
-    expect(source).not.toMatch(/case "email"|mailto/)
+    expect(source).not.toMatch(/case "email"/)
   })
 })
 
@@ -200,7 +230,7 @@ describe("step 1, profile details", () => {
     const inputIds = [...markup.matchAll(/<(?:input|textarea)[^>]*\sid="([^"]+)"/g)].map(
       (m) => m[1]!,
     )
-    expect(inputIds.length).toBe(7)
+    expect(inputIds.length).toBe(9)
     for (const id of inputIds) {
       expect(markup, `label for ${id}`).toContain(`for="${id}"`)
     }
@@ -212,6 +242,8 @@ describe("step 1, profile details", () => {
       "Website",
       "Instagram",
       "Behance",
+      "Location (optional)",
+      "Contact button (optional)",
     ]) {
       expect(textOf(markup)).toContain(label)
     }

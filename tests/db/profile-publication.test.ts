@@ -382,6 +382,144 @@ describe("publishing", () => {
   })
 })
 
+describe("location and the Contact button", () => {
+  let dave: Actor
+  let profileId: string
+  const handle = `dave-${suffix}`
+
+  const daveValues = (overrides: Record<string, string> = {}) => ({
+    handle,
+    display_name: "Dave Studio",
+    short_bio: "",
+    website_url: "",
+    instagram_url: "",
+    behance_url: "",
+    location: "Brooklyn, New York",
+    contact_url: "mailto:hello@dave.example",
+    ...overrides,
+  })
+
+  async function publishDave(values: Record<string, string>) {
+    const expected = await arrangeDraft(dave, profileId, [])
+    return dave.client.rpc("publish_public_profile", {
+      p_public_profile_id: profileId,
+      p_expected_draft_updated_at: expected,
+      p_values: values,
+      p_product_ids: [],
+    })
+  }
+
+  async function live() {
+    const { data } = await adminClient()
+      .from("public_profiles")
+      .select("location, contact_url, status")
+      .eq("id", profileId)
+      .single()
+    return data
+  }
+
+  beforeAll(async () => {
+    dave = await createActor("pub-dave")
+    profileId = await profileFor(dave, handle, "Dave Studio")
+  })
+
+  afterAll(async () => {
+    if (dave) await destroyActor(dave)
+  })
+
+  it("publishes both onto the live row, where a signed-out visitor can read them", async () => {
+    const { data, error } = await publishDave(daveValues())
+    expect(error).toBeNull()
+    expect(data).toMatchObject({ outcome: "published" })
+    expect(await live()).toEqual({
+      location: "Brooklyn, New York",
+      contact_url: "mailto:hello@dave.example",
+      status: "published",
+    })
+
+    const { data: seen } = await anonClient()
+      .from("public_profiles")
+      .select("location, contact_url")
+      .eq("id", profileId)
+      .single()
+    expect(seen).toEqual({
+      location: "Brooklyn, New York",
+      contact_url: "mailto:hello@dave.example",
+    })
+  })
+
+  it("treats the same location and contact as unchanged", async () => {
+    const before = await publicationCount(profileId)
+    const { data, error } = await publishDave(daveValues())
+    expect(error).toBeNull()
+    expect(data).toMatchObject({ outcome: "unchanged" })
+    expect(await publicationCount(profileId)).toBe(before)
+  })
+
+  it("changes the contact to a web page", async () => {
+    const { error } = await publishDave(daveValues({ contact_url: "https://dave.example/contact" }))
+    expect(error).toBeNull()
+    expect((await live())?.contact_url).toBe("https://dave.example/contact")
+  })
+
+  it("removes the Contact button and the location when both are published empty", async () => {
+    const before = await publicationCount(profileId)
+    const { data, error } = await publishDave(daveValues({ location: "", contact_url: "" }))
+    expect(error).toBeNull()
+    expect(data).toMatchObject({ outcome: "published" })
+    expect(await live()).toMatchObject({ location: null, contact_url: null })
+    expect(await publicationCount(profileId)).toBe(before + 1)
+  })
+
+  it("refuses a contact that is not an https page or a plain mailto, changing nothing", async () => {
+    await publishDave(daveValues())
+    for (const contact_url of ["javascript:alert(1)", "http://dave.example", "mailto:"]) {
+      const { error } = await publishDave(daveValues({ contact_url }))
+      expect(error?.code, contact_url).toBe("23514")
+    }
+    expect((await live())?.contact_url).toBe("mailto:hello@dave.example")
+  })
+
+  /**
+   * A publication recorded before this migration has no location or
+   * contact_url key. The old function never wrote those columns, so the live
+   * row holds what was published; an otherwise identical republish must be a
+   * no-op, not a new publication.
+   */
+  it("counts an older publication without the two keys as unchanged", async () => {
+    await publishDave(daveValues())
+    const admin = adminClient()
+    const { data: latest } = await admin
+      .from("public_profile_publications")
+      .select("snapshot, draft_updated_at, workspace_id, handle")
+      .eq("public_profile_id", profileId)
+      .order("published_at", { ascending: false })
+      .limit(1)
+      .single()
+    const legacy = Object.fromEntries(
+      Object.entries(latest!.snapshot as Record<string, unknown>).filter(
+        ([key]) => key !== "location" && key !== "contact_url",
+      ),
+    )
+    expect(Object.keys(legacy)).not.toContain("location")
+    const { error: insertError } = await admin.from("public_profile_publications").insert({
+      public_profile_id: profileId,
+      workspace_id: latest!.workspace_id,
+      handle: latest!.handle,
+      draft_updated_at: latest!.draft_updated_at,
+      snapshot: legacy as Json,
+      published_at: new Date(Date.now() + 60_000).toISOString(),
+    })
+    expect(insertError).toBeNull()
+
+    const before = await publicationCount(profileId)
+    const { data, error } = await publishDave(daveValues())
+    expect(error).toBeNull()
+    expect(data).toMatchObject({ outcome: "unchanged" })
+    expect(await publicationCount(profileId)).toBe(before)
+  })
+})
+
 describe("what a signed-out visitor can never read", () => {
   it("cannot read the publication log or any draft", async () => {
     const anon = anonClient()

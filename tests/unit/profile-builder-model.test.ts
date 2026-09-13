@@ -5,6 +5,7 @@ import { RESERVED_HANDLES, classifyHandle, normalizeHandleInput } from "@/lib/pu
 import {
   LINK_PARSERS,
   parseBehance,
+  parseContact,
   parseInstagram,
   parseWebsite,
   resolvedLinks,
@@ -42,7 +43,12 @@ const FIELDS: ProfileDraftFields = {
   website: "laurenproctor.com",
   instagram: "@laurenproctor",
   behance: "behance.net/laurenproctor",
+  location: "",
+  contact: "",
 }
+
+/** The live row's own check, `public_profiles_contact_url_scheme` in 20260912010000. */
+const CONTACT_URL_CONSTRAINT = /^(https:\/\/[^\s<>"]+|mailto:[^\s<>"@]+@[^\s<>"@]+)$/
 
 describe("studio address normalization", () => {
   it("folds what people type without meaning anything by it", () => {
@@ -185,6 +191,19 @@ describe("the draft model", () => {
     expect(errors.handle).toMatch(/reserved/i)
   })
 
+  it("never blocks step 1 on an empty location or contact, only on a wrong one", () => {
+    expect(checkDetailsStep({ ...FIELDS, location: "", contact: "" })).toEqual({})
+    expect(
+      checkDetailsStep({ ...FIELDS, location: "Brooklyn", contact: "hello@studio.com" }),
+    ).toEqual({})
+    const errors = checkDetailsStep({
+      ...FIELDS,
+      location: "x".repeat(DRAFT_LIMITS.location + 1),
+      contact: "hello@",
+    })
+    expect(Object.keys(errors).sort()).toEqual(["contact", "location"])
+  })
+
   it("seeds a never-saved draft from the live profile", () => {
     const draft = seedDraftFromProfile({
       id: "0f9f2d4e-1c3b-4a5e-9f7d-2b8c6a1e4d30",
@@ -208,8 +227,60 @@ describe("the draft model", () => {
     expect(draft.revision).toBe(0)
     expect(draft.fields.shortBio).toHaveLength(DRAFT_LIMITS.shortBio)
     expect(draft.fields.website).toBe("https://northline.com")
-    // The contact address is not part of the builder's model.
-    expect(JSON.stringify(draft)).not.toContain("mailto")
+    // Both optional fields carry over, so a creator who set them before the
+    // builder existed does not lose them on first publish. The field takes a
+    // bare address, so the scheme is dropped on the way in.
+    expect(draft.fields.location).toBe("Brooklyn")
+    expect(draft.fields.contact).toBe("hello@northline.com")
+  })
+
+  it("seeds empty optional fields as empty, not as the word null", () => {
+    const draft = seedDraftFromProfile({
+      id: "0f9f2d4e-1c3b-4a5e-9f7d-2b8c6a1e4d30",
+      workspace_id: "w",
+      handle: "northline",
+      display_name: "Northline",
+      short_bio: null,
+      location: null,
+      avatar_path: null,
+      website_url: null,
+      instagram_url: null,
+      behance_url: null,
+      contact_url: null,
+      status: "draft",
+      seo_title: null,
+      seo_description: null,
+      published_at: null,
+      created_at: "",
+      updated_at: "",
+    })
+    expect(draft.fields.location).toBe("")
+    expect(draft.fields.contact).toBe("")
+  })
+
+  it("reads a draft row from before location and contact existed as both unset", () => {
+    // What the builder sees in the minutes between deploying this code and
+    // applying 20260913020000 to the same database.
+    const legacyRow = {
+      public_profile_id: "p",
+      workspace_id: "w",
+      handle: "h",
+      display_name: "H",
+      short_bio: "",
+      website: "",
+      instagram: "",
+      behance: "",
+      avatar_path: null,
+      products: [],
+      revision: 1,
+      updated_by: null,
+      created_at: "",
+      updated_at: "",
+    } as unknown as Parameters<typeof draftFromRow>[0]
+    const draft = draftFromRow(legacyRow)
+    expect(draft.fields.location).toBe("")
+    expect(draft.fields.contact).toBe("")
+    expect(checkDetailsStep({ ...draft.fields, displayName: "H", handle: "studio-h" })).toEqual({})
   })
 
   it("reads a stored draft and ignores a malformed product list rather than failing", () => {
@@ -222,6 +293,8 @@ describe("the draft model", () => {
       website: "",
       instagram: "",
       behance: "",
+      location: "Brooklyn",
+      contact: "hello@h.example",
       avatar_path: null,
       products: [{ productId: "not-a-uuid", visible: "yes" }],
       revision: 4,
@@ -231,6 +304,7 @@ describe("the draft model", () => {
     })
     expect(draft.products).toEqual([])
     expect(draft.revision).toBe(4)
+    expect(draft.fields).toMatchObject({ location: "Brooklyn", contact: "hello@h.example" })
   })
 })
 
@@ -274,10 +348,105 @@ describe("the preview mapping", () => {
       },
     )
     expect(Object.keys(fromPublic).sort()).toEqual(
-      ["avatarUrl", "displayName", "handle", "initials", "links", "products", "shortBio"].sort(),
+      [
+        "avatarUrl",
+        "contact",
+        "displayName",
+        "handle",
+        "initials",
+        "links",
+        "location",
+        "products",
+        "shortBio",
+      ].sort(),
     )
     expect(fromPublic.avatarUrl).toBeNull()
-    expect(JSON.stringify(fromPublic)).not.toContain("private@")
+    // Location and the contact address are fields the creator chose to publish,
+    // so they arrive. The live row's own mailto: is labelled by its address.
+    expect(fromPublic.location).toBe("Brooklyn")
+    expect(fromPublic.contact).toEqual({
+      url: "mailto:private@northline.com",
+      label: "private@northline.com",
+    })
+  })
+
+  it("shows no location and no Contact button when both are empty", () => {
+    const presentation = presentationFromDraft(
+      { ...FIELDS, location: "   ", contact: "" },
+      { handle: "lauren-proctor", avatarUrl: null, products: [] },
+    )
+    expect(presentation.location).toBeNull()
+    expect(presentation.contact).toBeNull()
+  })
+
+  it("shows a Contact button only for a contact publication would accept", () => {
+    const valid = presentationFromDraft(
+      { ...FIELDS, contact: "hello@laurenproctor.com", location: " Brooklyn " },
+      { handle: "lauren-proctor", avatarUrl: null, products: [] },
+    )
+    expect(valid.contact).toEqual({
+      url: "mailto:hello@laurenproctor.com",
+      label: "hello@laurenproctor.com",
+    })
+    expect(valid.location).toBe("Brooklyn")
+
+    const invalid = presentationFromDraft(
+      { ...FIELDS, contact: "not an address" },
+      { handle: "lauren-proctor", avatarUrl: null, products: [] },
+    )
+    expect(invalid.contact).toBeNull()
+  })
+})
+
+describe("the contact button's address", () => {
+  it("takes an email address, with or without mailto:", () => {
+    for (const typed of [
+      "hello@studio.com",
+      "mailto:hello@studio.com",
+      "  Hello.Team+x@studio.co.uk ",
+    ]) {
+      const parsed = parseContact(typed)
+      expect(parsed.kind, typed).toBe("valid")
+      if (parsed.kind === "valid") {
+        expect(parsed.url).toMatch(/^mailto:/)
+        expect(parsed.url, typed).toMatch(CONTACT_URL_CONSTRAINT)
+      }
+    }
+    expect(parseContact("mailto:hello@studio.com")).toEqual({
+      kind: "valid",
+      url: "mailto:hello@studio.com",
+      label: "hello@studio.com",
+    })
+  })
+
+  it("takes a web page, with the same rules as the Website field", () => {
+    const parsed = parseContact("studio.com/contact")
+    expect(parsed).toMatchObject({ kind: "valid", url: "https://studio.com/contact" })
+    if (parsed.kind === "valid") expect(parsed.url).toMatch(CONTACT_URL_CONSTRAINT)
+    expect(parseContact("http://studio.com/contact")).toMatchObject({
+      kind: "invalid",
+      message: "Use an https:// address.",
+    })
+  })
+
+  it("treats empty as no button, which is how a creator removes it", () => {
+    expect(parseContact("")).toEqual({ kind: "empty" })
+    expect(parseContact("   ")).toEqual({ kind: "empty" })
+  })
+
+  it("refuses anything that is not plainly an address", () => {
+    for (const typed of [
+      "hello@",
+      "@studio.com",
+      "hello@studio",
+      "mailto:hello@studio.com?subject=hi&body=buy",
+      "mailto:",
+      "javascript:alert(1)",
+      "hello world",
+      "hello@studio.com/path",
+    ]) {
+      expect(parseContact(typed).kind, typed).toBe("invalid")
+    }
   })
 })
 
