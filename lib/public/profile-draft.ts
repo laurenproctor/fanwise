@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { classifyHandle } from "./handles"
-import { LINK_PARSERS, type ProfileLinkKind } from "./profile-links"
+import { LINK_PARSERS, parseContact, type ProfileLinkKind } from "./profile-links"
 import type { ProfileDraftFields } from "./profile-presentation"
 import type { Database } from "@/lib/supabase/database.types"
 
@@ -29,6 +29,9 @@ export const DRAFT_LIMITS = {
   displayName: 80,
   shortBio: 160,
   link: 2048,
+  /** What step 1 accepts. The draft column stores up to 200, as typed. */
+  location: 80,
+  locationStored: 200,
 } as const
 
 export type { ProfileDraftFields }
@@ -69,6 +72,8 @@ export const draftFieldsSchema = z.object({
   website: z.string().max(DRAFT_LIMITS.link),
   instagram: z.string().max(DRAFT_LIMITS.link),
   behance: z.string().max(DRAFT_LIMITS.link),
+  location: z.string().max(DRAFT_LIMITS.locationStored),
+  contact: z.string().max(DRAFT_LIMITS.link),
 })
 
 export const draftProductsSchema = z
@@ -91,6 +96,9 @@ export function seedDraftFromProfile(profile: PublicProfileRow): ProfileDraft {
       website: profile.website_url ?? "",
       instagram: profile.instagram_url ?? "",
       behance: profile.behance_url ?? "",
+      location: (profile.location ?? "").slice(0, DRAFT_LIMITS.locationStored),
+      // The field takes a bare address and adds the scheme itself.
+      contact: (profile.contact_url ?? "").replace(/^mailto:/i, ""),
     },
     avatarPath: profile.avatar_path,
     products: [],
@@ -111,6 +119,8 @@ export function draftFromRow(row: ProfileDraftRow): ProfileDraft {
       website: row.website,
       instagram: row.instagram,
       behance: row.behance,
+      location: row.location,
+      contact: row.contact,
     },
     avatarPath: row.avatar_path,
     products: products.success ? products.data : [],
@@ -151,6 +161,14 @@ export function checkDetailsStep(fields: ProfileDraftFields): DetailsErrors {
     const parsed = LINK_PARSERS[kind](fields[kind])
     if (parsed.kind === "invalid") errors[kind] = parsed.message
   }
+
+  // Both optional. Empty is always complete; only a filled field can be wrong.
+  if (fields.location.trim().length > DRAFT_LIMITS.location) {
+    errors.location = `Keep the location under ${DRAFT_LIMITS.location} characters.`
+  }
+
+  const contact = parseContact(fields.contact)
+  if (contact.kind === "invalid") errors.contact = contact.message
 
   return errors
 }

@@ -24,8 +24,11 @@ import type { ProfileLinkKind } from "@/lib/public/profile-links"
  * way to leave the builder by accident, and a tab stop on every product card
  * between the form and the Continue button.
  *
- * There is no email icon and no contact control. That is deliberate, and
- * tested.
+ * Location and the Contact button are both optional, and both render only
+ * when the creator filled them in: an empty field is no location and no
+ * button, never a placeholder on the public page. The builder shipped without
+ * them; on 13 September 2026 the founder asked for both back, with the button
+ * editable and removable.
  */
 
 export type ProfileLayout = "desktop" | "mobile" | "responsive"
@@ -109,6 +112,12 @@ export function PublicProfile({
                 Your short introduction appears here.
               </p>
             ) : null}
+            {profile.location ? (
+              <p className="flex items-center gap-1.5 text-[14px] break-words text-[var(--color-ink-2)]">
+                <PinGlyph />
+                {profile.location}
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -135,6 +144,9 @@ export function PublicProfile({
                 </li>
               ))}
             </ul>
+          ) : null}
+          {profile.contact ? (
+            <ContactButton contact={profile.contact} interactive={interactive} />
           ) : null}
         </nav>
       </header>
@@ -219,6 +231,67 @@ function Avatar({ profile, size }: { profile: ProfilePresentation; size: number 
         {profile.initials}
       </span>
     </span>
+  )
+}
+
+/**
+ * The Contact button.
+ *
+ * An email address opens the visitor's mail app in place; a web page opens in
+ * a new tab, with the same `rel` every outbound link on a public page carries.
+ * The accessible name says which, because "Contact" alone does not tell a
+ * screen-reader user whether they are about to leave the page. Inside a
+ * preview it is inert, like every other link there.
+ */
+function ContactButton({
+  contact,
+  interactive,
+}: {
+  contact: { url: string; label: string }
+  interactive: boolean
+}) {
+  const className =
+    "inline-flex min-h-11 items-center justify-center rounded-[var(--radius-pill)] border border-[var(--color-action)] bg-[var(--color-action)] px-5 text-[14px] font-medium text-[var(--color-on-action)]"
+  const email = contact.url.startsWith("mailto:")
+  if (!interactive) {
+    return (
+      <span data-contact className={className}>
+        Contact
+      </span>
+    )
+  }
+  return (
+    <a
+      href={contact.url}
+      data-contact
+      {...(email ? {} : { target: "_blank", rel: "noopener noreferrer nofollow" })}
+      aria-label={
+        email
+          ? `Contact by email: ${contact.label}`
+          : `Contact: ${contact.label} (opens in a new tab)`
+      }
+      className={`${className} hover:border-[var(--color-action-hover)] hover:bg-[var(--color-action-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]`}
+    >
+      Contact
+    </a>
+  )
+}
+
+function PinGlyph() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      className="shrink-0"
+    >
+      <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
   )
 }
 

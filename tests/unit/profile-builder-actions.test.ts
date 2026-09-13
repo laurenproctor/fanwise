@@ -134,6 +134,8 @@ const FIELDS = {
   website: "laurenproctor.com",
   instagram: "@laurenproctor",
   behance: "",
+  location: "Brooklyn, New York",
+  contact: "hello@laurenproctor.com",
 }
 
 interface World {
@@ -249,6 +251,34 @@ describe("autosave", () => {
     expect(draftWrites[1]!.filters).toContainEqual(["revision", 0])
     expect(publicationWrites()).toEqual([])
     expect(rpcs).toEqual([])
+  })
+
+  it("stores location and the contact address with the rest of the draft", async () => {
+    world()
+    await saveProfileDraftAction("laurens-studio", { fields: FIELDS, revision: 0 })
+    const update = calls.find((c) => c.table === "public_profile_drafts" && c.op === "update")
+    expect(update?.payload).toMatchObject({
+      location: "Brooklyn, New York",
+      contact: "hello@laurenproctor.com",
+    })
+  })
+
+  /**
+   * A builder tab opened before location and contact existed sends fields
+   * without them. Defaulting the missing keys to empty would make that tab's
+   * next autosave erase the values the migration copied into the draft, so the
+   * save is refused instead, before anything is written, and the tab reloads.
+   */
+  it("refuses a save that omits location and contact rather than blanking them", async () => {
+    world()
+    const stale = Object.fromEntries(
+      Object.entries(FIELDS).filter(([key]) => key !== "location" && key !== "contact"),
+    )
+    const result = await saveProfileDraftAction("laurens-studio", { fields: stale, revision: 0 })
+    expect(result).toEqual({ ok: false, reason: "failed" })
+    expect(calls.filter((c) => c.table === "public_profile_drafts" && c.op !== "select")).toEqual(
+      [],
+    )
   })
 
   it("reports a stale revision as a conflict instead of overwriting", async () => {

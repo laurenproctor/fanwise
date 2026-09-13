@@ -11,6 +11,7 @@ import {
   evaluateReadiness,
   sameSnapshot,
   snapshotOf,
+  snapshotWithLiveDefaults,
   type HandleStatus,
   type Readiness,
 } from "./publish-readiness"
@@ -78,7 +79,10 @@ export async function loadPublishState(
     published &&
     readiness.ready &&
     latest.data !== null &&
-    sameSnapshot(latest.data.snapshot, snapshotOf(readiness.plan, draft.avatarPath))
+    sameSnapshot(
+      snapshotWithLiveDefaults(latest.data.snapshot, ctx.profile),
+      snapshotOf(readiness.plan, draft.avatarPath),
+    )
 
   return {
     draft,

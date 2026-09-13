@@ -14,6 +14,10 @@ export const EXAMPLE_PROFILE: ProfilePresentation = {
   shortBio: "Independent type and templates for expressive brands.",
   avatarUrl: null,
   initials: "NS",
+  // Both optional fields filled in, so the example shows what they look like.
+  // example.com is reserved for documentation and reaches nobody.
+  location: "Brooklyn, New York",
+  contact: { url: "mailto:hello@example.com", label: "hello@example.com" },
   links: [
     { kind: "website", url: "https://example.com/", label: "example.com" },
     { kind: "instagram", url: "https://www.instagram.com/example/", label: "@example" },

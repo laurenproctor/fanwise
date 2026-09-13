@@ -15,9 +15,10 @@ import { safeExternalUrl } from "./urls"
  * produced here is passed through `safeExternalUrl` as its last step, so a
  * parser bug can lose a link but cannot emit an unsafe one.
  *
- * There is deliberately no email link here. A public profile carries no email
- * address and no mailto control; that is a product decision, and the absence
- * is tested rather than merely unimplemented.
+ * The link row carries no email link. Email belongs to the optional Contact
+ * button instead, parsed by `parseContact` below: the builder shipped without
+ * one, and on 13 September 2026 the founder asked for it back as a field a
+ * creator can set, change or clear.
  */
 
 export type ProfileLinkKind = "website" | "instagram" | "behance"
@@ -119,6 +120,52 @@ function usernameFrom(input: string, urlShape: RegExp): string | null {
   if (fromUrl) return fromUrl[1] ?? null
   if (input.includes("/") || input.includes(":")) return null
   return input.replace(/^@/, "")
+}
+
+/**
+ * The Contact button: an email address or a web page, whichever a creator
+ * would rather be reached through.
+ *
+ * Not one of `LINK_PARSERS`, because it is not a link in the profile's link
+ * row. It is a button, it takes an email address as well as a website, and a
+ * visitor reads it as "how do I reach this studio" rather than "where else are
+ * they online".
+ *
+ * An address becomes `mailto:<address>`, typed with or without the scheme,
+ * and nothing may follow it: headers after a `?` can pre-fill a subject and a
+ * body, which is a message a visitor did not write being sent over their name.
+ * Anything else goes through `parseWebsite`, so a contact page obeys the same
+ * https-only, plausible-host rules as the Website field. Both outputs match
+ * `public_profiles_contact_url_scheme`, the constraint the live row enforces.
+ *
+ * Empty is a valid answer, and the way a creator removes the button.
+ */
+const CONTACT_MESSAGE = "Use an email address, like hello@yourstudio.com, or a website address."
+const EMAIL = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/
+
+export function parseContact(raw: string): LinkParse {
+  if (blank(raw)) return { kind: "empty" }
+  const input = raw.trim()
+  if (input.length > MAX_INPUT) return { kind: "invalid", message: "That address is too long." }
+
+  const address = input.replace(/^mailto:/i, "")
+  if (address.includes("@")) {
+    if (!EMAIL.test(address)) return { kind: "invalid", message: CONTACT_MESSAGE }
+    const safe = safeExternalUrl(`mailto:${address}`, { allowMailto: true })
+    if (!safe) return { kind: "invalid", message: CONTACT_MESSAGE }
+    return { kind: "valid", url: safe, label: address }
+  }
+  if (/^mailto:/i.test(input)) return { kind: "invalid", message: CONTACT_MESSAGE }
+
+  const website = parseWebsite(input)
+  if (website.kind === "invalid") {
+    // "Use an https:// address." is the one website message that still helps
+    // here; the others talk about a website when this field also takes email.
+    return website.message.includes("https")
+      ? website
+      : { kind: "invalid", message: CONTACT_MESSAGE }
+  }
+  return website
 }
 
 export const LINK_PARSERS: Record<ProfileLinkKind, (raw: string) => LinkParse> = {

@@ -8,6 +8,7 @@ import {
   issueHref,
   sameSnapshot,
   snapshotOf,
+  snapshotWithLiveDefaults,
 } from "@/lib/public/publish-readiness"
 import type { PublicProductCard, PublicProfileView } from "@/lib/public/types"
 
@@ -32,6 +33,8 @@ const FIELDS: ProfileDraftFields = {
   website: "laurenproctor.com",
   instagram: "@laurenproctor",
   behance: "",
+  location: "",
+  contact: "",
 }
 
 const pid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`
@@ -75,9 +78,38 @@ describe("publish readiness", () => {
         website_url: "https://laurenproctor.com/",
         instagram_url: "https://www.instagram.com/laurenproctor/",
         behance_url: "",
+        location: "",
+        contact_url: "",
       },
       productIds: [pid(2), pid(1)],
     })
+  })
+
+  it("plans location and the contact address in the form the live row stores", () => {
+    const result = evaluateReadiness({
+      fields: { ...FIELDS, location: "  Brooklyn, New York ", contact: "hello@laurenproctor.com" },
+      avatar: { path: null, resolvable: false },
+      handleStatus: "available",
+      draftProducts: [],
+      rows: [],
+    })
+    expect(result.ready).toBe(true)
+    expect(result.plan?.values).toMatchObject({
+      location: "Brooklyn, New York",
+      contact_url: "mailto:hello@laurenproctor.com",
+    })
+  })
+
+  it("blocks on a contact address that is not one, pointing at the field", () => {
+    const result = evaluateReadiness({
+      fields: { ...FIELDS, contact: "hello@" },
+      avatar: { path: null, resolvable: false },
+      handleStatus: "available",
+      draftProducts: [],
+      rows: [],
+    })
+    expect(result.ready).toBe(false)
+    expect(result.issues).toEqual([expect.objectContaining({ step: 1, field: "contact" })])
   })
 
   it("names the step and field of every blocking detail", () => {
@@ -202,10 +234,60 @@ describe("publish readiness", () => {
       display_name: "Lauren Proctor",
       handle: "lauren-proctor",
     }
-    expect(sameSnapshot(recorded, snapshotOf(plan, null))).toBe(true)
+    const live = { location: null, contact_url: null }
+    expect(sameSnapshot(snapshotWithLiveDefaults(recorded, live), snapshotOf(plan, null))).toBe(
+      true,
+    )
     expect(
-      sameSnapshot(recorded, snapshotOf({ ...plan, productIds: [pid(1), pid(2)] }, null)),
+      sameSnapshot(
+        snapshotWithLiveDefaults(recorded, live),
+        snapshotOf({ ...plan, productIds: [pid(1), pid(2)] }, null),
+      ),
     ).toBe(false)
+  })
+
+  /**
+   * A publication recorded before location and contact_url joined the
+   * snapshot. The old publish function never wrote either column, so the live
+   * row's values are what it published; without filling them in, every
+   * already-published profile would read as having changes to publish.
+   */
+  it("reads a publication from before location and contact existed as unchanged", () => {
+    const recorded = {
+      product_ids: [],
+      avatar_path: null,
+      behance_url: null,
+      website_url: "https://laurenproctor.com/",
+      instagram_url: "https://www.instagram.com/laurenproctor/",
+      short_bio: "Design tools, templates, and resources for thoughtful brands.",
+      display_name: "Lauren Proctor",
+      handle: "lauren-proctor",
+    }
+    const plan = evaluateReadiness({
+      fields: { ...FIELDS, location: "Brooklyn", contact: "hello@laurenproctor.com" },
+      avatar: { path: null, resolvable: false },
+      handleStatus: "available",
+      draftProducts: [],
+      rows: [],
+    }).plan!
+    const liveRow = { location: "Brooklyn", contact_url: "mailto:hello@laurenproctor.com" }
+
+    // Compared raw, the missing keys alone would look like a change.
+    expect(sameSnapshot(recorded, snapshotOf(plan, null))).toBe(false)
+    expect(sameSnapshot(snapshotWithLiveDefaults(recorded, liveRow), snapshotOf(plan, null))).toBe(
+      true,
+    )
+    // A real edit still shows as one.
+    expect(
+      sameSnapshot(
+        snapshotWithLiveDefaults(recorded, { ...liveRow, contact_url: null }),
+        snapshotOf(plan, null),
+      ),
+    ).toBe(false)
+    // And a snapshot that already carries the keys is not overridden by the row.
+    expect(snapshotWithLiveDefaults({ ...recorded, location: "Recorded" }, liveRow)).toMatchObject({
+      location: "Recorded",
+    })
   })
 })
 
@@ -304,7 +386,16 @@ describe("publishing through the action", () => {
     expect(args.p_expected_draft_updated_at).toBe(UPDATED_AT)
     expect(args.p_product_ids).toEqual([pid(2), pid(1)])
     expect(Object.keys(args.p_values as object).sort()).toEqual(
-      ["behance_url", "display_name", "handle", "instagram_url", "short_bio", "website_url"].sort(),
+      [
+        "behance_url",
+        "contact_url",
+        "display_name",
+        "handle",
+        "instagram_url",
+        "location",
+        "short_bio",
+        "website_url",
+      ].sort(),
     )
     // Nothing private, nothing the browser named.
     expect(JSON.stringify(args)).not.toMatch(/email|workspace|billing|laurens-studio/i)
@@ -426,12 +517,12 @@ const VIEW: PublicProfileView = {
   handle: "lauren-proctor",
   displayName: "Lauren Proctor",
   shortBio: "Design tools, templates, and resources for thoughtful brands.",
-  location: "Private Street, Brooklyn",
+  location: "Brooklyn, New York",
   hasAvatar: true,
   websiteUrl: "https://laurenproctor.com/",
   instagramUrl: "https://www.instagram.com/laurenproctor/",
   behanceUrl: null,
-  contactUrl: "mailto:private-inbox@laurenproctor.com",
+  contactUrl: "mailto:hello@laurenproctor.com",
   seoTitle: "Stale SEO title from the old form",
   seoDescription: "Stale SEO description",
   updatedAt: "2026-09-12T18:00:00Z",
@@ -502,14 +593,46 @@ describe("the public profile route", () => {
     expect(markup).not.toContain('data-link="behance"')
   })
 
+  it("shows the creator's location and Contact button when they set them", async () => {
+    resolveProfile.mockResolvedValue({ kind: "found", value: VIEW })
+    loadProfileCatalog.mockResolvedValue([])
+    const markup = await renderPage()
+    expect(markup).toContain("Brooklyn, New York")
+    // An email address opens the mail app in place: no new tab.
+    expect(markup).toMatch(/<a[^>]*href="mailto:hello@laurenproctor.com"[^>]*data-contact/)
+    expect(markup).not.toMatch(/<a[^>]*data-contact[^>]*target="_blank"/)
+  })
+
+  it("opens a contact web page in a new tab with the outbound rel", async () => {
+    resolveProfile.mockResolvedValue({
+      kind: "found",
+      value: { ...VIEW, contactUrl: "https://laurenproctor.com/contact" },
+    })
+    loadProfileCatalog.mockResolvedValue([])
+    const markup = await renderPage()
+    const contact = markup.match(/<a[^>]*data-contact[^>]*>/)?.[0] ?? ""
+    expect(contact).toContain('href="https://laurenproctor.com/contact"')
+    expect(contact).toContain('target="_blank"')
+    expect(contact).toContain('rel="noopener noreferrer nofollow"')
+  })
+
+  it("shows no location and no Contact button when the creator removed them", async () => {
+    resolveProfile.mockResolvedValue({
+      kind: "found",
+      value: { ...VIEW, location: null, contactUrl: null },
+    })
+    loadProfileCatalog.mockResolvedValue([])
+    const markup = await renderPage()
+    expect(markup).not.toContain("data-contact")
+    expect(markup).not.toContain("mailto:")
+    expect(markup).not.toContain("Brooklyn")
+  })
+
   it("puts no private or unedited field into the page", async () => {
     resolveProfile.mockResolvedValue({ kind: "found", value: VIEW })
     loadProfileCatalog.mockResolvedValue([])
     const markup = await renderPage()
     for (const leak of [
-      "private-inbox",
-      "mailto:",
-      "Private Street",
       "Stale SEO",
       VIEW.id + '"', // the id appears only inside the avatar route
       "Sign out",
@@ -530,7 +653,9 @@ describe("published metadata", () => {
     expect(JSON.stringify(metadata.openGraph)).toContain(
       "https://fanwise.example/api/public/avatar/0f9f2d4e-1c3b-4a5e-9f7d-2b8c6a1e4d30",
     )
-    expect(JSON.stringify(metadata)).not.toMatch(/Stale SEO|private-inbox|mailto|Private Street/)
+    // Location and the contact address are on the page by the creator's choice,
+    // but they stay out of search snippets and share cards.
+    expect(JSON.stringify(metadata)).not.toMatch(/Stale SEO|hello@laurenproctor|mailto|Brooklyn/)
   })
 
   it("carries no image when there is none, and a default description without a bio", () => {

@@ -1250,10 +1250,12 @@ export type Database = {
         Row: {
           avatar_path: string | null
           behance: string
+          contact: string
           created_at: string
           display_name: string
           handle: string
           instagram: string
+          location: string
           products: Json
           public_profile_id: string
           revision: number
@@ -1266,10 +1268,12 @@ export type Database = {
         Insert: {
           avatar_path?: string | null
           behance?: string
+          contact?: string
           created_at?: string
           display_name?: string
           handle?: string
           instagram?: string
+          location?: string
           products?: Json
           public_profile_id: string
           revision?: number
@@ -1282,10 +1286,12 @@ export type Database = {
         Update: {
           avatar_path?: string | null
           behance?: string
+          contact?: string
           created_at?: string
           display_name?: string
           handle?: string
           instagram?: string
+          location?: string
           products?: Json
           public_profile_id?: string
           revision?: number

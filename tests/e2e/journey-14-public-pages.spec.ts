@@ -176,8 +176,11 @@ test("a creator builds, publishes and updates a profile, and a stranger reads it
   await page.getByLabel("Studio name").fill("Northline Studio")
   await page.getByLabel("Short introduction").fill("Independent type for expressive brands.")
   await page.getByLabel("Website", { exact: true }).fill("northline.example")
+  await page.getByLabel("Location (optional)").fill("Brooklyn, New York")
+  await page.getByLabel("Contact button (optional)").fill("hello@northline.example")
 
   await expect(preview.getByRole("heading", { name: "Northline Studio" })).toBeVisible()
+  await expect(preview).toContainText("Brooklyn, New York")
   await expect(preview).toContainText("Independent type for expressive brands.")
   await expect(page.getByText(`/@${handle}`).first()).toBeVisible()
   await expect(page.getByText("Available", { exact: true })).toBeVisible({
@@ -235,6 +238,12 @@ test("a creator builds, publishes and updates a profile, and a stranger reads it
   await expect(visitor.locator("article")).toContainText("Independent type for expressive brands.")
   expect(await renderedTitles(visitor)).toEqual(finalPreview)
   expect(await visitor.locator("article").textContent()).not.toContain("Brand Workbook")
+  // The optional fields reach the page the creator chose to put them on.
+  await expect(visitor.locator("article")).toContainText("Brooklyn, New York")
+  await expect(visitor.locator("a[data-contact]")).toHaveAttribute(
+    "href",
+    "mailto:hello@northline.example",
+  )
 
   const body = (await visitor.locator("body").textContent()) ?? ""
   expect(body).not.toContain(creator.email)
@@ -259,9 +268,14 @@ test("a creator builds, publishes and updates a profile, and a stranger reads it
   await page.getByRole("link", { name: "Edit profile" }).click()
   await page.waitForURL(/\/builder$/)
   await page.getByLabel("Short introduction").fill("Type, updated.")
+  // The creator takes the Contact button off, with the control that says so.
+  await page.getByRole("button", { name: "Remove contact button" }).click()
+  await expect(page.getByLabel("Contact button (optional)")).toHaveValue("")
   await expect(page.getByText("Draft saved")).toBeVisible({ timeout: SETUP_TIMEOUT })
 
   await visitor.goto(`/@${handle}`)
+  // Removing it is a draft edit like any other: still live until published.
+  await expect(visitor.locator("a[data-contact]")).toHaveCount(1)
   await expect(visitor.locator("article")).toContainText("Independent type for expressive brands.")
   await expect(visitor.locator("article")).not.toContainText("Type, updated.")
 
@@ -277,6 +291,8 @@ test("a creator builds, publishes and updates a profile, and a stranger reads it
 
   await visitor.reload()
   await expect(visitor.locator("article")).toContainText("Type, updated.")
+  await expect(visitor.locator("[data-contact]")).toHaveCount(0)
+  await expect(visitor.locator("article")).toContainText("Brooklyn, New York")
   await context.close()
 
   // 16. Another account cannot reach this draft ---------------------------------

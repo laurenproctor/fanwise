@@ -119,6 +119,8 @@ function fieldColumns(fields: ProfileDraftFields) {
     website: fields.website,
     instagram: fields.instagram,
     behance: fields.behance,
+    location: fields.location,
+    contact: fields.contact,
   }
 }
 

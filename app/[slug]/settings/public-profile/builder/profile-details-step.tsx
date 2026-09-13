@@ -34,7 +34,7 @@ import {
   type DetailsErrors,
   type ProfileDraftFields,
 } from "@/lib/public/profile-draft"
-import { LINK_PARSERS, type ProfileLinkKind } from "@/lib/public/profile-links"
+import { LINK_PARSERS, parseContact, type ProfileLinkKind } from "@/lib/public/profile-links"
 import { presentationFromDraft } from "@/lib/public/profile-presentation"
 import { routes } from "@/lib/routes"
 import { UnsavedChangesGuard } from "../../unsaved-changes-guard"
@@ -100,6 +100,8 @@ export function ProfileDetailsStep({
     website: useId(),
     instagram: useId(),
     behance: useId(),
+    location: useId(),
+    contact: useId(),
   }
 
   const [fields, setFields] = useState<ProfileDraftFields>(initial.fields)
@@ -281,6 +283,8 @@ export function ProfileDetailsStep({
       website: true,
       instagram: true,
       behance: true,
+      location: true,
+      contact: true,
     })
     setFormMessage(
       result.message ??
@@ -310,6 +314,19 @@ export function ProfileDetailsStep({
     const parsed = LINK_PARSERS[kind](fields[kind])
     return parsed.kind === "invalid" ? parsed.message : null
   }
+
+  const locationError =
+    serverErrors.location ??
+    (touched.location && fields.location.trim().length > DRAFT_LIMITS.location
+      ? `Keep the location under ${DRAFT_LIMITS.location} characters.`
+      : null)
+
+  const contactError = (() => {
+    if (serverErrors.contact) return serverErrors.contact
+    if (!touched.contact) return null
+    const parsed = parseContact(fields.contact)
+    return parsed.kind === "invalid" ? parsed.message : null
+  })()
 
   const nameError =
     serverErrors.displayName ??
@@ -527,6 +544,20 @@ export function ProfileDetailsStep({
             <FieldError id={`${ids.shortBio}-error`} message={serverErrors.shortBio ?? null} />
           </div>
 
+          {/* Location, optional -------------------------------------------------- */}
+          <TextInput
+            id={ids.location}
+            label="Location (optional)"
+            value={fields.location}
+            placeholder="Brooklyn, New York"
+            maxLength={DRAFT_LIMITS.location}
+            autoComplete="address-level2"
+            hint="Shown under your introduction. Leave it empty to show no location."
+            error={locationError}
+            onChange={(value) => setField("location", value)}
+            onBlur={() => touch("location")}
+          />
+
           {/* Links ------------------------------------------------------------------ */}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             {/* Website above Instagram on the left, Behance beside Instagram: the mockup's grid. */}
@@ -564,6 +595,40 @@ export function ProfileDetailsStep({
               onChange={(value) => setField("behance", value)}
               onBlur={() => touch("behance")}
             />
+          </div>
+
+          {/*
+            Contact, optional. A Remove control rather than only "clear the
+            field", because a creator who wants the button gone is looking for
+            a way to take it off, not for an empty input to aim at. Removing
+            saves like any other edit and nothing is public until publish.
+          */}
+          <div className="flex flex-col gap-2">
+            <TextInput
+              id={ids.contact}
+              label="Contact button (optional)"
+              value={fields.contact}
+              placeholder="hello@yourstudio.com or yourstudio.com/contact"
+              inputMode="email"
+              autoCapitalize="none"
+              autoComplete="email"
+              hint="Shown as a Contact button on your profile. Use an email address or a web page. Leave it empty to show no button."
+              error={contactError}
+              onChange={(value) => setField("contact", value)}
+              onBlur={() => touch("contact")}
+            />
+            {fields.contact.trim().length > 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setField("contact", "")
+                  document.getElementById(ids.contact)?.focus()
+                }}
+                className="min-h-11 self-start rounded-[6px] text-[14px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              >
+                Remove contact button
+              </button>
+            ) : null}
           </div>
         </fieldset>
 
@@ -669,6 +734,7 @@ function TextInput({
   id,
   label,
   error,
+  hint,
   onChange,
   wrapperClassName = "",
   ...rest
@@ -676,9 +742,13 @@ function TextInput({
   id: string
   label: string
   error: string | null
+  hint?: string
   onChange: (value: string) => void
   wrapperClassName?: string
 } & Omit<React.ComponentProps<"input">, "id" | "onChange">) {
+  const describedBy = [hint ? `${id}-hint` : null, error ? `${id}-error` : null]
+    .filter(Boolean)
+    .join(" ")
   return (
     <div className={`flex min-w-0 flex-col gap-2 ${wrapperClassName}`}>
       <label htmlFor={id} className="text-[14px] text-[var(--color-ink)]">
@@ -689,10 +759,15 @@ function TextInput({
         type="text"
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
+        aria-describedby={describedBy || undefined}
         className={`${FIELD_INPUT_CLASS} aria-[invalid=true]:border-[var(--color-bad)]`}
         {...rest}
       />
+      {hint ? (
+        <span id={`${id}-hint`} className="text-[13px] text-[var(--color-ink-3)]">
+          {hint}
+        </span>
+      ) : null}
       <FieldError id={`${id}-error`} message={error} />
     </div>
   )

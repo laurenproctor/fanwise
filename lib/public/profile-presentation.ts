@@ -1,4 +1,4 @@
-import { resolvedLinks, type ResolvedLink } from "./profile-links"
+import { parseContact, resolvedLinks, type ResolvedLink } from "./profile-links"
 import type { PublicProfileView, PublicProductCard } from "./types"
 
 /**
@@ -12,7 +12,9 @@ import type { PublicProfileView, PublicProductCard } from "./types"
  * reach a rendered page by accident.
  *
  * Links arrive already resolved. The component never parses a URL, which is
- * what guarantees the preview draws exactly the icons publication would.
+ * what guarantees the preview draws exactly the icons publication would. The
+ * Contact button is resolved the same way, by `parseContact`, so the preview
+ * shows a button exactly when publication would write one.
  */
 export interface ProfilePresentation {
   handle: string
@@ -21,7 +23,11 @@ export interface ProfilePresentation {
   /** A URL the viewer's browser may load: a blob, a signed URL or a media route. */
   avatarUrl: string | null
   initials: string
+  /** Optional, plain text. Null when the creator left it empty. */
+  location: string | null
   links: ResolvedLink[]
+  /** The Contact button, or null to show none. `url` is `mailto:` or https. */
+  contact: { url: string; label: string } | null
   products: PresentationProduct[]
 }
 
@@ -43,6 +49,10 @@ export interface ProfileDraftFields {
   website: string
   instagram: string
   behance: string
+  /** Optional. Empty means no location on the public profile. */
+  location: string
+  /** Optional: an email address or a website. Empty means no Contact button. */
+  contact: string
 }
 
 /**
@@ -58,12 +68,15 @@ export function presentationFromDraft(
 ): ProfilePresentation {
   const displayName = fields.displayName.trim()
   const shortBio = fields.shortBio.trim()
+  const location = fields.location.trim()
   return {
     handle: options.handle,
     displayName,
     shortBio: shortBio.length > 0 ? shortBio : null,
     avatarUrl: options.avatarUrl,
     initials: initialsFor(displayName),
+    location: location.length > 0 ? location : null,
+    contact: resolvedContact(fields.contact),
     links: resolvedLinks({
       website: fields.website,
       instagram: fields.instagram,
@@ -92,6 +105,8 @@ export function presentationFromPublicView(
     shortBio: profile.shortBio,
     avatarUrl: profile.hasAvatar ? media.avatarUrl : null,
     initials: initialsFor(profile.displayName),
+    location: profile.location?.trim() ? profile.location.trim() : null,
+    contact: resolvedContact(profile.contactUrl ?? ""),
     links: resolvedLinks({
       website: profile.websiteUrl ?? "",
       instagram: profile.instagramUrl ?? "",
@@ -106,6 +121,16 @@ export function presentationFromPublicView(
       href: media.productHref(card.slug),
     })),
   }
+}
+
+/**
+ * A Contact button, or none. The same parser reads what a creator typed and
+ * what the live row holds, so `mailto:hello@studio.com` from the database and
+ * `hello@studio.com` from the field both label the button with the address.
+ */
+function resolvedContact(raw: string): ProfilePresentation["contact"] {
+  const parsed = parseContact(raw)
+  return parsed.kind === "valid" ? { url: parsed.url, label: parsed.label } : null
 }
 
 /** Up to two letters, the rule `lib/public/avatars.ts` uses. Copied, not imported: that module reaches for the admin client. */
