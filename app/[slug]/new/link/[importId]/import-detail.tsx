@@ -244,8 +244,11 @@ export function ImportDetail(props: ImportDetailProps) {
               }
               return result.error
             }}
-            onDiscard={() => {
-              void discardImportAction(props.workspaceSlug, props.importId)
+            onDiscard={async () => {
+              // Redirects to the catalog once the product is gone; anything
+              // else comes back as a sentence for the dialog to show.
+              const result = await discardImportAction(props.workspaceSlug, props.importId)
+              return result.error
             }}
           />
         ) : null}

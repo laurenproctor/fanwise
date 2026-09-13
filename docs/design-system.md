@@ -74,6 +74,15 @@ bad     #FF8071 on dark                      needs a fix, rejected, failed
 State must be readable from form as well as color: a pill with a dot, a left border, a
 label. Never color alone.
 
+`danger` is not a state. It is the fill of the one button that cannot be undone, and only
+inside the confirmation that says so (today, Delete draft). It has its own tokens because
+`bad` is too light to carry text on the light theme:
+
+```
+danger        #FF8071 on dark, text #04060D   #B3261E on light, text #FFFFFF
+danger-hover  #FF9D91 on dark                 #8F1E18 on light
+```
+
 ## Components
 
 **Buttons** are fully rounded pills, `border-radius: 999px`, 10px by 18px padding at 14px

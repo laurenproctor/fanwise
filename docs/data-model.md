@@ -146,6 +146,68 @@ types there), so neither can remove a product's last ready buyer file; the name 
 "import" only because that screen needed it first. Every other asset type still deletes
 through `deleteAssetCascade`.
 
+### Deleting a product draft
+
+Added 13 September 2026, migration `20260913040000_delete_product_draft`.
+
+**Deleting a draft is not retiring a product.** A product that has never left Fanwise — no
+channel was asked to create it, no channel holds a reference to it, no activity was logged
+about it, no public page was made for it — can be deleted outright, and nothing outside
+Fanwise notices. A product that *has* been seen somewhere has buyers, links, indexed pages
+and channel listings that outlive the row, and removing it is a different act with
+obligations this does not meet. So permanent deletion is offered only for the first kind.
+Archive, restore, and removing a listing from a marketplace are future work; none of them
+exists yet, and none is implied by this.
+
+`delete_product_draft(product_id)` is the only path by which a signed-in user deletes a
+product. It returns `{ outcome, blocker, asset_paths, import_source_paths }`, where `outcome`
+is `deleted`, `blocked` or `not_found`. `product_draft_deletion_blocker(product_id)` is the
+same decision without the deletion, which the product page reads to decide what to show;
+the deletion calls it again under lock, so the offer and the outcome have one definition.
+Neither reads `products.status`, which is not the product's lifecycle (ADR 0005).
+
+Owner only. A product in another workspace, a product the caller is a member but not owner
+of, and an id that does not exist all return `not_found`.
+
+**What blocks**, as stable codes the application translates:
+
+| Code | When |
+|---|---|
+| `public_page` | any `public_product_pages` row, whatever its status: a page that has existed may have been published and unpublished, linked or indexed |
+| `listing_external_reference` | a listing with `external_listing_id` or `external_url` |
+| `listing_live` | a listing `publishing` or `published`, or a completed manual step |
+| `publication_history` | any `publication_jobs` row for one of its listings, in any state |
+| `activity_history` | any `workspace_events` row about the product or its listings; the log's immutability trigger refuses even a cascaded delete, and is not bypassed |
+| `import_in_progress` | the import is `pending`, `retrieving` or `analyzing`, or a source is `uploading`, `transcribing`, `pending` or `reading` |
+| `generation_in_progress` | an AI generation `pending` or `running` |
+| `upload_in_progress` | a product asset still `pending` |
+
+**What cascades**, because none of it has left Fanwise: assets and their derivatives, draft
+listings and their snapshots (the snapshot trigger already allows a delete whose listing is
+gone), open manual steps, finished AI generations, and the import with its sources and
+evidence. `public_profile_drafts.products` is jsonb and cannot cascade, so the function
+removes the product from any draft arrangement first and moves that draft's `revision`, so
+a builder tab holding the old arrangement conflicts rather than writing it back.
+
+**Serialization.** The function locks, in order, the workspace's profile drafts, the product,
+its listings, their manual steps, its import and the import's sources, then checks. A new
+listing, asset, generation, event, public page or import references the product by foreign
+key, and a new publication job or manual step references a listing; either way the insert
+waits for the deletion and then fails its foreign key, or committed first and is seen. So a
+publication and a deletion cannot both succeed.
+
+**Storage is cleaned after the commit, never before.** The function collects every asset path
+and every import-source path (the legacy `product_imports.source_path` and the per-source
+`storage_path`, deduplicated) before deleting, and returns them. `deleteProductDraft` in
+`lib/products/delete-draft.ts` removes those objects from the `product-assets` bucket once
+the transaction has committed. Removing them first would leave visible rows pointing at
+missing files whenever the database then refused; removing them after means a storage
+failure costs only private bytes no row points at, which is logged and does not undo the
+deletion.
+
+The product page's Delete draft and the import screen's discard both go through
+`deleteProductDraft`. Replacing an import's source never deletes the product.
+
 ## A3: channels
 
 Built. Migration `20260904173000_channels_connections_listings`.

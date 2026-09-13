@@ -19,6 +19,12 @@ import { sanitizeFilename } from "./storage"
 import { createProductSchema, updateProductSchema, uploadIntentSchema } from "./schemas"
 import { emptyMetadataFor } from "./metadata"
 import { planImageOrder } from "./image-order"
+import { deleteProductDraft } from "./delete-draft"
+import {
+  DRAFT_DELETION_MESSAGES,
+  deleteConfirmationSchema,
+  draftDeletionErrorMessage,
+} from "./draft-deletion"
 
 export interface ActionState {
   error: string | null
@@ -348,6 +354,35 @@ export async function reorderProductImagesAction(
 
   revalidatePath(routes.workspace(workspaceSlug), "layout")
   return { error: null }
+}
+
+/**
+ * Delete draft, from the product page.
+ *
+ * The typed confirmation is checked here, again, because the dialog's disabled
+ * button is a convenience and a form can be posted without it. Everything else
+ * — who is asking, whether the product may go, the storage cleanup — is
+ * `deleteProductDraft`, shared with the import screen's discard.
+ *
+ * Redirects to the catalog only once the database has confirmed the product is
+ * gone. Every other outcome stays on the page with a sentence.
+ */
+export async function deleteProductDraftAction(
+  workspaceSlug: string,
+  productId: string,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  if (!deleteConfirmationSchema.safeParse(formData.get("confirmation")).success) {
+    return { error: DRAFT_DELETION_MESSAGES.confirmation }
+  }
+
+  const outcome = await deleteProductDraft({ workspaceSlug, productId })
+  if (outcome.kind !== "deleted") {
+    return { error: draftDeletionErrorMessage(outcome, "product") }
+  }
+
+  redirect(routes.workspace(outcome.workspaceSlug))
 }
 
 /**

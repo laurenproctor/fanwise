@@ -42,6 +42,13 @@
   --color-warn: #f5b944;
   --color-bad: #ff8071;
 
+  /* Destructive action. Separate from `bad`, which is a status colour and too
+     light to carry text here: #b3261e is 6.5:1 against white text and 6.2:1
+     as text on paper. */
+  --color-danger: #b3261e;
+  --color-danger-hover: #8f1e18;
+  --color-on-danger: #ffffff;
+
   /* Faces are loaded and self-hosted by next/font in app/layout.tsx, which
      supplies these three variables. The stacks below are the fallbacks. */
   --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
@@ -80,6 +87,12 @@
   --color-action: #e9f0ff;
   --color-action-hover: #ffffff;
   --color-on-action: #04060d;
+
+  /* On dark, the status red is light enough to carry near-black text (8:1)
+     and to read as text on a card (7:1). */
+  --color-danger: #ff8071;
+  --color-danger-hover: #ff9d91;
+  --color-on-danger: #04060d;
 }
 
 html,

@@ -236,6 +236,22 @@ detached document and that the pop-out button is absent where the API is, and th
 covered by journey 7 being run once with the companion open. A new number would imply a
 new path, and there is not one.
 
+**Delete draft is not one of the fifteen** either, and for the same reason: removing a draft
+that never left Fanwise is not a step toward a live listing. It has one browser test,
+`tests/e2e/delete-product-draft.spec.ts`, because focus returning to the trigger after Escape
+and after Cancel, and the redirect to a populated catalog, are things only a browser can
+show. Everything else sits below it. `tests/db/product-draft-deletion.test.ts` is the rule:
+owner only, the same not-found for another workspace's product and a missing one, direct
+DELETE on `products` refused, every blocker (publication jobs in any state, activity
+events, external ids and URLs, live listings, completed manual steps, public pages, work in
+progress), what cascades, the storage paths returned and deduplicated, the profile builder's
+arrangement rewritten with its revision moved, and a publication and a deletion raced ten
+times with never both succeeding. `tests/unit/delete-product-draft.test.ts` is what the
+action does with each answer, including storage failing after the commit;
+`tests/unit/import-discard.test.ts` holds the import screen's discard to the same path; and
+`tests/unit/delete-product-draft-ui.test.ts` is the markup. The unit suite has no DOM, so
+the pending and error renders replace `useActionState` alone.
+
 **Password recovery is not one of the fifteen**, because it is not a step on the path from empty
 workspace to live listing. It is covered anyway, in two halves that meet at the token:
 `tests/db/password-recovery.test.ts` makes the same calls the confirm route makes, against the
