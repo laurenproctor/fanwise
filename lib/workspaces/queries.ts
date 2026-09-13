@@ -1,3 +1,4 @@
+import { cache } from "react"
 import { createClient } from "@/lib/supabase/server"
 import type { Database } from "@/lib/supabase/database.types"
 
@@ -13,14 +14,19 @@ export interface WorkspaceMember {
 /**
  * The signed-in user, revalidated against the auth server. Never trust
  * getSession() for an authorization decision; it only decodes a cookie.
+ *
+ * Memoized per request with React's cache(). The workspace layout and the page
+ * under it both ask, and without this each asked the auth server separately.
+ * The cache lives for one server render, so it never outlasts the request or
+ * crosses to another user.
  */
-export async function getCurrentUser() {
+export const getCurrentUser = cache(async () => {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   return user
-}
+})
 
 /**
  * Every workspace the current user belongs to. RLS does the filtering, so this
@@ -41,8 +47,10 @@ export async function listWorkspaces(): Promise<Workspace[]> {
  * One workspace by slug, or null. Returns null rather than throwing for a
  * workspace the user cannot see, so callers cannot distinguish "does not exist"
  * from "not yours" and leak the difference.
+ *
+ * Memoized per request for the same reason as getCurrentUser().
  */
-export async function getWorkspaceBySlug(slug: string): Promise<Workspace | null> {
+export const getWorkspaceBySlug = cache(async (slug: string): Promise<Workspace | null> => {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("workspaces")
@@ -52,7 +60,7 @@ export async function getWorkspaceBySlug(slug: string): Promise<Workspace | null
 
   if (error) throw error
   return data
-}
+})
 
 export async function listWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
   const supabase = await createClient()

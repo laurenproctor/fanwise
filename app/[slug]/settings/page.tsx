@@ -1,5 +1,6 @@
+import { Suspense } from "react"
 import { notFound, redirect } from "next/navigation"
-import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
+import { getCurrentUser, getWorkspaceBySlug, type Workspace } from "@/lib/workspaces/queries"
 import { getBillingOverview, listBillingLedger } from "@/lib/billing/queries"
 import { createIconUrl } from "@/lib/workspaces/icons"
 import { accountProfile } from "@/lib/account/profile"
@@ -44,14 +45,14 @@ export default async function SettingsPage({
   const workspace = await getWorkspaceBySlug(slug)
   if (!workspace) notFound()
 
-  const [billing, ledger, { billing: billingNotice }, iconUrl, publicProfile] = await Promise.all([
-    getBillingOverview(workspace),
-    listBillingLedger(workspace.id),
+  // Only what the first paint needs is awaited here. The public profile and the
+  // subscription each stream in behind their own Suspense boundary, so the
+  // header and both forms are not held back by the slowest read on the page.
+  const [{ billing: billingNotice }, iconUrl] = await Promise.all([
     searchParams,
     // Short lived and minted per render. Null when the object is gone, which
     // falls back to initials rather than to a broken image.
     workspace.icon_path ? createIconUrl(workspace.icon_path) : Promise.resolve(null),
-    getProfileForSettings(workspace.id),
   ])
 
   const profile = accountProfile(user)
@@ -96,46 +97,9 @@ export default async function SettingsPage({
         heading="Public profile"
         description="Your portfolio on the open web."
       >
-        <div className="flex flex-col items-start gap-4">
-          {publicProfile === null ? (
-            <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
-              You have not claimed a public address yet. A public profile gives everything you sell
-              one home at <span className="font-mono text-[13px]">fanwise/@your-handle</span>,
-              whichever marketplaces it is listed on.
-            </p>
-          ) : (
-            <div className="flex flex-wrap items-center gap-3">
-              <span
-                className={`inline-flex items-center gap-2 rounded-[var(--radius-pill)] border px-3 py-1 font-mono text-[10px] tracking-[0.12em] uppercase ${
-                  publicProfile.profile.status === "published"
-                    ? "border-[var(--color-ok)]/30 bg-[var(--color-ok)]/[0.09] text-[var(--color-ok)]"
-                    : "border-[var(--color-rule)] bg-[var(--color-paper-2)] text-[var(--color-ink-3)]"
-                }`}
-              >
-                <span
-                  aria-hidden
-                  className={`h-[5px] w-[5px] rounded-full ${
-                    publicProfile.profile.status === "published"
-                      ? "bg-[var(--color-ok)]"
-                      : "bg-[var(--color-ink-3)]"
-                  }`}
-                />
-                {publicProfile.profile.status === "published" ? "Live" : "Draft"}
-              </span>
-              <span className="font-mono text-[13px] text-[var(--color-ink-2)]">
-                @{publicProfile.profile.handle}
-              </span>
-              <span className="text-[14px] text-[var(--color-ink-3)]">
-                {publicProfile.publishedCount}{" "}
-                {publicProfile.publishedCount === 1 ? "product" : "products"} published
-              </span>
-            </div>
-          )}
-
-          <ButtonLink href={routes.publicProfileSettings(workspace.slug)} variant="secondary">
-            {publicProfile === null ? "Set up a public profile" : "Manage public profile"}
-          </ButtonLink>
-        </div>
+        <Suspense fallback={<SectionPlaceholder rows={1} />}>
+          <PublicProfileSummary workspace={workspace} />
+        </Suspense>
       </SettingsSection>
 
       <SettingsSection
@@ -143,25 +107,9 @@ export default async function SettingsPage({
         heading="Subscription"
         description="Plan, marketplaces and what they cost."
       >
-        <div className="flex flex-col gap-10">
-          <BillingPanel
-            workspaceSlug={workspace.slug}
-            state={billing.state}
-            billableConnections={billing.billableConnections}
-            notice={billingNotice ?? null}
-          />
-
-          <div className="flex flex-col gap-4">
-            <h3 className="label-mono">Billing history</h3>
-            <BillingLedger entries={ledger} />
-            <p className="max-w-prose text-[13px] text-[var(--color-ink-3)]">
-              Connecting a marketplace adds it to the next invoice, prorated for the rest of the
-              period. Disconnecting one keeps it through the end of the period you have paid for and
-              takes it off the invoice after that. Nothing is refunded mid-period.
-              {billing.hasCustomer ? " Invoices and receipts live in the billing portal." : null}
-            </p>
-          </div>
-        </div>
+        <Suspense fallback={<SectionPlaceholder rows={2} />}>
+          <Subscription workspace={workspace} notice={billingNotice ?? null} />
+        </Suspense>
       </SettingsSection>
 
       <SettingsSection
@@ -171,6 +119,99 @@ export default async function SettingsPage({
       >
         <AccountForm workspaceSlug={workspace.slug} profile={profile} />
       </SettingsSection>
+    </div>
+  )
+}
+
+async function PublicProfileSummary({ workspace }: { workspace: Workspace }) {
+  const publicProfile = await getProfileForSettings(workspace.id)
+
+  return (
+    <div className="flex flex-col items-start gap-4">
+      {publicProfile === null ? (
+        <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
+          You have not claimed a public address yet. A public profile gives everything you sell one
+          home at <span className="font-mono text-[13px]">fanwise/@your-handle</span>, whichever
+          marketplaces it is listed on.
+        </p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <span
+            className={`inline-flex items-center gap-2 rounded-[var(--radius-pill)] border px-3 py-1 font-mono text-[10px] tracking-[0.12em] uppercase ${
+              publicProfile.profile.status === "published"
+                ? "border-[var(--color-ok)]/30 bg-[var(--color-ok)]/[0.09] text-[var(--color-ok)]"
+                : "border-[var(--color-rule)] bg-[var(--color-paper-2)] text-[var(--color-ink-3)]"
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`h-[5px] w-[5px] rounded-full ${
+                publicProfile.profile.status === "published"
+                  ? "bg-[var(--color-ok)]"
+                  : "bg-[var(--color-ink-3)]"
+              }`}
+            />
+            {publicProfile.profile.status === "published" ? "Live" : "Draft"}
+          </span>
+          <span className="font-mono text-[13px] text-[var(--color-ink-2)]">
+            @{publicProfile.profile.handle}
+          </span>
+          <span className="text-[14px] text-[var(--color-ink-3)]">
+            {publicProfile.publishedCount}{" "}
+            {publicProfile.publishedCount === 1 ? "product" : "products"} published
+          </span>
+        </div>
+      )}
+
+      <ButtonLink href={routes.publicProfileSettings(workspace.slug)} variant="secondary">
+        {publicProfile === null ? "Set up a public profile" : "Manage public profile"}
+      </ButtonLink>
+    </div>
+  )
+}
+
+async function Subscription({
+  workspace,
+  notice,
+}: {
+  workspace: Workspace
+  notice: string | null
+}) {
+  const [billing, ledger] = await Promise.all([
+    getBillingOverview(workspace),
+    listBillingLedger(workspace.id),
+  ])
+
+  return (
+    <div className="flex flex-col gap-10">
+      <BillingPanel
+        workspaceSlug={workspace.slug}
+        state={billing.state}
+        billableConnections={billing.billableConnections}
+        notice={notice}
+      />
+
+      <div className="flex flex-col gap-4">
+        <h3 className="label-mono">Billing history</h3>
+        <BillingLedger entries={ledger} />
+        <p className="max-w-prose text-[13px] text-[var(--color-ink-3)]">
+          Connecting a marketplace adds it to the next invoice, prorated for the rest of the period.
+          Disconnecting one keeps it through the end of the period you have paid for and takes it
+          off the invoice after that. Nothing is refunded mid-period.
+          {billing.hasCustomer ? " Invoices and receipts live in the billing portal." : null}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/** Holds a section's height while its data streams in, so the page below does not jump. */
+function SectionPlaceholder({ rows }: { rows: number }) {
+  return (
+    <div className="flex flex-col gap-4" aria-busy="true">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="h-24 w-full rounded-[14px] bg-[var(--color-paper-2)]" />
+      ))}
     </div>
   )
 }
