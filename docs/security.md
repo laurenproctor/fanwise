@@ -295,6 +295,33 @@ collapse at once.
    via `storage_object_workspace_id()`. The cast is deliberately total: a
    malformed path returns null and denies, rather than raising.
 
+## Import sources and recordings
+
+The product composer (`docs/product-link-import.md` §15) stores pasted HTML, PDFs, HTML files and
+voice recordings a creator hands over. What holds:
+
+1. **Private, and never a deliverable.** Objects live under `<workspace_id>/import-sources/` in
+   the private `product-assets` bucket, uploaded through server-minted signed URLs as
+   `application/octet-stream`, and are never offered for download or counted as buyer files.
+2. **The path is checked twice.** The job reads with the service role, so the database refuses a
+   `storage_path` outside the row's own workspace prefix, and the runner checks
+   `isSourcePathFor` again before reading.
+3. **Bytes decide, not names.** The server measures each object and sniffs its first bytes
+   (`lib/imports/file-signature.ts`) before a source is staged.
+4. **Nothing handed over runs.** HTML is parsed as text, PDFs are read for their text layer only,
+   and no source is rendered, framed or evaluated. `tests/unit/import-source-boundaries.test.ts`
+   sweeps the import feature and the transcription layer.
+5. **The microphone is this origin's only.** `Permissions-Policy` is `microphone=(self)`; every
+   other origin and every frame is refused, and the browser still asks the creator. Recording
+   starts only when Record is pressed.
+6. **Transcription is server-side.** `lib/ai/transcription` receives audio and its sniffed type
+   and nothing else, and sends it to Cloudflare Workers AI (Whisper) when `CLOUDFLARE_ACCOUNT_ID`
+   and `CLOUDFLARE_AI_API_TOKEN` are set. The token is scoped to Workers AI, read server-side
+   only and never logged. Without it the composer says transcription is not available rather
+   than showing a recording as transcribed. The vendor's name is held to
+   `lib/ai/transcription/providers/` by `tests/unit/channel-boundaries.test.ts`. The suite's fixed transcript is enabled only by
+   `FANWISE_E2E_FAKE_TRANSCRIPTION=1` against a local database.
+
 ## The public web
 
 Added 12 September 2026 with the public creator pages. These are the first surfaces

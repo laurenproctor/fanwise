@@ -20,6 +20,7 @@ export type JobName =
   | "generate_listing"
   | "sync_billing"
   | "import_source"
+  | "transcribe_import_source"
 
 export interface JobPayloads {
   noop: { message: string }
@@ -64,7 +65,14 @@ export interface JobPayloads {
    * records what was actually found. The job claims the row by
    * compare-and-swap, so a redelivery does nothing.
    */
-  import_source: { workspaceId: string; importId: string }
+  import_source: { workspaceId: string; importId: string; sourceId?: string }
+  /**
+   * Turn one recording into text, before or after it joins an import.
+   *
+   * The source id only. The audio is read from storage when the job runs, and
+   * the row is claimed by compare-and-swap on `transcribing`.
+   */
+  transcribe_import_source: { workspaceId: string; sourceId: string }
 }
 
 /**
@@ -81,6 +89,7 @@ export const JOB_NAMES = [
   "generate_listing",
   "sync_billing",
   "import_source",
+  "transcribe_import_source",
 ] as const satisfies readonly JobName[]
 
 export interface EnqueueOptions {

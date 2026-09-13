@@ -128,8 +128,10 @@ test("a private link offers a way out and never reads as imported", async ({ pag
   const { slug } = await newCreator(page, "j3", "Private Studio")
 
   await page.goto(routes.importProduct(slug))
-  await page.getByLabel("Product link").fill("https://fanwise-import.invalid/private-thing")
-  await page.getByRole("button", { name: "Analyze product" }).click()
+  await page
+    .getByLabel("Product link or description")
+    .fill("https://fanwise-import.invalid/private-thing")
+  await page.getByRole("button", { name: "Create draft" }).click()
   await expect(page).toHaveURL(new RegExp(`${slug}/new/link/[0-9a-f-]{36}$`), { timeout: 20_000 })
 
   // The source step is not complete, and the gate is shut.

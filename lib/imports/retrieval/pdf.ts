@@ -1,5 +1,6 @@
 import { getDocumentProxy } from "unpdf"
 import { ImportError } from "../errors"
+import { IMPORT_LIMITS } from "../limits"
 
 /**
  * Reading the text layer of a PDF a creator uploaded.
@@ -18,7 +19,7 @@ import { ImportError } from "../errors"
 
 export const PDF_LIMITS = {
   /** The largest PDF an import will read. Checked at upload and again here. */
-  maxBytes: Math.floor(4.8 * 1024 * 1024),
+  maxBytes: IMPORT_LIMITS.maxPdfBytes,
   /** Pages read for text. A draft needs the opening, not chapter nine. */
   maxPages: 40,
   /** Characters kept across all pages. Matches the evidence body limit with room. */

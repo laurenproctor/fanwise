@@ -3,14 +3,16 @@ import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
 import { getImport, listDeliverables } from "@/lib/imports/queries"
 import {
+  conflictsFor,
   deliverablesFor,
   draftFor,
   evidenceChanges,
   licenseFor,
   rightsFor,
+  sourceModeFor,
+  sourcesFor,
   stateFor,
 } from "@/lib/imports/view"
-import { isContentSourceKind } from "@/lib/imports/types"
 import { ImportDetail } from "./import-detail"
 
 export const metadata = { title: "Import a product · Fanwise" }
@@ -62,7 +64,10 @@ export default async function ImportDetailPage({
       withheld={record.withheld}
       aiUnavailable={record.aiUnavailable}
       changes={evidenceChanges(record)}
-      sourceMode={isContentSourceKind(record.row.provider) ? "content" : "link"}
+      sourceMode={sourceModeFor(record)}
+      canReplaceLink={record.row.source_url !== null}
+      sources={sourcesFor(record)}
+      conflicts={conflictsFor(record)}
     />
   )
 }

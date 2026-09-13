@@ -33,6 +33,8 @@ export const EVIDENCE_ORIGINS = [
   "document",
   /** A document's own metadata, such as a PDF's title property. */
   "properties",
+  /** What a creator said in a recording, as transcribed. */
+  "transcript",
 ] as const
 export type EvidenceOrigin = (typeof EVIDENCE_ORIGINS)[number]
 

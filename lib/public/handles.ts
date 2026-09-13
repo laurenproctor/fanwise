@@ -43,6 +43,9 @@ export const RESERVED_HANDLES: ReadonlySet<string> = new Set([
   "assets",
   "auth",
   "billing",
+  // `/<workspace>/channels`. Added in 20260912220000 so the list covers every
+  // workspace sub-route as well as every top-level one; a unit test holds that.
+  "channels",
   "collections",
   "contact",
   "creator",
@@ -199,6 +202,53 @@ export function checkHandle(raw: string): IdentifierCheck {
     reserved: RESERVED_HANDLES,
     reservedMessage: "That handle is reserved. Choose another.",
   })
+}
+
+/**
+ * What the builder's address field holds, on its way to being a handle.
+ *
+ * Deliberately smaller than a slugify. It folds the three things a person
+ * typing an address does without meaning anything by them — a capital, a
+ * space where a hyphen goes, an `@` because the address is shown with one —
+ * and repairs nothing else. Anything the shape still refuses is reported by
+ * `checkHandle`, for the reason `canonicalHandle` gives: a handle that quietly
+ * became something else is not the one the creator chose.
+ *
+ * Only a literal space, tab and underscore become hyphens. `\s` would also
+ * swallow U+FEFF, and an invisible character must reach `checkHandle` intact
+ * so it can be named rather than silently turned into punctuation.
+ */
+export function normalizeHandleInput(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^@+/, "")
+    .toLowerCase()
+    .replace(/[ \t_]+/g, "-")
+}
+
+/**
+ * The handle, classified for the address field.
+ *
+ * `reserved` is its own outcome rather than one more message, because the
+ * builder shows it as its own state: "taken by somebody" and "kept by Fanwise"
+ * are different things to be told, and neither needs a round trip to decide.
+ */
+export type HandleClassification =
+  | { kind: "empty" }
+  | { kind: "invalid"; message: string }
+  | { kind: "reserved"; value: string; message: string }
+  | { kind: "valid"; value: string }
+
+export function classifyHandle(raw: string): HandleClassification {
+  const normalized = normalizeHandleInput(raw)
+  if (normalized.length === 0) return { kind: "empty" }
+  const checked = checkHandle(normalized)
+  if (checked.ok) return { kind: "valid", value: checked.value }
+  const value = canonicalHandle(normalized)
+  if (RESERVED_HANDLES.has(value)) {
+    return { kind: "reserved", value, message: checked.message }
+  }
+  return { kind: "invalid", message: checked.message }
 }
 
 export function checkPublicSlug(raw: string): IdentifierCheck {

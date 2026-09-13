@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import {
@@ -14,14 +14,29 @@ import {
 import { publicProfileSchema, publicProductPageSchema } from "@/lib/public/schemas"
 import { displayHost, referrerHost, safeExternalUrl } from "@/lib/public/urls"
 
-const MIGRATION = join(
-  __dirname,
-  "..",
-  "..",
-  "supabase",
-  "migrations",
-  "20260912010000_public_creator_pages.sql",
-)
+const MIGRATIONS = join(__dirname, "..", "..", "supabase", "migrations")
+const MIGRATION = join(MIGRATIONS, "20260912010000_public_creator_pages.sql")
+
+/**
+ * The migration that most recently (re)defines a constraint. A later migration
+ * that drops and re-adds the check is the one the database actually holds, so
+ * comparing against the first definition would pass while the two drift.
+ */
+function latestDefinitionOf(constraint: string): string {
+  const files = readdirSync(MIGRATIONS)
+    .filter((f) => f.endsWith(".sql"))
+    .sort()
+    .reverse()
+  for (const file of files) {
+    const sql = readFileSync(join(MIGRATIONS, file), "utf8")
+    if (
+      new RegExp(`add constraint ${constraint}|constraint ${constraint}\\s*\\n?\\s*check`).test(sql)
+    ) {
+      return sql
+    }
+  }
+  throw new Error(`no migration defines ${constraint}`)
+}
 
 describe("a handle is lowercase ASCII or it is refused", () => {
   it("accepts the ordinary shapes", () => {
@@ -110,7 +125,10 @@ describe("reserved handles", () => {
    * the first seed script.
    */
   it("matches the constraint in the migration exactly", () => {
-    const sql = readFileSync(MIGRATION, "utf8")
+    const sql = latestDefinitionOf("public_profiles_handle_not_reserved")
+    // 20260912160000 re-adds the constraint with `channels`; reading the
+    // original definition instead would let the two lists drift unnoticed.
+    expect(sql).toContain("public_profile_drafts")
     const block =
       /public_profiles_handle_not_reserved[\s\S]*?array\[([\s\S]*?)\]::extensions\.citext\[\]/.exec(
         sql,

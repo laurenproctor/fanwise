@@ -38,7 +38,7 @@ export type Resolution<T> =
   { kind: "found"; value: T } | { kind: "redirect"; to: string } | { kind: "missing" }
 
 const PROFILE_COLUMNS =
-  "id, handle, display_name, short_bio, location, avatar_path, website_url, instagram_url, contact_url, seo_title, seo_description, updated_at"
+  "id, handle, display_name, short_bio, location, avatar_path, website_url, instagram_url, behance_url, contact_url, seo_title, seo_description, updated_at"
 
 const PAGE_COLUMNS =
   "id, slug, product_id, featured, display_order, title_override, summary_override, description_override, cover_asset_id, seo_title, seo_description, published_at, updated_at"
@@ -52,6 +52,7 @@ function toProfileView(row: {
   avatar_path: string | null
   website_url: string | null
   instagram_url: string | null
+  behance_url: string | null
   contact_url: string | null
   seo_title: string | null
   seo_description: string | null
@@ -68,6 +69,7 @@ function toProfileView(row: {
     hasAvatar: row.avatar_path !== null,
     websiteUrl: safeExternalUrl(row.website_url),
     instagramUrl: safeExternalUrl(row.instagram_url),
+    behanceUrl: safeExternalUrl(row.behance_url),
     contactUrl: safeExternalUrl(row.contact_url, { allowMailto: true }),
     seoTitle: row.seo_title,
     seoDescription: row.seo_description,
@@ -134,7 +136,8 @@ export async function loadProfileCatalog(profileId: string): Promise<PublicProdu
     // Stated anyway: a reader of this function should not have to open a
     // migration to know what it returns.
     .eq("status", "published")
-    .order("featured", { ascending: false })
+    // The builder's order is the order (its publish writes display_order and
+    // clears featured), so featured no longer sorts ahead of it.
     .order("display_order", { ascending: true })
     .order("published_at", { ascending: false })
 

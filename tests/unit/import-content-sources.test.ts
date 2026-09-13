@@ -5,6 +5,7 @@ import { IMPORT_ERROR_CODES, IMPORT_ERROR_RECOVERIES, ImportError } from "@/lib/
 import { hashEvidence, productSourceEvidenceSchema } from "@/lib/imports/evidence"
 import { isWholeHtmlDocument } from "@/lib/imports/paste"
 import { HTML_LIMITS, readVisibleText } from "@/lib/imports/retrieval/html"
+import { IMPORT_LIMITS, megabytes } from "@/lib/imports/limits"
 import { isPlausibleDocumentTitle, readPdf } from "@/lib/imports/retrieval/pdf"
 import { isMostlyCode, looksLikeCode, readPlainText } from "@/lib/imports/retrieval/plain-text"
 import {
@@ -284,9 +285,13 @@ describe("storage paths", () => {
 describe("upload limits", () => {
   const LIMIT = Math.floor(4.8 * 1024 * 1024)
 
-  it("takes a PDF or an HTML file up to 4.8 MB", () => {
+  it("takes a PDF or an HTML file up to 4.8 MB, and says so", () => {
+    expect(IMPORT_LIMITS.maxPdfBytes).toBe(LIMIT)
+    expect(IMPORT_LIMITS.maxHtmlBytes).toBe(LIMIT)
     expect(maxBytesFor("pdf_document")).toBe(LIMIT)
     expect(maxBytesFor("html_document")).toBe(LIMIT)
+    expect(megabytes(LIMIT)).toBe("4.8 MB")
+    expect(megabytes(10 * 1024 * 1024)).toBe("10 MB")
   })
 
   it("keeps a fetched page at its own, smaller limit", () => {
@@ -325,31 +330,27 @@ describe("pasted markup", () => {
 })
 
 describe("naming the product before anything is read", () => {
-  it("uses the file name, then a first line that reads like a name, then the kind", () => {
+  it("uses the file name, then a first line that reads like a name, then a fallback", () => {
     expect(
       provisionalContentName({
-        kind: "pdf_document",
         filename: "aster-grotesk_specimen.pdf",
         firstLine: null,
       }),
     ).toBe("Aster Grotesk Specimen")
     expect(
       provisionalContentName({
-        kind: "pasted_text",
         filename: null,
         firstLine: "# Type Scale Studio",
       }),
     ).toBe("Type Scale Studio")
     expect(
       provisionalContentName({
-        kind: "pasted_text",
         filename: null,
         firstLine: 'import React from "react"',
+        fallback: "Pasted text",
       }),
     ).toBe("Pasted text")
-    expect(provisionalContentName({ kind: "html_document", filename: null, firstLine: null })).toBe(
-      "Imported HTML",
-    )
+    expect(provisionalContentName({ filename: null, firstLine: null })).toBe("Imported product")
   })
 })
 

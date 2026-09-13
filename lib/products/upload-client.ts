@@ -1,7 +1,11 @@
 "use client"
 
 import { createUploadIntent, finalizeUploadAction } from "./actions"
-import { createSourceUploadAction, startUploadedImportAction } from "@/lib/imports/actions"
+import {
+  confirmStagedSourceAction,
+  stageSourceAction,
+  type StagedSourceStatus,
+} from "@/lib/imports/composer-actions"
 import type { AssetType } from "./types"
 
 /**
@@ -72,7 +76,7 @@ export async function uploadProductFile(params: {
  */
 async function putToSignedUrl(
   signedUrl: string,
-  body: File,
+  body: Blob,
   contentType: string,
 ): Promise<boolean> {
   const response = await fetch(signedUrl, {
@@ -84,32 +88,41 @@ async function putToSignedUrl(
 }
 
 /**
- * Uploading a PDF or an HTML file to import a product from.
+ * Adding a file or a recording to the import composer.
  *
  * The same three steps as a product file, pointed somewhere else: the server
- * mints a signed URL for a path it builds, the browser pushes the bytes, and
- * the server measures what landed before it starts anything. The type sent is
- * always opaque, so an HTML file is stored as bytes rather than as a page a
- * signed link could ever render.
+ * records a staged source and mints a signed URL for a path it builds, the
+ * browser pushes the bytes, and the server measures and sniffs what landed. The
+ * type sent is always opaque, so an HTML file is stored as bytes rather than as
+ * a page a signed link could ever render.
+ *
+ * `onStaged` is called once the row exists, before the bytes move, so the
+ * composer can remove the right row if the creator takes the pill away while
+ * it uploads.
  */
-export async function uploadImportSource(params: {
+export async function uploadComposerSource(params: {
   workspaceSlug: string
-  kind: "pdf_document" | "html_document"
-  file: File
-}): Promise<{ href: string } | { error: string }> {
-  const intent = await createSourceUploadAction(params.workspaceSlug, {
-    kind: params.kind,
-    filename: params.file.name,
-    byteSize: params.file.size,
+  body: Blob
+  source:
+    | { type: "pdf" | "html"; filename: string }
+    | { type: "audio"; label: string; durationMs: number; mimeType: string }
+  onStaged?: (sourceId: string) => void
+}): Promise<StagedSourceStatus | { error: string; sourceId: string | null }> {
+  const stage = await stageSourceAction(params.workspaceSlug, {
+    ...params.source,
+    byteSize: params.body.size,
   })
-  if ("error" in intent) return { error: intent.error }
+  if ("error" in stage) return { error: stage.error, sourceId: null }
+  params.onStaged?.(stage.sourceId)
 
-  const stored = await putToSignedUrl(intent.signedUrl, params.file, "application/octet-stream")
-  if (!stored) return { error: "The upload did not complete. Try again." }
+  const stored = await putToSignedUrl(stage.signedUrl, params.body, "application/octet-stream")
+  if (!stored) {
+    return {
+      error: "The upload did not complete. Remove it and try again.",
+      sourceId: stage.sourceId,
+    }
+  }
 
-  return startUploadedImportAction(params.workspaceSlug, {
-    kind: params.kind,
-    uploadId: intent.uploadId,
-    filename: params.file.name,
-  })
+  const confirmed = await confirmStagedSourceAction(params.workspaceSlug, stage.sourceId)
+  return "error" in confirmed ? { error: confirmed.error, sourceId: stage.sourceId } : confirmed
 }

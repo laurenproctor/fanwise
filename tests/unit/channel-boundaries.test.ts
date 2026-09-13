@@ -139,6 +139,21 @@ function isSanctionedForVendor(path: string): boolean {
 }
 
 /**
+ * The transcription vendor, held to its own provider folder by the same rule.
+ * `lib/ai/transcription/index.ts` chooses it and names nothing but the import.
+ */
+const TRANSCRIPTION_VENDOR_TERMS = ["cloudflare", "workers ai"]
+
+function isSanctionedForTranscriptionVendor(path: string): boolean {
+  const rel = relative(ROOT, path).split(sep).join("/")
+  return (
+    rel.startsWith("lib/ai/transcription/providers/") ||
+    rel === "lib/ai/transcription/index.ts" ||
+    rel.startsWith("tests/")
+  )
+}
+
+/**
  * The names of the things a product can be imported *from*.
  *
  * One of them shares a word with the model vendor, and the two mean entirely
@@ -166,6 +181,20 @@ function withoutImportSourceNames(rel: string, contents: string): string {
   if (!rel.startsWith("lib/imports/sources/")) return contents
   return IMPORT_SOURCE_NAMES.reduce((text, name) => text.split(name).join(""), contents)
 }
+
+describe("the transcription vendor stays inside its provider folder", () => {
+  it("is named nowhere else in the tree", () => {
+    const offenders: string[] = []
+    for (const file of sourceFiles(ROOT)) {
+      if (isSanctionedForTranscriptionVendor(file)) continue
+      const contents = readFileSync(file, "utf8").toLowerCase()
+      for (const term of TRANSCRIPTION_VENDOR_TERMS) {
+        if (contents.includes(term)) offenders.push(`${relative(ROOT, file)} mentions ${term}`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+})
 
 describe("model vendor names stay inside the provider layer", () => {
   it("no vendor name appears outside lib/ai/providers", () => {

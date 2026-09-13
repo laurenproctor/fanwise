@@ -381,7 +381,6 @@ function PublicPageSection({
       appOrigin={appOrigin()}
       status={publicPage.page.status}
       profileStatus={publicPage.profileStatus ?? "draft"}
-      featured={publicPage.page.featured}
       page={{
         slug: publicPage.page.slug,
         titleOverride: publicPage.page.title_override ?? "",

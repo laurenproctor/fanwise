@@ -38,14 +38,70 @@ export type LinkSourceKind = (typeof LINK_SOURCE_KINDS)[number]
  * a link, which is why these are kinds of the same import rather than a second
  * feature beside it.
  */
-export const CONTENT_SOURCE_KINDS = ["pasted_text", "pdf_document", "html_document"] as const
+export const CONTENT_SOURCE_KINDS = [
+  "pasted_text",
+  "pdf_document",
+  "html_document",
+  "audio_recording",
+] as const
 export type ContentSourceKind = (typeof CONTENT_SOURCE_KINDS)[number]
 
 export const SOURCE_KINDS = [...LINK_SOURCE_KINDS, ...CONTENT_SOURCE_KINDS] as const
 export type SourceKind = (typeof SOURCE_KINDS)[number]
 
-export function isContentSourceKind(kind: SourceKind): kind is ContentSourceKind {
+export function isContentSourceKind(kind: string): kind is ContentSourceKind {
   return (CONTENT_SOURCE_KINDS as readonly string[]).includes(kind)
+}
+
+/**
+ * What an import session is, as `product_imports.provider` records it.
+ *
+ * A session with a link takes the link's kind, which keeps the one live import
+ * per link index meaningful. A session made only of handed-over sources is
+ * `composed`. Sessions from before the composer kept a single handed-over kind,
+ * and still read. `composed` is never an evidence kind: evidence is always
+ * about one source.
+ */
+export type SessionProvider = SourceKind | "composed"
+
+/**
+ * The kinds of source row, as `product_import_sources.source_type` records them.
+ *
+ * Coarser than `SourceKind`: which service a link belongs to is decided when it
+ * is read, by the registry, not when it is added.
+ */
+export const IMPORT_SOURCE_TYPES = ["public_url", "pasted_text", "pdf", "html", "audio"] as const
+export type ImportSourceType = (typeof IMPORT_SOURCE_TYPES)[number]
+
+export const IMPORT_SOURCE_STATUSES = [
+  "uploading",
+  "staged",
+  "transcribing",
+  "pending",
+  "reading",
+  "ready",
+  "failed",
+  "unavailable",
+  "removed",
+] as const
+export type ImportSourceStatus = (typeof IMPORT_SOURCE_STATUSES)[number]
+
+/** A source that will not change again without somebody asking. */
+export function isTerminalSourceStatus(status: ImportSourceStatus): boolean {
+  return (
+    status === "ready" || status === "failed" || status === "unavailable" || status === "removed"
+  )
+}
+
+/** The evidence kind a handed-over source type is read as. */
+export const CONTENT_KIND_FOR_TYPE: Record<
+  Exclude<ImportSourceType, "public_url">,
+  ContentSourceKind
+> = {
+  pasted_text: "pasted_text",
+  pdf: "pdf_document",
+  html: "html_document",
+  audio: "audio_recording",
 }
 
 /**
@@ -64,6 +120,7 @@ export const OBSERVATION_ORIGINS = [
   "header",
   "document",
   "properties",
+  "transcript",
 ] as const
 export type ObservationOrigin = (typeof OBSERVATION_ORIGINS)[number]
 
@@ -75,6 +132,7 @@ export const OBSERVATION_ORIGIN_LABELS: Record<ObservationOrigin, string> = {
   header: "Response header",
   document: "Document text",
   properties: "Document properties",
+  transcript: "Recording transcript",
 }
 
 /**

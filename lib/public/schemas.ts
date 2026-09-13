@@ -123,7 +123,6 @@ export const publicProductPageSchema = z.object({
       (v) => v === null || /^[0-9a-f-]{36}$/i.test(v),
       "Choose one of this product's own images.",
     ),
-  featured: z.boolean(),
   seoTitle: optionalText(70, "Search titles are cut off past 70 characters."),
   seoDescription: optionalText(200, "Search descriptions are cut off past 200 characters."),
 })

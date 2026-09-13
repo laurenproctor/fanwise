@@ -21,6 +21,14 @@ import { IMPORT_ERROR_MESSAGES, type ImportErrorCode } from "./errors"
  */
 
 export type ProductImportRow = Database["public"]["Tables"]["product_imports"]["Row"]
+export type ImportSourceRow = Database["public"]["Tables"]["product_import_sources"]["Row"]
+
+/** One source of an import, with its evidence parsed. */
+export interface ImportSourceRecord extends Omit<ImportSourceRow, "evidence" | "text_content"> {
+  evidence: ProductSourceEvidence | null
+  /** Whether the row holds text. The text itself is not sent to the screen. */
+  hasText: boolean
+}
 
 export interface ImportRecord {
   row: ProductImportRow
@@ -35,6 +43,8 @@ export interface ImportRecord {
   missingInformation: string[]
   errorCode: ImportErrorCode | null
   errorMessage: string | null
+  /** Every source that was not removed, in the creator's order. */
+  sources: ImportSourceRecord[]
 }
 
 /**
@@ -109,6 +119,14 @@ export async function getImport(
   const { products, ...row } = data as ProductImportRow & { products: Product }
   const suggestions = parseSuggestions(row.suggestions)
 
+  const { data: sourceRows } = await supabase
+    .from("product_import_sources")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("import_id", importId)
+    .neq("status", "removed")
+    .order("position", { ascending: true })
+
   return {
     row,
     product: products,
@@ -116,6 +134,11 @@ export async function getImport(
     ...suggestions,
     errorCode: knownErrorCode(row.error_code),
     errorMessage: row.error_message,
+    sources: (sourceRows ?? []).map(({ evidence, text_content, ...source }) => ({
+      ...source,
+      evidence: parseEvidence(evidence),
+      hasText: text_content !== null,
+    })),
   }
 }
 

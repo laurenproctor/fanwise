@@ -732,6 +732,96 @@ export type Database = {
           },
         ]
       }
+      product_import_sources: {
+        Row: {
+          byte_size: number | null
+          content_hash: string | null
+          created_at: string
+          display_name: string
+          duration_ms: number | null
+          error_code: string | null
+          error_message: string | null
+          evidence: Json
+          id: string
+          import_id: string | null
+          mime_type: string | null
+          normalized_url: string | null
+          position: number
+          processed_at: string | null
+          requested_by: string | null
+          source_type: Database["public"]["Enums"]["import_source_type"]
+          source_url: string | null
+          status: Database["public"]["Enums"]["import_source_status"]
+          storage_path: string | null
+          text_content: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          byte_size?: number | null
+          content_hash?: string | null
+          created_at?: string
+          display_name: string
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          evidence?: Json
+          id?: string
+          import_id?: string | null
+          mime_type?: string | null
+          normalized_url?: string | null
+          position?: number
+          processed_at?: string | null
+          requested_by?: string | null
+          source_type: Database["public"]["Enums"]["import_source_type"]
+          source_url?: string | null
+          status: Database["public"]["Enums"]["import_source_status"]
+          storage_path?: string | null
+          text_content?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          byte_size?: number | null
+          content_hash?: string | null
+          created_at?: string
+          display_name?: string
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          evidence?: Json
+          id?: string
+          import_id?: string | null
+          mime_type?: string | null
+          normalized_url?: string | null
+          position?: number
+          processed_at?: string | null
+          requested_by?: string | null
+          source_type?: Database["public"]["Enums"]["import_source_type"]
+          source_url?: string | null
+          status?: Database["public"]["Enums"]["import_source_status"]
+          storage_path?: string | null
+          text_content?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_import_sources_import_fk"
+            columns: ["import_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "product_imports"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "product_import_sources_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_imports: {
         Row: {
           accepted: Json
@@ -757,6 +847,7 @@ export type Database = {
           source_path: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["import_status"]
+          submission_id: string | null
           suggestions: Json
           updated_at: string
           workspace_id: string
@@ -785,6 +876,7 @@ export type Database = {
           source_path?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["import_status"]
+          submission_id?: string | null
           suggestions?: Json
           updated_at?: string
           workspace_id: string
@@ -813,6 +905,7 @@ export type Database = {
           source_path?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["import_status"]
+          submission_id?: string | null
           suggestions?: Json
           updated_at?: string
           workspace_id?: string
@@ -1153,9 +1246,117 @@ export type Database = {
           },
         ]
       }
+      public_profile_drafts: {
+        Row: {
+          avatar_path: string | null
+          behance: string
+          created_at: string
+          display_name: string
+          handle: string
+          instagram: string
+          products: Json
+          public_profile_id: string
+          revision: number
+          short_bio: string
+          updated_at: string
+          updated_by: string | null
+          website: string
+          workspace_id: string
+        }
+        Insert: {
+          avatar_path?: string | null
+          behance?: string
+          created_at?: string
+          display_name?: string
+          handle?: string
+          instagram?: string
+          products?: Json
+          public_profile_id: string
+          revision?: number
+          short_bio?: string
+          updated_at?: string
+          updated_by?: string | null
+          website?: string
+          workspace_id: string
+        }
+        Update: {
+          avatar_path?: string | null
+          behance?: string
+          created_at?: string
+          display_name?: string
+          handle?: string
+          instagram?: string
+          products?: Json
+          public_profile_id?: string
+          revision?: number
+          short_bio?: string
+          updated_at?: string
+          updated_by?: string | null
+          website?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_profile_drafts_profile_fk"
+            columns: ["public_profile_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "public_profile_drafts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      public_profile_publications: {
+        Row: {
+          draft_updated_at: string
+          handle: string
+          id: string
+          public_profile_id: string
+          published_at: string
+          published_by: string | null
+          snapshot: Json
+          workspace_id: string
+        }
+        Insert: {
+          draft_updated_at: string
+          handle: string
+          id?: string
+          public_profile_id: string
+          published_at?: string
+          published_by?: string | null
+          snapshot: Json
+          workspace_id: string
+        }
+        Update: {
+          draft_updated_at?: string
+          handle?: string
+          id?: string
+          public_profile_id?: string
+          published_at?: string
+          published_by?: string | null
+          snapshot?: Json
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_profile_publications_profile_fk"
+            columns: ["public_profile_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
       public_profiles: {
         Row: {
           avatar_path: string | null
+          behance_url: string | null
           contact_url: string | null
           created_at: string
           display_name: string
@@ -1174,6 +1375,7 @@ export type Database = {
         }
         Insert: {
           avatar_path?: string | null
+          behance_url?: string | null
           contact_url?: string | null
           created_at?: string
           display_name: string
@@ -1192,6 +1394,7 @@ export type Database = {
         }
         Update: {
           avatar_path?: string | null
+          behance_url?: string | null
           contact_url?: string | null
           created_at?: string
           display_name?: string
@@ -1477,6 +1680,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_import_session: {
+        Args: {
+          p_normalized_url: string
+          p_pasted_text: string
+          p_product_metadata: Json
+          p_product_name: string
+          p_product_slug: string
+          p_provider: Database["public"]["Enums"]["import_provider"]
+          p_source_url: string
+          p_staged_source_ids: string[]
+          p_submission_id: string
+          p_url_display_name: string
+          p_workspace_id: string
+        }
+        Returns: {
+          existing: boolean
+          import_id: string
+          product_slug: string
+        }[]
+      }
       create_workspace: {
         Args: { p_name: string; p_slug: string }
         Returns: {
@@ -1518,10 +1741,20 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      publish_public_profile: {
+        Args: {
+          p_expected_draft_updated_at: string
+          p_product_ids: string[]
+          p_public_profile_id: string
+          p_values: Json
+        }
+        Returns: Json
+      }
       release_public_handle: {
         Args: { p_new_handle: string; p_public_profile_id: string }
         Returns: {
           avatar_path: string | null
+          behance_url: string | null
           contact_url: string | null
           created_at: string
           display_name: string
@@ -1613,6 +1846,23 @@ export type Database = {
         | "pasted_text"
         | "pdf_document"
         | "html_document"
+        | "composed"
+      import_source_status:
+        | "uploading"
+        | "staged"
+        | "transcribing"
+        | "pending"
+        | "reading"
+        | "ready"
+        | "failed"
+        | "unavailable"
+        | "removed"
+      import_source_type:
+        | "public_url"
+        | "pasted_text"
+        | "pdf"
+        | "html"
+        | "audio"
       import_status:
         | "pending"
         | "retrieving"
@@ -2377,7 +2627,20 @@ export const Constants = {
         "pasted_text",
         "pdf_document",
         "html_document",
+        "composed",
       ],
+      import_source_status: [
+        "uploading",
+        "staged",
+        "transcribing",
+        "pending",
+        "reading",
+        "ready",
+        "failed",
+        "unavailable",
+        "removed",
+      ],
+      import_source_type: ["public_url", "pasted_text", "pdf", "html", "audio"],
       import_status: [
         "pending",
         "retrieving",

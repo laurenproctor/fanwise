@@ -337,9 +337,9 @@ export default async function PublicProductPage({ params, searchParams }: Params
 
         {/*
           Streamed, so the catalog query does not hold up the product itself.
-          Nested rather than a route-level loading.tsx for the reason in
-          components/public/catalog-section.tsx: a boundary above the page
-          commits the response before notFound() can set a 404.
+          Nested rather than a route-level loading.tsx: a boundary above the
+          page commits the response before notFound() can set a 404, which
+          turned a draft profile's 404 into a 200 once already.
         */}
         <Suspense fallback={null}>
           <MoreFromCreator

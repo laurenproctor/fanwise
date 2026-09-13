@@ -2,13 +2,15 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
 import { getProfileForSettings } from "@/lib/public/workspace-queries"
+import { loadBuilderContext } from "@/lib/public/draft-store"
+import { loadPublishState } from "@/lib/public/publish-state"
+import { createClient } from "@/lib/supabase/server"
 import { createPublicProfileAction } from "@/lib/public/actions"
 import { appOrigin } from "@/lib/channels/oauth"
 import { routes } from "@/lib/routes"
 import { Button } from "@/components/ui/button"
 import { FanLines } from "@/components/ui/fan-lines"
 import { SettingsSection } from "../settings-section"
-import { PublicProfileForm } from "./public-profile-form"
 import { PublishControls } from "./publish-controls"
 
 export const metadata = { title: "Public profile · Fanwise" }
@@ -23,9 +25,10 @@ export const metadata = { title: "Public profile · Fanwise" }
  * "your public biography" into one scroll is how somebody publishes the
  * first while editing the second.
  *
- * The page says so out loud, twice — in the standfirst and beside the publish
- * control — because the whole risk of this feature is a creator being unsure
- * which of these fields is public. They all are.
+ * Since the builder, this page is the overview rather than the editor: the
+ * address, whether it is live, the way into the builder, and Unpublish.
+ * Editing here used to write the live profile directly; now every edit is a
+ * draft until the builder's Publish, so there is exactly one path to public.
  */
 export default async function PublicProfileSettingsPage({
   params,
@@ -39,8 +42,13 @@ export default async function PublicProfileSettingsPage({
   const workspace = await getWorkspaceBySlug(slug)
   if (!workspace) notFound()
 
-  const settings = await getProfileForSettings(workspace.id)
+  const supabase = await createClient()
+  const [settings, ctx] = await Promise.all([
+    getProfileForSettings(workspace.id),
+    loadBuilderContext(supabase, workspace.slug),
+  ])
   const origin = appOrigin()
+  const live = ctx ? (await loadPublishState(supabase, ctx, workspace.slug)).live : null
 
   return (
     <div className="mx-auto flex w-full max-w-[900px] flex-col gap-12 pb-24 sm:gap-14 lg:gap-16">
@@ -64,49 +72,23 @@ export default async function PublicProfileSettingsPage({
         </p>
       </header>
 
-      {settings === null ? (
+      {settings === null || ctx === null ? (
         <NoProfileYet workspaceSlug={workspace.slug} />
       ) : (
-        <>
-          <SettingsSection
-            id="publishing"
-            heading="Publishing"
-            description="Your address, and whether the world can see it."
-          >
-            <PublishControls
-              workspaceSlug={workspace.slug}
-              handle={settings.profile.handle}
-              status={settings.profile.status}
-              appOrigin={origin}
-              publishedCount={settings.publishedCount}
-              draftCount={settings.draftCount}
-            />
-          </SettingsSection>
-
-          <SettingsSection
-            id="identity"
-            heading="Identity"
-            description="The name, picture and words at the top of your profile."
-          >
-            <PublicProfileForm
-              workspaceSlug={workspace.slug}
-              appOrigin={origin}
-              profile={{
-                handle: settings.profile.handle,
-                displayName: settings.profile.display_name,
-                shortBio: settings.profile.short_bio ?? "",
-                location: settings.profile.location ?? "",
-                websiteUrl: settings.profile.website_url ?? "",
-                instagramUrl: settings.profile.instagram_url ?? "",
-                contactUrl: settings.profile.contact_url ?? "",
-                seoTitle: settings.profile.seo_title ?? "",
-                seoDescription: settings.profile.seo_description ?? "",
-              }}
-              avatarUrl={settings.avatarUrl}
-              hasAvatar={settings.profile.avatar_path !== null}
-            />
-          </SettingsSection>
-        </>
+        <SettingsSection
+          id="publishing"
+          heading="Publishing"
+          description="Your address, whether the world can see it, and where to edit it."
+        >
+          <PublishControls
+            workspaceSlug={workspace.slug}
+            handle={settings.profile.handle}
+            status={settings.profile.status}
+            appOrigin={origin}
+            publishedCount={settings.publishedCount}
+            hasUnpublishedChanges={live?.hasUnpublishedChanges ?? false}
+          />
+        </SettingsSection>
       )}
     </div>
   )
@@ -121,7 +103,7 @@ export default async function PublicProfileSettingsPage({
  * act. Saying so here is what makes the button safe to press.
  */
 function NoProfileYet({ workspaceSlug }: { workspaceSlug: string }) {
-  const create = createPublicProfileAction.bind(null, workspaceSlug)
+  const create = createPublicProfileAction.bind(null, workspaceSlug, "builder")
 
   return (
     <section className="flex flex-col items-start gap-5 rounded-[16px] border border-dashed border-[var(--color-rule)] px-6 py-12">
@@ -130,8 +112,8 @@ function NoProfileYet({ workspaceSlug }: { workspaceSlug: string }) {
         Give your studio a public address
       </h2>
       <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
-        Fanwise will suggest a handle from your studio name, and you can change it before anyone
-        sees it. Nothing goes public until you publish it.
+        Fanwise suggests an address from your studio name, and you can change it before anyone sees
+        it. Nothing goes public until you publish it from the builder.
       </p>
       <form action={create}>
         <Button type="submit">Create a public profile</Button>

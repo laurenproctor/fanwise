@@ -55,6 +55,7 @@ export interface PublicProfileView {
   hasAvatar: boolean
   websiteUrl: string | null
   instagramUrl: string | null
+  behanceUrl: string | null
   contactUrl: string | null
   seoTitle: string | null
   seoDescription: string | null
