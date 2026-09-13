@@ -4,7 +4,8 @@ import { evidenceCorpus } from "@/lib/imports/claims"
 import { IMPORT_ERROR_CODES, IMPORT_ERROR_RECOVERIES, ImportError } from "@/lib/imports/errors"
 import { hashEvidence, productSourceEvidenceSchema } from "@/lib/imports/evidence"
 import { isWholeHtmlDocument } from "@/lib/imports/paste"
-import { readVisibleText } from "@/lib/imports/retrieval/html"
+import { HTML_LIMITS, readVisibleText } from "@/lib/imports/retrieval/html"
+import { IMPORT_LIMITS, megabytes } from "@/lib/imports/limits"
 import { isPlausibleDocumentTitle, readPdf } from "@/lib/imports/retrieval/pdf"
 import { isMostlyCode, looksLikeCode, readPlainText } from "@/lib/imports/retrieval/plain-text"
 import {
@@ -15,7 +16,7 @@ import {
   pdfDocumentImporter,
 } from "@/lib/imports/sources/content"
 import { SOURCE_LABELS, descriptorFor } from "@/lib/imports/sources/registry"
-import { isSourcePathFor, sourcePathFor } from "@/lib/imports/source-storage"
+import { isSourcePathFor, maxBytesFor, sourcePathFor } from "@/lib/imports/source-storage"
 import { provisionalContentName } from "@/lib/imports/start"
 import { CONTENT_SOURCE_KINDS, SOURCE_KINDS, isContentSourceKind } from "@/lib/imports/types"
 import { recoveriesFor, sourceLabelFor, stateFor } from "@/lib/imports/view"
@@ -281,6 +282,36 @@ describe("storage paths", () => {
   })
 })
 
+describe("upload limits", () => {
+  const LIMIT = Math.floor(4.8 * 1024 * 1024)
+
+  it("takes a PDF or an HTML file up to 4.8 MB, and says so", () => {
+    expect(IMPORT_LIMITS.maxPdfBytes).toBe(LIMIT)
+    expect(IMPORT_LIMITS.maxHtmlBytes).toBe(LIMIT)
+    expect(maxBytesFor("pdf_document")).toBe(LIMIT)
+    expect(maxBytesFor("html_document")).toBe(LIMIT)
+    expect(megabytes(LIMIT)).toBe("4.8 MB")
+    expect(megabytes(10 * 1024 * 1024)).toBe("10 MB")
+  })
+
+  it("keeps a fetched page at its own, smaller limit", () => {
+    expect(HTML_LIMITS.maxBytes).toBe(2 * 1024 * 1024)
+  })
+
+  it("reads an uploaded HTML file larger than a fetched page may be", async () => {
+    const page = `<!doctype html><html><head><title>Type Scale Studio</title></head><body><h1>Type Scale Studio</h1><p>Generate modular type scales for modern products.</p>${" ".repeat(3 * 1024 * 1024)}</body></html>`
+    const evidence = await htmlDocumentImporter.read({ bytes: bytes(page), filename: null })
+    expect(evidence.title?.value).toBe("Type Scale Studio")
+  })
+
+  it("refuses an uploaded HTML file over 4.8 MB", async () => {
+    const page = `<html>${" ".repeat(LIMIT)}</html>`
+    expect(await refusal(htmlDocumentImporter.read({ bytes: bytes(page), filename: null }))).toBe(
+      "too_large",
+    )
+  })
+})
+
 describe("pasted markup", () => {
   it("is re-read as HTML only when it declares itself a document", () => {
     expect(isWholeHtmlDocument("<!DOCTYPE html><html></html>")).toBe(true)
@@ -299,31 +330,27 @@ describe("pasted markup", () => {
 })
 
 describe("naming the product before anything is read", () => {
-  it("uses the file name, then a first line that reads like a name, then the kind", () => {
+  it("uses the file name, then a first line that reads like a name, then a fallback", () => {
     expect(
       provisionalContentName({
-        kind: "pdf_document",
         filename: "aster-grotesk_specimen.pdf",
         firstLine: null,
       }),
     ).toBe("Aster Grotesk Specimen")
     expect(
       provisionalContentName({
-        kind: "pasted_text",
         filename: null,
         firstLine: "# Type Scale Studio",
       }),
     ).toBe("Type Scale Studio")
     expect(
       provisionalContentName({
-        kind: "pasted_text",
         filename: null,
         firstLine: 'import React from "react"',
+        fallback: "Pasted text",
       }),
     ).toBe("Pasted text")
-    expect(provisionalContentName({ kind: "html_document", filename: null, firstLine: null })).toBe(
-      "Imported HTML",
-    )
+    expect(provisionalContentName({ filename: null, firstLine: null })).toBe("Imported product")
   })
 })
 

@@ -49,6 +49,13 @@ const AUTHENTICATED_MAY_EXECUTE = new Set([
     tests/db/public-pages-tenancy.test.ts holds that line from the outside.
   */
   /*
+    RPC, called by the composer's server action as the signed-in creator. It
+    makes a draft product, its import session and every source in one
+    transaction. Security invoker, so each statement inside passes the caller's
+    own RLS; tests/db/product-import-sources.test.ts holds that from outside.
+  */
+  "create_import_session(p_workspace_id uuid, p_submission_id uuid, p_product_name text, p_product_slug text, p_product_metadata jsonb, p_provider import_provider, p_source_url text, p_normalized_url text, p_url_display_name text, p_pasted_text text, p_staged_source_ids uuid[])",
+  /*
     RPC, called by the import screen's remove action as the signed-in creator.
     The last-ready-buyer-file check and the delete in one transaction, locked
     per product, so two removals at once cannot both pass the check. Security

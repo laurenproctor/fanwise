@@ -110,7 +110,7 @@ export async function saveStudioDetailsAction(
     if (file.size > MAX_ICON_BYTES) {
       return {
         error: null,
-        fieldErrors: { icon: "That image is over 2 MB. Choose a smaller one." },
+        fieldErrors: { icon: "That image is over 4 MB. Choose a smaller one." },
         savedAt: null,
         saved: null,
       }

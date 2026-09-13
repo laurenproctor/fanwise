@@ -63,6 +63,7 @@ export function SourceField({
   onSubmit,
   onReplaceLink,
   mode = "link",
+  canReplaceLink = mode === "link",
 }: {
   state: ImportState
   onUrlChange: (url: string) => void
@@ -73,6 +74,8 @@ export function SourceField({
    * shows its name rather than an address, and has no link to replace.
    */
   mode?: "link" | "content"
+  /** Offered whenever the import has a link, even alongside other sources. */
+  canReplaceLink?: boolean
 }) {
   const inputId = useId()
   const hintId = useId()
@@ -144,7 +147,7 @@ export function SourceField({
               />
               {STATE_WORDS[state.status]}
             </span>
-            {mode === "link" ? (
+            {canReplaceLink ? (
               <>
                 <span aria-hidden className="hidden h-5 w-px bg-[var(--color-rule)] sm:block" />
                 <button

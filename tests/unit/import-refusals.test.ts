@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import { describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/jobs", () => ({
@@ -12,6 +10,7 @@ vi.mock("@/lib/jobs", () => ({
 
 import { startImport } from "@/lib/imports/start"
 import { validateSourceUrl } from "@/lib/imports/url"
+import { classifyInput, initialComposerState, readiness } from "@/lib/imports/composer"
 
 /**
  * The bad shapes are refused before anything is fetched, in words a creator
@@ -66,16 +65,14 @@ describe("a link the importer will not read", () => {
     },
   )
 
-  it("is refused by the form before it submits, with the same message", () => {
-    // The form is a client component; its submit handler is read from source.
-    const form = readFileSync(
-      join(__dirname, "..", "..", "app", "[slug]", "new", "link", "paste-form.tsx"),
-      "utf8",
-    )
-
-    expect(form).toMatch(
-      /onSubmit=\{\(event\) => \{\s*const checked = validateSourceUrl\(url\)\s*if \(!checked\.ok\) \{\s*event\.preventDefault\(\)\s*setLocal\(checked\.message\)/,
-    )
-    expect(form).toContain("const message = local ?? state.error")
-  })
+  it.each(SHAPES)(
+    "is refused by the composer before it submits, with the same message: %s",
+    (input, message) => {
+      // The composer reads a standalone link through the same validator, and
+      // "Create draft" stays shut with the validator's own sentence as the reason.
+      const typed = classifyInput(input)
+      expect(typed).toEqual({ kind: "refused_link", message })
+      expect(readiness(initialComposerState, typed)).toEqual({ canSubmit: false, reason: message })
+    },
+  )
 })

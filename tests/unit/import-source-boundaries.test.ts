@@ -163,6 +163,8 @@ describe("nothing in the import feature can run what it imported", () => {
     ...sourceFiles(join(ROOT, "lib", "imports")),
     ...sourceFiles(join(ROOT, "components", "imports")),
     ...sourceFiles(join(ROOT, "app", "[slug]", "new")),
+    // Recordings are read by a transcription provider, never played or rendered.
+    ...sourceFiles(join(ROOT, "lib", "ai", "transcription")),
   ]
 
   it("reads the files it is asserting about", () => {
