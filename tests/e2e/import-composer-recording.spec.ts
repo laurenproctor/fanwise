@@ -31,12 +31,12 @@ test("a recording is transcribed before it becomes a source", async ({ page }) =
 
   const pills = page.getByRole("list", { name: "Added sources" })
   await expect(pills.getByText(/Product notes · 00:0\d/)).toBeVisible({ timeout: 10_000 })
-  await expect(pills.getByText("Transcribed")).toBeVisible({ timeout: 30_000 })
+  await expect(pills.getByText("Transcribed", { exact: true })).toBeVisible({ timeout: 30_000 })
 
   await page.getByRole("button", { name: "Create draft" }).click()
   await expect(page).toHaveURL(new RegExp(`${slug}/new/link/[0-9a-f-]{36}$`), { timeout: 20_000 })
   const sources = page.getByRole("region", { name: /Your source/ })
-  await expect(sources.getByText("Transcribed")).toBeVisible({ timeout: 30_000 })
+  await expect(sources.getByText("Transcribed", { exact: true })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText(/Canvas tote in natural cotton/).first()).toBeVisible({
     timeout: 30_000,
   })
