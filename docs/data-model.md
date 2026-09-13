@@ -131,6 +131,18 @@ duplicating work.
 Storage is a private bucket, `product-assets`, path
 `<workspace_id>/<product_id>/<asset_id><ext>`, capped at 4 GiB.
 
+**Removing a buyer file on the import screen is one transaction.**
+`remove_import_deliverable(product_id, asset_id)` locks the product row, refuses to
+remove the last ready buyer file (`deliverable`, `archive` or `source_file`), and
+otherwise deletes the row and its derivatives, returning their storage paths for the
+action to delete after commit. The lock is the point: the check used to be a read and a
+delete from the application, and two removals arriving together against a product with
+exactly two ready files could both pass and leave none. Security invoker, so it runs
+under the creator's RLS; another workspace's product is not found. Migration
+`20260912233000_remove_import_deliverable`, proven under concurrency in
+`tests/db/import-deliverable-removal.test.ts`. The product page's own Files section
+does not use it and still removes any file, including the last one.
+
 ## A3: channels
 
 Built. Migration `20260904173000_channels_connections_listings`.
