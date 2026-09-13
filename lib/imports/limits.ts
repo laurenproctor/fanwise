@@ -13,10 +13,10 @@ export const IMPORT_LIMITS = {
   maxLinks: 1,
   /** Characters of pasted text. Well inside the server action body limit. */
   maxPasteCharacters: 200_000,
-  maxPdfBytes: 20 * 1024 * 1024,
+  maxPdfBytes: Math.floor(4.8 * 1024 * 1024),
   /** Pages of a PDF read for text. */
   maxPdfPages: 40,
-  maxHtmlBytes: 2 * 1024 * 1024,
+  maxHtmlBytes: Math.floor(4.8 * 1024 * 1024),
   /** Characters of running text carried from one source into evidence. */
   maxBodyText: 20_000,
   /**
@@ -30,5 +30,6 @@ export const IMPORT_LIMITS = {
 } as const
 
 export function megabytes(bytes: number): string {
-  return `${Math.round(bytes / (1024 * 1024))} MB`
+  // One decimal, so 4.8 MB is not rounded up to a limit Fanwise does not keep.
+  return `${Number((bytes / (1024 * 1024)).toFixed(1))} MB`
 }
