@@ -32,7 +32,7 @@ const { ProductCard, formatPrice } = await import("@/components/public/product-c
 const { DestinationList, ChooseWhereToBuy } = await import("@/components/public/destination-list")
 const { PublicImage, PublicAvatar } = await import("@/components/public/public-image")
 const { PublicShell } = await import("@/components/public/public-shell")
-const { PublishControls } = await import("@/app/[slug]/settings/public-profile/publish-controls")
+const { PublishControls } = await import("@/app/[slug]/profile/publish-controls")
 
 function render(element: Parameters<typeof renderToStaticMarkup>[0]): string {
   return renderToStaticMarkup(element)

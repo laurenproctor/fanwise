@@ -74,9 +74,10 @@ function values(handle: string, name = "Alice Studio") {
     handle,
     display_name: name,
     short_bio: "Type and templates.",
-    website_url: "https://alice.example/",
-    instagram_url: "https://www.instagram.com/alice/",
-    behance_url: "",
+    links: [
+      { url: "https://alice.example/", label: "" },
+      { url: "https://www.instagram.com/alice/", label: "" },
+    ],
   }
 }
 
@@ -245,8 +246,18 @@ describe("publishing", () => {
     expect(await liveProfile(aliceProfileId)).toMatchObject({
       status: "published",
       short_bio: "Type and templates.",
-      website_url: "https://alice.example/",
+      // Links live in their own table now; the retired column is cleared.
+      website_url: null,
     })
+    const { data: links } = await adminClient()
+      .from("public_profile_links")
+      .select("position, url, label")
+      .eq("public_profile_id", aliceProfileId)
+      .order("position")
+    expect(links).toEqual([
+      { position: 0, url: "https://alice.example/", label: null },
+      { position: 1, url: "https://www.instagram.com/alice/", label: null },
+    ])
     expect(await pages(aliceProfileId)).toEqual([
       { product_id: products[0], status: "published", display_order: 0, featured: false },
       { product_id: products[1], status: "published", display_order: 1, featured: false },

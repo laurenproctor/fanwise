@@ -38,38 +38,47 @@ export type Resolution<T> =
   { kind: "found"; value: T } | { kind: "redirect"; to: string } | { kind: "missing" }
 
 const PROFILE_COLUMNS =
-  "id, handle, display_name, short_bio, location, avatar_path, website_url, instagram_url, behance_url, contact_url, seo_title, seo_description, updated_at"
+  "id, handle, display_name, short_bio, about, location, city, country_code, avatar_path, contact_url, seo_title, seo_description, updated_at"
 
 const PAGE_COLUMNS =
   "id, slug, product_id, featured, display_order, title_override, summary_override, description_override, cover_asset_id, seo_title, seo_description, published_at, updated_at"
 
-function toProfileView(row: {
-  id: string
-  handle: string
-  display_name: string
-  short_bio: string | null
-  location: string | null
-  avatar_path: string | null
-  website_url: string | null
-  instagram_url: string | null
-  behance_url: string | null
-  contact_url: string | null
-  seo_title: string | null
-  seo_description: string | null
-  updated_at: string
-}): PublicProfileView {
+function toProfileView(
+  row: {
+    id: string
+    handle: string
+    display_name: string
+    short_bio: string | null
+    about: string | null
+    location: string | null
+    city: string | null
+    country_code: string | null
+    avatar_path: string | null
+    contact_url: string | null
+    seo_title: string | null
+    seo_description: string | null
+    updated_at: string
+  },
+  links: ReadonlyArray<{ url: string; label: string | null }>,
+): PublicProfileView {
   return {
     id: row.id,
     handle: row.handle,
     displayName: row.display_name,
     shortBio: row.short_bio,
+    about: row.about,
     location: row.location,
+    city: row.city,
+    countryCode: row.country_code,
     // The path itself never crosses into a view. A page asks the media route
     // for the image; it does not learn where the object lives.
     hasAvatar: row.avatar_path !== null,
-    websiteUrl: safeExternalUrl(row.website_url),
-    instagramUrl: safeExternalUrl(row.instagram_url),
-    behanceUrl: safeExternalUrl(row.behance_url),
+    // Re-checked at render as well as constrained in the table, like every
+    // other link on a public page.
+    links: links.flatMap((link) => {
+      const url = safeExternalUrl(link.url)
+      return url ? [{ url, label: link.label ?? "" }] : []
+    }),
     contactUrl: safeExternalUrl(row.contact_url, { allowMailto: true }),
     seoTitle: row.seo_title,
     seoDescription: row.seo_description,
@@ -96,7 +105,16 @@ export async function resolveProfile(rawHandle: string): Promise<Resolution<Publ
     .eq("handle", handle)
     .maybeSingle()
 
-  if (profile) return { kind: "found", value: toProfileView(profile) }
+  if (profile) {
+    // Readable by anon only while the profile is published, which the row
+    // above already is.
+    const { data: links } = await supabase
+      .from("public_profile_links")
+      .select("url, label, position")
+      .eq("public_profile_id", profile.id)
+      .order("position", { ascending: true })
+    return { kind: "found", value: toProfileView(profile, links ?? []) }
+  }
 
   // A handle this profile used to answer to. The join is on the history row's
   // own profile, and the profile SELECT is RLS-filtered to published, so a

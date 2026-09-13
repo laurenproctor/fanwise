@@ -1,8 +1,11 @@
+import { isCountryCode } from "@/lib/location/countries"
 import { classifyHandle } from "./handles"
+import type { CityCheck } from "./location-check"
 import { isShown, type ArrangementRow, type Ineligibility } from "./product-arrangement"
-import { LINK_PARSERS, parseContact, type ProfileLinkKind } from "./profile-links"
+import { parseContact, publishableLinks } from "./profile-links"
 import {
   checkDetailsStep,
+  unknownCityMessage,
   type DetailsField,
   type DraftProduct,
   type ProfileDraftFields,
@@ -27,7 +30,7 @@ const INELIGIBLE_REASONS: Record<Ineligibility, string> = {
   not_live: "it isn't live in a connected shop right now.",
 }
 
-export type IssueField = DetailsField | "image" | "products"
+export type IssueField = DetailsField | "links" | "image" | "products"
 
 export interface ReadinessIssue {
   step: 1 | 2
@@ -42,10 +45,14 @@ export interface PublishValues {
   handle: string
   display_name: string
   short_bio: string
-  website_url: string
-  instagram_url: string
-  behance_url: string
-  /** Empty removes the location from the live profile. */
+  about: string
+  /** In order. `label` empty means the page derives one from the address. */
+  links: Array<{ url: string; label: string }>
+  /** The dataset's spelling, or empty. Only ever with a country. */
+  city: string
+  /** ISO 3166-1 alpha-2, or empty. */
+  country_code: string
+  /** The legacy free-text location. Empty whenever a country is chosen, which retires it. */
   location: string
   /** `mailto:` or https, or empty to remove the Contact button. */
   contact_url: string
@@ -63,6 +70,8 @@ export type Readiness =
 
 export function evaluateReadiness(input: {
   fields: ProfileDraftFields
+  /** Whether the draft's city is in its country, decided on the server against the dataset. */
+  city: CityCheck
   avatar: { path: string | null; resolvable: boolean }
   handleStatus: HandleStatus
   draftProducts: readonly DraftProduct[]
@@ -71,8 +80,22 @@ export function evaluateReadiness(input: {
   const issues: ReadinessIssue[] = []
 
   const details = checkDetailsStep(input.fields)
-  for (const [field, message] of Object.entries(details) as Array<[DetailsField, string]>) {
-    issues.push({ step: 1, field, message })
+  for (const [field, value] of Object.entries(details)) {
+    if (field === "links") {
+      for (const issue of details.links ?? []) {
+        issues.push({
+          step: 1,
+          field: "links",
+          message: `Link ${issue.index + 1}: ${issue.message}`,
+        })
+      }
+    } else if (typeof value === "string") {
+      issues.push({ step: 1, field: field as DetailsField, message: value })
+    }
+  }
+
+  if (!details.city && !details.countryCode && input.city.kind === "unknown") {
+    issues.push({ step: 1, field: "city", message: unknownCityMessage(input.fields.countryCode) })
   }
 
   if (!details.handle) {
@@ -138,6 +161,9 @@ export function evaluateReadiness(input: {
     }
   }
 
+  const countryCode = input.fields.countryCode.trim()
+  const hasCountry = isCountryCode(countryCode)
+
   return {
     ready: true,
     issues: [],
@@ -146,10 +172,11 @@ export function evaluateReadiness(input: {
         handle: handle.value,
         display_name: input.fields.displayName.trim(),
         short_bio: input.fields.shortBio.trim(),
-        website_url: linkUrl("website", input.fields.website),
-        instagram_url: linkUrl("instagram", input.fields.instagram),
-        behance_url: linkUrl("behance", input.fields.behance),
-        location: input.fields.location.trim(),
+        about: input.fields.about.trim(),
+        links: publishableLinks(input.fields.links),
+        city: hasCountry && input.city.kind === "known" ? input.city.name : "",
+        country_code: hasCountry ? countryCode : "",
+        location: hasCountry ? "" : input.fields.location.trim(),
         contact_url: contactUrl(input.fields.contact),
       },
       productIds: input.rows.filter(isShown).map((row) => row.product.id),
@@ -159,11 +186,6 @@ export function evaluateReadiness(input: {
 
 function contactUrl(raw: string): string {
   const parsed = parseContact(raw)
-  return parsed.kind === "valid" ? parsed.url : ""
-}
-
-function linkUrl(kind: ProfileLinkKind, raw: string): string {
-  const parsed = LINK_PARSERS[kind](raw)
   return parsed.kind === "valid" ? parsed.url : ""
 }
 
@@ -178,9 +200,10 @@ export function snapshotOf(plan: PublishPlan, avatarPath: string | null) {
     handle: plan.values.handle,
     display_name: plan.values.display_name,
     short_bio: orNull(plan.values.short_bio),
-    website_url: orNull(plan.values.website_url),
-    instagram_url: orNull(plan.values.instagram_url),
-    behance_url: orNull(plan.values.behance_url),
+    about: orNull(plan.values.about),
+    links: plan.values.links.map((link) => ({ url: link.url, label: orNull(link.label) })),
+    city: orNull(plan.values.city),
+    country_code: orNull(plan.values.country_code),
     location: orNull(plan.values.location),
     contact_url: orNull(plan.values.contact_url),
     avatar_path: avatarPath,
@@ -189,22 +212,41 @@ export function snapshotOf(plan: PublishPlan, avatarPath: string | null) {
 }
 
 /**
- * A recorded snapshot, with the two fields older publications never carried.
+ * A recorded snapshot, read the way the current publish function reads it.
  *
- * `location` and `contact_url` joined the snapshot on 13 September 2026. The
- * publish function before that never wrote either column, so for a
- * publication without those keys the live row's current values are exactly
- * what was published. Filling them from the live row keeps an unchanged
- * profile reading as published rather than "changes to publish".
- * `publish_public_profile()` makes the same allowance when it decides whether
- * a republish is a no-op, in 20260913020000.
+ * Fields joined the snapshot over time: `location` and `contact_url` on 13
+ * September 2026, then `about`, `links`, `city` and `country_code` with
+ * 20260913030000, which also retired `website_url`, `instagram_url` and
+ * `behance_url` into `links`. A publication recorded before a field existed
+ * has no key for it, and the live row holds exactly what that publication
+ * left, so the live value fills the gap; the retired keys are dropped. That
+ * keeps an unchanged profile reading as published rather than "changes to
+ * publish". `publish_public_profile()` makes the same allowance when it
+ * decides whether a republish is a no-op.
  */
 export function snapshotWithLiveDefaults(
   recorded: unknown,
-  live: { location: string | null; contact_url: string | null },
+  live: {
+    location: string | null
+    contact_url: string | null
+    city: string | null
+    country_code: string | null
+    about: string | null
+    links: ReadonlyArray<{ url: string; label: string | null }>
+  },
 ): unknown {
   if (!recorded || typeof recorded !== "object" || Array.isArray(recorded)) return recorded
-  return { location: live.location, contact_url: live.contact_url, ...recorded }
+  const rest: Record<string, unknown> = { ...(recorded as Record<string, unknown>) }
+  for (const retired of ["website_url", "instagram_url", "behance_url"]) delete rest[retired]
+  return {
+    location: live.location,
+    contact_url: live.contact_url,
+    city: live.city,
+    country_code: live.country_code,
+    about: live.about,
+    links: live.links.map((link) => ({ url: link.url, label: link.label })),
+    ...rest,
+  }
 }
 
 export function sameSnapshot(a: unknown, b: unknown): boolean {

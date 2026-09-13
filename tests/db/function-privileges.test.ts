@@ -73,6 +73,17 @@ const AUTHENTICATED_MAY_EXECUTE = new Set([
     tests/db/profile-publication.test.ts holds that line from the outside.
   */
   "publish_public_profile(p_public_profile_id uuid, p_expected_draft_updated_at timestamp with time zone, p_values jsonb, p_product_ids uuid[])",
+  /*
+    "Publish all products on my profile": the named products' pages onto a
+    live profile, the draft's arrangement kept in step, and a publication
+    recorded, in one transaction. Security definer, re-checks
+    is_workspace_member() and each product's workspace itself, and writes no
+    listing or channel row. Its two helpers, publish_profile_product_pages()
+    and profile_links_snapshot(), have no grant at all: only these two
+    definer functions call them. tests/db/profile-storefront.test.ts holds it
+    from the outside.
+  */
+  "publish_all_profile_products(p_public_profile_id uuid, p_product_ids uuid[])",
 ])
 
 /**
@@ -317,9 +328,16 @@ describe("triggers still fire for a member with no grant on their function", () 
  * `docker exec` into it is the same path `supabase db reset` takes. When the
  * container cannot be reached this fails rather than skips: an unreadable
  * catalog is not a passing one.
+ *
+ * `SUPABASE_WORKDIR` is honoured the way the CLI honours it. A stack started
+ * from a scratch workdir, with its own project id so it does not disturb a
+ * shared one, is the stack the rest of the suite is talking to; reading the
+ * repository's config instead would inspect a different database and pass
+ * against a catalog that does not have this branch's migrations.
  */
 function publicFunctionAcls(): Array<{ signature: string; acl: string[] }> {
-  const configPath = join(__dirname, "..", "..", "supabase", "config.toml")
+  const root = process.env.SUPABASE_WORKDIR ?? join(__dirname, "..", "..")
+  const configPath = join(root, "supabase", "config.toml")
   const projectId = /^project_id\s*=\s*"([^"]+)"/m.exec(readFileSync(configPath, "utf8"))?.[1]
   if (!projectId) throw new Error("supabase/config.toml has no project_id")
 

@@ -206,6 +206,15 @@ public page matching the final preview, an edit that stays a draft until "Publis
 and another account refused the draft. Everything that journey passes through is also
 tested below the browser, so the journey asserts the path, not every rule on it.
 
+**Journey 14 grew on 13 September 2026** with the profile's storefront work, by assertion
+rather than by a new test: it now reaches the builder through the header's Profile
+section, chooses a country and city and two links, sets the profile image on a full page
+load before hydration (the case that used to lose the image until it was chosen again) and
+checks it loads for a stranger on the first publish, and presses "Publish all products on
+my profile". The rules underneath are `tests/unit/profile-location.test.ts`,
+`tests/unit/profile-storefront-ui.test.ts`, `tests/unit/profile-publish-all.test.ts`,
+`tests/unit/workspace-nav.test.ts` and `tests/db/profile-storefront.test.ts`.
+
 **Journey 15 was added on 12 September 2026**, when importing a live listing was planned as
 B12. It is the only journey that does not begin in Fanwise. Every other path starts with an
 upload or a form and ends at a marketplace; this one starts at a marketplace listing the

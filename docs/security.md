@@ -363,6 +363,15 @@ in the authority, no control characters smuggling a scheme past the check — an
 carries `noopener noreferrer nofollow`. Without `noopener`, a marketplace listing
 edited by whoever owns that shop can navigate the Fanwise page that opened it.
 
+Since 13 September 2026 a creator's profile links are any sites they choose, so the same
+rule is held in three places rather than trusted to one: the builder's parser refuses
+every scheme but https (`javascript:`, `data:`, `mailto:` and `http:` each with a message),
+`public_profile_links` refuses a non-https `url` by CHECK, and render re-validates.
+Nobody can write a link row directly: the table grants `anon` and `authenticated` SELECT
+only, and the publish function is its one writer. Destination favicons are deliberately
+not loaded, because fetching one would tell every linked site about every visitor before
+they clicked anything.
+
 **The public pages render per request.** ISR was the obvious setting and was removed:
 with a rewrite in play, which of `/@handle` and `/profile/handle` the route cache keys
 on is not something to bet a privacy guarantee on, and `revalidatePath()` can only

@@ -111,6 +111,7 @@ test("search narrows the catalog, says so, and clears back to all of it", async 
     page.getByRole("link", { name: /Search Studio/ }),
     nav.getByRole("link", { name: "Products", exact: true }),
     nav.getByRole("link", { name: "Channels", exact: true }),
+    nav.getByRole("link", { name: "Profile", exact: true }),
     nav.getByRole("link", { name: "Settings", exact: true }),
     page.getByRole("button", { name: /^Switch to (dark|light) mode$/ }),
     page.getByRole("button", { name: "Sign out" }),

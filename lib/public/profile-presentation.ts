@@ -1,4 +1,5 @@
-import { parseContact, resolvedLinks, type ResolvedLink } from "./profile-links"
+import { formatLocation } from "@/lib/location/countries"
+import { parseContact, resolveLinks, type DraftLink, type ResolvedLink } from "./profile-links"
 import type { PublicProfileView, PublicProductCard } from "./types"
 
 /**
@@ -20,15 +21,23 @@ export interface ProfilePresentation {
   handle: string
   displayName: string
   shortBio: string | null
+  /** The longer About. Null when the creator left it empty. */
+  about: string | null
   /** A URL the viewer's browser may load: a blob, a signed URL or a media route. */
   avatarUrl: string | null
   initials: string
-  /** Optional, plain text. Null when the creator left it empty. */
+  /** "Brooklyn, United States", a country alone, or a legacy free-text location. Null for none. */
   location: string | null
   links: ResolvedLink[]
   /** The Contact button, or null to show none. `url` is `mailto:` or https. */
   contact: { url: string; label: string } | null
   products: PresentationProduct[]
+  /**
+   * The kinds of product on the page, in the order they first appear. Derived
+   * from the products shown, never typed, so it cannot claim a specialty the
+   * catalog does not back up.
+   */
+  specialties: string[]
 }
 
 export interface PresentationProduct {
@@ -39,6 +48,10 @@ export interface PresentationProduct {
   imageAlt: string
   /** The product's public page. Set on the public route; absent in the builder's previews. */
   href?: string | null
+  /** One line about the product, when the page or the product has one. */
+  summary?: string | null
+  startingPrice?: { amount: number; currency: string } | null
+  channelCount?: number
 }
 
 /** The draft's editable fields, as typed. */
@@ -46,11 +59,19 @@ export interface ProfileDraftFields {
   handle: string
   displayName: string
   shortBio: string
-  website: string
-  instagram: string
-  behance: string
-  /** Optional. Empty means no location on the public profile. */
+  /** Optional, longer than the introduction. */
+  about: string
+  /** Optional. A city from the dataset, only with a country. */
+  city: string
+  /** Optional ISO 3166-1 alpha-2 code, or empty. */
+  countryCode: string
+  /**
+   * The legacy free-text location, kept for a profile that has not chosen a
+   * city and country yet. Ignored once a country is chosen.
+   */
   location: string
+  /** The creator's links, in order, as typed. */
+  links: DraftLink[]
   /** Optional: an email address or a website. Empty means no Contact button. */
   contact: string
 }
@@ -68,21 +89,23 @@ export function presentationFromDraft(
 ): ProfilePresentation {
   const displayName = fields.displayName.trim()
   const shortBio = fields.shortBio.trim()
-  const location = fields.location.trim()
+  const about = fields.about.trim()
   return {
     handle: options.handle,
     displayName,
     shortBio: shortBio.length > 0 ? shortBio : null,
+    about: about.length > 0 ? about : null,
     avatarUrl: options.avatarUrl,
     initials: initialsFor(displayName),
-    location: location.length > 0 ? location : null,
-    contact: resolvedContact(fields.contact),
-    links: resolvedLinks({
-      website: fields.website,
-      instagram: fields.instagram,
-      behance: fields.behance,
+    location: formatLocation({
+      city: fields.city,
+      countryCode: fields.countryCode.trim(),
+      legacy: fields.location,
     }),
+    contact: resolvedContact(fields.contact),
+    links: resolveLinks(fields.links),
     products: options.products,
+    specialties: specialtiesOf(options.products),
   }
 }
 
@@ -99,28 +122,38 @@ export function presentationFromPublicView(
     productHref: (slug: string) => string
   },
 ): ProfilePresentation {
+  const products = cards.map((card) => ({
+    key: card.slug,
+    title: card.title,
+    typeLabel: card.typeLabel,
+    imageUrl: card.coverAssetId ? media.imageUrl(card.coverAssetId) : null,
+    imageAlt: card.coverAlt,
+    href: media.productHref(card.slug),
+    summary: card.summary,
+    startingPrice: card.startingPrice,
+    channelCount: card.channelCount,
+  }))
   return {
     handle: profile.handle,
     displayName: profile.displayName,
     shortBio: profile.shortBio,
+    about: profile.about?.trim() ? profile.about.trim() : null,
     avatarUrl: profile.hasAvatar ? media.avatarUrl : null,
     initials: initialsFor(profile.displayName),
-    location: profile.location?.trim() ? profile.location.trim() : null,
-    contact: resolvedContact(profile.contactUrl ?? ""),
-    links: resolvedLinks({
-      website: profile.websiteUrl ?? "",
-      instagram: profile.instagramUrl ?? "",
-      behance: profile.behanceUrl ?? "",
+    location: formatLocation({
+      city: profile.city,
+      countryCode: profile.countryCode,
+      legacy: profile.location,
     }),
-    products: cards.map((card) => ({
-      key: card.slug,
-      title: card.title,
-      typeLabel: card.typeLabel,
-      imageUrl: card.coverAssetId ? media.imageUrl(card.coverAssetId) : null,
-      imageAlt: card.coverAlt,
-      href: media.productHref(card.slug),
-    })),
+    contact: resolvedContact(profile.contactUrl ?? ""),
+    links: resolveLinks(profile.links),
+    products,
+    specialties: specialtiesOf(products),
   }
+}
+
+function specialtiesOf(products: readonly PresentationProduct[]): string[] {
+  return [...new Set(products.map((product) => product.typeLabel).filter(Boolean))]
 }
 
 /**

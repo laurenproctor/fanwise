@@ -85,7 +85,23 @@ export async function readDraft(
 
   return row
     ? { draft: draftFromRow(row), stored: true }
-    : { draft: seedDraftFromProfile(profile), stored: false }
+    : {
+        draft: seedDraftFromProfile(profile, await readLiveLinks(supabase, profile.id)),
+        stored: false,
+      }
+}
+
+/** The live profile's links, in order, read through the caller's RLS. */
+export async function readLiveLinks(
+  supabase: Client,
+  profileId: string,
+): Promise<Array<{ url: string; label: string | null }>> {
+  const { data } = await supabase
+    .from("public_profile_links")
+    .select("url, label, position")
+    .eq("public_profile_id", profileId)
+    .order("position", { ascending: true })
+  return (data ?? []).map(({ url, label }) => ({ url, label }))
 }
 
 /**
@@ -95,7 +111,7 @@ export async function readDraft(
  * created first is left alone rather than reset to the seed.
  */
 async function ensureDraftRow(supabase: Client, ctx: BuilderContext): Promise<boolean> {
-  const seed = seedDraftFromProfile(ctx.profile)
+  const seed = seedDraftFromProfile(ctx.profile, await readLiveLinks(supabase, ctx.profile.id))
   const { error } = await supabase.from("public_profile_drafts").upsert(
     {
       public_profile_id: ctx.profile.id,
@@ -111,15 +127,21 @@ async function ensureDraftRow(supabase: Client, ctx: BuilderContext): Promise<bo
   return !error
 }
 
+/**
+ * The draft columns the builder writes. The retired `website`, `instagram`
+ * and `behance` columns are not among them: `links` replaced all three.
+ */
 function fieldColumns(fields: ProfileDraftFields) {
   return {
     handle: fields.handle,
     display_name: fields.displayName,
     short_bio: fields.shortBio,
-    website: fields.website,
-    instagram: fields.instagram,
-    behance: fields.behance,
+    about: fields.about,
+    city: fields.city,
+    country_code: fields.countryCode,
     location: fields.location,
+    // Plain literals: the generated Json type needs an index signature.
+    links: fields.links.map(({ url, label }) => ({ url, label })),
     contact: fields.contact,
   }
 }

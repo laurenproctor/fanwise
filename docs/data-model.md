@@ -506,12 +506,17 @@ describes data one workspace can see; this section describes data the open web c
 see, and the differences are the parts worth reading twice.
 
 **public_profiles** — id, workspace_id, handle (citext, unique), display_name,
-short_bio, location, avatar_path, website_url, instagram_url, behance_url, contact_url,
-status, seo_title, seo_description, published_at, created_at, updated_at
+short_bio, about, city, country_code, location, avatar_path, contact_url, status,
+seo_title, seo_description, published_at, created_at, updated_at; and the deprecated
+website_url, instagram_url, behance_url (see below)
+
+**public_profile_links** — id, workspace_id, public_profile_id, position (0–7, unique per
+profile), url (https only), label (null derives one), created_at
 
 **public_profile_drafts** — public_profile_id (pk), workspace_id, handle, display_name,
-short_bio, website, instagram, behance, avatar_path, products (jsonb), revision,
-updated_by, created_at, updated_at
+short_bio, about, city, country_code, location, links (jsonb), contact, avatar_path,
+products (jsonb), revision, updated_by, created_at, updated_at; and the deprecated
+website, instagram, behance
 
 The profile builder's unpublished working copy, one per profile
 (20260912220000). Autosave writes here and **never** to `public_profiles`; only
@@ -541,6 +546,55 @@ publication recorded before that migration has no `location` or `contact_url` ke
 its snapshot; both the publish function's no-op check and the builder's "changes to
 publish" state fill those keys from the live row, which the previous publish function
 never wrote.
+
+**The storefront fields (20260913030000).** Four changes, each keeping every value a
+creator already had.
+
+- *Links a creator chooses.* The three fixed links became `public_profile_links`, up to
+  eight rows in the creator's order, and `public_profile_drafts.links`, the same list as
+  typed. A normalized table on the live side because the public route reads it as `anon`
+  and each row carries its own https CHECK; jsonb on the draft side because a draft is
+  stored as typed, the convention `products` set. Only `publish_public_profile()` writes
+  link rows (no member holds a write grant); `anon` reads them only while the profile is
+  published. The migration copied every live `website_url`, `instagram_url` and
+  `behance_url` into rows, and every draft's typed values into `links` (a bare `@name`
+  becomes its instagram.com or behance.net address; anything unparseable is carried as
+  typed, never dropped). The six old columns stay in place and unread; publication nulls
+  the three live ones so a removed link is not left readable signed out. A platform
+  (Instagram, Behance, Dribbble, LinkedIn, X, YouTube, TikTok, Pinterest, Vimeo, Threads,
+  Bluesky, GitHub) only chooses an icon and a default label; every other address is a
+  website and draws a globe. Favicons are not fetched, for the visitor's privacy.
+- *Structured location.* `country_code` is ISO 3166-1 alpha-2 (CHECK `^[A-Z]{2}$`); the
+  display name is derived, never stored. `city` requires a country (CHECK) and is the
+  location dataset's spelling, checked against that country on the server at Continue and
+  at publish, so a mismatched pair cannot reach the live row. The legacy free-text
+  `location` is kept untouched and shown until a country is chosen; publishing a country
+  clears it. Nothing parses the old text. The dataset is `lib/location/data`, built by
+  `scripts/build-location-data.mjs` from GeoNames `cities15000` and `countryInfo`
+  (CC BY 4.0, https://www.geonames.org/): 252 countries and 34,014 places of 15,000 people
+  or more, searched in memory on the server. A smaller town is not in it; its creator can
+  choose the country alone or the nearest city. No provider, account or key is involved.
+- *About.* `about`, up to 2,000 characters, shown in the profile's About section. Kinds of
+  product ("Makes") are derived from the products shown, not stored.
+- *Publish all products.* `publish_all_profile_products()` publishes named, unarchived
+  products of the caller's own workspace onto an already-published profile (PT412
+  otherwise), appends nothing it was not asked to, takes nothing down, updates the draft's
+  arrangement and revision in the same transaction, records a publication, and returns
+  `unchanged` when there is nothing to do. It shares `publish_profile_product_pages()` with
+  `publish_public_profile()` (neither helper is executable by any browser role). Listing
+  liveness is decided by the server action, as for the builder. It never reads or writes
+  a listing, channel or connection: public Fanwise visibility only. It acts on the
+  products that exist when pressed; there is no auto-publish preference.
+
+Snapshots recorded before this migration carry `website_url`, `instagram_url` and
+`behance_url` and lack `links`, `about`, `city` and `country_code`. The publish function's
+no-op check and the builder's "changes to publish" state both drop the retired keys and
+fill the missing ones from the live row and its links, so an unchanged profile still reads
+as unchanged.
+
+`profile` also joined `products_slug_not_reserved`, because the profile's management pages
+moved from `/<workspace>/settings/public-profile` to `/<workspace>/profile` (old addresses
+redirect permanently). A product already slugged `profile` is renamed `profile-xxxx`.
 
 **public_profile_publications** — id, public_profile_id, workspace_id, handle,
 draft_updated_at, snapshot (jsonb), published_by, published_at

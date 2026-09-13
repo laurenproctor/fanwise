@@ -7,21 +7,23 @@ import { createAvatarUrl } from "@/lib/public/avatars"
 import { loadBuilderContext, readDraft } from "@/lib/public/draft-store"
 import { appOrigin } from "@/lib/channels/oauth"
 import { BuilderHeader } from "./builder-header"
-import { ProfileDetailsStep } from "./profile-details-step"
+import { ProfileDetailsStep, type FocusField } from "./profile-details-step"
 
 export const metadata = { title: "Public profile · Fanwise" }
 
 /** Fields step 3 may send the creator back to, named in `?field=`. */
-const FOCUSABLE = new Set([
+const FOCUSABLE: ReadonlySet<FocusField> = new Set<FocusField>([
   "handle",
   "displayName",
   "shortBio",
-  "website",
-  "instagram",
-  "behance",
+  "about",
+  "countryCode",
+  "city",
+  "location",
+  "links",
+  "contact",
   "image",
-] as const)
-type FocusField = typeof FOCUSABLE extends Set<infer T> ? T : never
+])
 
 /**
  * Step 1 of the public-profile builder: profile details.

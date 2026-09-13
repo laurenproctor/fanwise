@@ -47,6 +47,7 @@ export const RESERVED_PRODUCT_SLUGS: ReadonlySet<string> = new Set([
   "assets",
   "channels",
   "new",
+  "profile",
   "settings",
 ])
 

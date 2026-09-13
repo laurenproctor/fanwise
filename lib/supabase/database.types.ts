@@ -1248,13 +1248,17 @@ export type Database = {
       }
       public_profile_drafts: {
         Row: {
+          about: string
           avatar_path: string | null
           behance: string
+          city: string
           contact: string
+          country_code: string
           created_at: string
           display_name: string
           handle: string
           instagram: string
+          links: Json
           location: string
           products: Json
           public_profile_id: string
@@ -1266,13 +1270,17 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          about?: string
           avatar_path?: string | null
           behance?: string
+          city?: string
           contact?: string
+          country_code?: string
           created_at?: string
           display_name?: string
           handle?: string
           instagram?: string
+          links?: Json
           location?: string
           products?: Json
           public_profile_id: string
@@ -1284,13 +1292,17 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          about?: string
           avatar_path?: string | null
           behance?: string
+          city?: string
           contact?: string
+          country_code?: string
           created_at?: string
           display_name?: string
           handle?: string
           instagram?: string
+          links?: Json
           location?: string
           products?: Json
           public_profile_id?: string
@@ -1315,6 +1327,44 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      public_profile_links: {
+        Row: {
+          created_at: string
+          id: string
+          label: string | null
+          position: number
+          public_profile_id: string
+          url: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          position: number
+          public_profile_id: string
+          url: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          position?: number
+          public_profile_id?: string
+          url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_profile_links_profile_fk"
+            columns: ["public_profile_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id", "workspace_id"]
           },
         ]
       }
@@ -1361,9 +1411,12 @@ export type Database = {
       }
       public_profiles: {
         Row: {
+          about: string | null
           avatar_path: string | null
           behance_url: string | null
+          city: string | null
           contact_url: string | null
+          country_code: string | null
           created_at: string
           display_name: string
           handle: string
@@ -1380,9 +1433,12 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          about?: string | null
           avatar_path?: string | null
           behance_url?: string | null
+          city?: string | null
           contact_url?: string | null
+          country_code?: string | null
           created_at?: string
           display_name: string
           handle: string
@@ -1399,9 +1455,12 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          about?: string | null
           avatar_path?: string | null
           behance_url?: string | null
+          city?: string | null
           contact_url?: string | null
+          country_code?: string | null
           created_at?: string
           display_name?: string
           handle?: string
@@ -1729,6 +1788,10 @@ export type Database = {
         Returns: boolean
       }
       is_workspace_owner: { Args: { p_workspace_id: string }; Returns: boolean }
+      profile_links_snapshot: {
+        Args: { p_public_profile_id: string }
+        Returns: Json
+      }
       provision_personal_workspace: {
         Args: { p_name: string; p_slug: string }
         Returns: {
@@ -1747,6 +1810,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      publish_all_profile_products: {
+        Args: { p_product_ids: string[]; p_public_profile_id: string }
+        Returns: Json
+      }
+      publish_profile_product_pages: {
+        Args: {
+          p_hide_others: boolean
+          p_ids: string[]
+          p_public_profile_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       publish_public_profile: {
         Args: {
           p_expected_draft_updated_at: string
@@ -1759,9 +1835,12 @@ export type Database = {
       release_public_handle: {
         Args: { p_new_handle: string; p_public_profile_id: string }
         Returns: {
+          about: string | null
           avatar_path: string | null
           behance_url: string | null
+          city: string | null
           contact_url: string | null
+          country_code: string | null
           created_at: string
           display_name: string
           handle: string

@@ -1,4 +1,5 @@
 import { publicMediaRoutes } from "@/lib/public/media-routes"
+import { ProfileAvatar } from "./profile-avatar"
 
 /**
  * An image on a public page.
@@ -65,47 +66,39 @@ export function PublicImage({
  * The fallback is not a placeholder silhouette. A studio that has not uploaded
  * a mark still has a name, and two letters of it in the brand's own type reads
  * as a considered identity where a grey person icon reads as a broken image.
+ * The same letters stand in when an image fails to load (ProfileAvatar), so a
+ * removed or unreadable object never shows as a broken frame.
+ *
+ * `version` is the profile's `updated_at`, the same cache key the profile page
+ * puts on its avatar. The avatar route is cached for a minute, and without the
+ * version a replaced picture stayed on this page for that minute, pointing at
+ * an object the replacement had already deleted.
  */
 export function PublicAvatar({
   profileId,
   displayName,
   initials,
   hasAvatar,
+  version,
   size = 96,
 }: {
   profileId: string
   displayName: string
   initials: string
   hasAvatar: boolean
+  version?: string
   size?: number
 }) {
-  const box = { width: size, height: size }
-
-  if (!hasAvatar) {
-    return (
-      <span
-        style={box}
-        role="img"
-        aria-label={displayName}
-        className="font-display flex shrink-0 items-center justify-center rounded-[20px] border border-[var(--color-rule)] bg-[var(--color-ink)] text-[var(--color-paper)]"
-      >
-        <span style={{ fontSize: Math.round(size * 0.38) }} className="tracking-[-0.02em]">
-          {initials}
-        </span>
-      </span>
-    )
-  }
-
+  const src = hasAvatar
+    ? `${publicMediaRoutes.avatar(profileId)}${version ? `?v=${encodeURIComponent(version)}` : ""}`
+    : null
   return (
-    /* eslint-disable-next-line @next/next/no-img-element -- as PublicImage. */
-    <img
-      src={publicMediaRoutes.avatar(profileId)}
+    <ProfileAvatar
+      src={src}
+      initials={initials}
+      size={size}
       alt={displayName}
-      width={size}
-      height={size}
-      style={box}
-      decoding="async"
-      className="shrink-0 rounded-[20px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] object-cover"
+      rounded="rounded-[20px]"
     />
   )
 }

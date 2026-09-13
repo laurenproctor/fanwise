@@ -30,6 +30,7 @@ const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")
 function candidate(n: number, overrides: Partial<ProductCandidate> = {}): ProductCandidate {
   return {
     id: id(n),
+    slug: `product-${n}`,
     title: `Product ${n}`,
     typeLabel: "Template",
     imageUrl: `/ws/assets/img-${n}/preview`,
@@ -109,6 +110,7 @@ describe("eligibility comes from the product lifecycle", () => {
 
     expect(candidates[0]).toEqual({
       id: id(1),
+      slug: null,
       title: "Editorial Type",
       typeLabel: "FONT",
       imageUrl: "/img/cover-1",
@@ -142,7 +144,7 @@ describe("eligibility comes from the product lifecycle", () => {
       { typeLabel: (t) => t, imageUrl: (a) => a },
     )
     expect(Object.keys(only!).sort()).toEqual(
-      ["eligibility", "existingOrder", "id", "imageUrl", "title", "typeLabel"].sort(),
+      ["eligibility", "existingOrder", "id", "imageUrl", "slug", "title", "typeLabel"].sort(),
     )
   })
 })

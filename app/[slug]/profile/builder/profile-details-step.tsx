@@ -34,11 +34,13 @@ import {
   type DetailsErrors,
   type ProfileDraftFields,
 } from "@/lib/public/profile-draft"
-import { LINK_PARSERS, parseContact, type ProfileLinkKind } from "@/lib/public/profile-links"
+import { parseContact } from "@/lib/public/profile-links"
 import { presentationFromDraft } from "@/lib/public/profile-presentation"
 import { routes } from "@/lib/routes"
-import { UnsavedChangesGuard } from "../../unsaved-changes-guard"
+import { UnsavedChangesGuard } from "../../settings/unsaved-changes-guard"
 import { DraftStatus, ErrorGlyph, OkGlyph } from "./builder-status"
+import { LinksEditor } from "./links-editor"
+import { LocationFields } from "./location-fields"
 import { ProfilePreview } from "./profile-preview"
 
 /**
@@ -55,6 +57,15 @@ import { ProfilePreview } from "./profile-preview"
  *   - the image preview, which holds exactly one object URL at a time and
  *     uploads a picture once, when it is chosen, not on every later save.
  *
+ * The image has one more rule, and it is the fix for a picture that only
+ * appeared after a second edit. The file field is server-rendered, so it can
+ * be clicked before the page hydrates; a file chosen in that window fires its
+ * change event before React is listening, and used to be lost without a word
+ * while the creator carried on and published a profile with no image. On
+ * mount the field is read once, and a file already sitting in it is taken as
+ * if it had just been chosen. Continue is also held while an upload is in
+ * flight, so the step is never submitted ahead of its image.
+ *
  * The preview reads from local state, so it changes on the same render as the
  * field. Nothing it shows waits on the network.
  */
@@ -68,7 +79,11 @@ const availabilityResponse = z.object({
 type ImageState =
   | { kind: "idle" }
   | { kind: "uploading" }
+  | { kind: "saved"; removed: boolean }
   | { kind: "error"; message: string; retry: File | "remove" | null }
+
+/** Fields step 3 can send the creator back to. `links` focuses the first link row. */
+export type FocusField = keyof ProfileDraftFields | "image"
 
 export function ProfileDetailsStep({
   workspaceSlug,
@@ -83,7 +98,7 @@ export function ProfileDetailsStep({
   liveHandle: string
   published: boolean
   /** A field step 3 sent the creator back to fix; focused and shown as touched on arrival. */
-  focusField?: keyof ProfileDraftFields | "image" | null
+  focusField?: FocusField | null
   initial: {
     fields: ProfileDraftFields
     revision: number
@@ -92,15 +107,16 @@ export function ProfileDetailsStep({
   }
 }) {
   const router = useRouter()
-  const ids = {
+  const ids: Record<FocusField, string> = {
     image: useId(),
     handle: useId(),
     displayName: useId(),
     shortBio: useId(),
-    website: useId(),
-    instagram: useId(),
-    behance: useId(),
+    about: useId(),
+    countryCode: useId(),
+    city: useId(),
     location: useId(),
+    links: useId(),
     contact: useId(),
   }
 
@@ -121,6 +137,10 @@ export function ProfileDetailsStep({
   const checker = useRef<HandleAvailabilityChecker | null>(null)
   const previews = useRef<ImagePreviewManager | null>(null)
   const uploadedIdentity = useRef<string | null>(null)
+  /** The file being uploaded now, so the same pick arriving twice sends its bytes once. */
+  const uploadingIdentity = useRef<string | null>(null)
+  /** Which upload is the latest. An older one finishing late must not report for a newer pick. */
+  const latestUpload = useRef(0)
   const fileInput = useRef<HTMLInputElement>(null)
   const initialHandle = useRef(initial.fields.handle)
 
@@ -167,7 +187,10 @@ export function ProfileDetailsStep({
   // Arriving from step 3 with a named field: put the cursor where the fix goes.
   useEffect(() => {
     if (!focusField) return
-    const element = document.getElementById(ids[focusField])
+    const element =
+      focusField === "links"
+        ? document.querySelector<HTMLElement>(`#${CSS.escape(ids.links)} input`)
+        : document.getElementById(ids[focusField])
     element?.focus()
     element?.scrollIntoView({ block: "center" })
     // Once, on arrival.
@@ -180,18 +203,33 @@ export function ProfileDetailsStep({
       revoke: (url) => URL.revokeObjectURL(url),
     })
     previews.current = manager
+    // A file chosen before hydration is already in the field; take it now.
+    const early = fileInput.current?.files?.[0]
+    if (early) onPickImage(early)
     return () => manager.dispose()
+    // Once, on mount: this is the hydration catch-up, not a subscription.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Not memoised: it closes over the current fields, and every change event
   // re-renders before the next one arrives, so the closure is never stale.
-  function setField(key: keyof ProfileDraftFields, value: string) {
-    const next = { ...fields, [key]: value }
+  function setFieldsPatch(patch: Partial<ProfileDraftFields>) {
+    const next = { ...fields, ...patch }
     setFields(next)
     autosave.current?.change(next)
-    setServerErrors((current) => (current[key] ? { ...current, [key]: undefined } : current))
+    setServerErrors((current) => {
+      const keys = Object.keys(patch) as Array<keyof DetailsErrors>
+      if (!keys.some((key) => current[key])) return current
+      const cleared = { ...current }
+      for (const key of keys) delete cleared[key]
+      return cleared
+    })
     setFormMessage(null)
-    if (key === "handle") checker.current?.update(value)
+    if (patch.handle !== undefined) checker.current?.update(patch.handle)
+  }
+
+  function setField<K extends keyof ProfileDraftFields>(key: K, value: ProfileDraftFields[K]) {
+    setFieldsPatch({ [key]: value } as Partial<ProfileDraftFields>)
   }
 
   const touch = (key: keyof ProfileDraftFields) =>
@@ -200,6 +238,9 @@ export function ProfileDetailsStep({
   // ---- Image ---------------------------------------------------------------
 
   async function uploadImage(file: File | "remove") {
+    const identity = file === "remove" ? "remove" : fileIdentity(file)
+    const attempt = (latestUpload.current += 1)
+    uploadingIdentity.current = identity
     setImageState({ kind: "uploading" })
     const body = new FormData()
     if (file === "remove") body.set("remove", "true")
@@ -212,9 +253,13 @@ export function ProfileDetailsStep({
       result = { ok: false, message: "That image could not be saved. Try again." }
     }
 
+    // Server actions run in order, so a newer pick's upload lands after this
+    // one; its own result is the one the screen should report.
+    if (attempt !== latestUpload.current) return
+    uploadingIdentity.current = null
     if (result.ok) {
-      uploadedIdentity.current = file === "remove" ? null : fileIdentity(file)
-      setImageState({ kind: "idle" })
+      uploadedIdentity.current = file === "remove" ? null : identity
+      setImageState({ kind: "saved", removed: file === "remove" })
     } else {
       setImageState({ kind: "error", message: result.message, retry: file })
     }
@@ -228,9 +273,11 @@ export function ProfileDetailsStep({
       if (fileInput.current) fileInput.current.value = ""
       return
     }
+    const identity = fileIdentity(file)
     setAvatarUrl(previews.current?.show(file) ?? null)
-    if (uploadedIdentity.current === fileIdentity(file)) {
-      setImageState({ kind: "idle" })
+    if (uploadingIdentity.current === identity) return
+    if (uploadedIdentity.current === identity) {
+      setImageState({ kind: "saved", removed: false })
       return
     }
     void uploadImage(file)
@@ -248,6 +295,10 @@ export function ProfileDetailsStep({
   async function onContinue() {
     const saver = autosave.current
     if (!saver) return
+    if (imageState.kind === "uploading") {
+      setFormMessage("Your image is still uploading. Continue once it has saved.")
+      return
+    }
     setContinuing(true)
     setFormMessage(null)
 
@@ -280,10 +331,11 @@ export function ProfileDetailsStep({
       handle: true,
       displayName: true,
       shortBio: true,
-      website: true,
-      instagram: true,
-      behance: true,
+      about: true,
+      city: true,
+      countryCode: true,
       location: true,
+      links: true,
       contact: true,
     })
     setFormMessage(
@@ -308,18 +360,15 @@ export function ProfileDetailsStep({
     [fields, normalizedHandle, avatarUrl],
   )
 
-  const linkError = (kind: ProfileLinkKind): string | null => {
-    if (serverErrors[kind]) return serverErrors[kind] ?? null
-    if (!touched[kind]) return null
-    const parsed = LINK_PARSERS[kind](fields[kind])
-    return parsed.kind === "invalid" ? parsed.message : null
+  const locationErrors = {
+    countryCode: serverErrors.countryCode ?? null,
+    city: serverErrors.city ?? null,
+    location:
+      serverErrors.location ??
+      (fields.location.trim().length > DRAFT_LIMITS.location
+        ? `Keep the location under ${DRAFT_LIMITS.location} characters, or remove it.`
+        : null),
   }
-
-  const locationError =
-    serverErrors.location ??
-    (touched.location && fields.location.trim().length > DRAFT_LIMITS.location
-      ? `Keep the location under ${DRAFT_LIMITS.location} characters.`
-      : null)
 
   const contactError = (() => {
     if (serverErrors.contact) return serverErrors.contact
@@ -345,10 +394,11 @@ export function ProfileDetailsStep({
   const handleError = serverErrors.handle ?? availabilityMessage(shownAvailability)
 
   const unsaved = saveStatus === "pending" || saveStatus === "saving" || saveStatus === "error"
+  const uploading = imageState.kind === "uploading"
 
   return (
     <div className="grid grid-cols-1 overflow-hidden rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-card)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
-      <UnsavedChangesGuard when={unsaved || imageState.kind === "uploading"} />
+      <UnsavedChangesGuard when={unsaved || uploading} />
 
       <form
         noValidate
@@ -388,7 +438,10 @@ export function ProfileDetailsStep({
                   alt="Your profile image"
                   width={80}
                   height={80}
-                  className="h-20 w-20 rounded-[12px] border border-[var(--color-rule)] object-cover"
+                  // A signed URL can expire under a tab left open, and an object
+                  // can be gone. Initials, never a broken-image icon.
+                  onError={() => setAvatarUrl(null)}
+                  className="aspect-square h-20 w-20 rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] object-cover"
                 />
               ) : (
                 <span
@@ -432,6 +485,13 @@ export function ProfileDetailsStep({
                 <span id={`${ids.image}-status`} aria-live="polite" className="text-[13px]">
                   {imageState.kind === "uploading" ? (
                     <span className="text-[var(--color-ink-3)]">Saving image…</span>
+                  ) : imageState.kind === "saved" ? (
+                    <span className="flex items-center gap-2 text-[var(--color-ink)]">
+                      <OkGlyph />
+                      {imageState.removed
+                        ? "Image removed from your draft"
+                        : "Image saved to your draft"}
+                    </span>
                   ) : null}
                 </span>
                 {imageState.kind === "error" ? (
@@ -544,56 +604,58 @@ export function ProfileDetailsStep({
             <FieldError id={`${ids.shortBio}-error`} message={serverErrors.shortBio ?? null} />
           </div>
 
+          {/* About, optional ----------------------------------------------------- */}
+          <div className="flex flex-col gap-2">
+            <label htmlFor={ids.about} className="text-[14px] text-[var(--color-ink)]">
+              About (optional)
+            </label>
+            <textarea
+              id={ids.about}
+              rows={5}
+              maxLength={DRAFT_LIMITS.about}
+              value={fields.about}
+              onChange={(event) => setField("about", event.target.value)}
+              onBlur={() => touch("about")}
+              aria-invalid={serverErrors.about ? true : undefined}
+              aria-describedby={`${ids.about}-hint ${ids.about}-count${serverErrors.about ? ` ${ids.about}-error` : ""}`}
+              className={`${FIELD_INPUT_CLASS} resize-y`}
+            />
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <span id={`${ids.about}-hint`} className="text-[13px] text-[var(--color-ink-3)]">
+                Your practice, what you make and who it&rsquo;s for. Shown in your profile&rsquo;s
+                About section.
+              </span>
+              <span
+                id={`${ids.about}-count`}
+                className="tabular text-[13px] text-[var(--color-ink-3)]"
+              >
+                {fields.about.length} / {DRAFT_LIMITS.about}
+                <span className="sr-only"> characters used</span>
+              </span>
+            </div>
+            <FieldError id={`${ids.about}-error`} message={serverErrors.about ?? null} />
+          </div>
+
           {/* Location, optional -------------------------------------------------- */}
-          <TextInput
-            id={ids.location}
-            label="Location (optional)"
-            value={fields.location}
-            placeholder="Brooklyn, New York"
-            maxLength={DRAFT_LIMITS.location}
-            autoComplete="address-level2"
-            hint="Shown under your introduction. Leave it empty to show no location."
-            error={locationError}
-            onChange={(value) => setField("location", value)}
-            onBlur={() => touch("location")}
+          <LocationFields
+            workspaceSlug={workspaceSlug}
+            countryId={ids.countryCode}
+            cityId={ids.city}
+            countryCode={fields.countryCode}
+            city={fields.city}
+            legacyLocation={fields.location}
+            errors={locationErrors}
+            onChange={(next) => setFieldsPatch(next)}
+            onRemoveLegacy={() => setField("location", "")}
           />
 
           {/* Links ------------------------------------------------------------------ */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {/* Website above Instagram on the left, Behance beside Instagram: the mockup's grid. */}
-            <TextInput
-              id={ids.website}
-              label="Website"
-              wrapperClassName="sm:col-start-1 sm:row-start-1"
-              value={fields.website}
-              placeholder="yourstudio.com"
-              inputMode="url"
-              autoComplete="url"
-              error={linkError("website")}
-              onChange={(value) => setField("website", value)}
-              onBlur={() => touch("website")}
-            />
-            <TextInput
-              id={ids.instagram}
-              label="Instagram"
-              wrapperClassName="sm:col-start-1 sm:row-start-2"
-              value={fields.instagram}
-              placeholder="@yourstudio"
-              autoCapitalize="none"
-              error={linkError("instagram")}
-              onChange={(value) => setField("instagram", value)}
-              onBlur={() => touch("instagram")}
-            />
-            <TextInput
-              id={ids.behance}
-              label="Behance"
-              wrapperClassName="sm:col-start-2 sm:row-start-2"
-              value={fields.behance}
-              placeholder="behance.net/yourstudio"
-              autoCapitalize="none"
-              error={linkError("behance")}
-              onChange={(value) => setField("behance", value)}
-              onBlur={() => touch("behance")}
+          <div id={ids.links}>
+            <LinksEditor
+              initial={initial.fields.links}
+              serverIssues={serverErrors.links ?? []}
+              showAllErrors={Boolean(touched.links)}
+              onChange={(links) => setField("links", links)}
             />
           </div>
 
@@ -642,8 +704,13 @@ export function ProfileDetailsStep({
         ) : null}
 
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3 pt-2">
-          <Button type="submit" disabled={continuing} className="min-w-[160px] max-sm:w-full">
-            {continuing ? "Saving…" : "Continue"}
+          <Button
+            type="submit"
+            disabled={continuing || uploading}
+            aria-describedby={uploading ? `${ids.image}-status` : undefined}
+            className="min-w-[160px] max-sm:w-full"
+          >
+            {continuing ? "Saving…" : uploading ? "Saving image…" : "Continue"}
           </Button>
           <button
             type="button"

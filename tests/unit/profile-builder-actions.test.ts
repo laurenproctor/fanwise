@@ -43,6 +43,7 @@ interface Builder extends PromiseLike<Result> {
   neq: (column: string, value: unknown) => Builder
   in: (column: string, values: unknown[]) => Builder
   limit: (n: number) => Builder
+  order: (column: string, options?: unknown) => Builder
   maybeSingle: () => Promise<Result>
   single: () => Promise<Result>
 }
@@ -74,6 +75,7 @@ function makeClient(kind: "user" | "admin") {
         neq: (column, value) => (call.filters.push([`!${column}`, value]), builder),
         in: (column, values) => (call.filters.push([`in:${column}`, values]), builder),
         limit: () => builder,
+        order: () => builder,
         maybeSingle: async () => {
           const result = run()
           return {
@@ -131,10 +133,14 @@ const FIELDS = {
   handle: "lauren-proctor",
   displayName: "Lauren Proctor",
   shortBio: "Design tools.",
-  website: "laurenproctor.com",
-  instagram: "@laurenproctor",
-  behance: "",
-  location: "Brooklyn, New York",
+  about: "A studio making tools for brands.",
+  city: "Brooklyn",
+  countryCode: "US",
+  location: "",
+  links: [
+    { url: "laurenproctor.com", label: "" },
+    { url: "https://www.instagram.com/laurenproctor/", label: "Studio feed" },
+  ],
   contact: "hello@laurenproctor.com",
 }
 
@@ -253,27 +259,56 @@ describe("autosave", () => {
     expect(rpcs).toEqual([])
   })
 
-  it("stores location and the contact address with the rest of the draft", async () => {
+  it("stores location, links, About and the contact address with the rest of the draft", async () => {
     world()
     await saveProfileDraftAction("laurens-studio", { fields: FIELDS, revision: 0 })
     const update = calls.find((c) => c.table === "public_profile_drafts" && c.op === "update")
     expect(update?.payload).toMatchObject({
-      location: "Brooklyn, New York",
+      about: "A studio making tools for brands.",
+      city: "Brooklyn",
+      country_code: "US",
+      location: "",
+      links: FIELDS.links,
       contact: "hello@laurenproctor.com",
     })
+    // The retired columns are not written: links replaced them.
+    expect(update?.payload).not.toHaveProperty("website")
+    expect(update?.payload).not.toHaveProperty("instagram")
+    expect(update?.payload).not.toHaveProperty("behance")
   })
 
   /**
-   * A builder tab opened before location and contact existed sends fields
-   * without them. Defaulting the missing keys to empty would make that tab's
-   * next autosave erase the values the migration copied into the draft, so the
-   * save is refused instead, before anything is written, and the tab reloads.
+   * A builder tab opened before a field existed sends fields without it.
+   * Defaulting the missing keys to empty would make that tab's next autosave
+   * erase the values the migration copied into the draft (links, most of all),
+   * so the save is refused instead, before anything is written, and the tab
+   * reloads.
    */
-  it("refuses a save that omits location and contact rather than blanking them", async () => {
+  it.each([["links"], ["city"], ["countryCode"], ["about"], ["location"], ["contact"]])(
+    "refuses a save that omits %s rather than blanking it",
+    async (missing) => {
+      world()
+      const stale = Object.fromEntries(Object.entries(FIELDS).filter(([key]) => key !== missing))
+      const result = await saveProfileDraftAction("laurens-studio", { fields: stale, revision: 0 })
+      expect(result).toEqual({ ok: false, reason: "failed" })
+      expect(calls.filter((c) => c.table === "public_profile_drafts" && c.op !== "select")).toEqual(
+        [],
+      )
+    },
+  )
+
+  it("refuses a save from before links existed, carrying the three old fields", async () => {
     world()
-    const stale = Object.fromEntries(
-      Object.entries(FIELDS).filter(([key]) => key !== "location" && key !== "contact"),
-    )
+    const stale = {
+      handle: FIELDS.handle,
+      displayName: FIELDS.displayName,
+      shortBio: FIELDS.shortBio,
+      website: "laurenproctor.com",
+      instagram: "@laurenproctor",
+      behance: "",
+      location: "Brooklyn, New York",
+      contact: FIELDS.contact,
+    }
     const result = await saveProfileDraftAction("laurens-studio", { fields: stale, revision: 0 })
     expect(result).toEqual({ ok: false, reason: "failed" })
     expect(calls.filter((c) => c.table === "public_profile_drafts" && c.op !== "select")).toEqual(
@@ -334,7 +369,7 @@ describe("continue from step 1", () => {
     expect(result).toEqual({
       ok: true,
       revision: 1,
-      next: "/laurens-studio/settings/public-profile/builder/products",
+      next: "/laurens-studio/profile/builder/products",
     })
     expect(publicationWrites()).toEqual([])
     expect(rpcs).toEqual([])
@@ -515,8 +550,10 @@ describe("the builder has no path to publication", () => {
   it.each([
     ["lib", "public", "draft-actions.ts"],
     ["lib", "public", "draft-store.ts"],
-    ["app", "[slug]", "settings", "public-profile", "builder", "profile-details-step.tsx"],
-    ["app", "[slug]", "settings", "public-profile", "builder", "manage-products-step.tsx"],
+    ["app", "[slug]", "profile", "builder", "profile-details-step.tsx"],
+    ["app", "[slug]", "profile", "builder", "manage-products-step.tsx"],
+    ["app", "[slug]", "profile", "builder", "links-editor.tsx"],
+    ["app", "[slug]", "profile", "builder", "location-fields.tsx"],
     ["lib", "public", "product-arrangement.ts"],
     ["lib", "public", "product-candidates.ts"],
   ])("%s never names a publishing operation", (...parts) => {

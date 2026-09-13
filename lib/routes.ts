@@ -68,20 +68,25 @@ export const routes = {
     `/${workspace}/${product}/channels/${connectionId}`,
   channels: (workspace: string) => `/${workspace}/channels`,
   settings: (workspace: string) => `/${workspace}/settings`,
-  publicProfileSettings: (workspace: string) => `/${workspace}/settings/public-profile`,
   /**
-   * The three-step builder. Nested under the management page, which stays the
-   * place a profile is published from until the builder's own publish step
-   * replaces it; nothing here shares a namespace with a product slug, because
-   * `settings` is already reserved.
+   * The public profile, managed: a section of its own in the workspace header
+   * since 13 September 2026, beside Products, Channels and Settings. It was
+   * `/<workspace>/settings/public-profile` before that, and next.config.ts
+   * redirects every old address here.
+   *
+   * This is the creator's public identity, not their account. Account
+   * details and sign-in security stay in Settings.
    */
-  publicProfileBuilder: (workspace: string) => `/${workspace}/settings/public-profile/builder`,
-  publicProfileBuilderProducts: (workspace: string) =>
-    `/${workspace}/settings/public-profile/builder/products`,
-  publicProfileBuilderPublish: (workspace: string) =>
-    `/${workspace}/settings/public-profile/builder/publish`,
+  profile: (workspace: string) => `/${workspace}/profile`,
+  /** The three-step builder, nested under the profile's own page. */
+  publicProfileBuilder: (workspace: string) => `/${workspace}/profile/builder`,
+  publicProfileBuilderProducts: (workspace: string) => `/${workspace}/profile/builder/products`,
+  publicProfileBuilderPublish: (workspace: string) => `/${workspace}/profile/builder/publish`,
   publicProfileHandleAvailability: (workspace: string, handle: string) =>
-    `/${workspace}/settings/public-profile/builder/handle-availability?handle=${encodeURIComponent(handle)}`,
+    `/${workspace}/profile/builder/handle-availability?handle=${encodeURIComponent(handle)}`,
+  /** City suggestions for the builder's location field, scoped to one country. */
+  publicProfileCities: (workspace: string, country: string, query: string) =>
+    `/${workspace}/profile/builder/cities?country=${encodeURIComponent(country)}&q=${encodeURIComponent(query)}`,
   assetDownload: (workspace: string, assetId: string) => `/${workspace}/assets/${assetId}/download`,
   assetPreview: (workspace: string, assetId: string) => `/${workspace}/assets/${assetId}/preview`,
 } as const
@@ -133,8 +138,8 @@ export function publicUrl(origin: string, path: string): string {
   return new URL(path, origin).toString()
 }
 
-/** The three places the workspace header navigates between. */
-export type WorkspaceSection = "products" | "channels" | "settings"
+/** The four places the workspace header navigates between. */
+export type WorkspaceSection = "products" | "channels" | "profile" | "settings"
 
 /**
  * Which of them a path belongs to, for the header's current-page marker.
@@ -147,6 +152,7 @@ export type WorkspaceSection = "products" | "channels" | "settings"
 export function workspaceSection(pathname: string, workspace: string): WorkspaceSection {
   const within = (base: string) => pathname === base || pathname.startsWith(`${base}/`)
   if (within(routes.channels(workspace))) return "channels"
+  if (within(routes.profile(workspace))) return "profile"
   if (within(routes.settings(workspace))) return "settings"
   return "products"
 }

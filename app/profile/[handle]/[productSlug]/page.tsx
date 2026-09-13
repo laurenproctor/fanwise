@@ -192,6 +192,7 @@ export default async function PublicProductPage({ params, searchParams }: Params
               displayName={profile.displayName}
               initials={initialsOf(profile.displayName)}
               hasAvatar={profile.hasAvatar}
+              version={profile.updatedAt}
               size={28}
             />
             by <span className="underline underline-offset-4">{profile.displayName}</span>

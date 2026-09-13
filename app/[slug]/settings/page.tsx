@@ -8,9 +8,6 @@ import { appOrigin } from "@/lib/channels/oauth"
 import { BillingPanel } from "@/components/billing/billing-panel"
 import { BillingLedger } from "@/components/billing/billing-ledger"
 import { FanLines } from "@/components/ui/fan-lines"
-import { ButtonLink } from "@/components/ui/button"
-import { getProfileForSettings } from "@/lib/public/workspace-queries"
-import { routes } from "@/lib/routes"
 import { AccountForm } from "./account-form"
 import { SettingsSection } from "./settings-section"
 import { StudioDetailsForm } from "./studio-details-form"
@@ -19,6 +16,11 @@ export const metadata = { title: "Settings · Fanwise" }
 
 /**
  * Three sections: the studio, what it costs, and the person signed in.
+ *
+ * The public profile is not one of them. It has its own section of the
+ * workspace header (`/<workspace>/profile`), because it describes a page
+ * strangers see, and a creator looking for it should not have to know it was
+ * ever filed under Settings.
  *
  * A server component that reads everything once and hands it down. The two forms
  * below it are client components because a dirty-state button and a staged file
@@ -45,9 +47,9 @@ export default async function SettingsPage({
   const workspace = await getWorkspaceBySlug(slug)
   if (!workspace) notFound()
 
-  // Only what the first paint needs is awaited here. The public profile and the
-  // subscription each stream in behind their own Suspense boundary, so the
-  // header and both forms are not held back by the slowest read on the page.
+  // Only what the first paint needs is awaited here. The subscription streams
+  // in behind its own Suspense boundary, so the header and both forms are not
+  // held back by the slowest read on the page.
   const [{ billing: billingNotice }, iconUrl] = await Promise.all([
     searchParams,
     // Short lived and minted per render. Null when the object is gone, which
@@ -85,23 +87,6 @@ export default async function SettingsPage({
         />
       </SettingsSection>
 
-      {/*
-        A summary and a link, not the form. The public profile is a page of its
-        own: its fields describe what strangers see, and mixing them into the
-        same scroll as an email address is how somebody edits one thinking it
-        is the other. The state is here because "is my profile live" is a thing
-        a creator checks far more often than they edit it.
-      */}
-      <SettingsSection
-        id="public-profile"
-        heading="Public profile"
-        description="Your portfolio on the open web."
-      >
-        <Suspense fallback={<SectionPlaceholder rows={1} />}>
-          <PublicProfileSummary workspace={workspace} />
-        </Suspense>
-      </SettingsSection>
-
       <SettingsSection
         id="subscription"
         heading="Subscription"
@@ -119,53 +104,6 @@ export default async function SettingsPage({
       >
         <AccountForm workspaceSlug={workspace.slug} profile={profile} />
       </SettingsSection>
-    </div>
-  )
-}
-
-async function PublicProfileSummary({ workspace }: { workspace: Workspace }) {
-  const publicProfile = await getProfileForSettings(workspace.id)
-
-  return (
-    <div className="flex flex-col items-start gap-4">
-      {publicProfile === null ? (
-        <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
-          You have not claimed a public address yet. A public profile gives everything you sell one
-          home at <span className="font-mono text-[13px]">fanwise/@your-handle</span>, whichever
-          marketplaces it is listed on.
-        </p>
-      ) : (
-        <div className="flex flex-wrap items-center gap-3">
-          <span
-            className={`inline-flex items-center gap-2 rounded-[var(--radius-pill)] border px-3 py-1 font-mono text-[10px] tracking-[0.12em] uppercase ${
-              publicProfile.profile.status === "published"
-                ? "border-[var(--color-ok)]/30 bg-[var(--color-ok)]/[0.09] text-[var(--color-ok)]"
-                : "border-[var(--color-rule)] bg-[var(--color-paper-2)] text-[var(--color-ink-3)]"
-            }`}
-          >
-            <span
-              aria-hidden
-              className={`h-[5px] w-[5px] rounded-full ${
-                publicProfile.profile.status === "published"
-                  ? "bg-[var(--color-ok)]"
-                  : "bg-[var(--color-ink-3)]"
-              }`}
-            />
-            {publicProfile.profile.status === "published" ? "Live" : "Draft"}
-          </span>
-          <span className="font-mono text-[13px] text-[var(--color-ink-2)]">
-            @{publicProfile.profile.handle}
-          </span>
-          <span className="text-[14px] text-[var(--color-ink-3)]">
-            {publicProfile.publishedCount}{" "}
-            {publicProfile.publishedCount === 1 ? "product" : "products"} published
-          </span>
-        </div>
-      )}
-
-      <ButtonLink href={routes.publicProfileSettings(workspace.slug)} variant="secondary">
-        {publicProfile === null ? "Set up a public profile" : "Manage public profile"}
-      </ButtonLink>
     </div>
   )
 }
