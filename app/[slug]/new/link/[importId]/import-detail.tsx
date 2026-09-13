@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { SaveStatus } from "@/components/ui/save-status"
 import { CompletionChecklist } from "@/components/imports/completion-checklist"
@@ -71,7 +72,12 @@ export interface ImportDetailProps {
   license: LicenseSelection | null
   rights: RightsAttestation | null
   missingInformation: readonly string[]
+  /** Fields whose whole suggestion the claims check withheld. */
   withheld: readonly string[]
+  /** Fields offered with some wording the claims check removed. */
+  trimmed: readonly string[]
+  /** HTML sources that named no picture Fanwise could import. */
+  htmlWithoutPictures: readonly string[]
   /** True when the page was read and no model was configured to draft from it. */
   aiUnavailable: boolean
   /** The product id, for minting an upload the pipeline already understands. */
@@ -292,6 +298,15 @@ export function ImportDetail(props: ImportDetailProps) {
           {props.withheld.length > 0 ? (
             <Withheld fields={props.withheld} mode={props.sourceMode} />
           ) : null}
+          {props.trimmed.length > 0 ? (
+            <Trimmed fields={props.trimmed} mode={props.sourceMode} />
+          ) : null}
+          {!busy && props.htmlWithoutPictures.length > 0 ? (
+            <NoPreviewImages
+              names={props.htmlWithoutPictures}
+              productHref={routes.product(props.workspaceSlug, props.productSlug)}
+            />
+          ) : null}
         </div>
 
         <div className="flex min-w-0 flex-col gap-8">
@@ -416,7 +431,7 @@ function MissingInformation({
 }
 
 /**
- * Fields a model proposed and the claims check refused to offer.
+ * Fields a model proposed and the claims check refused to offer at all.
  *
  * Named rather than silently dropped. A creator who sees "Fanwise did not
  * suggest a description" and no reason concludes the feature is broken; one who
@@ -427,10 +442,66 @@ function Withheld({ fields, mode }: { fields: readonly string[]; mode: "link" | 
     <section className="flex flex-col gap-2 rounded-[16px] border border-[var(--color-warn)] bg-[var(--color-card)] px-5 py-4">
       <h2 className="label-mono">Held back</h2>
       <p className="text-[14px] leading-[1.55] text-[var(--color-ink-2)]">
-        Fanwise did not offer a suggestion for {fields.join(", ")}, because what it wrote made a
-        claim the {mode === "link" ? "page" : "sources"} does not support — about files,
+        Fanwise withheld the entire suggestion for {fields.join(", ")}, because what it wrote made a
+        claim the {mode === "link" ? "page does" : "sources do"} not support — about files,
         compatibility, licensing, support, ownership or resale. Those are yours to state.
       </p>
+    </section>
+  )
+}
+
+/**
+ * Fields offered with some wording taken out.
+ *
+ * Kept apart from the withheld notice because the two ask different things of
+ * the creator: a withheld field is empty and theirs to write, a trimmed one is
+ * offered and theirs to read, knowing a sentence or an entry is missing.
+ */
+function Trimmed({ fields, mode }: { fields: readonly string[]; mode: "link" | "content" }) {
+  return (
+    <section className="flex flex-col gap-2 rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-card)] px-5 py-4">
+      <h2 className="label-mono">Some wording removed</h2>
+      <p className="text-[14px] leading-[1.55] text-[var(--color-ink-2)]">
+        Fanwise still offers its suggestion for {fields.join(", ")}, with some sentences or items
+        taken out, because they made a claim the {mode === "link" ? "page does" : "sources do"} not
+        support — about files, compatibility, licensing, support, ownership or resale. Add those
+        details yourself if they are true.
+      </p>
+    </section>
+  )
+}
+
+/**
+ * Why an HTML source brought no pictures with it.
+ *
+ * Fanwise reads an HTML file as text and never runs it, so whatever its script
+ * would draw is invisible to the import. Saying so turns an unexplained empty
+ * gallery into a task the creator can finish.
+ */
+function NoPreviewImages({
+  names,
+  productHref,
+}: {
+  names: readonly string[]
+  productHref: string
+}) {
+  const explanation =
+    names.length === 1
+      ? "This HTML builds its visuals with code and does not contain importable preview images."
+      : `These HTML files (${names.join(", ")}) build their visuals with code and do not contain importable preview images.`
+  return (
+    <section className="flex flex-col gap-2 rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-card)] px-5 py-4">
+      <h2 className="label-mono">No preview images found</h2>
+      <p className="text-[14px] leading-[1.55] text-[var(--color-ink-2)]">
+        {explanation} Fanwise never runs an imported file to draw them. Upload screenshots or
+        preview images to complete the listing.
+      </p>
+      <Link
+        href={productHref}
+        className="text-[14px] text-[var(--color-accent)] underline underline-offset-4 hover:text-[var(--color-ink)]"
+      >
+        Add images on the product page
+      </Link>
     </section>
   )
 }

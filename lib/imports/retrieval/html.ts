@@ -159,8 +159,12 @@ export function sanitizeText(input: string, maxLength: number): string {
 
 /** The markup with every opaque element's contents removed. */
 export function stripOpaqueElements(html: string): string {
+  return stripElements(html, OPAQUE_ELEMENTS)
+}
+
+function stripElements(html: string, tags: readonly string[]): string {
   let out = html
-  for (const tag of OPAQUE_ELEMENTS) {
+  for (const tag of tags) {
     out = out.replace(new RegExp(`<${tag}\\b[\\s\\S]*?<\\/${tag}\\s*>`, "gi"), " ")
     // An unclosed opaque element swallows the rest of the document, which is
     // the safe direction: better to find nothing than to read a script body.
@@ -225,12 +229,39 @@ export function readLanguage(html: string): string | null {
 }
 
 /**
+ * One-word headings that are page chrome rather than a section of anything.
+ * Short on purpose: a heading is a deliberate thing, and most one-word headings
+ * — "Kerning", "Cyrillic", "Specs" — are the page's own structure.
+ */
+const CHROME_HEADINGS = new Set([
+  "menu",
+  "navigation",
+  "search",
+  "close",
+  "home",
+  "login",
+  "share",
+  "more",
+  "loading",
+  "skip",
+])
+
+/** Whether a one-word heading names a section rather than a control. */
+function isMeaningfulOneWordHeading(text: string): boolean {
+  if (text.length < 3 || text.includes(" ")) return false
+  // A word, not a number, a symbol run or an arrow.
+  if (!/^[\p{L}][\p{L}\p{M}'’-]*[\p{L}\p{M}]$/u.test(text)) return false
+  return !CHROME_HEADINGS.has(text.toLowerCase())
+}
+
+/**
  * The headings and list items a page displays, in document order.
  *
  * Not "features". They are strings the page showed, and calling them features
  * anywhere but in the field name would be Fanwise deciding that a heading is a
- * claim about a product. Duplicates and one-word fragments are dropped because
- * navigation menus are made of them.
+ * claim about a product. Duplicates are dropped, and so are one-word list
+ * items, because navigation menus are made of them. A one-word heading is kept:
+ * a specimen's "Kerning" or "Cyrillic" is a section somebody chose to title.
  */
 export function readVisibleFeatures(html: string): string[] {
   const found: string[] = []
@@ -241,8 +272,10 @@ export function readVisibleFeatures(html: string): string[] {
     const text = sanitizeText(match[2] ?? "", HTML_LIMITS.maxFeatureLength)
     if (text.length < 3) continue
     // A nested list produces the outer item's whole subtree; a run of items
-    // joined by spaces is navigation, not a feature.
-    if (text.split(" ").length < 2) continue
+    // joined by spaces is navigation, not a feature. Headings are exempt when
+    // their one word is a real word.
+    const heading = match[1]!.toLowerCase() !== "li"
+    if (text.split(" ").length < 2 && !(heading && isMeaningfulOneWordHeading(text))) continue
     const key = text.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
@@ -274,6 +307,12 @@ export function readAssets(
    * and is dropped, and only an absolute one is carried forward.
    */
   base: string | null,
+  /**
+   * JSON-LD image URLs, read by `readJsonLd` before scripts were cut. Only a
+   * handed-over file passes them, so a link import's assets, and its hash, stay
+   * exactly as they shipped.
+   */
+  jsonLdImages: readonly string[] = [],
 ): ReadAsset[] {
   const found: ReadAsset[] = []
   const seen = new Set<string>()
@@ -296,6 +335,7 @@ export function readAssets(
 
   push(metaValue(tags, "og:image", "og:image:url", "og:image:secure_url"), "og")
   push(metaValue(tags, "twitter:image", "twitter:image:src"), "twitter")
+  for (const image of jsonLdImages) push(image, "jsonld")
 
   for (const match of html.matchAll(/<img\b[^>]*>/gi)) {
     if (found.length >= HTML_LIMITS.maxAssets) break
@@ -366,6 +406,111 @@ function flatten(value: unknown): unknown[] {
   const record = value as Record<string, unknown>
   const graph = record["@graph"]
   return graph === undefined ? [record] : [record, ...flatten(graph)]
+}
+
+/**
+ * Elements whose paragraphs are the page's machinery rather than its message.
+ * Cut, on top of the opaque elements, before a summary paragraph is looked
+ * for. `header` is not here: an article's lead paragraph often lives in one.
+ */
+const CHROME_ELEMENTS = [
+  "nav",
+  "footer",
+  "aside",
+  "form",
+  "button",
+  "label",
+  "select",
+  "textarea",
+  "dialog",
+]
+
+export const SUMMARY_PARAGRAPH_LIMITS = {
+  minLength: 40,
+  maxLength: 600,
+  minWords: 5,
+  /** Paragraphs examined before giving up, so a hostile page costs a bounded read. */
+  maxCandidates: 200,
+  /** Raw markup inside one paragraph beyond which it is not a summary. */
+  maxRawLength: 20_000,
+} as const
+
+/** Attributes that mark a paragraph as a control, a hint or something hidden. */
+const NOT_A_SUMMARY_ATTRIBUTE =
+  /\b(hint|help|caption|nav|menu|breadcrumb|cookie|consent|toolbar|control|legal|copyright|sr-only|visually-hidden)\b/i
+
+/** A short line that tells a reader what to do with the page, not what it is. */
+const INSTRUCTION = /^(click|tap|drag|scroll|type|press|hover|select|choose|toggle|use the|try)\b/i
+
+/**
+ * Whether a paragraph's text reads like a sentence about something. Prose is
+ * mostly letters; a paragraph of code, figures or arrows is not.
+ */
+function isProse(text: string): boolean {
+  if (text.split(" ").length < SUMMARY_PARAGRAPH_LIMITS.minWords) return false
+  const letters = text.match(/[\p{L}\p{M}]/gu)?.length ?? 0
+  return letters / text.length >= 0.6 && !/[{};]|=>/.test(text)
+}
+
+/** A paragraph over the preferred length, cut at its last sentence end inside it. */
+function cutAtSentence(text: string): string | null {
+  const head = text.slice(0, SUMMARY_PARAGRAPH_LIMITS.maxLength)
+  const end = Math.max(head.lastIndexOf(". "), head.lastIndexOf("! "), head.lastIndexOf("? "))
+  const cut = end > 0 ? head.slice(0, end + 1) : head.endsWith(".") ? head : ""
+  return cut.length >= SUMMARY_PARAGRAPH_LIMITS.minLength ? cut : null
+}
+
+/**
+ * The first substantial paragraph a page shows, for a page that wrote no
+ * description of itself.
+ *
+ * Only `<p>` elements, outside every opaque and chrome element, and not one
+ * marked editable, hidden, or classed as a hint or control. The first in the
+ * preferred length wins; failing that, the first longer one cut at a sentence.
+ * What comes back is text the page displays, so it is observed evidence — it
+ * is never written, only chosen.
+ *
+ * The paragraph search is linear: the document is split at closing tags once,
+ * at most `maxCandidates` times, and each piece is searched for its own last
+ * opening tag, so an unclosed `<p>` repeated a million times costs one pass
+ * rather than a million.
+ */
+export function readSummaryParagraph(html: string): string | null {
+  const body = stripElements(stripOpaqueElements(html), CHROME_ELEMENTS).replace(
+    /<head\b[\s\S]*?<\/head\s*>/gi,
+    " ",
+  )
+
+  const pieces = body.split(/<\/p\s*>/i, SUMMARY_PARAGRAPH_LIMITS.maxCandidates + 1)
+  let longer: string | null = null
+
+  // The last piece follows the last closing tag, so it holds no closed paragraph.
+  for (const piece of pieces.slice(0, -1)) {
+    let open = -1
+    for (const match of piece.matchAll(/<p(?=[\s>/])/gi)) open = match.index
+    if (open < 0) continue
+    const tagEnd = piece.indexOf(">", open)
+    if (tagEnd < 0) continue
+    const inner = piece.slice(tagEnd + 1)
+    if (inner.length > SUMMARY_PARAGRAPH_LIMITS.maxRawLength) continue
+
+    const tag = piece.slice(open, tagEnd + 1)
+    // Named without a value as often as with one, which `attributesOf` does not
+    // collect, so they are looked for in the tag itself.
+    if (/\s(contenteditable|hidden)(?=[\s=/>])/i.test(tag)) continue
+    const attributes = attributesOf(tag)
+    if (attributes["aria-hidden"] === "true" || attributes.role) continue
+    if (NOT_A_SUMMARY_ATTRIBUTE.test(`${attributes.class ?? ""} ${attributes.id ?? ""}`)) continue
+
+    const text = sanitizeText(inner, HTML_LIMITS.maxSummaryLength)
+    if (text.length < SUMMARY_PARAGRAPH_LIMITS.minLength || !isProse(text)) continue
+    if (INSTRUCTION.test(text) && text.length < 100) continue
+
+    if (text.length <= SUMMARY_PARAGRAPH_LIMITS.maxLength) return text
+    longer ??= cutAtSentence(text)
+  }
+
+  return longer
 }
 
 /**

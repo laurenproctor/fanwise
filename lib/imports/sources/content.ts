@@ -8,6 +8,7 @@ import {
   readJsonLd,
   readLanguage,
   readMetaTags,
+  readSummaryParagraph,
   readTitle,
   readVisibleFeatures,
   readVisibleText,
@@ -201,12 +202,18 @@ export const htmlDocumentImporter: ContentImporter = {
 
     const ogDescription = metaValue(tags, "og:description")
     const metaDescription = metaValue(tags, "description")
+    // Last, and only when the file described itself nowhere: the first
+    // substantial paragraph it shows. A choice among the page's own words,
+    // never words written for it, so it is observed and its origin is the DOM.
+    const paragraph =
+      ogDescription || metaDescription || jsonLd.description ? null : readSummaryParagraph(html)
     const summary =
       (ogDescription &&
         observedValue(sanitizeText(ogDescription, HTML_LIMITS.maxSummaryLength), "og")) ||
       (metaDescription &&
         observedValue(sanitizeText(metaDescription, HTML_LIMITS.maxSummaryLength), "meta")) ||
       (jsonLd.description && observedValue(jsonLd.description, "jsonld")) ||
+      (paragraph && observedValue(paragraph, "dom")) ||
       null
 
     const features = readVisibleFeatures(body)
@@ -226,7 +233,9 @@ export const htmlDocumentImporter: ContentImporter = {
       ...(summary ? { summary } : {}),
       visibleFeatures: observedValue(features, "dom"),
       ...(text.length > 0 ? { bodyText: observedValue(text, "dom") } : {}),
-      previewAssets: readAssets(body, tags, null).map((asset) => ({
+      // Only URLs a file names outright. A picture its script would draw, and a
+      // font embedded as `data:`, are not images anybody can import.
+      previewAssets: readAssets(body, tags, null, jsonLd.images).map((asset) => ({
         sourceUrl: asset.url,
         origin: asset.origin,
       })),

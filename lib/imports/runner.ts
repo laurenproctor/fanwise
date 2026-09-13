@@ -408,6 +408,7 @@ export async function composeSession(
       suggestions: toJson({
         draft: composed.draft,
         withheld: composed.withheld,
+        trimmed: composed.trimmed,
         violations: composed.violations,
         provider: composed.provider,
         model: composed.model,
@@ -425,7 +426,12 @@ export async function composeSession(
     const normalized = normalizeImportError(error)
     if (normalized.code === "ai_unavailable") {
       await settleReady(admin, workspaceId, importId, {
-        suggestions: toJson({ draft: { missingInformation: [] }, withheld: [], unavailable: true }),
+        suggestions: toJson({
+          draft: { missingInformation: [] },
+          withheld: [],
+          trimmed: [],
+          unavailable: true,
+        }),
       })
       return
     }

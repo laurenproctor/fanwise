@@ -135,6 +135,7 @@ function record(overrides: Partial<ImportRecord> = {}): ImportRecord {
     sources: [],
     draft: null,
     withheld: [],
+    trimmed: [],
     aiUnavailable: false,
     missingInformation: [],
     errorCode: null,

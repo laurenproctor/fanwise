@@ -247,12 +247,90 @@ describe("what a draft may not claim on the strength of a screenshot", () => {
     expect(result.withheld).toEqual([])
   })
 
-  it("finds a claim hidden inside an array, not only in prose", () => {
+  it("finds a claim hidden inside an array, and removes only that entry", () => {
     const result = checkDraftClaims(
       draft({ features: suggestion(["Fast", "Compatible with Photoshop"]) }),
       evidence(),
     )
-    expect(result.withheld).toContain("features")
+    expect(result.violations).toEqual([
+      {
+        field: "features",
+        kind: "compatibility",
+        phrase: "compatible with",
+        resolution: "removed",
+      },
+    ])
+    expect(result.withheld).not.toContain("features")
+    expect(result.trimmed).toEqual(["features"])
+    expect(result.cleaned.features.value).toEqual(["Fast"])
+  })
+
+  it("withholds a list whose every entry made a claim", () => {
+    const result = checkDraftClaims(
+      draft({ technicalRequirements: suggestion(["Works with Figma", "Requires Adobe Illustrator"]) }),
+      evidence(),
+    )
+    expect(result.withheld).toEqual(["technicalRequirements"])
+    expect(result.trimmed).toEqual([])
+    expect(result.violations.every((violation) => violation.resolution === "withheld")).toBe(true)
+  })
+
+  it("removes only the sentence that made a claim, and keeps the paragraphs around it", () => {
+    const full = draft({
+      longDescription: suggestion(
+        "A bubble-letter display family built from inflated strokes.\n\nEvery letter tilts a little. Includes a royalty-free commercial licence. Reads well at poster sizes.",
+      ),
+    })
+    const result = checkDraftClaims(full, evidence())
+
+    expect(result.trimmed).toEqual(["longDescription"])
+    expect(result.withheld).toEqual([])
+    expect(result.cleaned.longDescription.value).toBe(
+      "A bubble-letter display family built from inflated strokes.\n\nEvery letter tilts a little. Reads well at poster sizes.",
+    )
+    // Recorded, though the field survives, so the removal can be explained.
+    expect(result.violations.map((violation) => violation.kind)).toContain("license")
+    expect(result.violations.every((violation) => violation.resolution === "removed")).toBe(true)
+
+    const kept = withoutWithheldFields(result.cleaned, result.withheld)
+    expect(kept.longDescription?.value).not.toContain("licence")
+    // The original is untouched; cleaning never edits what the model returned.
+    expect(full.longDescription.value).toContain("royalty-free")
+  })
+
+  it("does not split a sentence at a decimal point", () => {
+    const result = checkDraftClaims(
+      draft({
+        shortDescription: suggestion("Version 2.5 adds kana. Compatible with Figma 3.0 and later."),
+      }),
+      evidence(),
+    )
+    expect(result.cleaned.shortDescription.value).toBe("Version 2.5 adds kana.")
+  })
+
+  it("withholds prose when nothing meaningful is left once the claim is out", () => {
+    const result = checkDraftClaims(
+      draft({ audience: suggestion("Includes a commercial licence. OK.") }),
+      evidence(),
+    )
+    expect(result.withheld).toEqual(["audience"])
+    expect(result.trimmed).toEqual([])
+  })
+
+  it("keeps the stricter rule for a title and for price guidance", () => {
+    const result = checkDraftClaims(
+      draft({
+        title: suggestion("Aster Grotesk. Royalty-free."),
+        priceGuidance: suggestion({
+          amount: null,
+          currency: "USD",
+          rationale: "No price is stated. Priced for commercial use elsewhere.",
+        }),
+      }),
+      evidence(),
+    )
+    expect(result.withheld).toEqual(["title", "priceGuidance"])
+    expect(result.trimmed).toEqual([])
   })
 
   it("leaves ordinary prose alone", () => {
@@ -373,6 +451,29 @@ describe("composing a draft", () => {
     expect(composed.withheld).toContain("longDescription")
     expect(composed.draft.longDescription).toBeUndefined()
     expect(composed.draft.title).toBeDefined()
+  })
+
+  it("offers a description with one unsupported sentence taken out, and says so", async () => {
+    const drifted = draft({
+      longDescription: suggestion(
+        "A grotesque for screens. You will receive 12 OTF files. Matching italics throughout.",
+      ),
+    })
+    const composed = await composeDraft(evidence(), { provider: stubProvider(drifted) })
+
+    expect(composed.withheld).toEqual([])
+    expect(composed.trimmed).toEqual(["longDescription"])
+    expect(composed.draft.longDescription?.value).toBe(
+      "A grotesque for screens. Matching italics throughout.",
+    )
+    expect(composed.violations).toEqual([
+      {
+        field: "longDescription",
+        kind: "files",
+        phrase: "you will receive",
+        resolution: "removed",
+      },
+    ])
   })
 
   it("refuses an answer that does not match the schema", async () => {

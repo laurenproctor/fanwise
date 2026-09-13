@@ -199,6 +199,19 @@ describe("the claims check over several sources", () => {
     expect(check.violations.every((violation) => violation.kind === "conflict")).toBe(true)
   })
 
+  it("withholds the whole field around a disputed value, never just its sentence", () => {
+    const check = checkDraftClaimsAgainst(
+      draft({
+        longDescription: suggestion("A hand-printed tote in heavy canvas. Yours for $15 today."),
+      }),
+      sources,
+      conflicts,
+    )
+    expect(check.withheld).toEqual(["longDescription"])
+    expect(check.trimmed).toEqual([])
+    expect(check.violations.every((violation) => violation.resolution === "withheld")).toBe(true)
+  })
+
   it("does not mistake an unrelated number for a conflicting price", () => {
     const check = checkDraftClaimsAgainst(
       draft({ longDescription: suggestion("Holds 12 notebooks.") }),

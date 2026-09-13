@@ -4,7 +4,14 @@ import { evidenceCorpus } from "@/lib/imports/claims"
 import { IMPORT_ERROR_CODES, IMPORT_ERROR_RECOVERIES, ImportError } from "@/lib/imports/errors"
 import { hashEvidence, productSourceEvidenceSchema } from "@/lib/imports/evidence"
 import { isWholeHtmlDocument } from "@/lib/imports/paste"
-import { HTML_LIMITS, readVisibleText } from "@/lib/imports/retrieval/html"
+import {
+  HTML_LIMITS,
+  readAssets,
+  readMetaTags,
+  readSummaryParagraph,
+  readVisibleFeatures,
+  readVisibleText,
+} from "@/lib/imports/retrieval/html"
 import { IMPORT_LIMITS, megabytes } from "@/lib/imports/limits"
 import { isPlausibleDocumentTitle, readPdf } from "@/lib/imports/retrieval/pdf"
 import { isMostlyCode, looksLikeCode, readPlainText } from "@/lib/imports/retrieval/plain-text"
@@ -19,7 +26,12 @@ import { SOURCE_LABELS, descriptorFor } from "@/lib/imports/sources/registry"
 import { isSourcePathFor, maxBytesFor, sourcePathFor } from "@/lib/imports/source-storage"
 import { provisionalContentName } from "@/lib/imports/start"
 import { CONTENT_SOURCE_KINDS, SOURCE_KINDS, isContentSourceKind } from "@/lib/imports/types"
-import { recoveriesFor, sourceLabelFor, stateFor } from "@/lib/imports/view"
+import {
+  htmlSourcesWithoutPictures,
+  recoveriesFor,
+  sourceLabelFor,
+  stateFor,
+} from "@/lib/imports/view"
 import type { ImportRecord } from "@/lib/imports/queries"
 import { buildPdf } from "./import-pdf-fixture"
 import { createElement } from "react"
@@ -207,11 +219,185 @@ describe("an HTML file import", () => {
     ])
   })
 
+  it("does not overwrite a description the file wrote with a paragraph it shows", async () => {
+    const evidence = await htmlDocumentImporter.read({ bytes: bytes(PAGE), filename: null })
+    expect(evidence.summary).toMatchObject({
+      value: "Balanced type scales for modern products.",
+      origin: "meta",
+    })
+  })
+
   it("refuses a file that is all script, as a JavaScript shell link is refused", async () => {
     const shell = `<!doctype html><html><head><title>App</title></head><body><div id="root"></div><script src="app.js"></script></body></html>`
     expect(await refusal(htmlDocumentImporter.read({ bytes: bytes(shell), filename: null }))).toBe(
       "unsupported_source",
     )
+  })
+})
+
+describe("an HTML specimen that describes itself nowhere", () => {
+  /*
+    The shape of a real type specimen: no <html>, <head> or <body>, a title, an
+    embedded font as base64 inside CSS, an editable tester, hint paragraphs,
+    one-word section headings, glyph grids a script fills in, and no <img>.
+  */
+  const FONT = `data:font/woff2;base64,${"d09GMgABAAAAA".repeat(400)}`
+  const SPECIMEN = `<title>Blimp Display</title>
+<meta charset="utf-8">
+<style>@font-face { font-family: "Blimp"; src: url(${FONT}) format("woff2"); }
+.hero p { background: url(data:image/png;base64,iVBORw0KGgo=); }</style>
+<nav><p>Home, specimens, fonts in progress and the rest of the studio's catalogue.</p></nav>
+<header><span>Blimp Display <span class="tag">/ v0.7 specimen</span></span></header>
+<div class="hero">
+  <p class="sub">A bubble-letter display family built from inflated strokes: a fat white fill with a thick black contour. Upper and lowercase Latin and Cyrillic, Japanese kana, plus a tilted throw-up cut.</p>
+</div>
+<section>
+  <h2>Try it</h2>
+  <p contenteditable>HELLO NEW YORK, the quick brown fox jumps over the lazy dog</p>
+  <label for="size">Size <input type="range" id="size"></label>
+  <button type="button">Throwie</button>
+  <p class="hint">Click the text to type. Upper and lowercase, Latin with accents, Cyrillic and kana.</p>
+</section>
+<section><h2>Throwie</h2><p>The graffiti throw-up cut: every letter tilts and bounces a little.</p></section>
+<section><h2>Kerning</h2><div class="glyphs" id="kern"></div></section>
+<section><h2>Kana</h2><div class="glyphs" id="kana"></div></section>
+<section><h2>Cyrillic</h2><div class="glyphs" id="cyr"></div></section>
+<section><h2>Specs</h2><dl><dt>Format</dt><dd>TrueType</dd></dl></section>
+<ul><li>Menu</li><li>Home</li><li>Solid and Outline layered</li></ul>
+<script>
+  document.getElementById("kana").innerHTML = "<p>A generated paragraph that no reader of the file ever sees as markup.</p><img src='https://cdn.example.com/drawn.png'>"
+</script>`
+
+  it("summarises from the first substantial paragraph it shows, as observed DOM text", async () => {
+    const evidence = await htmlDocumentImporter.read({
+      bytes: bytes(SPECIMEN),
+      filename: "blimp-display-specimen.html",
+    })
+    expect(productSourceEvidenceSchema.safeParse(evidence).success).toBe(true)
+    expect(evidence.title).toMatchObject({ value: "Blimp Display", origin: "dom" })
+    expect(evidence.summary?.provenance).toBe("observed")
+    expect(evidence.summary?.origin).toBe("dom")
+    expect(
+      evidence.summary?.value.startsWith(
+        "A bubble-letter display family built from inflated strokes",
+      ),
+    ).toBe(true)
+  })
+
+  it("skips navigation, editable samples, control labels and hints when choosing it", () => {
+    // Without the lead paragraph, every earlier candidate is one that must be
+    // passed over: a paragraph in <nav>, an editable sample, and a hint.
+    const withoutLead = SPECIMEN.replace(/<div class="hero">[\s\S]*?<\/div>/, "")
+    expect(readSummaryParagraph(withoutLead)).toBe(
+      "The graffiti throw-up cut: every letter tilts and bounces a little.",
+    )
+    expect(readSummaryParagraph(`<p>Click here to start typing.</p><p>Size</p>`)).toBeNull()
+    expect(
+      readSummaryParagraph(`<p hidden>A hidden paragraph that nobody reading the page can see.</p>`),
+    ).toBeNull()
+  })
+
+  it("never chooses a paragraph from script, template, noscript, svg or iframe contents", () => {
+    const long = "A paragraph long enough to be chosen as the summary of this whole page."
+    for (const tag of ["script", "template", "noscript", "svg", "iframe", "object", "canvas"]) {
+      const markup = `<${tag}><p>${long} (${tag})</p></${tag}><p>The visible lead paragraph, which is the one a reader actually sees.</p>`
+      expect(readSummaryParagraph(markup), tag).toBe(
+        "The visible lead paragraph, which is the one a reader actually sees.",
+      )
+    }
+  })
+
+  it("cuts a long first paragraph at a sentence rather than mid-word, within the cap", () => {
+    const sentence = "This sentence describes the product in plain and ordinary words. "
+    const summary = readSummaryParagraph(`<p>${sentence.repeat(20)}</p>`)
+    expect(summary).not.toBeNull()
+    expect(summary!.length).toBeLessThanOrEqual(600)
+    expect(summary!.endsWith(".")).toBe(true)
+  })
+
+  it("stays fast on a file built of unclosed paragraphs", () => {
+    const hostile = "<p>unclosed words ".repeat(50_000)
+    const started = performance.now()
+    expect(readSummaryParagraph(hostile)).toBeNull()
+    expect(performance.now() - started).toBeLessThan(500)
+  })
+
+  it("keeps one-word section headings, and still drops one-word list items", async () => {
+    const evidence = await htmlDocumentImporter.read({ bytes: bytes(SPECIMEN), filename: null })
+    const features = evidence.visibleFeatures.value
+    for (const heading of ["Throwie", "Kerning", "Kana", "Cyrillic", "Specs", "Try it"]) {
+      expect(features, heading).toContain(heading)
+    }
+    expect(features).toContain("Solid and Outline layered")
+    expect(features).not.toContain("Menu")
+    expect(features).not.toContain("Home")
+    // A one-word heading still has to be a word of three letters or more.
+    expect(readVisibleFeatures("<h2>Go</h2><h2>2026</h2><h3>→→→</h3><h1>Menu</h1>")).toEqual([])
+  })
+
+  it("imports no picture from an embedded font, a CSS data URI or a script's markup", async () => {
+    const evidence = await htmlDocumentImporter.read({ bytes: bytes(SPECIMEN), filename: null })
+    expect(evidence.previewAssets).toEqual([])
+    // Nothing the file embeds reaches evidence at all, so nothing downstream can
+    // mistake a font for a picture or for a file a buyer receives.
+    const stored = JSON.stringify(evidence)
+    expect(stored).not.toContain("data:font")
+    expect(stored).not.toContain("base64")
+    expect(stored).not.toContain("drawn.png")
+    expect(evidence.bodyText?.value).not.toContain("generated paragraph")
+    expect(readAssets(`<img src="${FONT}">`, readMetaTags(""), null)).toEqual([])
+  })
+
+  it("prefers every description the file wrote over a paragraph, in the documented order", async () => {
+    const paragraph = "<p>The visible lead paragraph, which is the one a reader actually sees.</p>"
+    const jsonLd = `<script type="application/ld+json">{"@type":"Product","description":"From JSON-LD."}</script>`
+    const meta = `<meta name="description" content="From the meta description.">`
+    const og = `<meta property="og:description" content="From Open Graph.">`
+    const read = async (head: string) =>
+      (await htmlDocumentImporter.read({ bytes: bytes(`${head}${paragraph}`), filename: null }))
+        .summary
+
+    expect(await read(`${og}${meta}${jsonLd}`)).toMatchObject({
+      value: "From Open Graph.",
+      origin: "og",
+    })
+    expect(await read(`${meta}${jsonLd}`)).toMatchObject({
+      value: "From the meta description.",
+      origin: "meta",
+    })
+    expect(await read(jsonLd)).toMatchObject({ value: "From JSON-LD.", origin: "jsonld" })
+    expect(await read("")).toMatchObject({
+      value: "The visible lead paragraph, which is the one a reader actually sees.",
+      origin: "dom",
+    })
+  })
+
+  it("counts a JSON-LD image as importable, and says so when there is no picture at all", async () => {
+    const withJsonLdImage = await htmlDocumentImporter.read({
+      bytes: bytes(
+        `<script type="application/ld+json">{"image":"https://cdn.example.com/cover.png"}</script><h1>Aster Grotesk</h1>`,
+      ),
+      filename: null,
+    })
+    expect(withJsonLdImage.previewAssets).toEqual([
+      { sourceUrl: "https://cdn.example.com/cover.png", origin: "jsonld" },
+    ])
+
+    const specimen = await htmlDocumentImporter.read({ bytes: bytes(SPECIMEN), filename: null })
+    const record = (evidence: typeof specimen, provider: string) =>
+      ({
+        row: { provider, source_url: null, source_filename: "blimp-display-specimen.html" },
+        evidence,
+        sources: [],
+      }) as unknown as ImportRecord
+
+    expect(htmlSourcesWithoutPictures(record(specimen, "html_document"))).toEqual([
+      "blimp-display-specimen.html",
+    ])
+    expect(htmlSourcesWithoutPictures(record(withJsonLdImage, "html_document"))).toEqual([])
+    // A paste or a PDF never had pictures to find, so it is not told otherwise.
+    const paste = await pastedTextImporter.read({ bytes: bytes("Aster\nWords."), filename: null })
+    expect(htmlSourcesWithoutPictures(record(paste, "pasted_text"))).toEqual([])
   })
 })
 

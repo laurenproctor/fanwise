@@ -224,6 +224,33 @@ export function sourcesFor(record: ImportRecord): SourceSummary[] {
   })
 }
 
+/**
+ * The HTML sources that named no picture Fanwise could import.
+ *
+ * An HTML file's visuals are often drawn by its script — a specimen's glyph
+ * grid, a generated chart — and Fanwise never runs a file to find out what it
+ * would draw. So a file with no Open Graph, Twitter, JSON-LD or absolute `<img>`
+ * image has no preview to offer, and the screen says why instead of leaving the
+ * gap unexplained. Embedded `data:` fonts and images are never counted: they
+ * were refused as assets when the file was read.
+ */
+export function htmlSourcesWithoutPictures(record: ImportRecord): string[] {
+  const sources = record.sources ?? []
+  if (sources.length > 0) {
+    return sources.flatMap((source) =>
+      source.status === "ready" &&
+      source.evidence?.provider === "html_document" &&
+      source.evidence.previewAssets.length === 0
+        ? [source.display_name]
+        : [],
+    )
+  }
+  const evidence = record.evidence
+  return evidence?.provider === "html_document" && evidence.previewAssets.length === 0
+    ? [sourceLabelFor(record)]
+    : []
+}
+
 /** Where the readable sources disagree, from their evidence. Pure. */
 export function conflictsFor(record: ImportRecord): FactConflict[] {
   const readable = (record.sources ?? []).flatMap((source) =>
