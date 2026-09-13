@@ -131,7 +131,7 @@ duplicating work.
 Storage is a private bucket, `product-assets`, path
 `<workspace_id>/<product_id>/<asset_id><ext>`, capped at 4 GiB.
 
-**Removing a buyer file on the import screen is one transaction.**
+**Removing a buyer file is one transaction, on every screen.**
 `remove_import_deliverable(product_id, asset_id)` locks the product row, refuses to
 remove the last ready buyer file (`deliverable`, `archive` or `source_file`), and
 otherwise deletes the row and its derivatives, returning their storage paths for the
@@ -140,8 +140,11 @@ delete from the application, and two removals arriving together against a produc
 exactly two ready files could both pass and leave none. Security invoker, so it runs
 under the creator's RLS; another workspace's product is not found. Migration
 `20260913010000_remove_import_deliverable`, proven under concurrency in
-`tests/db/import-deliverable-removal.test.ts`. The product page's own Files section
-does not use it and still removes any file, including the last one.
+`tests/db/import-deliverable-removal.test.ts`. The import screen and the product page's
+Files section both delete buyer files through it (`deleteAssetAction` routes those three
+types there), so neither can remove a product's last ready buyer file; the name says
+"import" only because that screen needed it first. Every other asset type still deletes
+through `deleteAssetCascade`.
 
 ## A3: channels
 
