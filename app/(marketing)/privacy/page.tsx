@@ -69,7 +69,9 @@ export default function PrivacyPage() {
           <p>
             Your listing content is shared with the marketplaces you connect — that is the product.
             Beyond that, we share data only with the processors that run Fanwise (hosting, payments,
-            email), each bound by contract to use it solely for us, and where the law requires it.
+            email, and transcription of voice notes you record), each bound by contract to use it
+            solely for us, and where the law requires it. A recording is sent for transcription
+            once, and is not used to train anyone&apos;s models.
           </p>
         </section>
         <section>

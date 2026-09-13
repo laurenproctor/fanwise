@@ -226,6 +226,10 @@ describe("the headers next.config.ts configures", () => {
     expect(headers.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin")
     expect(headers.get("Permissions-Policy")).toContain("camera=()")
     expect(headers.get("Permissions-Policy")).toContain("geolocation=()")
+    // The microphone is admitted for this origin only, for the composer's Record
+    // button; no other origin and no frame may ask for it.
+    expect(headers.get("Permissions-Policy")).toContain("microphone=(self)")
+    expect(headers.get("Permissions-Policy")).not.toContain("microphone=*")
     expect(headers.get("X-Frame-Options")).toBe("DENY")
     expect(headers.has("Content-Security-Policy")).toBe(false)
   })

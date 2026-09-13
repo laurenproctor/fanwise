@@ -132,6 +132,7 @@ function record(overrides: Partial<ImportRecord> = {}): ImportRecord {
     } as ImportRecord["row"],
     product: product(),
     evidence: null,
+    sources: [],
     draft: null,
     withheld: [],
     aiUnavailable: false,

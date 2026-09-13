@@ -732,6 +732,96 @@ export type Database = {
           },
         ]
       }
+      product_import_sources: {
+        Row: {
+          byte_size: number | null
+          content_hash: string | null
+          created_at: string
+          display_name: string
+          duration_ms: number | null
+          error_code: string | null
+          error_message: string | null
+          evidence: Json
+          id: string
+          import_id: string | null
+          mime_type: string | null
+          normalized_url: string | null
+          position: number
+          processed_at: string | null
+          requested_by: string | null
+          source_type: Database["public"]["Enums"]["import_source_type"]
+          source_url: string | null
+          status: Database["public"]["Enums"]["import_source_status"]
+          storage_path: string | null
+          text_content: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          byte_size?: number | null
+          content_hash?: string | null
+          created_at?: string
+          display_name: string
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          evidence?: Json
+          id?: string
+          import_id?: string | null
+          mime_type?: string | null
+          normalized_url?: string | null
+          position?: number
+          processed_at?: string | null
+          requested_by?: string | null
+          source_type: Database["public"]["Enums"]["import_source_type"]
+          source_url?: string | null
+          status: Database["public"]["Enums"]["import_source_status"]
+          storage_path?: string | null
+          text_content?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          byte_size?: number | null
+          content_hash?: string | null
+          created_at?: string
+          display_name?: string
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          evidence?: Json
+          id?: string
+          import_id?: string | null
+          mime_type?: string | null
+          normalized_url?: string | null
+          position?: number
+          processed_at?: string | null
+          requested_by?: string | null
+          source_type?: Database["public"]["Enums"]["import_source_type"]
+          source_url?: string | null
+          status?: Database["public"]["Enums"]["import_source_status"]
+          storage_path?: string | null
+          text_content?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_import_sources_import_fk"
+            columns: ["import_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "product_imports"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "product_import_sources_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_imports: {
         Row: {
           accepted: Json
@@ -757,6 +847,7 @@ export type Database = {
           source_path: string | null
           source_url: string | null
           status: Database["public"]["Enums"]["import_status"]
+          submission_id: string | null
           suggestions: Json
           updated_at: string
           workspace_id: string
@@ -785,6 +876,7 @@ export type Database = {
           source_path?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["import_status"]
+          submission_id?: string | null
           suggestions?: Json
           updated_at?: string
           workspace_id: string
@@ -813,6 +905,7 @@ export type Database = {
           source_path?: string | null
           source_url?: string | null
           status?: Database["public"]["Enums"]["import_status"]
+          submission_id?: string | null
           suggestions?: Json
           updated_at?: string
           workspace_id?: string
@@ -1587,6 +1680,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_import_session: {
+        Args: {
+          p_normalized_url: string
+          p_pasted_text: string
+          p_product_metadata: Json
+          p_product_name: string
+          p_product_slug: string
+          p_provider: Database["public"]["Enums"]["import_provider"]
+          p_source_url: string
+          p_staged_source_ids: string[]
+          p_submission_id: string
+          p_url_display_name: string
+          p_workspace_id: string
+        }
+        Returns: {
+          existing: boolean
+          import_id: string
+          product_slug: string
+        }[]
+      }
       create_workspace: {
         Args: { p_name: string; p_slug: string }
         Returns: {
@@ -1733,6 +1846,23 @@ export type Database = {
         | "pasted_text"
         | "pdf_document"
         | "html_document"
+        | "composed"
+      import_source_status:
+        | "uploading"
+        | "staged"
+        | "transcribing"
+        | "pending"
+        | "reading"
+        | "ready"
+        | "failed"
+        | "unavailable"
+        | "removed"
+      import_source_type:
+        | "public_url"
+        | "pasted_text"
+        | "pdf"
+        | "html"
+        | "audio"
       import_status:
         | "pending"
         | "retrieving"
@@ -2497,7 +2627,20 @@ export const Constants = {
         "pasted_text",
         "pdf_document",
         "html_document",
+        "composed",
       ],
+      import_source_status: [
+        "uploading",
+        "staged",
+        "transcribing",
+        "pending",
+        "reading",
+        "ready",
+        "failed",
+        "unavailable",
+        "removed",
+      ],
+      import_source_type: ["public_url", "pasted_text", "pdf", "html", "audio"],
       import_status: [
         "pending",
         "retrieving",

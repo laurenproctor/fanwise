@@ -34,9 +34,15 @@ import { refuseEmpty } from "./importer"
  */
 
 export interface ContentSource {
+  /** Stored bytes. Empty for a source whose text is already on its row. */
   bytes: Uint8Array
   /** What the creator called the file, or null for a paste. Display only. */
   filename: string | null
+  /**
+   * Text the row already holds: what the composer's text box sent, or a
+   * recording's transcript. Read instead of `bytes` when present.
+   */
+  text?: string | null
 }
 
 export interface ContentImporter {
@@ -111,8 +117,43 @@ function fromText(
 export const pastedTextImporter: ContentImporter = {
   kind: "pasted_text",
   async read(source) {
-    const text = decodeText(source.bytes)
+    const text = source.text ?? decodeText(source.bytes)
     return finish("pasted_text", source, { ...fromText(text, null), previewAssets: [] })
+  },
+}
+
+/**
+ * A recording, read through its transcript.
+ *
+ * The audio itself is never evidence: what a model may draft from is what the
+ * creator said, as text, marked as a transcript so the screen can say so. A
+ * recording with no transcript has not been transcribed, and reading it as if
+ * it had would be the lie the composer's statuses exist to prevent.
+ */
+export const audioRecordingImporter: ContentImporter = {
+  kind: "audio_recording",
+  async read(source) {
+    if (!source.text) throw new ImportError("no_text", { reason: "no_transcript" })
+    const reading = fromText(source.text, null)
+    // Speech has no title line, so the opening of the transcript is its summary
+    // rather than a first sentence mistaken for a name.
+    const opening = sanitizeText(source.text, HTML_LIMITS.maxSummaryLength)
+    return finish("audio_recording", source, {
+      ...(opening
+        ? {
+            summary: {
+              value: opening,
+              provenance: "observed" as const,
+              origin: "transcript" as const,
+            },
+          }
+        : {}),
+      visibleFeatures: { ...reading.visibleFeatures, origin: "transcript" },
+      ...(reading.bodyText
+        ? { bodyText: { ...reading.bodyText, origin: "transcript" as const } }
+        : {}),
+      previewAssets: [],
+    })
   },
 }
 
@@ -197,4 +238,5 @@ export const CONTENT_IMPORTERS: Record<ContentSourceKind, ContentImporter> = {
   pasted_text: pastedTextImporter,
   pdf_document: pdfDocumentImporter,
   html_document: htmlDocumentImporter,
+  audio_recording: audioRecordingImporter,
 }

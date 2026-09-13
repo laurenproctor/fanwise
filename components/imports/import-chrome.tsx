@@ -18,13 +18,27 @@ import { routes } from "@/lib/routes"
 export function ImportChrome({
   workspaceSlug,
   children,
+  heading = "Import a product",
+  lede = "Turn a product page, a document, or text you already have into an editable Fanwise listing.",
+  width = "full",
 }: {
   workspaceSlug: string
+  heading?: string
+  lede?: string
+  /**
+   * `full` widens the workspace canvas for the two-column review screen.
+   * `composer` keeps the entry screen to one centred column, the width a
+   * single field reads best at.
+   */
+  width?: "full" | "composer"
   /** Optional, so the frame can be rendered and asserted on by itself. */
   children?: ReactNode
 }) {
   return (
-    <div data-workspace-canvas="full" className="flex flex-col">
+    <div
+      {...(width === "full" ? { "data-workspace-canvas": "full" } : {})}
+      className={`flex flex-col ${width === "composer" ? "mx-auto w-full max-w-[920px]" : ""}`}
+    >
       <nav aria-label="Breadcrumb" className="pb-6">
         <ol className="flex flex-wrap items-center gap-2 text-[14px]">
           <li>
@@ -47,11 +61,10 @@ export function ImportChrome({
 
       <header className="flex flex-col gap-3 pb-8">
         <h1 className="font-display text-[clamp(2.25rem,4.4vw,3.5rem)] font-extralight leading-[1.02] tracking-[-0.04em]">
-          Import a product
+          {heading}
         </h1>
-        <p className="max-w-[52ch] text-[clamp(1rem,1.4vw,1.125rem)] leading-[1.5] text-[var(--color-ink-2)]">
-          Turn a product page, a document, or text you already have into an editable Fanwise
-          listing.
+        <p className="max-w-[60ch] text-[clamp(1rem,1.4vw,1.125rem)] leading-[1.5] text-[var(--color-ink-2)]">
+          {lede}
         </p>
       </header>
 

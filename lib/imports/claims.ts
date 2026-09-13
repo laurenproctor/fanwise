@@ -1,4 +1,5 @@
 import type { ProductSourceEvidence } from "./evidence"
+import { CONFLICT_KIND_LABELS, conflictPatterns, type FactConflict } from "./conflicts"
 import { DRAFT_FIELDS, type DraftField, type DraftOutput } from "./draft-output"
 
 /**
@@ -37,7 +38,14 @@ import { DRAFT_FIELDS, type DraftField, type DraftOutput } from "./draft-output"
  */
 
 export type ClaimKind =
-  "files" | "compatibility" | "license" | "support" | "ownership" | "commercial"
+  | "files"
+  | "compatibility"
+  | "license"
+  | "support"
+  | "ownership"
+  | "commercial"
+  /** The draft states a fact the creator's sources disagree about. */
+  | "conflict"
 
 export interface ClaimViolation {
   field: DraftField
@@ -189,7 +197,25 @@ export interface ClaimCheck {
 }
 
 export function checkDraftClaims(output: DraftOutput, evidence: ProductSourceEvidence): ClaimCheck {
-  const corpus = evidenceCorpus(evidence)
+  return checkDraftClaimsAgainst(output, [evidence], [])
+}
+
+/**
+ * The same check over several sources, with their disagreements.
+ *
+ * A claim is allowed when any source stated it — the allow-list is the union
+ * of what every readable source said, because a licence stated in the PDF is
+ * the creator's own statement wherever it came from. A value two sources state
+ * differently is refused in every field, whichever source it matches: agreeing
+ * with one of them is exactly the silent pick this exists to stop.
+ */
+export function checkDraftClaimsAgainst(
+  output: DraftOutput,
+  evidence: readonly ProductSourceEvidence[],
+  conflicts: readonly FactConflict[],
+): ClaimCheck {
+  const corpus = evidence.map(evidenceCorpus).join(" \n ")
+  const patterns = conflictPatterns(conflicts)
   const violations: ClaimViolation[] = []
 
   for (const field of DRAFT_FIELDS) {
@@ -203,6 +229,25 @@ export function checkDraftClaims(output: DraftOutput, evidence: ProductSourceEvi
           violations.push({ field, kind, phrase })
         }
       }
+      for (const { kind, pattern } of patterns) {
+        const match = pattern.exec(text)
+        if (match) {
+          violations.push({
+            field,
+            kind: "conflict",
+            phrase: `${CONFLICT_KIND_LABELS[kind]}: ${match[0].trim()}`,
+          })
+        }
+      }
+    }
+  }
+
+  // A price the sources disagree about is withheld even as a bare number,
+  // which the text patterns above cannot see.
+  if (conflicts.some((conflict) => conflict.kind === "price")) {
+    const amount = output.priceGuidance?.value.amount
+    if (typeof amount === "number") {
+      violations.push({ field: "priceGuidance", kind: "conflict", phrase: `Price: ${amount}` })
     }
   }
 
@@ -221,6 +266,7 @@ export const CLAIM_KIND_REASONS: Record<ClaimKind, string> = {
   support: "it promised support or updates, which only you can offer.",
   ownership: "it made a claim about who owns the work, which only you can make.",
   commercial: "it described resale or redistribution rights, which only you can grant.",
+  conflict: "your sources disagree about it, so the value is yours to choose.",
 }
 
 /**
