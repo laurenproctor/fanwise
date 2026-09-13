@@ -587,6 +587,12 @@ export async function withdrawOwnershipAction(
  * away until the new one has been measured and found to be real. A replacement
  * that fails therefore leaves the original exactly where it was, without
  * anything having to remember to put it back.
+ *
+ * The check and the delete are one database transaction,
+ * `remove_import_deliverable`, serialized per product. They used to be two
+ * requests from here, and two removals arriving together could each read the
+ * other file as still present and both delete. That migration also records
+ * why the stored objects are removed after the rows rather than before.
  */
 export async function removeDeliverableAction(
   workspaceSlug: string,
@@ -598,22 +604,38 @@ export async function removeDeliverableAction(
   const record = await getImport(supabase, workspace.id, importId)
   if (!record) return { error: "That import could not be found." }
 
-  const files = await listDeliverables(supabase, workspace.id, record.row.product_id)
-  const target = files.find((file) => file.id === assetId)
-  if (!target) return { error: "That file could not be found." }
+  const { data: storagePaths, error } = await supabase.rpc("remove_import_deliverable", {
+    p_product_id: record.row.product_id,
+    p_asset_id: assetId,
+  })
 
-  const otherReady = files.some((file) => file.id !== assetId && file.asset_state === "ready")
-  if (target.asset_state === "ready" && !otherReady) {
-    return {
-      error: "That is the only file buyers would receive. Upload its replacement first.",
+  if (error) {
+    if (error.message === "only_ready_deliverable") {
+      return {
+        error: "That is the only file buyers would receive. Upload its replacement first.",
+      }
     }
+    if (error.message === "deliverable_not_found") {
+      return { error: "That file could not be found." }
+    }
+    // Rule 8: the original is kept in the log, the creator gets a sentence.
+    console.error("[imports] could not remove a deliverable", { importId, error })
+    return { error: "That file could not be removed. Try again." }
   }
 
-  const { deleteAssetAction } = await import("@/lib/products/actions")
-  const result = await deleteAssetAction(workspaceSlug, assetId)
-  if (result.error) return { error: result.error }
+  // The rows are gone and committed; what remains is bytes nothing points at.
+  // A failure here costs storage, not a buyer's file, so it is logged rather
+  // than reported as though the removal had not happened.
+  const { removeObjects } = await import("@/lib/products/storage")
+  await removeObjects(storagePaths ?? []).catch((cause: unknown) => {
+    console.error("[imports] removed a deliverable but not its stored object", {
+      importId,
+      error: cause,
+    })
+  })
 
   revalidatePath(routes.productImport(workspaceSlug, importId))
+  revalidatePath(routes.workspace(workspaceSlug))
   return { error: null }
 }
 
