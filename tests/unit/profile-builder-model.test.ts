@@ -258,6 +258,31 @@ describe("the draft model", () => {
     expect(draft.fields.contact).toBe("")
   })
 
+  it("reads a draft row from before location and contact existed as both unset", () => {
+    // What the builder sees in the minutes between deploying this code and
+    // applying 20260913020000 to the same database.
+    const legacyRow = {
+      public_profile_id: "p",
+      workspace_id: "w",
+      handle: "h",
+      display_name: "H",
+      short_bio: "",
+      website: "",
+      instagram: "",
+      behance: "",
+      avatar_path: null,
+      products: [],
+      revision: 1,
+      updated_by: null,
+      created_at: "",
+      updated_at: "",
+    } as unknown as Parameters<typeof draftFromRow>[0]
+    const draft = draftFromRow(legacyRow)
+    expect(draft.fields.location).toBe("")
+    expect(draft.fields.contact).toBe("")
+    expect(checkDetailsStep({ ...draft.fields, displayName: "H", handle: "studio-h" })).toEqual({})
+  })
+
   it("reads a stored draft and ignores a malformed product list rather than failing", () => {
     const draft = draftFromRow({
       public_profile_id: "p",

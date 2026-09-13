@@ -119,8 +119,13 @@ export function draftFromRow(row: ProfileDraftRow): ProfileDraft {
       website: row.website,
       instagram: row.instagram,
       behance: row.behance,
-      location: row.location,
-      contact: row.contact,
+      // `?? ""` for the deploy window, not for the steady state. Production is
+      // deployed from main before 20260913020000 is applied to it, so for a few
+      // minutes a draft row has neither column. Reading that as "not set" keeps
+      // the builder rendering; a save in that window fails at the database and
+      // writes nothing, so no value is lost either way.
+      location: row.location ?? "",
+      contact: row.contact ?? "",
     },
     avatarPath: row.avatar_path,
     products: products.success ? products.data : [],
