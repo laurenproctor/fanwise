@@ -29,7 +29,7 @@ export default function PrivacyPage() {
       <header className="fw-legal__header">
         <span className="fw-eyebrow">Legal</span>
         <h1 className="fw-legal__h1">Privacy Policy</h1>
-        <p className="fw-legal__date">Effective September 6, 2026</p>
+        <p className="fw-legal__date">Effective September 12, 2026</p>
         <p className="fw-legal__summary">
           Fanwise collects what it needs to run your workspace and publish your listings, and
           nothing it doesn&apos;t. We do not sell your data, and your catalog is never used for
