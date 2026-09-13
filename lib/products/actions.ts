@@ -14,7 +14,7 @@ import {
 import { routes } from "@/lib/routes"
 import { jobs } from "@/lib/jobs"
 import { deleteAssetCascade } from "./assets"
-import { createUploadUrl, buildStoragePath } from "./storage"
+import { createUploadUrl, buildStoragePath, removeObjects } from "./storage"
 import { sanitizeFilename } from "./storage"
 import { createProductSchema, updateProductSchema, uploadIntentSchema } from "./schemas"
 import { emptyMetadataFor } from "./metadata"
@@ -350,6 +350,27 @@ export async function reorderProductImagesAction(
   return { error: null }
 }
 
+/**
+ * The files a buyer receives. A product's last ready one of these cannot be
+ * deleted until its replacement is ready; see `deleteAssetAction`. The same
+ * three types the database function checks, and the import screen's
+ * buyer-files step lists.
+ */
+const BUYER_FILE_TYPES: ReadonlySet<string> = new Set(["deliverable", "archive", "source_file"])
+
+/**
+ * Deletes a product asset.
+ *
+ * A buyer file goes through `remove_import_deliverable`, the same locked
+ * transaction the import screen uses: it refuses to remove the product's last
+ * ready buyer file, and two deletions at once cannot both pass that check. The
+ * function is named for the screen that needed it first, but it takes any
+ * product and file. Its rows are removed first and their stored objects after
+ * the commit, which is the harmless order when the second step fails.
+ *
+ * Everything else — images, documentation, a licence — is not a buyer file and
+ * deletes as it always has, object first and row second.
+ */
 export async function deleteAssetAction(
   workspaceSlug: string,
   assetId: string,
@@ -360,11 +381,42 @@ export async function deleteAssetAction(
   // service-role delete runs with RLS bypassed.
   const { data: asset } = await supabase
     .from("product_assets")
-    .select("id")
+    .select("id, product_id, asset_type")
     .eq("id", assetId)
     .maybeSingle()
 
   if (!asset) return { error: "That file could not be found." }
+
+  if (BUYER_FILE_TYPES.has(asset.asset_type)) {
+    const { data: storagePaths, error } = await supabase.rpc("remove_import_deliverable", {
+      p_product_id: asset.product_id,
+      p_asset_id: assetId,
+    })
+
+    if (error) {
+      if (error.message === "only_ready_deliverable") {
+        return {
+          error: "That is the only file buyers would receive. Upload its replacement first.",
+        }
+      }
+      if (error.message === "deliverable_not_found") {
+        return { error: "That file could not be found." }
+      }
+      console.error("[assets] could not delete a buyer file", { assetId, error })
+      return { error: "That file could not be deleted. Try again." }
+    }
+
+    // The rows are committed; what remains is bytes nothing points at.
+    await removeObjects(storagePaths ?? []).catch((cause: unknown) => {
+      console.error("[assets] deleted a buyer file but not its stored object", {
+        assetId,
+        error: cause,
+      })
+    })
+
+    revalidatePath(routes.workspace(workspaceSlug))
+    return { error: null }
+  }
 
   try {
     await deleteAssetCascade(workspace.id, assetId)
