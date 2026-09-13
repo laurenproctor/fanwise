@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server"
-import { createAvatarUrl } from "./avatars"
 import type { PublicPageStatus, PublicProductPageRow, PublicProfileRow } from "./types"
 
 /**
@@ -19,8 +18,6 @@ import type { PublicPageStatus, PublicProductPageRow, PublicProfileRow } from ".
 
 export interface ProfileForSettings {
   profile: PublicProfileRow
-  /** Minted per render. Null when the object is gone, which falls back to initials. */
-  avatarUrl: string | null
   publishedCount: number
   draftCount: number
 }
@@ -30,24 +27,21 @@ export async function getProfileForSettings(
 ): Promise<ProfileForSettings | null> {
   const supabase = await createClient()
 
-  const { data: profile } = await supabase
+  // One round trip: the page statuses come embedded in the profile row rather
+  // than from a second query that waited on the first.
+  const { data } = await supabase
     .from("public_profiles")
-    .select("*")
+    .select("*, pages:public_product_pages!public_product_pages_profile_fk(status)")
     .eq("workspace_id", workspaceId)
     .maybeSingle()
 
-  if (!profile) return null
+  if (!data) return null
 
-  const [{ data: pages }, avatarUrl] = await Promise.all([
-    supabase.from("public_product_pages").select("status").eq("public_profile_id", profile.id),
-    profile.avatar_path ? createAvatarUrl(profile.avatar_path) : Promise.resolve(null),
-  ])
-
+  const { pages, ...profile } = data
   return {
     profile,
-    avatarUrl,
-    publishedCount: (pages ?? []).filter((p) => p.status === "published").length,
-    draftCount: (pages ?? []).filter((p) => p.status === "draft").length,
+    publishedCount: pages.filter((p) => p.status === "published").length,
+    draftCount: pages.filter((p) => p.status === "draft").length,
   }
 }
 
