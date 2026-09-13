@@ -104,6 +104,33 @@ Content column is 1160px max with 68px gutters, stepping to 44px on tablet and 2
 mobile. Sections are 92px vertical, 66px on mobile. The marketing frame is a 26px-radius
 rounded container on a light grey ground.
 
+The marketing stylesheet's own column, `.fw-wrap`, is narrower than that: 1080px max
+(1160px on the landing) with 24px gutters, narrowing to 18px below 480px. See Breakpoints.
+
+## Breakpoints
+
+Three widths, and each one exists because something stops fitting at it. None is a device
+size.
+
+| Width | What changes |
+|---|---|
+| 900px | The marketing nav's links, Sign in and the CTA move into a disclosure. Below it the bar holds the brand, the theme toggle and a menu button. |
+| 700px | The landing's workspace mock stops being a table: each derived row stacks, and the shop rail's column dividers become row dividers. |
+| 640px | The same nav disclosure on a creator's public page, which carries fewer links and so fits for longer. |
+| 480px | Marketing gutters narrow from 24px to 18px a side. |
+
+Both nav rows are always in the markup and a media query picks one, so the correct nav is
+painted on the first frame. Measuring the bar in the browser would be a frame too late and
+would flash.
+
+Grids use `repeat(auto-fit, minmax(min(<floor>, 100%), 1fr))`. The inner `min()` is what
+stops a 300px track forcing a scrollbar on a 320px screen, and it is the reason the site has
+no horizontal scroll at any width.
+
+Wide reference tables are the exception: they keep their width inside a
+`.fw-table-scroll` region that scrolls on its own and is focusable, because six spec columns
+do not mean anything collapsed onto a phone.
+
 ## In the app
 
 `app/globals.css` defines these as Tailwind v4 `@theme` tokens. Style through tokens, never
