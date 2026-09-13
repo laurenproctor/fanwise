@@ -2,6 +2,7 @@ import Link from "next/link"
 import { FanMark } from "@/components/marketing/logo"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { ButtonLink } from "@/components/ui/button"
+import { PublicNavMenu } from "./public-nav-menu"
 import { marketingRoutes } from "@/lib/routes"
 
 /**
@@ -53,7 +54,8 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
       </a>
 
       <header className="border-b border-[var(--color-rule)]">
-        <div className="mx-auto flex w-full max-w-[1160px] flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4 sm:px-8">
+        {/* `relative` is the containing block for the mobile nav panel. */}
+        <div className="relative mx-auto flex w-full max-w-[1160px] flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4 sm:px-8">
           <Link
             href={marketingRoutes.landing}
             className="flex min-h-11 shrink-0 items-center gap-2 rounded-[6px] text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
@@ -75,13 +77,14 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             <ThemeToggle />
             <Link
               href={marketingRoutes.signIn}
-              className="text-[14px] text-[var(--color-ink-2)] underline-offset-4 hover:text-[var(--color-ink)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              className="text-[14px] text-[var(--color-ink-2)] underline-offset-4 hover:text-[var(--color-ink)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] max-sm:hidden"
             >
               Sign in
             </Link>
             <ButtonLink href={marketingRoutes.signUp} variant="secondary" className="max-sm:hidden">
               Create your profile
             </ButtonLink>
+            <PublicNavMenu links={NAV_LINKS} />
           </nav>
         </div>
       </header>

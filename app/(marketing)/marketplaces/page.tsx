@@ -102,7 +102,12 @@ export default function MarketplacesPage() {
           Spec values on this page are illustrative. Each marketplace publishes its own requirements
           and Fanwise tracks them per channel.
         </p>
-        <div className="fw-table-scroll">
+        <div
+          className="fw-table-scroll"
+          role="region"
+          aria-label="Marketplace spec sheet"
+          tabIndex={0}
+        >
           <table className="fw-table">
             <thead>
               <tr>
