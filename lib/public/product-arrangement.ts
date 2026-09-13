@@ -58,6 +58,8 @@ export const INELIGIBLE_MESSAGES: Record<Ineligibility, string> = {
  */
 export interface ProductCandidate {
   id: string
+  /** The product's slug in the workspace, for a link to fix it. Null when not known. */
+  slug: string | null
   title: string
   typeLabel: string
   /** A members-only image route, or null for a product with no ready image. */
@@ -245,6 +247,7 @@ export function candidatesFrom(
   catalog: ReadonlyArray<{
     product: {
       id: string
+      slug?: string
       name: string
       canonical_title: string | null
       product_type: string
@@ -267,6 +270,7 @@ export function candidatesFrom(
     const coverId = page?.cover_asset_id ?? thumbnail?.assetId ?? null
     return {
       id: product.id,
+      slug: product.slug ?? null,
       title: page?.title_override ?? product.canonical_title ?? product.name,
       typeLabel: options.typeLabel(product.product_type),
       imageUrl: coverId ? options.imageUrl(coverId) : null,

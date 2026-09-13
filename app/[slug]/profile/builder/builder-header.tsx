@@ -27,10 +27,10 @@ export function BuilderHeader({
       <FanLines className="-top-6 -right-6 -z-10 hidden h-[300px] w-[480px] opacity-50 lg:block" />
       <nav aria-label="Breadcrumb">
         <Link
-          href={routes.settings(workspaceSlug)}
+          href={routes.profile(workspaceSlug)}
           className="label-mono underline-offset-4 hover:text-[var(--color-ink-2)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
         >
-          ← Settings
+          ← Profile
         </Link>
       </nav>
       <h1 className="font-display text-[44px] leading-[1.05] font-extralight tracking-[-0.04em] sm:text-[64px]">

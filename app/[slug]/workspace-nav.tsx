@@ -11,11 +11,17 @@ const ITEMS: ReadonlyArray<{
 }> = [
   { section: "products", label: "Products", href: routes.workspace },
   { section: "channels", label: "Channels", href: routes.channels },
+  { section: "profile", label: "Profile", href: routes.profile },
   { section: "settings", label: "Settings", href: routes.settings },
 ]
 
 /**
- * The workspace's three sections.
+ * The workspace's four sections.
+ *
+ * Profile is the creator's public profile: its builder, whether it is live,
+ * and which products it shows. It is a section of its own rather than a page
+ * inside Settings because it describes what strangers see, where Settings
+ * describes the studio, its bill and the person signed in.
  *
  * A client component for one reason: a layout does not re-render on
  * navigation and is never told the path, so the current-page marker has to be
@@ -33,7 +39,7 @@ export function WorkspaceNav({
 
   return (
     <nav aria-label="Workspace" className={className}>
-      <ul className="flex items-center gap-1">
+      <ul className="flex flex-wrap items-center gap-1">
         {ITEMS.map((item) => {
           const active = item.section === current
           return (

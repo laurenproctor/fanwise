@@ -26,7 +26,7 @@ import {
 import type { DraftProduct } from "@/lib/public/profile-draft"
 import type { ProfilePresentation } from "@/lib/public/profile-presentation"
 import { routes } from "@/lib/routes"
-import { UnsavedChangesGuard } from "../../unsaved-changes-guard"
+import { UnsavedChangesGuard } from "../../settings/unsaved-changes-guard"
 import { DraftStatus } from "./builder-status"
 import { ProfilePreview } from "./profile-preview"
 

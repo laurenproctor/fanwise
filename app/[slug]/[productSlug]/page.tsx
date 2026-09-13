@@ -333,7 +333,7 @@ function PublicPageSection({
           Claim a public handle for the studio first. Every product page lives under it, at{" "}
           <span className="font-mono text-[13px]">/@your-handle/{productSlug}</span>.
         </p>
-        <ButtonLink href={routes.publicProfileSettings(workspaceSlug)} variant="secondary">
+        <ButtonLink href={routes.profile(workspaceSlug)} variant="secondary">
           Set up a public profile
         </ButtonLink>
       </div>

@@ -134,7 +134,7 @@ describe("nothing else is captured", () => {
     routes.product("best-night", "facette-typeface"),
     routes.channels("best-night"),
     routes.settings("best-night"),
-    routes.publicProfileSettings("best-night"),
+    routes.profile("best-night"),
     routes.assetPreview("best-night", "a1"),
   ]
 
@@ -212,7 +212,7 @@ describe("the proxy lets the public web through without a session", () => {
   it("still refuses a private workspace path", () => {
     expect(isPublic(routes.workspace("best-night"))).toBe(false)
     expect(isPublic(routes.settings("best-night"))).toBe(false)
-    expect(isPublic(routes.publicProfileSettings("best-night"))).toBe(false)
+    expect(isPublic(routes.profile("best-night"))).toBe(false)
   })
 })
 

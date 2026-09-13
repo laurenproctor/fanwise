@@ -317,21 +317,22 @@ describe("the settings page", () => {
   const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")
 
   /**
-   * Public profile is a summary and a link, not a form. Its fields describe a
-   * page strangers read, and putting them in the same scroll as an email
-   * address is how somebody edits one believing it is the other, so the
-   * editing lives at app/[slug]/settings/public-profile. The section is here
-   * because "is my profile live" is checked far more often than it is edited.
+   * The public profile is not a Settings destination. It moved to a section of
+   * the workspace header on 13 September 2026 (tests/unit/workspace-nav.test.ts
+   * holds that side), and a second way in from here would be two answers to
+   * "where is my profile".
    */
-  it("renders four sections, in order, and no fifth", () => {
+  it("renders three sections, in order, and no fourth", () => {
     const headings = [...code.matchAll(/heading="([^"]+)"/g)].map((m) => m[1])
-    expect(headings).toEqual(["Studio details", "Public profile", "Subscription", "Account"])
+    expect(headings).toEqual(["Studio details", "Subscription", "Account"])
   })
 
-  it("links to the public profile page rather than editing it here", () => {
-    expect(code).toContain("routes.publicProfileSettings(workspace.slug)")
-    // The identity fields belong to the other page. None of them appears here.
-    for (const field of ["shortBio", "instagramUrl", "seoDescription"]) {
+  it("is no longer a way into the public profile", () => {
+    expect(code).not.toContain("routes.profile(")
+    expect(code).not.toContain("getProfileForSettings")
+    expect(code).not.toMatch(/public profile/i)
+    // The identity fields belong to the profile's own page. None appears here.
+    for (const field of ["shortBio", "links", "seoDescription", "countryCode"]) {
       expect(code, `${field} should not be edited on the settings page`).not.toContain(field)
     }
   })

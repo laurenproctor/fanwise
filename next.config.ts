@@ -35,6 +35,27 @@ const config: NextConfig = {
     return [{ source: "/(.*)", headers: baselineHeaders(environmentFrom(process.env)) }]
   },
   /**
+   * The profile's management pages moved out of Settings on 13 September 2026,
+   * when Profile became a section of the workspace header. A bookmark, an email
+   * link or an open tab at the old address lands on the same page at the new
+   * one. `settings` is a reserved product slug, so no product page can be
+   * behind the old path.
+   */
+  async redirects() {
+    return [
+      {
+        source: "/:slug/settings/public-profile",
+        destination: "/:slug/profile",
+        permanent: true,
+      },
+      {
+        source: "/:slug/settings/public-profile/:path*",
+        destination: "/:slug/profile/:path*",
+        permanent: true,
+      },
+    ]
+  },
+  /**
    * The public creator pages: `/@handle` and `/@handle/<anything>`.
    *
    * This is a config rewrite rather than a `NextResponse.rewrite()` in the

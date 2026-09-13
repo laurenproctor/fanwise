@@ -33,23 +33,25 @@ vi.mock("@/lib/public/draft-actions", () => ({
 }))
 
 const { PublicProfile } = await import("@/components/public/public-profile")
-const { ProfilePreview } =
-  await import("@/app/[slug]/settings/public-profile/builder/profile-preview")
-const { ProfileDetailsStep } =
-  await import("@/app/[slug]/settings/public-profile/builder/profile-details-step")
-const { BuilderSteps } = await import("@/app/[slug]/settings/public-profile/builder/builder-header")
-const { ManageProductsStep } =
-  await import("@/app/[slug]/settings/public-profile/builder/manage-products-step")
+const { ProfilePreview } = await import("@/app/[slug]/profile/builder/profile-preview")
+const { ProfileDetailsStep } = await import("@/app/[slug]/profile/builder/profile-details-step")
+const { BuilderSteps } = await import("@/app/[slug]/profile/builder/builder-header")
+const { ManageProductsStep } = await import("@/app/[slug]/profile/builder/manage-products-step")
 const { arrange } = await import("@/lib/public/product-arrangement")
 
 const FIELDS: ProfileDraftFields = {
   handle: "lauren-proctor",
   displayName: "Lauren Proctor",
   shortBio: "Design tools, templates, and resources for thoughtful brands.",
-  website: "laurenproctor.com",
-  instagram: "@laurenproctor",
-  behance: "behance.net/laurenproctor",
+  about: "",
+  city: "",
+  countryCode: "",
   location: "",
+  links: [
+    { url: "laurenproctor.com", label: "" },
+    { url: "instagram.com/laurenproctor", label: "" },
+    { url: "behance.net/laurenproctor", label: "" },
+  ],
   contact: "",
 }
 
@@ -111,7 +113,13 @@ describe("the live preview", () => {
     expect(all).toContain('data-link="instagram"')
     expect(all).toContain('data-link="behance"')
 
-    const some = renderPreview({ website: "http://insecure.com", behance: "" })
+    const some = renderPreview({
+      links: [
+        { url: "http://insecure.com", label: "" },
+        { url: "instagram.com/laurenproctor", label: "" },
+        { url: "", label: "" },
+      ],
+    })
     expect(some).not.toContain('data-link="website"')
     expect(some).toContain('data-link="instagram"')
     expect(some).not.toContain('data-link="behance"')
@@ -145,9 +153,7 @@ describe("the live preview", () => {
     const empty = present({
       displayName: "",
       shortBio: "",
-      website: "",
-      instagram: "",
-      behance: "",
+      links: [],
     })
     const builder = textOf(
       renderToStaticMarkup(
@@ -177,8 +183,9 @@ describe("location and the Contact button", () => {
   it("offers both as optional fields, and says what leaving them empty does", () => {
     const text = textOf(step({}))
     expect(text).toContain("Location (optional)")
+    expect(text).toContain("Country")
+    expect(text).toContain("City")
     expect(text).toContain("Contact button (optional)")
-    expect(text).toContain("Leave it empty to show no location.")
     expect(text).toContain("Leave it empty to show no button.")
   })
 
@@ -230,7 +237,9 @@ describe("step 1, profile details", () => {
     const inputIds = [...markup.matchAll(/<(?:input|textarea)[^>]*\sid="([^"]+)"/g)].map(
       (m) => m[1]!,
     )
-    expect(inputIds.length).toBe(9)
+    // Image, address, name, introduction, About, country, city, contact, and
+    // an address and a label for each of the three links.
+    expect(inputIds.length).toBe(8 + 3 * 2)
     for (const id of inputIds) {
       expect(markup, `label for ${id}`).toContain(`for="${id}"`)
     }
@@ -239,10 +248,12 @@ describe("step 1, profile details", () => {
       "Studio address",
       "Studio name",
       "Short introduction",
-      "Website",
-      "Instagram",
-      "Behance",
+      "About (optional)",
       "Location (optional)",
+      "Country",
+      "City",
+      "Links (optional)",
+      "Label (optional)",
       "Contact button (optional)",
     ]) {
       expect(textOf(markup)).toContain(label)
@@ -285,6 +296,7 @@ describe("step 2, manage products", () => {
     overrides: Partial<import("@/lib/public/product-arrangement").ProductCandidate> = {},
   ) => ({
     id: pid(n),
+    slug: null,
     title,
     typeLabel: "Templates",
     imageUrl: `/laurens-studio/assets/a${n}/preview`,

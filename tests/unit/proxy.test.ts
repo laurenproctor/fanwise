@@ -62,7 +62,7 @@ const PRIVATE = [
   ["the new-product form", routes.newProduct(SLUG)],
   ["channels", routes.channels(SLUG)],
   ["settings", routes.settings(SLUG)],
-  ["public profile settings", routes.publicProfileSettings(SLUG)],
+  ["public profile settings", routes.profile(SLUG)],
   ["the importer", routes.importProduct(SLUG)],
   ["somebody's import", `${routes.importProduct(SLUG)}/${IMPORT_ID}`],
   ["onboarding", "/onboarding"],

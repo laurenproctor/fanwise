@@ -20,10 +20,13 @@ import {
   writeDraftFields,
   writeDraftProducts,
 } from "./draft-store"
+import { checkCity } from "./location-check"
 import {
   checkDetailsStep,
   draftFieldsSchema,
   draftProductsSchema,
+  hasDetailsErrors,
+  unknownCityMessage,
   type DetailsErrors,
 } from "./profile-draft"
 
@@ -173,7 +176,7 @@ export async function continueProfileDetailsAction(
 
   const supabase = await createClient()
   const ctx = await loadBuilderContext(supabase, workspaceSlug)
-  if (!ctx) redirect(routes.publicProfileSettings(workspaceSlug))
+  if (!ctx) redirect(routes.profile(workspaceSlug))
 
   const saved = await writeDraftFields(supabase, ctx, parsed.data.fields, parsed.data.revision)
   if (!saved.ok) {
@@ -189,6 +192,12 @@ export async function continueProfileDetailsAction(
   }
 
   const errors = checkDetailsStep(parsed.data.fields)
+  // The city against the dataset, which only the server holds. A city that is
+  // not in the chosen country is refused here rather than stored on the live
+  // profile later.
+  if (!errors.city && !errors.countryCode && checkCity(parsed.data.fields).kind === "unknown") {
+    errors.city = unknownCityMessage(parsed.data.fields.countryCode)
+  }
   if (!errors.handle) {
     try {
       const status = await checkHandleForProfile(ctx.profile, parsed.data.fields.handle)
@@ -204,7 +213,7 @@ export async function continueProfileDetailsAction(
     }
   }
 
-  if (Object.keys(errors).length > 0) {
+  if (hasDetailsErrors(errors)) {
     return { ok: false, revision: saved.revision, errors, message: null }
   }
 

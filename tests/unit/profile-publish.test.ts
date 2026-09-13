@@ -30,10 +30,14 @@ const FIELDS: ProfileDraftFields = {
   handle: "Lauren Proctor",
   displayName: "Lauren Proctor",
   shortBio: "Design tools, templates, and resources for thoughtful brands.",
-  website: "laurenproctor.com",
-  instagram: "@laurenproctor",
-  behance: "",
+  about: "",
+  city: "",
+  countryCode: "",
   location: "",
+  links: [
+    { url: "laurenproctor.com", label: "" },
+    { url: "instagram.com/laurenproctor/", label: "" },
+  ],
   contact: "",
 }
 
@@ -41,6 +45,7 @@ const pid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0"
 function candidate(n: number, overrides: Partial<ProductCandidate> = {}): ProductCandidate {
   return {
     id: pid(n),
+    slug: `product-${n}`,
     title: `Product ${n}`,
     typeLabel: "Template",
     imageUrl: null,
@@ -58,6 +63,7 @@ function readiness(overrides: Partial<Parameters<typeof evaluateReadiness>[0]> =
   ]
   return evaluateReadiness({
     fields: FIELDS,
+    city: { kind: "empty" },
     avatar: { path: null, resolvable: false },
     handleStatus: "available",
     draftProducts,
@@ -75,9 +81,13 @@ describe("publish readiness", () => {
         handle: "lauren-proctor",
         display_name: "Lauren Proctor",
         short_bio: "Design tools, templates, and resources for thoughtful brands.",
-        website_url: "https://laurenproctor.com/",
-        instagram_url: "https://www.instagram.com/laurenproctor/",
-        behance_url: "",
+        about: "",
+        links: [
+          { url: "https://laurenproctor.com/", label: "" },
+          { url: "https://instagram.com/laurenproctor/", label: "" },
+        ],
+        city: "",
+        country_code: "",
         location: "",
         contact_url: "",
       },
@@ -87,7 +97,14 @@ describe("publish readiness", () => {
 
   it("plans location and the contact address in the form the live row stores", () => {
     const result = evaluateReadiness({
-      fields: { ...FIELDS, location: "  Brooklyn, New York ", contact: "hello@laurenproctor.com" },
+      fields: {
+        ...FIELDS,
+        city: "sao paulo",
+        countryCode: "BR",
+        location: "Old text",
+        contact: "hello@laurenproctor.com",
+      },
+      city: { kind: "known", name: "São Paulo" },
       avatar: { path: null, resolvable: false },
       handleStatus: "available",
       draftProducts: [],
@@ -95,14 +112,46 @@ describe("publish readiness", () => {
     })
     expect(result.ready).toBe(true)
     expect(result.plan?.values).toMatchObject({
-      location: "Brooklyn, New York",
+      // The dataset's spelling, never what was typed.
+      city: "São Paulo",
+      country_code: "BR",
+      // A chosen country retires the legacy free text.
+      location: "",
       contact_url: "mailto:hello@laurenproctor.com",
     })
+  })
+
+  it("keeps a legacy location, untouched, until a country replaces it", () => {
+    const result = evaluateReadiness({
+      fields: { ...FIELDS, location: "  Brooklyn, New York " },
+      city: { kind: "empty" },
+      avatar: { path: null, resolvable: false },
+      handleStatus: "available",
+      draftProducts: [],
+      rows: [],
+    })
+    expect(result.plan?.values).toMatchObject({ location: "Brooklyn, New York", country_code: "" })
+  })
+
+  it("blocks on a city the dataset does not place in the chosen country", () => {
+    const result = evaluateReadiness({
+      fields: { ...FIELDS, city: "Brooklyn", countryCode: "FR" },
+      city: { kind: "unknown" },
+      avatar: { path: null, resolvable: false },
+      handleStatus: "available",
+      draftProducts: [],
+      rows: [],
+    })
+    expect(result.ready).toBe(false)
+    expect(result.issues).toEqual([
+      { step: 1, field: "city", message: expect.stringContaining("France") },
+    ])
   })
 
   it("blocks on a contact address that is not one, pointing at the field", () => {
     const result = evaluateReadiness({
       fields: { ...FIELDS, contact: "hello@" },
+      city: { kind: "empty" },
       avatar: { path: null, resolvable: false },
       handleStatus: "available",
       draftProducts: [],
@@ -114,7 +163,13 @@ describe("publish readiness", () => {
 
   it("names the step and field of every blocking detail", () => {
     const result = evaluateReadiness({
-      fields: { ...FIELDS, displayName: "", website: "http://insecure.com", handle: "settings" },
+      fields: {
+        ...FIELDS,
+        displayName: "",
+        links: [{ url: "http://insecure.com", label: "" }],
+        handle: "settings",
+      },
+      city: { kind: "empty" },
       avatar: { path: null, resolvable: false },
       handleStatus: "available",
       draftProducts: [],
@@ -125,7 +180,7 @@ describe("publish readiness", () => {
       [
         [1, "displayName"],
         [1, "handle"],
-        [1, "website"],
+        [1, "links"],
       ].sort(),
     )
   })
@@ -155,6 +210,7 @@ describe("publish readiness", () => {
     ]
     const result = evaluateReadiness({
       fields: FIELDS,
+      city: { kind: "empty" },
       avatar: { path: null, resolvable: false },
       handleStatus: "available",
       draftProducts,
@@ -178,6 +234,7 @@ describe("publish readiness", () => {
     ]
     const result = evaluateReadiness({
       fields: FIELDS,
+      city: { kind: "empty" },
       avatar: { path: null, resolvable: false },
       handleStatus: "available",
       draftProducts,
@@ -193,6 +250,7 @@ describe("publish readiness", () => {
   it("asks for a product choice when products exist but none were ever arranged", () => {
     const result = evaluateReadiness({
       fields: FIELDS,
+      city: { kind: "empty" },
       avatar: { path: null, resolvable: false },
       handleStatus: "available",
       draftProducts: [],
@@ -205,6 +263,7 @@ describe("publish readiness", () => {
     const draftProducts = [{ productId: pid(1), visible: false }]
     const result = evaluateReadiness({
       fields: FIELDS,
+      city: { kind: "empty" },
       avatar: { path: null, resolvable: false },
       handleStatus: "available",
       draftProducts,
@@ -215,9 +274,9 @@ describe("publish readiness", () => {
   })
 
   it("links each issue to the step, and step 1 issues to the field", () => {
-    const routes = { details: "/ws/settings/public-profile/builder", products: "/ws/p" }
-    expect(issueHref({ step: 1, field: "website", message: "" }, routes)).toBe(
-      "/ws/settings/public-profile/builder?field=website",
+    const routes = { details: "/ws/profile/builder", products: "/ws/p" }
+    expect(issueHref({ step: 1, field: "links", message: "" }, routes)).toBe(
+      "/ws/profile/builder?field=links",
     )
     expect(issueHref({ step: 2, field: "products", message: "" }, routes)).toBe("/ws/p")
   })
@@ -227,14 +286,27 @@ describe("publish readiness", () => {
     const recorded = {
       product_ids: [pid(2), pid(1)],
       avatar_path: null,
-      behance_url: null,
-      website_url: "https://laurenproctor.com/",
-      instagram_url: "https://www.instagram.com/laurenproctor/",
       short_bio: "Design tools, templates, and resources for thoughtful brands.",
+      about: null,
+      links: [
+        { url: "https://laurenproctor.com/", label: null },
+        { url: "https://instagram.com/laurenproctor/", label: null },
+      ],
+      city: null,
+      country_code: null,
+      location: null,
+      contact_url: null,
       display_name: "Lauren Proctor",
       handle: "lauren-proctor",
     }
-    const live = { location: null, contact_url: null }
+    const live = {
+      location: null,
+      contact_url: null,
+      city: null,
+      country_code: null,
+      about: null,
+      links: [],
+    }
     expect(sameSnapshot(snapshotWithLiveDefaults(recorded, live), snapshotOf(plan, null))).toBe(
       true,
     )
@@ -247,12 +319,15 @@ describe("publish readiness", () => {
   })
 
   /**
-   * A publication recorded before location and contact_url joined the
-   * snapshot. The old publish function never wrote either column, so the live
-   * row's values are what it published; without filling them in, every
-   * already-published profile would read as having changes to publish.
+   * A publication recorded before the fields it would carry today. The
+   * earliest had no `location` or `contact_url`; everything before
+   * 20260913030000 had the three fixed link columns and no `links`, `about`,
+   * `city` or `country_code`. The live row, and the links table its migration
+   * filled, hold what those publications left, so they fill the gaps, and the
+   * retired keys are dropped. Without that every already-published profile
+   * would read as having changes to publish.
    */
-  it("reads a publication from before location and contact existed as unchanged", () => {
+  it("reads a publication from before links, location and contact existed as unchanged", () => {
     const recorded = {
       product_ids: [],
       avatar_path: null,
@@ -264,15 +339,35 @@ describe("publish readiness", () => {
       handle: "lauren-proctor",
     }
     const plan = evaluateReadiness({
-      fields: { ...FIELDS, location: "Brooklyn", contact: "hello@laurenproctor.com" },
+      fields: {
+        ...FIELDS,
+        links: [
+          { url: "https://laurenproctor.com/", label: "" },
+          { url: "https://www.instagram.com/laurenproctor/", label: "" },
+        ],
+        location: "Brooklyn",
+        contact: "hello@laurenproctor.com",
+      },
+      city: { kind: "empty" },
       avatar: { path: null, resolvable: false },
       handleStatus: "available",
       draftProducts: [],
       rows: [],
     }).plan!
-    const liveRow = { location: "Brooklyn", contact_url: "mailto:hello@laurenproctor.com" }
+    const liveRow = {
+      location: "Brooklyn",
+      contact_url: "mailto:hello@laurenproctor.com",
+      city: null,
+      country_code: null,
+      about: null,
+      // What 20260913030000 copied out of website_url and instagram_url.
+      links: [
+        { url: "https://laurenproctor.com/", label: null },
+        { url: "https://www.instagram.com/laurenproctor/", label: null },
+      ],
+    }
 
-    // Compared raw, the missing keys alone would look like a change.
+    // Compared raw, the missing and retired keys alone would look like a change.
     expect(sameSnapshot(recorded, snapshotOf(plan, null))).toBe(false)
     expect(sameSnapshot(snapshotWithLiveDefaults(recorded, liveRow), snapshotOf(plan, null))).toBe(
       true,
@@ -288,6 +383,7 @@ describe("publish readiness", () => {
     expect(snapshotWithLiveDefaults({ ...recorded, location: "Recorded" }, liveRow)).toMatchObject({
       location: "Recorded",
     })
+    expect(snapshotWithLiveDefaults(recorded, liveRow)).not.toHaveProperty("website_url")
   })
 })
 
@@ -387,14 +483,15 @@ describe("publishing through the action", () => {
     expect(args.p_product_ids).toEqual([pid(2), pid(1)])
     expect(Object.keys(args.p_values as object).sort()).toEqual(
       [
-        "behance_url",
+        "about",
+        "city",
         "contact_url",
+        "country_code",
         "display_name",
         "handle",
-        "instagram_url",
+        "links",
         "location",
         "short_bio",
-        "website_url",
       ].sort(),
     )
     // Nothing private, nothing the browser named.
@@ -517,11 +614,16 @@ const VIEW: PublicProfileView = {
   handle: "lauren-proctor",
   displayName: "Lauren Proctor",
   shortBio: "Design tools, templates, and resources for thoughtful brands.",
+  about: "A studio making tools for brands that think in systems.",
   location: "Brooklyn, New York",
+  city: null,
+  countryCode: null,
   hasAvatar: true,
-  websiteUrl: "https://laurenproctor.com/",
-  instagramUrl: "https://www.instagram.com/laurenproctor/",
-  behanceUrl: null,
+  links: [
+    { url: "https://laurenproctor.com/", label: "" },
+    { url: "https://www.instagram.com/laurenproctor/", label: "" },
+    { url: "https://are.na/lauren-proctor", label: "Research" },
+  ],
   contactUrl: "mailto:hello@laurenproctor.com",
   seoTitle: "Stale SEO title from the old form",
   seoDescription: "Stale SEO description",
@@ -591,6 +693,48 @@ describe("the public profile route", () => {
     expect(markup).toContain('data-link="website"')
     expect(markup).toContain('data-link="instagram"')
     expect(markup).not.toContain('data-link="behance"')
+    // Headings in order under the name: the page reads as one outline.
+    expect(markup).toMatch(/<h2[^>]*>Products<\/h2>/)
+    expect(markup).toMatch(/<h2[^>]*>About/)
+  })
+
+  it("opens every profile link in a new tab with the outbound rel, labelled in words", async () => {
+    resolveProfile.mockResolvedValue({ kind: "found", value: VIEW })
+    loadProfileCatalog.mockResolvedValue([])
+    const markup = await renderPage()
+    const anchors = [...markup.matchAll(/<a[^>]*href="(https:\/\/[^"]+)"[^>]*>/g)].filter(
+      (m) => !m[0].includes("data-contact"),
+    )
+    expect(anchors.length).toBeGreaterThanOrEqual(6)
+    for (const [tag] of anchors) {
+      expect(tag).toContain('target="_blank"')
+      expect(tag).toContain('rel="me noopener noreferrer nofollow"')
+    }
+    // An unrecognised site keeps its own label and draws the globe.
+    expect(markup).toContain('aria-label="Website: Research (opens in a new tab)"')
+    expect(markup).toContain("Research")
+  })
+
+  it("shows a structured location as City, Country near the name", async () => {
+    resolveProfile.mockResolvedValue({
+      kind: "found",
+      value: { ...VIEW, location: "Old free text", city: "Brooklyn", countryCode: "US" },
+    })
+    loadProfileCatalog.mockResolvedValue([])
+    const markup = await renderPage()
+    expect(markup).toMatch(/data-location[^>]*>.*Brooklyn, United States<\/p>/s)
+    expect(markup).not.toContain("Old free text")
+  })
+
+  it("shows a country alone without stray punctuation", async () => {
+    resolveProfile.mockResolvedValue({
+      kind: "found",
+      value: { ...VIEW, location: null, city: null, countryCode: "JP" },
+    })
+    loadProfileCatalog.mockResolvedValue([])
+    const markup = await renderPage()
+    expect(markup).toMatch(/data-location[^>]*>.*Japan<\/p>/s)
+    expect(markup).not.toMatch(/, Japan|Japan,/)
   })
 
   it("shows the creator's location and Contact button when they set them", async () => {
@@ -619,7 +763,7 @@ describe("the public profile route", () => {
   it("shows no location and no Contact button when the creator removed them", async () => {
     resolveProfile.mockResolvedValue({
       kind: "found",
-      value: { ...VIEW, location: null, contactUrl: null },
+      value: { ...VIEW, location: null, city: null, countryCode: null, contactUrl: null },
     })
     loadProfileCatalog.mockResolvedValue([])
     const markup = await renderPage()

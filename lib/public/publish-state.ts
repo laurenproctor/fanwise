@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import { createAvatarUrl } from "./avatars"
-import { checkHandleForProfile, readDraft, type BuilderContext } from "./draft-store"
+import { checkHandleForProfile, readDraft, readLiveLinks, type BuilderContext } from "./draft-store"
+import { checkCity } from "./location-check"
 import { normalizeHandleInput } from "./handles"
 import { arrange, toPresentationProducts, type ArrangementRow } from "./product-arrangement"
 import { loadProductCandidates } from "./product-candidates"
@@ -49,7 +50,7 @@ export async function loadPublishState(
 ): Promise<PublishState> {
   const { draft, stored } = await readDraft(supabase, ctx.profile)
 
-  const [candidates, avatarUrl, handleStatus, latest] = await Promise.all([
+  const [candidates, avatarUrl, handleStatus, latest, liveLinks] = await Promise.all([
     loadProductCandidates(supabase, ctx, workspaceSlug),
     draft.avatarPath ? createAvatarUrl(draft.avatarPath) : Promise.resolve(null),
     checkHandleForProfile(ctx.profile, draft.fields.handle).then(
@@ -63,11 +64,13 @@ export async function loadPublishState(
       .order("published_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    readLiveLinks(supabase, ctx.profile.id),
   ])
 
   const rows = arrange(draft.products, candidates)
   const readiness = evaluateReadiness({
     fields: draft.fields,
+    city: checkCity(draft.fields),
     avatar: { path: draft.avatarPath, resolvable: avatarUrl !== null },
     handleStatus,
     draftProducts: draft.products,
@@ -80,7 +83,7 @@ export async function loadPublishState(
     readiness.ready &&
     latest.data !== null &&
     sameSnapshot(
-      snapshotWithLiveDefaults(latest.data.snapshot, ctx.profile),
+      snapshotWithLiveDefaults(latest.data.snapshot, { ...ctx.profile, links: liveLinks }),
       snapshotOf(readiness.plan, draft.avatarPath),
     )
 

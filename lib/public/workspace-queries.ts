@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/lib/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
 import type { PublicPageStatus, PublicProductPageRow, PublicProfileRow } from "./types"
 
@@ -43,6 +45,24 @@ export async function getProfileForSettings(
     publishedCount: pages.filter((p) => p.status === "published").length,
     draftCount: pages.filter((p) => p.status === "draft").length,
   }
+}
+
+/**
+ * The products a profile shows right now: its published product pages, read
+ * as the member. Whether a visitor can see them also depends on the profile
+ * being published, which the caller knows.
+ */
+export async function loadLiveProductIds(
+  supabase: SupabaseClient<Database>,
+  profileId: string,
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("public_product_pages")
+    .select("product_id")
+    .eq("public_profile_id", profileId)
+    .eq("status", "published")
+  if (error) throw error
+  return new Set((data ?? []).map((row) => row.product_id))
 }
 
 export interface ProductPageForEditor {

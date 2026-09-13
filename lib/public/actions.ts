@@ -77,11 +77,11 @@ export async function createPublicProfileAction(
     }
   }
 
-  revalidatePath(routes.publicProfileSettings(workspaceSlug))
+  revalidatePath(routes.profile(workspaceSlug))
   redirect(
     destination === "builder"
       ? routes.publicProfileBuilder(workspaceSlug)
-      : routes.publicProfileSettings(workspaceSlug),
+      : routes.profile(workspaceSlug),
   )
 }
 
@@ -122,7 +122,7 @@ export async function createPublicProductPageAction(
 
   // No profile yet means the creator has not claimed a handle. Sending them to
   // settings is more use than an error telling them so.
-  if (!profile) redirect(routes.publicProfileSettings(workspaceSlug))
+  if (!profile) redirect(routes.profile(workspaceSlug))
   if (!product) redirect(routes.workspace(workspaceSlug))
 
   const base = product.slug.toLowerCase()
@@ -302,7 +302,7 @@ async function workspaceIdFor(
  * the cache half of the rule the RLS policies enforce in the database.
  */
 function revalidatePublic(workspaceSlug: string, oldHandle: string, newHandle: string): void {
-  revalidatePath(routes.publicProfileSettings(workspaceSlug))
+  revalidatePath(routes.profile(workspaceSlug))
   for (const handle of new Set([oldHandle.toLowerCase(), newHandle.toLowerCase()])) {
     revalidatePath(publicInternal(handle), "layout")
   }

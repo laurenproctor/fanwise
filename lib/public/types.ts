@@ -51,11 +51,14 @@ export interface PublicProfileView {
   handle: string
   displayName: string
   shortBio: string | null
+  about: string | null
+  /** The legacy free-text location. Shown only when there is no country. */
   location: string | null
+  city: string | null
+  countryCode: string | null
   hasAvatar: boolean
-  websiteUrl: string | null
-  instagramUrl: string | null
-  behanceUrl: string | null
+  /** In display order. Each URL was validated https at the boundary; the label is null when derived. */
+  links: Array<{ url: string; label: string }>
   contactUrl: string | null
   seoTitle: string | null
   seoDescription: string | null

@@ -87,9 +87,9 @@ async function seedLiveProducts(slug: string, names: string[]): Promise<void> {
   }
 }
 
-/** Opens step 1 from Settings, creating the profile if there is none. */
+/** Opens step 1 from the Profile section, creating the profile if there is none. */
 async function openBuilder(page: Page, slug: string): Promise<void> {
-  await page.goto(routes.publicProfileSettings(slug))
+  await page.goto(routes.profile(slug))
   const create = page.getByRole("button", { name: "Create a public profile" })
   const edit = page.getByRole("link", { name: /Build your profile|Edit public profile/ })
   // Wait for the page to decide which one it is showing before choosing.
@@ -99,7 +99,7 @@ async function openBuilder(page: Page, slug: string): Promise<void> {
   } else {
     await edit.click()
   }
-  await page.waitForURL(/\/settings\/public-profile\/builder$/)
+  await page.waitForURL(/\/profile\/builder$/)
   await expect(page.getByRole("heading", { name: "Build your profile" })).toBeVisible({
     timeout: SETUP_TIMEOUT,
   })
@@ -164,23 +164,57 @@ test("a creator builds, publishes and updates a profile, and a stranger reads it
   const handle = `northline-${Date.now().toString(36)}`.slice(0, 32)
   const preview = page.locator("article").first()
 
-  // 1. Settings → Public profile ------------------------------------------
+  // 1. The Profile section of the header, not Settings -----------------------
   await page.goto(routes.settings(creator.slug))
-  await page.getByRole("link", { name: "Set up a public profile" }).click()
-  await page.waitForURL(new RegExp(`${routes.publicProfileSettings(creator.slug)}$`))
+  await expect(page.getByRole("link", { name: /public profile/i })).toHaveCount(0)
+  const nav = page.getByRole("navigation", { name: "Workspace" })
+  await nav.getByRole("link", { name: "Profile", exact: true }).click()
+  await page.waitForURL(new RegExp(`${routes.profile(creator.slug)}$`))
+  await expect(nav.getByRole("link", { name: "Profile", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page",
+  )
   await page.getByRole("button", { name: "Create a public profile" }).click()
   await page.waitForURL(/\/builder$/)
 
-  // 2–3. Profile details, with the preview following the typing -----------
+  // 2. The image, chosen the moment the page appears ---------------------------
+  // A full load, and the file set before anything waits for hydration: a pick
+  // in that window used to be dropped without a word, and the profile went
+  // live with no image until it was chosen a second time.
+  await page.goto(routes.publicProfileBuilder(creator.slug))
+  await page.locator('input[type="file"]').setInputFiles("tests/fixtures/small-800x600.png")
+  await expect(page.getByText("Image saved to your draft")).toBeVisible({ timeout: SETUP_TIMEOUT })
+  await expect(page.getByRole("img", { name: "Your profile image" })).toBeVisible()
+
+  // 3. Profile details, with the preview following the typing -----------------
   await page.getByLabel("Studio address").fill(handle)
   await page.getByLabel("Studio name").fill("Northline Studio")
   await page.getByLabel("Short introduction").fill("Independent type for expressive brands.")
-  await page.getByLabel("Website", { exact: true }).fill("northline.example")
-  await page.getByLabel("Location (optional)").fill("Brooklyn, New York")
+
+  // Links: any site, in the creator's order, each labelled or not.
+  await page.getByRole("button", { name: "Add link" }).click()
+  await page.getByRole("textbox", { name: "Address, link 1" }).fill("northline.example")
+  await page.getByRole("button", { name: "Add link" }).click()
+  await page.getByRole("textbox", { name: "Address, link 2" }).fill("are.na/northline")
+  await page.getByRole("textbox", { name: "Label (optional), link 2" }).fill("Research")
+  await page.getByRole("button", { name: "Move link 2 up" }).click()
+
+  // Location: a country, then a city in it, both chosen from suggestions.
+  const country = page.getByRole("combobox", { name: "Country" })
+  await country.fill("united st")
+  await page.getByRole("option", { name: "United States", exact: true }).click()
+  const city = page.getByRole("combobox", { name: "City" })
+  await expect(city).toBeEnabled()
+  await city.fill("brookl")
+  await page.getByRole("option", { name: /^Brooklyn\s*New York$/ }).click()
+  await expect(city).toHaveValue("Brooklyn")
+
   await page.getByLabel("Contact button (optional)").fill("hello@northline.example")
 
-  await expect(preview.getByRole("heading", { name: "Northline Studio" })).toBeVisible()
-  await expect(preview).toContainText("Brooklyn, New York")
+  await expect(
+    preview.getByRole("heading", { name: "Northline Studio", exact: true }),
+  ).toBeVisible()
+  await expect(preview).toContainText("Brooklyn, United States")
   await expect(preview).toContainText("Independent type for expressive brands.")
   await expect(page.getByText(`/@${handle}`).first()).toBeVisible()
   await expect(page.getByText("Available", { exact: true })).toBeVisible({
@@ -239,11 +273,29 @@ test("a creator builds, publishes and updates a profile, and a stranger reads it
   expect(await renderedTitles(visitor)).toEqual(finalPreview)
   expect(await visitor.locator("article").textContent()).not.toContain("Brand Workbook")
   // The optional fields reach the page the creator chose to put them on.
-  await expect(visitor.locator("article")).toContainText("Brooklyn, New York")
+  await expect(visitor.locator("article [data-location]")).toHaveText("Brooklyn, United States")
   await expect(visitor.locator("a[data-contact]")).toHaveAttribute(
     "href",
     "mailto:hello@northline.example",
   )
+  // The image chosen on the first pass is live on the first publish, and loads.
+  const avatar = visitor.locator('article header img[data-avatar="image"]')
+  await expect(avatar).toBeVisible()
+  await expect
+    .poll(() => avatar.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth))
+    .toBeGreaterThan(0)
+  // Links in the order chosen, each leaving safely in a new tab.
+  const links = visitor.locator('article header ul[aria-label="Links"] a')
+  await expect(links).toHaveCount(2)
+  await expect(links.first()).toHaveAttribute(
+    "aria-label",
+    "Website: Research (opens in a new tab)",
+  )
+  await expect(links.first()).toHaveAttribute("href", "https://are.na/northline")
+  for (const link of await links.all()) {
+    await expect(link).toHaveAttribute("target", "_blank")
+    await expect(link).toHaveAttribute("rel", "me noopener noreferrer nofollow")
+  }
 
   const body = (await visitor.locator("body").textContent()) ?? ""
   expect(body).not.toContain(creator.email)
@@ -292,7 +344,26 @@ test("a creator builds, publishes and updates a profile, and a stranger reads it
   await visitor.reload()
   await expect(visitor.locator("article")).toContainText("Type, updated.")
   await expect(visitor.locator("[data-contact]")).toHaveCount(0)
-  await expect(visitor.locator("article")).toContainText("Brooklyn, New York")
+  await expect(visitor.locator("article")).toContainText("Brooklyn, United States")
+
+  // 15b. Publish all products on the profile ------------------------------------
+  // Brand Workbook was switched off in step 2. The bulk control puts it on the
+  // live profile, after a confirmation that names the count, and the stranger
+  // sees it on the next load: the action refreshes the public route itself.
+  await page.goto(routes.profile(creator.slug))
+  await page.getByRole("button", { name: "Publish all products on my profile" }).click()
+  const confirm = page.getByRole("dialog", { name: "Publish 1 product on your profile?" })
+  await expect(confirm).toContainText("Nothing is published to your channels")
+  await confirm.getByRole("button", { name: "Publish 1 product" }).click()
+  await expect(page.getByText("Published 1 product on your profile.")).toBeVisible({
+    timeout: SETUP_TIMEOUT,
+  })
+  await expect(
+    page.getByRole("button", { name: "Publish all products on my profile" }),
+  ).toBeDisabled()
+  await visitor.reload()
+  // In the place the creator arranged it, not appended.
+  expect(await renderedTitles(visitor)).toEqual(arranged)
   await context.close()
 
   // 16. Another account cannot reach this draft ---------------------------------
@@ -370,7 +441,7 @@ test("unpublishing removes the page from the public web", async ({ page, browser
   expect((await visitor.goto(`/@${handle}`))?.status()).toBe(200)
   expect((await visitor.goto(`/@${handle}/ephemeral-sans`))?.status()).toBe(200)
 
-  await page.goto(routes.publicProfileSettings(creator.slug))
+  await page.goto(routes.profile(creator.slug))
   await page.getByRole("button", { name: "Unpublish" }).click()
   await expect(page.getByText("Only you can see this profile")).toBeVisible({
     timeout: SETUP_TIMEOUT,

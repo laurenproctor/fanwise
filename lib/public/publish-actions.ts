@@ -6,14 +6,19 @@ import { createClient } from "@/lib/supabase/server"
 import { publicInternal, publicRoutes, routes } from "@/lib/routes"
 import { removeAvatars } from "./avatars"
 import { loadBuilderContext } from "./draft-store"
+import { loadProductCandidates } from "./product-candidates"
+import { confirmedAndEligible, planPublishAll } from "./publish-all"
 import type { ReadinessIssue } from "./publish-readiness"
 import { loadPublishState } from "./publish-state"
+import { loadLiveProductIds } from "./workspace-queries"
 
 /**
  * Publishing a profile, and taking it down.
  *
  * Kept apart from `./draft-actions`, which never publishes and is tested to
- * say so. This is the only file the builder reaches publication through.
+ * say so. This is the only file anything reaches publication through: the
+ * builder's Publish, Unpublish, and the profile page's "Publish all products
+ * on my profile".
  *
  * Publishing is the database function `publish_public_profile()`, one
  * transaction. Before calling it this action re-reads the draft and re-derives
@@ -141,6 +146,117 @@ export async function publishProfileAction(
   }
 }
 
+export type PublishAllResult =
+  | {
+      ok: true
+      outcome: "published" | "unchanged"
+      publishedCount: number
+      noLongerEligible: number
+    }
+  | { ok: false; kind: "not_live" | "nothing_to_publish" | "failed"; message: string }
+
+const publishAllInput = z.object({
+  productIds: z.array(z.uuid()).min(1).max(500),
+})
+
+const publishAllOutcome = z.object({
+  outcome: z.enum(["published", "unchanged"]),
+  published_count: z.number().int().min(0),
+})
+
+const PUBLISH_ALL_FAILED = "Your products could not be published. Nothing changed; try again."
+
+/**
+ * Publishes every product the creator confirmed onto their live public
+ * profile, in one transaction, and nothing else.
+ *
+ * Public Fanwise visibility only. This reads listings to decide eligibility,
+ * exactly as step 2 of the builder does, and writes none: no channel is
+ * contacted, no listing changes status, no publication run is started.
+ *
+ * Nothing the browser sends is trusted beyond "these are the products I
+ * confirmed". The workspace is the one RLS resolves for the signed-in member,
+ * eligibility is recomputed here from that member's own reads, and only the
+ * overlap is sent. `publish_all_profile_products()` then re-checks membership,
+ * workspace ownership and archival itself, and holds the profile row lock, so
+ * a second press waits for the first and finds nothing left to do.
+ */
+export async function publishAllProductsAction(
+  workspaceSlug: string,
+  input: unknown,
+): Promise<PublishAllResult> {
+  const parsed = publishAllInput.safeParse(input)
+  if (!parsed.success) return { ok: false, kind: "failed", message: PUBLISH_ALL_FAILED }
+
+  const supabase = await createClient()
+  const ctx = await loadBuilderContext(supabase, workspaceSlug)
+  if (!ctx) return { ok: false, kind: "failed", message: PUBLISH_ALL_FAILED }
+
+  if (ctx.profile.status !== "published") {
+    return {
+      ok: false,
+      kind: "not_live",
+      message: "Publish your profile first. Products appear on it once it is live.",
+    }
+  }
+
+  let plan
+  try {
+    const [candidates, live] = await Promise.all([
+      loadProductCandidates(supabase, ctx, workspaceSlug),
+      loadLiveProductIds(supabase, ctx.profile.id),
+    ])
+    plan = planPublishAll(candidates, live)
+  } catch (error) {
+    console.error("[public] publish all: eligibility read failed", error)
+    return { ok: false, kind: "failed", message: PUBLISH_ALL_FAILED }
+  }
+
+  const { ids, noLongerEligible } = confirmedAndEligible(parsed.data.productIds, plan)
+  if (ids.length === 0) {
+    return {
+      ok: false,
+      kind: "nothing_to_publish",
+      message:
+        "None of those products can be published now. They may already be on your profile, or no longer be live in a shop.",
+    }
+  }
+
+  const { data, error } = await supabase.rpc("publish_all_profile_products", {
+    p_public_profile_id: ctx.profile.id,
+    p_product_ids: ids,
+  })
+
+  if (error) {
+    console.error("[public] publish all failed", error)
+    if (error.code === "PT412") {
+      return {
+        ok: false,
+        kind: "not_live",
+        message: "Publish your profile first. Products appear on it once it is live.",
+      }
+    }
+    return { ok: false, kind: "failed", message: PUBLISH_ALL_FAILED }
+  }
+
+  const result = publishAllOutcome.safeParse(data)
+  if (!result.success) {
+    console.error("[public] publish all returned an unexpected shape", result.error)
+    return { ok: false, kind: "failed", message: PUBLISH_ALL_FAILED }
+  }
+
+  if (result.data.outcome === "published") {
+    revalidateProfile(workspaceSlug, ctx.profile.handle, ctx.profile.handle)
+  }
+
+  return {
+    ok: true,
+    outcome: result.data.outcome,
+    publishedCount: result.data.published_count,
+    noLongerEligible,
+  }
+}
+
 /**
  * Takes the live profile off the public web. Every product page beneath it
  * goes with it, by the RLS gate on the parent's status; nothing is deleted and
@@ -165,7 +281,9 @@ export async function unpublishProfileAction(workspaceSlug: string): Promise<voi
  * pages beneath go too; see the note on revalidatePublic in ./actions.ts.
  */
 function revalidateProfile(workspaceSlug: string, previous: string, next: string): void {
-  revalidatePath(routes.publicProfileSettings(workspaceSlug), "layout")
+  // `layout` on the profile section covers its overview and all three builder
+  // steps, so a publish from any of them is reflected on the others at once.
+  revalidatePath(routes.profile(workspaceSlug), "layout")
   for (const handle of new Set([previous.toLowerCase(), next.toLowerCase()])) {
     revalidatePath(publicInternal(handle), "layout")
   }

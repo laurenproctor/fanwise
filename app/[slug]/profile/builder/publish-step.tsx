@@ -134,7 +134,7 @@ export function PublishStep({
                 ? "Complete"
                 : "Needs attention"
             }
-            detail="Image, name, introduction, website, and social links"
+            detail="Image, name, introduction, location, About and links"
           />
           <SummaryRow
             ok={!issues.some((i) => i.step === 2)}
