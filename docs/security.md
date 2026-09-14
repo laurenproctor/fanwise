@@ -374,6 +374,14 @@ published, and only then mint a short signed URL. Buckets stay private. A public
 bucket would have left a creator's avatar and product shots fetchable by URL after
 they took the page down, which is not what anybody means by unpublish.
 
+**A description is creator Markdown rendered as HTML, so the sanitizer is the boundary.** The
+public product page, and every storefront a product is published to, receive
+`markdownToHtml` (`lib/text/markdown-html.ts`): an allowlist of text elements, no attributes but
+`href` and `ol[start]`, links limited to http, https and mailto, and script, style, iframe,
+object and template removed with their contents. On a public page links also carry
+`nofollow noopener noreferrer`. Widening the allowlist is a change to ADR 0011, and
+`tests/unit/markdown.test.ts` pins what it removes.
+
 **Outbound links are the feature and therefore the attack surface.** Every href on a
 public page is validated at render by `safeExternalUrl` — https only, no credentials
 in the authority, no control characters smuggling a scheme past the check — and

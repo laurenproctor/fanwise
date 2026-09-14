@@ -16,7 +16,7 @@ export const woocommerceMerchandising: MerchandisingProfile = {
   voice:
     "Direct and warm, in the brand's own voice. Second person. Short sentences. Confident without hype: no exclamation marks, no superlatives the facts do not earn. Say what the product is, what it is for, and what the buyer gets.",
   structure:
-    "Open with one or two sentences that place the product: what it is and who it is for. Then a short paragraph on what makes it worth buying, drawn from the facts. Then a plain 'What you get' section listing only the included files, formats and counts that appear in the facts. Close with one sentence on use or fit. Plain text paragraphs separated by blank lines; a simple list may use hyphens. No headings, no markdown emphasis, no links, no emoji.",
+    "Open with one or two sentences that place the product: what it is and who it is for. Then a short paragraph on what makes it worth buying, drawn from the facts. Then a plain 'What you get' section listing only the included files, formats and counts that appear in the facts. Close with one sentence on use or fit. Markdown: paragraphs separated by blank lines, and the 'What you get' section as a bullet list with '- '. Bold may mark a short label, sparingly. No headings, no links, no images, no emoji.",
   fields: {
     title:
       "The product name as a buyer would search for it, with the product type if it is not obvious from the name. No shop name, no promotional words, no trailing punctuation.",

@@ -146,7 +146,7 @@ export const DRAFT_OUTPUT_JSON_SCHEMA: Record<string, unknown> = {
     shortDescription: suggestedJson({ type: "string" }, "One or two sentences."),
     longDescription: suggestedJson(
       { type: "string" },
-      "Plain text, paragraphs separated by blank lines. No markdown, no links, no emoji.",
+      "Markdown: paragraphs separated by blank lines, bullet lists with '- ' where the evidence lists things. No headings, no links, no emoji.",
     ),
     productType: suggestedJson(
       { type: "string", enum: [...PRODUCT_TYPES] },

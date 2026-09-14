@@ -80,7 +80,7 @@ Return one JSON object matching the schema. For every field give a confidence be
 
 productType must be one of: ${PRODUCT_TYPES.join(", ")}.
 
-Descriptions are plain text. No markdown, no headings, no links, no emoji.
+Descriptions are Markdown: paragraphs separated by blank lines, and bullet lists with '- ' where the evidence lists things. No headings, no links, no images, no emoji.
 
 WHEN THERE IS MORE THAN ONE SOURCE
 

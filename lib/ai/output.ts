@@ -49,7 +49,7 @@ export const LISTING_OUTPUT_JSON_SCHEMA: Record<string, unknown> = {
   required: ["title", "description", "shortDescription", "seoTitle", "seoDescription", "tags"],
   properties: {
     title: { type: "string", description: "The listing title." },
-    description: { type: "string", description: "The full description, plain text." },
+    description: { type: "string", description: "The full description, as Markdown." },
     shortDescription: {
       type: "string",
       description: "A one or two sentence summary. Empty string if the channel has no use for one.",

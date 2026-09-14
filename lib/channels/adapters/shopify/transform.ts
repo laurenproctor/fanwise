@@ -1,4 +1,4 @@
-import { plainTextToHtml } from "@/lib/channels/html"
+import { markdownToHtml } from "@/lib/text/markdown-html"
 
 /**
  * Canonical product values into the shapes Shopify's fields expect.
@@ -9,11 +9,13 @@ import { plainTextToHtml } from "@/lib/channels/html"
  */
 
 /**
- * Plain canonical text into `descriptionHtml`. The transform lives in
- * lib/channels/html.ts since a second channel wanted the same one; this name
+ * The Markdown description into `descriptionHtml`, sanitized. The transform
+ * lives in lib/text since every HTML channel wants the same one; this name
  * stays so the adapter reads as it did.
  */
-export const toDescriptionHtml = plainTextToHtml
+export function toDescriptionHtml(text: string | null): string {
+  return markdownToHtml(text)
+}
 
 /**
  * Money, as Shopify wants it: a decimal string, two places, never a float in

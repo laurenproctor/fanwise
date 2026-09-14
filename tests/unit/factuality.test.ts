@@ -182,3 +182,26 @@ describe("describeViolations", () => {
     expect(text).toBe("The model claimed something not in your product data: 12, ttf.")
   })
 })
+
+describe("Markdown descriptions are read as the words a buyer sees", () => {
+  it("does not read an ordered list's markers as counts", () => {
+    expect(
+      violations(
+        output({
+          description:
+            "Why it works:\n\n1. Drawn for long text\n2. Includes Cyrillic\n3. Nine weights",
+        }),
+      ),
+    ).toEqual([])
+  })
+
+  it("still refuses an invented number inside a list item or emphasis", () => {
+    const found = violations(output({ description: "- **500 glyphs**\n- Nine weights" }))
+    expect(found.map((v) => v.value)).toContain("500")
+  })
+
+  it("still reads the address of a link", () => {
+    const found = violations(output({ description: "[Specimen](https://example.com/2024)" }))
+    expect(found.map((v) => v.value)).toContain("2024")
+  })
+})

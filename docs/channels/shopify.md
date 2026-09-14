@@ -51,7 +51,7 @@ them true now would have the UI offer a sales report that does not exist.
 | Fanwise | Shopify | Notes |
 |---|---|---|
 | `canonical_title` or `name` | `title` | Max 255 |
-| `canonical_description` | `descriptionHtml` | Plain text is wrapped in paragraphs, §8 |
+| `canonical_description` | `descriptionHtml` | Markdown rendered to sanitized HTML, §8 |
 | `seo_title`, then `title` | `seo.title` | Truncated at 70, §14 |
 | `seo_description`, then `short_description` | `seo.description` | Truncated at 320, §14 |
 | `base_price` | `variants[0].price` | Money, string-encoded |
@@ -224,10 +224,11 @@ because it is not a new operation.
 
 ## 8. Description transform
 
-`canonical_description` is plain text. Shopify expects HTML in `descriptionHtml`, so blank
-lines become paragraph breaks and everything else is escaped. No Markdown, no sanitizer, no
-rich text: the canonical record does not hold any, and inventing structure the creator did
-not write is exactly the kind of thing the factuality rule exists to prevent elsewhere.
+The description is Markdown (ADR 0011). `descriptionHtml` receives `markdownToHtml` from
+`lib/text/markdown-html.ts`: rendered, then sanitized to paragraphs, breaks, emphasis, lists,
+headings two to four, quotes, code and http/https/mailto links. Raw HTML a creator types is
+removed unless it is on that list. Until 13 September 2026 this field received escaped plain
+text in paragraphs; that text is valid Markdown with the same meaning, so nothing changed for it.
 
 ## 9. OAuth
 

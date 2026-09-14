@@ -1,3 +1,4 @@
+import { markdownToPlainText } from "@/lib/text/markdown"
 import { LIMITS } from "./config"
 
 /**
@@ -40,12 +41,12 @@ export function toPrice(price: number | null): number | null {
 }
 
 /**
- * Etsy strips formatting from descriptions, so the canonical plain text goes
- * as it is, with Windows line endings normalized and trailing space removed.
+ * Etsy strips formatting from descriptions, so the Markdown goes as the text a
+ * reader would see: paragraphs kept, list items one per line with a bullet,
+ * links followed by their address, emphasis reduced to its words.
  */
 export function toDescription(text: string | null): string {
-  if (!text) return ""
-  return text.replace(/\r\n/g, "\n").trim()
+  return markdownToPlainText(text)
 }
 
 export function listingUrl(listingId: number): string {

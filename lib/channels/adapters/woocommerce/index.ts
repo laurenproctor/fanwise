@@ -15,7 +15,13 @@ import type { WooClient } from "./client"
 import { productMissing } from "./errors"
 import { woocommerceMerchandising } from "./merchandising"
 import { woocommerceCredentialsSchema, woocommerceOAuth } from "./oauth"
-import { adminProductUrl, storeBase, toDescriptionHtml, toMoney } from "./transform"
+import {
+  adminProductUrl,
+  storeBase,
+  toDescriptionHtml,
+  toMoney,
+  toShortDescriptionHtml,
+} from "./transform"
 
 /**
  * WooCommerce. The second owned storefront.
@@ -309,7 +315,7 @@ async function writeProduct(
     type: "simple",
     status,
     description: toDescriptionHtml(listing.description),
-    short_description: toDescriptionHtml(listing.short_description),
+    short_description: toShortDescriptionHtml(listing.short_description),
     ...(price === null ? {} : { regular_price: price }),
     // A digital product: nothing ships, and one copy per order.
     virtual: true,

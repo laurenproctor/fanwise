@@ -45,7 +45,7 @@ somewhere public. That is a Fanwise decision, recorded in §6, and it could chan
 | Fanwise | WooCommerce | Notes |
 |---|---|---|
 | `canonical_title` or `name` | `name` | House limit 200 |
-| `canonical_description` | `description` | Plain text wrapped in paragraphs, shared transform |
+| `canonical_description` | `description` | Markdown rendered to sanitized HTML, shared transform |
 | `short_description` | `short_description` | Shown beside the price |
 | `base_price` | `regular_price` | Decimal string |
 | `currency` | — | The store's currency wins, warning rule |
@@ -120,8 +120,9 @@ becomes an update of that id.
 
 ## 8. Description transform
 
-`lib/channels/html.ts`, shared with Shopify: blank lines to paragraphs, newlines to breaks,
-everything escaped. No Markdown.
+`description` receives `markdownToHtml` from `lib/text/markdown-html.ts`, shared with Shopify
+(ADR 0011). `short_description` stays plain text through `lib/channels/html.ts`: blank lines
+to paragraphs, newlines to breaks, everything escaped.
 
 ## 9. Authorization
 
