@@ -293,13 +293,20 @@ describe("transforms", () => {
     expect(toDescriptionHtml("One.\nTwo.")).toBe("<p>One.<br>Two.</p>")
   })
 
-  it("escapes HTML rather than passing it through", () => {
-    // The canonical record holds plain text. A creator who types a < is not
-    // writing markup, and forwarding it as markup is both a rendering bug and
-    // an injection into someone else's storefront.
-    expect(toDescriptionHtml('<script>alert("x")</script>')).toBe(
-      "<p>&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;</p>",
+  it("renders the Markdown a creator wrote", () => {
+    expect(toDescriptionHtml("A **layered** font.\n\n- Six fonts\n- Cyrillic")).toBe(
+      "<p>A <strong>layered</strong> font.</p><ul><li>Six fonts</li><li>Cyrillic</li></ul>",
     )
+  })
+
+  it("removes markup that could run in someone else's storefront, and escapes a bare <", () => {
+    // Markdown passes raw HTML through, so the sanitizer is what stands between
+    // a description and an injection into the store it is published to.
+    expect(toDescriptionHtml('<script>alert("x")</script>Hello')).toBe("<p>Hello</p>")
+    expect(toDescriptionHtml('<img src=x onerror="alert(1)"> [x](javascript:alert(1))')).toBe(
+      "<p> x</p>",
+    )
+    expect(toDescriptionHtml("5 < 6 & 7 > 3")).toBe("<p>5 &lt; 6 &amp; 7 &gt; 3</p>")
   })
 
   it("returns an empty string for no description, never the word null", () => {

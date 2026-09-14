@@ -15,6 +15,7 @@ import { publicMediaRoutes } from "@/lib/public/media-routes"
 import { publicRoutes, publicUrl } from "@/lib/routes"
 import type { PublicProductView } from "@/lib/public/types"
 import { appOrigin } from "@/lib/channels/oauth"
+import { markdownToHtml } from "@/lib/text/markdown-html"
 
 /**
  * A product's public page, served at `/@<handle>/<slug>`.
@@ -270,26 +271,18 @@ export default async function PublicProductPage({ params, searchParams }: Params
               Overview
             </h2>
             {/*
-              Rendered as text, split on blank lines. Not as HTML and not
-              through a Markdown renderer: this string is creator input, and
-              the moment it is rendered as markup the public page becomes a
-              place to put a script tag. Paragraphs are the whole of the
-              formatting on offer, and that is a deliberate ceiling.
+              Markdown, rendered to HTML and then sanitized to the handful of
+              elements the editor offers. This string is creator input: the
+              sanitizer in lib/text/markdown-html.ts is what keeps a script tag
+              typed into a description from running on this page, and links
+              leave with nofollow, as the destination list's do.
             */}
-            <div className="flex max-w-prose flex-col gap-4 text-[16px] leading-relaxed text-[var(--color-ink-2)]">
-              {product.description
-                .replace(/\r\n?/g, "\n")
-                .split(/\n[^\S\n]*\n\s*/)
-                .map((paragraph) => paragraph.trim())
-                .filter((paragraph) => paragraph.length > 0)
-                .map((paragraph, index) => (
-                  // pre-line keeps a single newline a line break, which is how a
-                  // list typed one item per line stays a list.
-                  <p key={index} className="whitespace-pre-line">
-                    {paragraph}
-                  </p>
-                ))}
-            </div>
+            <div
+              className="fanwise-prose max-w-prose text-[16px] leading-relaxed text-[var(--color-ink-2)]"
+              dangerouslySetInnerHTML={{
+                __html: markdownToHtml(product.description, { outboundLinks: true }),
+              }}
+            />
           </section>
         ) : null}
 

@@ -1,3 +1,4 @@
+import { markdownToClaimText } from "@/lib/text/markdown"
 import type { FactSheet } from "./factsheet"
 import type { ListingOutput } from "./output"
 
@@ -291,7 +292,7 @@ function factCorpus(sheet: FactSheet): string {
     sheet.name,
     sheet.title,
     sheet.productType,
-    sheet.description ?? "",
+    markdownToClaimText(sheet.description),
     sheet.shortDescription ?? "",
     sheet.brand ?? "",
     sheet.version ?? "",
@@ -453,7 +454,8 @@ export function validateFactuality(output: ListingOutput, sheet: FactSheet): Fac
 
   const violations: Violation[] = []
   checkField("title", output.title, allowed, violations)
-  checkField("description", output.description, allowed, violations)
+  // Read as the words a buyer sees: list markers are structure, not counts.
+  checkField("description", markdownToClaimText(output.description), allowed, violations)
   checkField("shortDescription", output.shortDescription, allowed, violations)
   checkField("seoTitle", output.seoTitle, allowed, violations)
   checkField("seoDescription", output.seoDescription, allowed, violations)

@@ -8,6 +8,7 @@ import { savePublicProductPageAction } from "@/lib/public/actions"
 import { EMPTY_PAGE_STATE, type PublicProductPageState } from "@/lib/public/form-state"
 import { PUBLIC_SLUG_LIMITS, canonicalHandle, checkPublicSlug } from "@/lib/public/handles"
 import { publicRoutes, routes } from "@/lib/routes"
+import { MarkdownEditor } from "@/components/ui/markdown-editor"
 import type { PublicPageStatus } from "@/lib/public/types"
 
 /**
@@ -254,21 +255,18 @@ export function PublicPageForm({
           />
 
           <div className="flex flex-col gap-2">
-            <label htmlFor={ids.description} className="label-mono">
-              Description
-            </label>
-            <textarea
+            <MarkdownEditor
               id={ids.description}
               name="descriptionOverride"
+              label="Description"
               rows={6}
-              maxLength={4000}
               value={fields.descriptionOverride}
-              onChange={(event) => set("descriptionOverride", event.target.value)}
-              aria-describedby={`${ids.description}-hint`}
-              className="w-full resize-y rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-card)] px-3 py-2.5 text-[15px] text-[var(--color-ink)] outline-none focus:border-[var(--color-accent)]"
+              onChange={(value) => set("descriptionOverride", value)}
+              describedBy={`${ids.description}-hint`}
             />
             <p id={`${ids.description}-hint`} className="text-[13px] text-[var(--color-ink-3)]">
-              Plain text. Blank lines become paragraphs; formatting and links are not rendered.
+              Headings, lists, bold, italic and links are shown on the page. Leave empty to use the
+              product&apos;s description.
             </p>
             <FieldError
               id={`${ids.description}-error`}

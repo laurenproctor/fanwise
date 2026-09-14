@@ -43,6 +43,15 @@ one of the three things that never bend.
 
 Log the FactSheet hash on every `ai_generations` row so a bad listing traces to its inputs.
 
+## Formatting
+
+Descriptions are Markdown (ADR 0011). A generated description may use paragraphs and bullet
+lists, and bold sparingly where the channel profile allows; never headings, links, images or
+emoji. The factuality validator reads the description as the words a buyer sees
+(`markdownToClaimText`): markup is removed, list markers are dropped because they are
+structure rather than counts, and everything else, a link's address included, is checked as
+before. The FactSheet's description is read the same way.
+
 ## Channel profiles
 
 Do not write the canonical description four times.

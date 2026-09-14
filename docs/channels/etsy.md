@@ -40,7 +40,7 @@ No manual steps. Etsy takes the file, so ADR 0001's assisted step does not apply
 | Fanwise | Etsy | Notes |
 |---|---|---|
 | `canonical_title` or `name` | `title` | Max 140 |
-| `canonical_description` | `description` | Plain text; Etsy strips formatting |
+| `canonical_description` | `description` | Markdown as plain text (`markdownToPlainText`); Etsy strips formatting |
 | `base_price` | `price` | Number, shop currency, minimum 0.20 |
 | `currency` | — | The shop's currency wins, warning rule |
 | `category` | `taxonomy_id` | A label from §14, required |

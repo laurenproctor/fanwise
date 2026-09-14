@@ -27,7 +27,7 @@ import { LISTING_FIELD_LABELS, type ListingField } from "./output"
  */
 
 /** Moves whenever the rules text or the assembly changes. */
-export const RULES_VERSION = "2026-09-07.1"
+export const RULES_VERSION = "2026-09-13.1"
 
 const RULES = `You compose product listings for independent creators who sell digital products: fonts, templates, graphics, photos, illustrations, icons, mockups, brushes, 3D assets and themes. You write for one sales channel at a time, following that channel's profile.
 
@@ -41,7 +41,7 @@ The rule, precisely:
 - Do not use numbers you were not given, including number words. Do not name file formats you were not given. Do not name software you were not given.
 - Do not mention the sales channel by name and do not mention that the listing was composed.
 
-Output is a single JSON object with exactly these keys: title, description, shortDescription, seoTitle, seoDescription, tags. Every value is a string except tags, which is an array of strings. Use an empty string for a field the profile tells you to leave empty. The description is plain text: paragraphs separated by blank lines, no markdown headings, no bold, no links, no emoji.`
+Output is a single JSON object with exactly these keys: title, description, shortDescription, seoTitle, seoDescription, tags. Every value is a string except tags, which is an array of strings. Use an empty string for a field the profile tells you to leave empty. The description is Markdown: paragraphs separated by blank lines, and bullet lists with '- ' where the profile asks for a list. No headings, no links, no images, no emoji. The rules above apply to the words whatever the markup: a number in a list item is still a number.`
 
 export interface BuiltPrompt {
   system: PromptBlock[]

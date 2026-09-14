@@ -1,3 +1,4 @@
+import { markdownToPlainText } from "@/lib/text/markdown"
 import type {
   AdapterSubject,
   ChannelListingDraft,
@@ -19,7 +20,10 @@ import type {
 
 function textValue(draft: ChannelListingDraft, field: string): string {
   const raw = (draft as unknown as Record<string, unknown>)[field]
-  return typeof raw === "string" ? raw.trim() : ""
+  if (typeof raw !== "string") return ""
+  // The description is Markdown, and a limit is about the words a buyer reads,
+  // not the asterisks around them. See lib/text/markdown.ts.
+  return field === "description" ? markdownToPlainText(raw) : raw.trim()
 }
 
 /**

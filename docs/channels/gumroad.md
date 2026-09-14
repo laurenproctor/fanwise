@@ -174,8 +174,8 @@ only what the product is short of. It never changes published state.
 
 ## 8. Description transform
 
-`lib/channels/html.ts`, shared with Shopify and WooCommerce: blank lines to paragraphs,
-newlines to breaks, everything escaped.
+`markdownToHtml` from `lib/text/markdown-html.ts`, shared with Shopify and WooCommerce
+(ADR 0011): the Markdown description rendered and sanitized.
 
 ## 9. OAuth
 

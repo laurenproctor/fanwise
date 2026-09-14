@@ -89,6 +89,9 @@ Status: draft, incomplete, ready, publishing, published, archived.
 
 No channel-specific column belongs here. Ever.
 
+`canonical_description` is Markdown, as are `channel_listings.description` and
+`public_product_pages.description_override` (ADR 0011). Every other text column is plain text.
+
 Slugs are unique **per workspace**, not globally: two creators may both ship
 `aster-grotesk`, and neither learns the other exists.
 

@@ -21,6 +21,8 @@ import type { GlossaryTerm } from "@/lib/ui/glossary"
 import { ReadinessBar } from "./readiness-bar"
 import { RequirementList } from "./requirement-list"
 import { TagInput } from "./tag-input"
+import { MarkdownEditor } from "@/components/ui/markdown-editor"
+import { markdownToPlainText } from "@/lib/text/markdown"
 
 /**
  * The manual listing editor.
@@ -47,9 +49,18 @@ function Submit() {
 }
 
 /** A character counter that reads the channel's own rule. */
-function Counter({ value, constraint }: { value: string; constraint?: TextConstraint }) {
+function Counter({
+  value,
+  constraint,
+  markdown = false,
+}: {
+  value: string
+  constraint?: TextConstraint
+  /** Count what a reader sees, as readiness does for a Markdown field. */
+  markdown?: boolean
+}) {
   if (!constraint?.maxLength && !constraint?.minLength) return null
-  const length = value.trim().length
+  const length = (markdown ? markdownToPlainText(value) : value.trim()).length
   const over = constraint.maxLength !== undefined && length > constraint.maxLength
   const under = constraint.minLength !== undefined && length < constraint.minLength
 
@@ -336,7 +347,11 @@ export function ListingEditor({
           term="listingDescription"
           aside={
             <>
-              <Counter value={draft.description ?? ""} constraint={constraints.text.description} />
+              <Counter
+                value={draft.description ?? ""}
+                constraint={constraints.text.description}
+                markdown
+              />
               {regen("description", "Description")}
               <PullButton
                 field="Description"
@@ -346,13 +361,13 @@ export function ListingEditor({
             </>
           }
         >
-          <textarea
+          <MarkdownEditor
             id="listing-description"
             name="description"
+            ariaLabel="Description"
             rows={10}
             value={draft.description ?? ""}
-            onChange={(e) => set("description", e.target.value)}
-            className={inputClass}
+            onChange={(value) => set("description", value)}
           />
         </FieldShell>
 

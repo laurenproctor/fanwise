@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Field } from "@/components/ui/field"
 import { RequiredMark } from "@/components/ui/required-mark"
 import { FormError } from "@/components/ui/form-error"
+import { MarkdownEditor } from "@/components/ui/markdown-editor"
 import { updateProductAction, type SaveState } from "@/lib/products/actions"
 import { PRODUCT_TYPES, PRODUCT_TYPE_LABELS, type Product } from "@/lib/products/types"
 import { SaveStatusIndicator, type SaveStatus } from "@/components/ui/save-status"
@@ -197,14 +198,20 @@ export function ProductForm({
           maxLength={200}
           hint="Every channel's listing starts from this. Editing a listing later never changes it back."
         />
-        <Area
-          label="Canonical description"
-          name="canonicalDescription"
-          defaultValue={product.canonical_description ?? ""}
-          rows={6}
-          maxLength={8000}
-          hint="The full description each channel starts from."
-        />
+        <div className="flex flex-col gap-2">
+          <MarkdownEditor
+            id="canonical-description"
+            name="canonicalDescription"
+            label="Canonical description"
+            defaultValue={product.canonical_description ?? ""}
+            rows={8}
+            describedBy="canonical-description-hint"
+          />
+          <span id="canonical-description-hint" className="text-[13px] text-[var(--color-ink-3)]">
+            The full description each channel starts from. Formatting carries to channels that show
+            it; a channel that shows only plain text receives the same words without it.
+          </span>
+        </div>
         <Area
           label="Short description"
           name="shortDescription"

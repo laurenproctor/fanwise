@@ -1,4 +1,5 @@
 import { plainTextToHtml } from "@/lib/channels/html"
+import { markdownToHtml } from "@/lib/text/markdown-html"
 
 /**
  * Canonical values into the shapes WooCommerce's fields expect.
@@ -6,7 +7,13 @@ import { plainTextToHtml } from "@/lib/channels/html"
  * Everything here is pure and total: no provider call, no clock, no throw.
  */
 
-export const toDescriptionHtml = plainTextToHtml
+/** The Markdown description, sanitized. */
+export function toDescriptionHtml(text: string | null): string {
+  return markdownToHtml(text)
+}
+
+/** The short description stays plain text: a line under the title, not a document. */
+export const toShortDescriptionHtml = plainTextToHtml
 
 /**
  * Money, as WooCommerce wants it: a decimal string. The store formats it in
