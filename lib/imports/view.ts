@@ -1,6 +1,7 @@
 import type { ProductAsset, ProductType } from "@/lib/products/types"
 import { PRODUCT_TYPES } from "@/lib/products/types"
 import { IMPORT_ERROR_RECOVERIES } from "./errors"
+import { IMPORT_LIMITS } from "./limits"
 import { licenseEntry } from "./licenses"
 import { parseEvidence, type ProductSourceEvidence } from "./evidence"
 import { SOURCE_LABELS, descriptorFor } from "./sources/registry"
@@ -360,6 +361,33 @@ function nonEmpty(value: string | null | undefined): string | null {
 }
 
 /**
+ * A description Fanwise fills in, fitted to the field it lands in.
+ *
+ * Cut at the last sentence or line end inside the limit, so what remains is
+ * still the source's or the model's own sentences, and marked with an ellipsis
+ * only when no sentence end was near enough to cut at. Never applied to the
+ * product's saved description: that is the creator's, and cutting it here would
+ * shorten it on the next save without anyone deciding to.
+ */
+export function fitDescription(
+  text: string,
+  limit: number = IMPORT_LIMITS.maxListingDescription,
+): string {
+  if (text.length <= limit) return text
+  const head = text.slice(0, limit)
+  const end = Math.max(
+    head.lastIndexOf(". "),
+    head.lastIndexOf("! "),
+    head.lastIndexOf("? "),
+    head.lastIndexOf(".\n"),
+    head.lastIndexOf("\n"),
+  )
+  if (end >= limit / 2) return head.slice(0, head[end] === "\n" ? end : end + 1).trimEnd()
+  const space = head.lastIndexOf(" ", limit - 1)
+  return `${head.slice(0, space > 0 ? space : limit - 1).trimEnd()}…`
+}
+
+/**
  * The listing draft, assembled from three sources in one order.
  *
  * The product's own column is the value whenever it holds one, because that is
@@ -378,11 +406,10 @@ export function draftFor(record: ImportRecord): ListingDraft {
     draft?.title?.value ??
     product.name
 
+  const filledDescription = draft?.longDescription?.value ?? evidence?.summary?.value
   const descriptionValue =
     nonEmpty(product.canonical_description) ??
-    draft?.longDescription?.value ??
-    evidence?.summary?.value ??
-    ""
+    (filledDescription === undefined ? "" : fitDescription(filledDescription))
 
   const priceValue =
     product.base_price !== null ? String(product.base_price) : suggestedPrice(draft)

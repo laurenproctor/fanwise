@@ -20,6 +20,12 @@ export const IMPORT_LIMITS = {
   /** Characters of running text carried from one source into evidence. */
   maxBodyText: 20_000,
   /**
+   * Characters the review screen's description field takes. A description the
+   * screen fills in for the creator is fitted to it, so the field never opens
+   * over its own limit.
+   */
+  maxListingDescription: 1000,
+  /**
    * A recording is sent to the transcription provider in one request, base64
    * inside JSON, so it is kept small: the recorder captures speech at 48 kbps,
    * which puts ten minutes near 3.6 MB, well inside this.

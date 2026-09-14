@@ -13,8 +13,18 @@ import {
   readVisibleText,
 } from "@/lib/imports/retrieval/html"
 import { IMPORT_LIMITS, megabytes } from "@/lib/imports/limits"
-import { isPlausibleDocumentTitle, readPdf } from "@/lib/imports/retrieval/pdf"
-import { isMostlyCode, looksLikeCode, readPlainText } from "@/lib/imports/retrieval/plain-text"
+import {
+  collapseLetterSpacing,
+  isPlausibleDocumentTitle,
+  readPdf,
+  withoutRunningLines,
+} from "@/lib/imports/retrieval/pdf"
+import {
+  isMostlyCode,
+  isProseLine,
+  looksLikeCode,
+  readPlainText,
+} from "@/lib/imports/retrieval/plain-text"
 import {
   CONTENT_IMPORTERS,
   decodeText,
@@ -27,6 +37,8 @@ import { isSourcePathFor, maxBytesFor, sourcePathFor } from "@/lib/imports/sourc
 import { provisionalContentName } from "@/lib/imports/start"
 import { CONTENT_SOURCE_KINDS, SOURCE_KINDS, isContentSourceKind } from "@/lib/imports/types"
 import {
+  draftFor,
+  fitDescription,
   htmlSourcesWithoutPictures,
   recoveriesFor,
   sourceLabelFor,
@@ -400,6 +412,138 @@ describe("an HTML specimen that describes itself nowhere", () => {
     // A paste or a PDF never had pictures to find, so it is not told otherwise.
     const paste = await pastedTextImporter.read({ bytes: bytes("Aster\nWords."), filename: null })
     expect(htmlSourcesWithoutPictures(record(paste, "pasted_text"))).toEqual([])
+  })
+})
+
+describe("a PDF printed from a web page", () => {
+  /*
+    The text layer of a type specimen saved with the browser's "Save as PDF":
+    tracked-out navigation and labels, the lead paragraph wrapped over four
+    visual lines, figures as labels, and the browser's date, title, address and
+    page number on every page.
+  */
+  const header = (page: number) => [
+    `9/13/26, 8:46 PM Facette`,
+    `file:///Users/me/Desktop/Facette.html ${page}/9`,
+  ]
+  const FIRST_PAGE = [
+    "F A C E T T E",
+    "· T H I N",
+    "T O",
+    "B L A C K ·",
+    "V 0 . 5",
+    "T E S T E R W E I G H T S I D E A A N AT O M Y",
+    "A wide display face that lives between two worlds: octagonal,",
+    "machined curves and stems cut like a stone inscription. One",
+    "45 degree angle, repeated at every scale, now in caps and",
+    "lowercase.",
+    "G LY P H S",
+    "287",
+    "W ORD M AR K STORE FRONT LABE L LO W ERCAS E F IGURE S ACCENTS",
+    "The quick",
+    ...header(1),
+  ]
+  const pages = [
+    FIRST_PAGE,
+    ["brown fox", "Click the line and type. Caps, lowercase and figures are drawn.", ...header(2)],
+    ["Most gothics pick one construction and apply it everywhere.", ...header(3)],
+  ]
+
+  it("joins tracked-out letters, and leaves ordinary words alone", () => {
+    expect(collapseLetterSpacing("F A C E T T E")).toBe("FACETTE")
+    expect(collapseLetterSpacing("V 0 . 5")).toBe("V0.5")
+    expect(collapseLetterSpacing("B L A C K ·")).toBe("BLACK·")
+    expect(collapseLetterSpacing("T O")).toBe("T O")
+    expect(collapseLetterSpacing("A wide display face, like B, D, P and R.")).toBe(
+      "A wide display face, like B, D, P and R.",
+    )
+    expect(collapseLetterSpacing("Version 2.5 of a font")).toBe("Version 2.5 of a font")
+  })
+
+  it("drops the browser's running header and footer from every page, and nothing else", () => {
+    const cleaned = withoutRunningLines(pages.map((lines) => lines.map(collapseLetterSpacing)))
+    const text = cleaned.flat().join("\n")
+    expect(text).not.toContain("8:46 PM")
+    expect(text).not.toContain("file:///")
+    expect(text).toContain("FACETTE")
+    expect(text).toContain("Most gothics pick one construction")
+    // One page has no running matter to find: nothing repeats.
+    expect(withoutRunningLines([FIRST_PAGE])).toEqual([FIRST_PAGE])
+  })
+
+  it("keeps a heading that repeats mid-page", () => {
+    const body = (n: number) => ["Intro", "one", "two", "three", "Specs", "four", "five", `${n}`]
+    const cleaned = withoutRunningLines([body(1), body(2), body(3)])
+    expect(cleaned.every((lines) => lines.includes("Specs"))).toBe(true)
+  })
+
+  it("summarises from the lead paragraph, not from the labels around it", () => {
+    const text = withoutRunningLines(pages.map((lines) => lines.map(collapseLetterSpacing)))
+      .map((lines) => lines.join("\n"))
+      .join("\n\n")
+    const reading = readPlainText(text)
+    expect(reading.title).toBe("FACETTE")
+    expect(reading.summary).toBe(
+      "A wide display face that lives between two worlds: octagonal, machined curves and stems cut like a stone inscription. One 45 degree angle, repeated at every scale, now in caps and lowercase.",
+    )
+  })
+
+  it("tells a label from a line of prose", () => {
+    for (const label of ["GLYPHS", "THIN · 100", "OTF TTF VF", "TESTERWEIGHTSIDEAAN AT OMY"]) {
+      expect(isProseLine(label), label).toBe(false)
+    }
+    expect(isProseLine("W ORD M AR K STORE FRONT LABE L LO W ERCAS E F IGURE S ACCENTS")).toBe(
+      false,
+    )
+    expect(isProseLine("machined curves and stems cut like a stone inscription. One")).toBe(true)
+  })
+})
+
+describe("a description Fanwise fills in", () => {
+  const sentence = "Each stem is heavier than the last, so the family climbs one scale. "
+
+  it("fits the field, cut at a sentence end", () => {
+    const fitted = fitDescription(sentence.repeat(40))
+    expect(fitted.length).toBeLessThanOrEqual(IMPORT_LIMITS.maxListingDescription)
+    expect(fitted.endsWith("one scale.")).toBe(true)
+    expect(fitDescription("Short and whole.")).toBe("Short and whole.")
+  })
+
+  it("cuts at a word and says so when no sentence ends near the limit", () => {
+    const fitted = fitDescription("word ".repeat(400))
+    expect(fitted.length).toBeLessThanOrEqual(IMPORT_LIMITS.maxListingDescription)
+    expect(fitted.endsWith("word…")).toBe(true)
+  })
+
+  function record(canonicalDescription: string | null, summary: string) {
+    return {
+      row: { accepted: {}, provider: "pdf_document", source_url: null },
+      product: {
+        name: "Facette",
+        canonical_title: null,
+        canonical_description: canonicalDescription,
+        base_price: null,
+        currency: "USD",
+        product_type: "other",
+      },
+      evidence: {
+        summary: { value: summary, provenance: "observed", origin: "document" },
+        visibleFeatures: { value: [], provenance: "observed", origin: "document" },
+      },
+      draft: null,
+      sources: [],
+    } as unknown as ImportRecord
+  }
+
+  it("never opens the listing over the description limit from what a source said", () => {
+    const description = draftFor(record(null, sentence.repeat(60))).description
+    expect(description.value.length).toBeLessThanOrEqual(IMPORT_LIMITS.maxListingDescription)
+    expect(description.origin).toEqual({ kind: "observed", from: "document" })
+  })
+
+  it("leaves a description the creator saved exactly as they saved it", () => {
+    const saved = sentence.repeat(30)
+    expect(draftFor(record(saved, "A summary.")).description.value).toBe(saved.trim())
   })
 })
 
