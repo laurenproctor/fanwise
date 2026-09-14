@@ -2,12 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import type { Product, ProductAsset } from "@/lib/products/types"
 import { parseEvidence, type ProductSourceEvidence } from "./evidence"
-import {
-  DRAFT_FIELDS,
-  draftOutputSchema,
-  type DraftField,
-  type DraftOutput,
-} from "./draft-output"
+import { DRAFT_FIELDS, draftOutputSchema, type DraftField, type DraftOutput } from "./draft-output"
 import { IMPORT_ERROR_MESSAGES, type ImportErrorCode } from "./errors"
 
 /**

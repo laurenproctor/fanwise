@@ -267,7 +267,9 @@ describe("what a draft may not claim on the strength of a screenshot", () => {
 
   it("withholds a list whose every entry made a claim", () => {
     const result = checkDraftClaims(
-      draft({ technicalRequirements: suggestion(["Works with Figma", "Requires Adobe Illustrator"]) }),
+      draft({
+        technicalRequirements: suggestion(["Works with Figma", "Requires Adobe Illustrator"]),
+      }),
       evidence(),
     )
     expect(result.withheld).toEqual(["technicalRequirements"])

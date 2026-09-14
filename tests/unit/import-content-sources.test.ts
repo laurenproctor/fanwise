@@ -293,7 +293,9 @@ describe("an HTML specimen that describes itself nowhere", () => {
     )
     expect(readSummaryParagraph(`<p>Click here to start typing.</p><p>Size</p>`)).toBeNull()
     expect(
-      readSummaryParagraph(`<p hidden>A hidden paragraph that nobody reading the page can see.</p>`),
+      readSummaryParagraph(
+        `<p hidden>A hidden paragraph that nobody reading the page can see.</p>`,
+      ),
     ).toBeNull()
   })
 
