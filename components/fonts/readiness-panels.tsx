@@ -26,10 +26,8 @@ export function SectionNav({
 
   return (
     <div className="flex flex-col gap-8">
-      <nav aria-labelledby="font-sections-heading" className="flex flex-col gap-3">
-        <h2 id="font-sections-heading" className="label-mono">
-          Listing
-        </h2>
+      <nav aria-label="Listing sections" className="flex flex-col gap-3">
+        <h2 className="label-mono">Listing</h2>
         <ul className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
           {FONT_SECTIONS.map((section) => {
             const active = section === current
@@ -46,8 +44,11 @@ export function SectionNav({
                       : "text-[var(--color-ink)] hover:bg-[var(--color-paper-2)]"
                   }`}
                 >
-                  <StatusIcon status={status} />
-                  <span className="whitespace-nowrap">{FONT_SECTION_LABELS[section]}</span>
+                  <StatusIcon status={status} announce={false} />
+                  <span className="whitespace-nowrap">
+                    {FONT_SECTION_LABELS[section]}
+                    <span className="sr-only"> ({STATUS_TEXT[status].toLowerCase()})</span>
+                  </span>
                 </button>
               </li>
             )
@@ -105,14 +106,22 @@ const RULE_STATUS: Record<ReadinessRule["severity"], "error" | "attention" | "in
  */
 export function ReadinessIssues({
   readiness,
+  publishBlockedReason,
   onOpen,
 }: {
   readiness: FontReadiness
+  /**
+   * Why Publish is disabled, from the same decision the button makes. The
+   * verdict here never says "ready" beside a button that is not: a product can
+   * clear every rule of its own while every connected channel still refuses it.
+   */
+  publishBlockedReason: string | null
   onOpen: (rule: ReadinessRule) => void
 }) {
   const required = readiness.issues.filter((rule) => rule.severity !== "optional")
   const optional = readiness.issues.filter((rule) => rule.severity === "optional")
   const blocked = readiness.blockingAll.length > 0
+  const unavailable = blocked || publishBlockedReason !== null
 
   return (
     <section
@@ -121,19 +130,21 @@ export function ReadinessIssues({
     >
       <div className="flex items-start gap-3">
         <StatusIcon
-          status={blocked ? "error" : required.length > 0 ? "attention" : "complete"}
+          status={unavailable ? "error" : required.length > 0 ? "attention" : "complete"}
           size={24}
         />
         <div className="flex flex-col gap-0.5">
           <h2 id="font-issues-heading" className="label-mono">
-            {blocked ? "Not ready to publish" : "Ready to publish"}
+            {unavailable ? "Not ready to publish" : "Ready to publish"}
           </h2>
           <p className="text-[14px] text-[var(--color-ink-2)]">
             {blocked
               ? "Fix the items marked as blocking and Publish becomes available."
-              : required.length > 0
-                ? "Publishing is available. These details are still worth fixing."
-                : "Every required detail is in place."}
+              : publishBlockedReason
+                ? `${publishBlockedReason} Each channel’s own blockers are listed below.`
+                : required.length > 0
+                  ? "Publishing is available. These details are still worth fixing."
+                  : "Every required detail is in place."}
           </p>
         </div>
       </div>
@@ -177,7 +188,7 @@ function IssueItem({
         onClick={() => onOpen(rule)}
         className="group/issue flex w-full items-start gap-3 rounded-[8px] px-1 py-1.5 text-left hover:bg-[var(--color-paper-2)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]"
       >
-        <StatusIcon status={status} size={20} />
+        <StatusIcon status={status} size={20} announce={false} />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-center gap-1 text-[14px] underline decoration-[var(--color-rule)] underline-offset-4 group-hover/issue:decoration-[var(--color-ink)]">
             {rule.label}

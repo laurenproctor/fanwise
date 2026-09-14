@@ -96,6 +96,23 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
     uploads.some((u) => u.state === "processing") || files.some((f) => f.state === "pending")
   useBackgroundRefresh(processing)
 
+  // Queued means started and not yet settled: a batch still going through
+  // `startAll` counts here before its later files have a row at all.
+  const [queued, setQueued] = useState(0)
+  const inFlight = queued > 0 || uploads.some((u) => u.state !== "failed")
+  const transferring = uploads.some((u) => u.state === "uploading")
+  const { setUploadsBusy } = ctx
+  useEffect(() => setUploadsBusy(inFlight), [inFlight, setUploadsBusy])
+
+  // Bytes still leaving the browser are lost with the tab. Processing is not:
+  // the stored file finishes on the server whether or not anyone is watching.
+  useEffect(() => {
+    if (!transferring && queued === 0) return
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener("beforeunload", warn)
+    return () => window.removeEventListener("beforeunload", warn)
+  }, [transferring, queued])
+
   const patch = (localId: string, changes: Partial<LocalUpload>) =>
     setUploads((current) => current.map((u) => (u.localId === localId ? { ...u, ...changes } : u)))
 
@@ -229,7 +246,15 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
   async function startAll(list: FileList | File[]) {
     // One at a time: a family is many small files, and parallel PUTs mostly
     // compete with each other on a creator's upload link.
-    for (const file of Array.from(list)) await start(file)
+    const batch = Array.from(list)
+    setQueued((n) => n + batch.length)
+    for (const file of batch) {
+      try {
+        await start(file)
+      } finally {
+        setQueued((n) => n - 1)
+      }
+    }
   }
 
   async function discard(upload: LocalUpload) {

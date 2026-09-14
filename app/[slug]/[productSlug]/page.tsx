@@ -96,6 +96,11 @@ export default async function ProductPage({
               workspaceSlug={slug}
               productSlug={product.slug}
               publicPage={publicPage}
+              productWording={{
+                title: product.canonical_title ?? product.name,
+                summary: product.short_description ?? "",
+                description: product.canonical_description ?? "",
+              }}
               hasDestinations={data.channels.some((channel) => channel.externalUrl !== null)}
               hasContact={false}
             />

@@ -6,7 +6,8 @@ import { buildListingAction } from "@/lib/channels/actions"
 import { LIVENESS_LABELS, type ListingLiveness } from "@/lib/publishing/manual-steps"
 import { FIELD_IDS } from "@/lib/fonts/readiness"
 import { routes } from "@/lib/routes"
-import type { ChannelDraftView } from "@/lib/fonts/workspace"
+import { markdownToPlainText } from "@/lib/text/markdown"
+import { liveDraftValue, type ChannelDraftView, type DraftFieldOrigin } from "@/lib/fonts/workspace"
 import type { SectionContext } from "../context"
 import {
   LINK_BUTTON_CLASS,
@@ -19,15 +20,16 @@ import {
 /**
  * Each connected channel's draft, beside the product it was derived from.
  *
- * Every value is labelled with whose it is. "From the product" means the draft
- * still says what the product says; "Only this channel" means someone changed
- * it for this channel, and editing the product will not change it back. That
- * label is the answer to "if I edit this, what changes?".
+ * Every value is labelled with whose it is, read from the listing row rather
+ * than guessed by comparing strings. "From the product" means the column is
+ * empty and the draft inherits (docs/channel-adapters.md), so it is shown with
+ * the value being typed on this screen; "Only this channel" means it was
+ * customized there, and editing the product will not change it. That label is
+ * the answer to "if I edit this, what changes?".
  *
- * This section builds a draft only where none exists. It never regenerates an
- * existing one, because regenerating writes the product's values over the
- * draft's and that is exactly the silent overwrite of a channel edit this
- * screen promises not to make. Existing drafts open in the channel editor.
+ * This section builds a draft only where none exists and never regenerates an
+ * existing one. Existing drafts open in the channel editor, which is where a
+ * field is customized or handed back to the product.
  */
 export function MarketplaceDraftsSection({ ctx }: { ctx: SectionContext }) {
   const { channels } = ctx
@@ -134,39 +136,48 @@ function DraftCard({ ctx, channel }: { ctx: SectionContext; channel: ChannelDraf
       ) : (
         <>
           <dl className="grid gap-x-6 gap-y-3 text-[14px] sm:grid-cols-[9rem_minmax(0,1fr)]">
-            <DraftValue
-              term="Title"
-              value={channel.title}
-              fromProduct={channel.title === (values.canonicalTitle.trim() || values.name)}
-            />
-            <DraftValue
-              term="Description"
-              value={
-                channel.description
-                  ? channel.description.length > 180
-                    ? `${channel.description.slice(0, 180)}…`
-                    : channel.description
-                  : null
-              }
-              fromProduct={(channel.description ?? "") === values.canonicalDescription}
-            />
+            {channel.origins.title !== "absent" ? (
+              <DraftValue
+                term="Title"
+                value={liveDraftValue(channel, "title", values) as string | null}
+                origin={channel.origins.title}
+              />
+            ) : null}
+            {channel.origins.description !== "absent" ? (
+              <DraftValue
+                term="Description"
+                value={excerpt(liveDraftValue(channel, "description", values) as string | null)}
+                origin={channel.origins.description}
+              />
+            ) : null}
             <DraftValue
               term="Tags"
               value={channel.tags.length > 0 ? channel.tags.join(", ") : null}
-              fromProduct={null}
+              origin={null}
               note={
                 channel.tags.length === 0 && (metadata.tags ?? []).length > 0
                   ? "Product tags are not copied into drafts automatically. Add them in the draft."
                   : undefined
               }
             />
-            <DraftValue term="Category" value={channel.category} fromProduct={null} />
-            <DraftValue
-              term="Price"
-              value={channel.price === null ? null : `${channel.price} ${channel.currency}`}
-              fromProduct={channel.price !== null && channel.price === values.basePrice}
-            />
+            <DraftValue term="Category" value={channel.category} origin={null} />
+            {channel.origins.price !== "absent" ? (
+              <DraftValue
+                term="Price"
+                value={(() => {
+                  const price = liveDraftValue(channel, "price", values)
+                  const currency =
+                    channel.origins.price === "inherited" ? values.currency : channel.currency
+                  return price === null ? null : `${price} ${currency}`
+                })()}
+                origin={channel.origins.price}
+              />
+            ) : null}
           </dl>
+          <p className="text-[12.5px] text-[var(--color-ink-3)]">
+            “From the product” follows your edits here. “Only this channel” was customized in the{" "}
+            {channel.channelName} draft and is never overwritten by the product.
+          </p>
 
           <div className="flex flex-col gap-2">
             <h4 className="flex items-center gap-2 text-[14px]">
@@ -208,18 +219,25 @@ function DraftCard({ ctx, channel }: { ctx: SectionContext; channel: ChannelDraf
   )
 }
 
+function excerpt(markdown: string | null): string | null {
+  const text = markdownToPlainText(markdown).replace(/\s+/g, " ").trim()
+  if (!text) return null
+  return text.length > 180 ? `${text.slice(0, 180)}…` : text
+}
+
 function DraftValue({
   term,
   value,
-  fromProduct,
+  origin,
   note,
 }: {
   term: string
   value: string | null
-  /** True, false, or null where the value has no product counterpart. */
-  fromProduct: boolean | null
+  /** Whose value it is, or null where the field has no product counterpart. */
+  origin: Exclude<DraftFieldOrigin, "absent"> | null
   note?: string
 }) {
+  const fromProduct = origin === null ? null : origin === "inherited"
   return (
     <>
       <dt className="text-[var(--color-ink-3)]">{term}</dt>

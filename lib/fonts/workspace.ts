@@ -424,17 +424,27 @@ export const MIN_HERO_WIDTH = 1200
 
 /* ----------------------------------------------------------------- channels */
 
+/**
+ * Whose value a channel draft holds for a field it can inherit (ADR on listing
+ * inheritance, docs/channel-adapters.md): `inherited` follows the product and
+ * changes when the product does, `customized` is this channel's own and never
+ * does, `absent` is a field this channel has no place for.
+ */
+export type DraftFieldOrigin = "inherited" | "customized" | "absent"
+
 export interface ChannelDraftView {
   connectionId: string
   channelName: string
   integrationType: "api" | "assisted"
   listingId: string | null
+  /** Resolved values: what the channel would be sent, as of the last server read. */
   title: string | null
   description: string | null
   tags: string[]
   category: string | null
   price: number | null
   currency: string
+  origins: Record<"title" | "description" | "price", DraftFieldOrigin>
   results: Array<{
     key: string
     label: string
@@ -445,4 +455,28 @@ export interface ChannelDraftView {
   liveness: string
   externalUrl: string | null
   editHref: string
+}
+
+/**
+ * A draft's value for an inheritable field, as of this keystroke.
+ *
+ * The server resolved the draft when the page loaded; an inherited field has
+ * followed the product since, so it is read from the values being edited. A
+ * customized field is the channel's and is shown as stored.
+ */
+export function liveDraftValue(
+  channel: ChannelDraftView,
+  field: "title" | "description" | "price",
+  values: Pick<FontProductValues, "name" | "canonicalTitle" | "canonicalDescription" | "basePrice">,
+): string | number | null {
+  switch (channel.origins[field]) {
+    case "absent":
+      return null
+    case "customized":
+      return channel[field]
+    case "inherited":
+      if (field === "title") return values.canonicalTitle.trim() || values.name
+      if (field === "description") return values.canonicalDescription.trim() || null
+      return values.basePrice
+  }
 }

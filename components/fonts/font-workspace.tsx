@@ -29,7 +29,7 @@ import {
 import type { EditOptions, FontKey, SectionContext } from "./context"
 import { LivePreview, previewStyles } from "./live-preview"
 import { ReadinessIssues, SectionNav, SectionSummaries } from "./readiness-panels"
-import { QUIET_BUTTON_CLASS } from "./controls"
+import { ActiveSectionContext, QUIET_BUTTON_CLASS } from "./controls"
 import { ListingBasicsSection } from "./sections/basics"
 import { FontFilesSection } from "./sections/files"
 import { FamilySection } from "./sections/family"
@@ -67,6 +67,18 @@ export interface FontWorkspaceProps {
 
 type LocalErrors = Partial<Record<PatchField, string>>
 
+const SECTION_COMPONENTS: ReadonlyArray<
+  readonly [FontSection, (props: { ctx: SectionContext }) => React.ReactNode]
+> = [
+  ["basics", ListingBasicsSection],
+  ["files", FontFilesSection],
+  ["family", FamilySection],
+  ["coverage", CoverageSection],
+  ["images", SpecimenImagesSection],
+  ["licensing", LicensingSection],
+  ["drafts", MarketplaceDraftsSection],
+]
+
 function subscribeToHash(onChange: () => void) {
   window.addEventListener("hashchange", onChange)
   return () => window.removeEventListener("hashchange", onChange)
@@ -102,6 +114,14 @@ export function FontWorkspace(props: FontWorkspaceProps) {
   )
   const [chosenSection, setSection] = useState<FontSection | null>(null)
   const section = chosenSection ?? hashSection ?? props.defaultSection
+  // A click records its choice with replaceState, which fires no hashchange. A
+  // real hash change — a pasted #section link, Back, Forward — is the address
+  // speaking, and it takes over from the last click.
+  useEffect(() => {
+    const onHash = () => setSection(null)
+    window.addEventListener("hashchange", onHash)
+    return () => window.removeEventListener("hashchange", onHash)
+  }, [])
   const [localErrors, setLocalErrors] = useState<LocalErrors>({})
   const [adoptedNotice, setAdoptedNotice] = useState<string | null>(null)
   const [publishing, setPublishing] = useState(false)
@@ -200,12 +220,21 @@ export function FontWorkspace(props: FontWorkspaceProps) {
    * nothing new was read — so the filled values appear in the same paint. The
    * save is a server call and goes out from the effect below.
    */
-  const familyKey = JSON.stringify(props.family)
+  /*
+   * Not while a batch is still arriving. Files upload one at a time and each is
+   * read as it lands, so adopting on the first reading seeded the style list
+   * with one face and then offered the rest of the same drop as "uploaded but
+   * not in the family". A drop is one answer; it is adopted once it has landed.
+   */
+  const [uploadsBusy, setUploadsBusy] = useState(false)
+  const batchArriving =
+    uploadsBusy || props.files.some((file) => file.kind === "font" && file.state === "pending")
+  const familyKey = `${JSON.stringify(props.family)}${batchArriving ? ":arriving" : ""}`
   const [seenFamilyKey, setSeenFamilyKey] = useState<string | null>(null)
   const [adoption, setAdoption] = useState<ProductPatch | null>(null)
   if (seenFamilyKey !== familyKey) {
     setSeenFamilyKey(familyKey)
-    const patch = adoptionPatch({ metadata, values, family: props.family })
+    const patch = batchArriving ? null : adoptionPatch({ metadata, values, family: props.family })
     if (patch) {
       if (patch.version || patch.brandName) {
         setValues((current) => ({
@@ -275,16 +304,24 @@ export function FontWorkspace(props: FontWorkspaceProps) {
     setFocusTick((tick) => tick + 1)
   }, [])
 
-  // Focus after the section has rendered, so the target exists.
+  // Focus after the section has rendered, so the target exists. A few frames of
+  // patience, because some controls (the description's rich-text editor) mount
+  // their focusable surface a frame or two after the section itself.
   useEffect(() => {
     if (focusTick === 0 || !focusTarget.current) return
-    const frame = requestAnimationFrame(() => {
+    let frame = 0
+    let attempts = 0
+    const tryFocus = () => {
       const element = document.getElementById(focusTarget.current ?? "")
-      if (!element) return
+      if (!element) {
+        if (++attempts < 20) frame = requestAnimationFrame(tryFocus)
+        return
+      }
       element.scrollIntoView({ block: "center", behavior: "smooth" })
       element.focus({ preventScroll: true })
       focusTarget.current = null
-    })
+    }
+    frame = requestAnimationFrame(tryFocus)
     return () => cancelAnimationFrame(frame)
   }, [focusTick, section])
 
@@ -314,6 +351,7 @@ export function FontWorkspace(props: FontWorkspaceProps) {
     hasLicenseFile: props.hasLicenseFile,
     openSection,
     refresh,
+    setUploadsBusy,
   }
 
   const styles = useMemo(
@@ -500,15 +538,19 @@ export function FontWorkspace(props: FontWorkspaceProps) {
             </p>
           ) : null}
 
-          <div key={section}>
-            {section === "basics" ? <ListingBasicsSection ctx={ctx} /> : null}
-            {section === "files" ? <FontFilesSection ctx={ctx} /> : null}
-            {section === "family" ? <FamilySection ctx={ctx} /> : null}
-            {section === "coverage" ? <CoverageSection ctx={ctx} /> : null}
-            {section === "images" ? <SpecimenImagesSection ctx={ctx} /> : null}
-            {section === "licensing" ? <LicensingSection ctx={ctx} /> : null}
-            {section === "drafts" ? <MarketplaceDraftsSection ctx={ctx} /> : null}
-          </div>
+          {/*
+            Every section stays mounted and only the open one is shown. A
+            section holds work of its own that is not product data — an upload
+            queue and its progress, an alt text being typed, a draft being built
+            — and unmounting it on every switch dropped that work mid-flight.
+          */}
+          {SECTION_COMPONENTS.map(([key, Section]) => (
+            <div key={key} hidden={key !== section}>
+              <ActiveSectionContext.Provider value={key === section}>
+                <Section ctx={ctx} />
+              </ActiveSectionContext.Provider>
+            </div>
+          ))}
 
           <SectionSummaries
             current={section}
@@ -531,6 +573,7 @@ export function FontWorkspace(props: FontWorkspaceProps) {
           />
           <ReadinessIssues
             readiness={readiness}
+            publishBlockedReason={publishBlockedReason}
             onOpen={(rule: ReadinessRule) => openSection(rule.section, rule.fieldId)}
           />
         </aside>

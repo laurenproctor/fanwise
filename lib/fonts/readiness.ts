@@ -571,8 +571,10 @@ export function evaluateFontReadiness(input: FontReadinessInput): FontReadiness 
       })
     }
 
-    const priceDiffers =
-      values.basePrice !== null && (channel.price === null || channel.price !== values.basePrice)
+    // An inherited price follows the product and cannot drift from it; a missing
+    // product price is already the base-price blocker. Only a price customized
+    // for one channel can quietly disagree with the product.
+    if (channel.origins.price !== "customized") continue
     add({
       key: `licensing.channelPrice.${channel.connectionId}`,
       section: "licensing",
@@ -581,11 +583,8 @@ export function evaluateFontReadiness(input: FontReadinessInput): FontReadiness 
       tone: "problem",
       scope,
       label: "Review marketplace pricing",
-      message:
-        channel.price === null
-          ? `The ${channel.channelName} draft has no price yet.`
-          : `The ${channel.channelName} draft sells at ${channel.price} ${channel.currency}; the product is ${values.basePrice} ${values.currency}.`,
-      satisfied: !priceDiffers,
+      message: `The ${channel.channelName} draft sells at its own price of ${channel.price} ${channel.currency}; the product is ${values.basePrice ?? "unpriced"}${values.basePrice === null ? "" : ` ${values.currency}`}.`,
+      satisfied: values.basePrice !== null && channel.price === values.basePrice,
     })
   }
 

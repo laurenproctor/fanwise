@@ -3,6 +3,7 @@
 import { FONT_CLASSIFICATION_LABELS } from "@/lib/fonts/labels"
 import { FIELD_IDS } from "@/lib/fonts/readiness"
 import { routes } from "@/lib/routes"
+import { MarkdownEditor } from "@/components/ui/markdown-editor"
 import type { SectionContext } from "../context"
 import { ChipsInput, LINK_BUTTON_CLASS, SectionHeading, TextArea, TextInput } from "../controls"
 
@@ -16,6 +17,8 @@ import { ChipsInput, LINK_BUTTON_CLASS, SectionHeading, TextArea, TextInput } fr
 export function ListingBasicsSection({ ctx }: { ctx: SectionContext }) {
   const { values, metadata } = ctx
   const address = routes.product(ctx.workspaceSlug, values.slug || ctx.productSlug)
+  const descriptionError = ctx.fieldError("canonicalDescription")
+  const descriptionTooLong = values.canonicalDescription.length > 8000
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,16 +66,39 @@ export function ListingBasicsSection({ ctx }: { ctx: SectionContext }) {
         hint="One line under the name, like “Playful type for a bigger tomorrow.”"
       />
 
-      <TextArea
-        id={FIELD_IDS.canonicalDescription}
-        label="Full description"
-        rows={7}
-        maxLength={8000}
-        value={values.canonicalDescription}
-        onChange={(event) => ctx.setValue("canonicalDescription", event.target.value)}
-        error={ctx.fieldError("canonicalDescription")}
-        hint={`${values.canonicalDescription.length.toLocaleString()} / 8,000 characters`}
-      />
+      {/*
+        Markdown, in the same editor the product form and the channel editor use
+        (ADR 0011). The product owns one description; channels that show only
+        plain text receive the same words without the formatting.
+      */}
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <span className="text-[14px] text-[var(--color-ink)]">Full description</span>
+        <MarkdownEditor
+          id={FIELD_IDS.canonicalDescription}
+          name="canonicalDescription"
+          ariaLabel="Full description"
+          value={values.canonicalDescription}
+          onChange={(markdown) => ctx.setValue("canonicalDescription", markdown)}
+          rows={7}
+          describedBy={`${FIELD_IDS.canonicalDescription}-${descriptionError ? "error" : "hint"}`}
+        />
+        {descriptionError ? (
+          <p
+            id={`${FIELD_IDS.canonicalDescription}-error`}
+            className="text-[13px] text-[var(--color-danger)]"
+          >
+            {descriptionError}
+          </p>
+        ) : (
+          <p
+            id={`${FIELD_IDS.canonicalDescription}-hint`}
+            className={`text-[12.5px] ${descriptionTooLong ? "text-[var(--color-danger)]" : "text-[var(--color-ink-3)]"}`}
+          >
+            {values.canonicalDescription.length.toLocaleString()} / 8,000 characters. Formatting
+            carries to channels that show it.
+          </p>
+        )}
+      </div>
 
       <ChipsInput
         id={FIELD_IDS.tags}

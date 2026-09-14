@@ -8,6 +8,7 @@ import {
   cropLoss,
   detectFamily,
   fontFileViews,
+  liveDraftValue,
   unlistedStyles,
   type ChannelDraftView,
   type FontProductValues,
@@ -413,6 +414,7 @@ function channel(overrides: Partial<ChannelDraftView> = {}): ChannelDraftView {
     liveness: "unpublished",
     externalUrl: null,
     editHref: "/x",
+    origins: { title: "inherited", description: "inherited", price: "inherited" },
     ...overrides,
   }
 }
@@ -476,14 +478,30 @@ describe("font listing readiness", () => {
     expect(withLimit.issues.find((r) => r.key === "licensing.webTerms")).toBeUndefined()
   })
 
-  it("asks to review marketplace pricing when a draft's price differs", () => {
-    const readiness = evaluateFontReadiness(readinessInput({ channels: [channel({ price: 24 })] }))
+  it("asks to review marketplace pricing when a customized price differs", () => {
+    const readiness = evaluateFontReadiness(
+      readinessInput({
+        channels: [
+          channel({
+            price: 24,
+            origins: { title: "inherited", description: "inherited", price: "customized" },
+          }),
+        ],
+      }),
+    )
     const rule = readiness.issues.find((r) => r.key.startsWith("licensing.channelPrice"))
     expect(rule).toMatchObject({
       label: "Review marketplace pricing",
       scope: { kind: "channel", channelName: "Storefront" },
     })
     expect(readiness.canPublish).toBe(true)
+  })
+
+  it("never flags an inherited price, which follows the product", () => {
+    // A stale resolved price from the last server read is not a disagreement:
+    // the draft sends whatever the product says when it is published.
+    const readiness = evaluateFontReadiness(readinessInput({ channels: [channel({ price: 24 })] }))
+    expect(readiness.rules.find((r) => r.key.startsWith("licensing.channelPrice"))).toBeUndefined()
   })
 
   it("lets a channel's own blocker block that channel only", () => {
@@ -595,5 +613,42 @@ describe("the product page for anything that is not a font", () => {
     }
     // The original editor is still what every other product type gets.
     expect(page.indexOf("<ProductForm")).toBeGreaterThan(branchEnd)
+  })
+})
+
+/* ----------------------------------------------------------- channel drafts */
+
+describe("a channel draft's live values", () => {
+  const values = {
+    name: "Blimp Display",
+    canonicalTitle: "",
+    canonicalDescription: "Playful **bubble** type",
+    basePrice: 19,
+  }
+
+  it("shows what the product says now for an inherited field", () => {
+    const draft = channel({ title: "Old title", price: 12 })
+    expect(liveDraftValue(draft, "title", values)).toBe("Blimp Display")
+    expect(liveDraftValue(draft, "price", { ...values, basePrice: 29 })).toBe(29)
+    expect(liveDraftValue(draft, "description", values)).toBe("Playful **bubble** type")
+  })
+
+  it("keeps a customized field as the channel saved it, whatever the product says", () => {
+    const draft = channel({
+      title: "Blimp Display — bubble font",
+      price: 24,
+      origins: { title: "customized", description: "inherited", price: "customized" },
+    })
+    expect(liveDraftValue(draft, "title", { ...values, canonicalTitle: "Changed" })).toBe(
+      "Blimp Display — bubble font",
+    )
+    expect(liveDraftValue(draft, "price", { ...values, basePrice: 99 })).toBe(24)
+  })
+
+  it("says nothing for a field the channel has no place for", () => {
+    const draft = channel({
+      origins: { title: "inherited", description: "inherited", price: "absent" },
+    })
+    expect(liveDraftValue(draft, "price", values)).toBeNull()
   })
 })

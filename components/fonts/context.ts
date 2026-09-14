@@ -49,4 +49,6 @@ export interface SectionContext {
   hasLicenseFile: boolean
   openSection: (section: FontSection, fieldId?: string | null) => void
   refresh: () => void
+  /** The files section says when a transfer or its processing is under way. */
+  setUploadsBusy: (busy: boolean) => void
 }

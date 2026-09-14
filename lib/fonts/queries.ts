@@ -13,6 +13,7 @@ import {
   specimenImageViews,
   type ChannelDraftView,
   type DetectedFamily,
+  type DraftFieldOrigin,
   type FontFileView,
   type FontProductValues,
   type SpecimenImageView,
@@ -96,18 +97,31 @@ export async function loadFontWorkspace(params: {
       const steps = listing
         ? mergeManualSteps(adapter!.manualSteps, publications.manualSteps.get(listing.id) ?? [])
         : []
+      // The draft as it reads (inherited where the row is empty), and, from the
+      // row itself, which of those values are the channel's own.
+      const draft = view?.draft
+      const origin = (field: "title" | "description" | "price"): DraftFieldOrigin =>
+        !adapter!.fields.includes(field)
+          ? "absent"
+          : listing && listing[field] !== null
+            ? "customized"
+            : "inherited"
       return {
         connectionId: connection.id,
         channelName: channel.name,
         integrationType: adapter!.integrationType,
         listingId: listing?.id ?? null,
-        title: listing?.title ?? null,
-        description: listing?.description ?? null,
-        tags: listing?.tags ?? [],
-        category: listing?.category ?? null,
-        price:
-          listing?.price === null || listing?.price === undefined ? null : Number(listing.price),
-        currency: listing?.currency ?? product.currency,
+        title: draft?.title ?? null,
+        description: draft?.description ?? null,
+        tags: draft?.tags ?? [],
+        category: draft?.category ?? null,
+        price: draft?.price ?? null,
+        currency: draft?.currency ?? product.currency,
+        origins: {
+          title: origin("title"),
+          description: origin("description"),
+          price: origin("price"),
+        },
         results: (view?.evaluation?.results ?? []).map((result) => ({
           key: result.key,
           label: result.label,

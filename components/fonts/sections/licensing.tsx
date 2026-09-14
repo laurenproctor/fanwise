@@ -6,6 +6,7 @@ import { z } from "zod"
 import { FONT_LICENSE_KINDS, type FontLicense, type FontLicenseKind } from "@/lib/products/metadata"
 import { FONT_LICENSE_LABELS } from "@/lib/fonts/labels"
 import { FIELD_IDS } from "@/lib/fonts/readiness"
+import { liveDraftValue } from "@/lib/fonts/workspace"
 import type { SectionContext } from "../context"
 import {
   LINK_BUTTON_CLASS,
@@ -302,7 +303,9 @@ export function LicensingSection({ ctx }: { ctx: SectionContext }) {
         ) : (
           <ul className="flex flex-col divide-y divide-[var(--color-rule-2)] border-y border-[var(--color-rule)]">
             {channels.map((channel) => {
-              const same = channel.price !== null && channel.price === values.basePrice
+              const price = liveDraftValue(channel, "price", values)
+              const currency =
+                channel.origins.price === "inherited" ? values.currency : channel.currency
               return (
                 <li
                   key={channel.connectionId}
@@ -312,16 +315,19 @@ export function LicensingSection({ ctx }: { ctx: SectionContext }) {
                   <span className="flex flex-wrap items-center gap-3 text-[14px] tabular-nums">
                     {channel.listingId === null ? (
                       <span className="text-[var(--color-ink-3)]">No draft yet</span>
+                    ) : channel.origins.price === "absent" ? (
+                      <span className="text-[var(--color-ink-3)]">
+                        Priced on {channel.channelName}
+                      </span>
                     ) : (
                       <>
-                        <span>
-                          {channel.price === null
-                            ? "No price"
-                            : `${channel.price} ${channel.currency}`}
-                        </span>
-                        <OriginBadge origin={same ? "product" : "channel"} />
+                        <span>{price === null ? "No price" : `${price} ${currency}`}</span>
+                        <OriginBadge
+                          origin={channel.origins.price === "customized" ? "channel" : "product"}
+                        />
                         <Link href={channel.editHref} className={LINK_BUTTON_CLASS}>
-                          Edit<span className="sr-only"> the {channel.channelName} price</span>
+                          {channel.origins.price === "customized" ? "Edit" : "Customize"}
+                          <span className="sr-only"> the {channel.channelName} price</span>
                         </Link>
                       </>
                     )}
@@ -332,8 +338,8 @@ export function LicensingSection({ ctx }: { ctx: SectionContext }) {
           </ul>
         )}
         <p className="text-[12.5px] text-[var(--color-ink-3)]">
-          A price saved in a channel draft belongs to that channel. Changing the base price here
-          does not rewrite an existing draft, so review each one after a price change.
+          A draft marked “From the product” follows the base price. A price customized in a channel
+          draft belongs to that channel, and changing the base price here never rewrites it.
         </p>
       </section>
     </div>

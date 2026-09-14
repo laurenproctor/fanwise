@@ -1,7 +1,17 @@
 "use client"
 
-import { useId, useState, type ComponentProps, type ReactNode } from "react"
+import {
+  createContext,
+  useContext,
+  useId,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react"
 import type { SectionStatus } from "@/lib/fonts/readiness"
+
+/** Whether the section a control sits in is the one on screen. */
+export const ActiveSectionContext = createContext(true)
 
 /**
  * The workspace's form vocabulary.
@@ -307,7 +317,20 @@ export const STATUS_TEXT: Record<SectionStatus, string> = {
  * exclamation mark, a cross. Someone who cannot tell the green from the amber
  * can still tell a tick from a ring.
  */
-export function StatusIcon({ status, size = 20 }: { status: SectionStatus; size?: number }) {
+export function StatusIcon({
+  status,
+  size = 20,
+  announce = true,
+}: {
+  status: SectionStatus
+  size?: number
+  /**
+   * Whether the icon speaks its status. Off where the caller says the status
+   * itself, after the thing it describes, so a control is named "Font files,
+   * incomplete" rather than "Incomplete Font files".
+   */
+  announce?: boolean
+}) {
   const common = { width: size, height: size, viewBox: "0 0 20 20", "aria-hidden": true } as const
   const icon =
     status === "complete" ? (
@@ -346,7 +369,7 @@ export function StatusIcon({ status, size = 20 }: { status: SectionStatus; size?
   return (
     <span className="inline-flex shrink-0 items-center">
       {icon}
-      <span className="sr-only">{STATUS_TEXT[status]}</span>
+      {announce ? <span className="sr-only">{STATUS_TEXT[status]}</span> : null}
     </span>
   )
 }
@@ -360,11 +383,14 @@ export function SectionHeading({
   description: string
   aside?: ReactNode
 }) {
+  // Every section stays mounted; only the open one's heading carries the id the
+  // editor region is labelled by and focus returns to.
+  const active = useContext(ActiveSectionContext)
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="flex min-w-0 flex-col gap-1">
         <h2
-          id="font-section-heading"
+          id={active ? "font-section-heading" : undefined}
           tabIndex={-1}
           className="font-display text-[26px] font-light tracking-[-0.02em] outline-none"
         >

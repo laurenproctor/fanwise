@@ -124,7 +124,11 @@ languages, features, axes, the style list, search tags, the licence types sold
 and their limits, and a EULA link. The workspace seeds unanswered product fields
 from the files once and never replaces a value the creator has set
 (`adoptionPatch` in `lib/fonts/workspace.ts`). No migration was needed for any
-of it: both are the existing jsonb columns, validated with Zod on write.
+of it: both are the existing jsonb columns, validated with Zod on write. The
+workspace's Marketplace drafts section reads listing inheritance from the row, not
+by comparing strings: an empty `title`, `description` or `price` column is shown as
+"From the product" with the value being typed, a filled one as "Only this
+channel", and the price review warning is raised only for a customized price.
 
 **The tenant boundary is a foreign key, not just a policy.** `product_assets`
 references `products (id, workspace_id)` as a pair, and `derived_from` references
