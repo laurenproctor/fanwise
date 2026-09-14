@@ -14,6 +14,7 @@ import {
  *
  *   SELECT, UPDATE, DELETE   200, empty array, no error. Assert row count.
  *   INSERT                   403, SQLSTATE 42501. Assert the error code.
+ *   DELETE on products       42501: no grant, see delete_product_draft().
  *
  * An empty-array assertion on an INSERT passes vacuously, because data is null
  * whenever there is an error.
@@ -78,7 +79,9 @@ describe("positive controls", () => {
     // Bob may take a slug alice already uses. Neither learns of the other.
     const id = await createProduct(bob, "Same Name", "alice-grotesk")
     expect(id).toBeTruthy()
-    await bob.client.from("products").delete().eq("id", id)
+    // Teardown through the service role: a member has no direct delete on
+    // products, which tests/db/product-draft-deletion.test.ts holds.
+    await adminClient().from("products").delete().eq("id", id)
   })
 
   it("the same slug twice in one workspace is rejected", async () => {
@@ -124,8 +127,11 @@ describe("products: alice cannot reach bob", () => {
       .eq("id", bobProductId)
       .select()
 
-    expect(error).toBeNull()
-    expect(data).toEqual([])
+    // Refused before RLS is consulted: since 20260913040000 no signed-in user
+    // holds DELETE on products at all, and deletion goes through
+    // delete_product_draft(). Stronger than the empty array this used to be.
+    expect(error?.code).toBe(RLS_DENIED)
+    expect(data).toBeNull()
 
     const { count } = await adminClient()
       .from("products")

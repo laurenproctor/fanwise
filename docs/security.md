@@ -240,6 +240,7 @@ while proving nothing.** Confirmed against the running stack at A1:
 | SELECT, UPDATE, DELETE | the policy filters the rows away: HTTP 200, empty array, no error. Assert on the row count |
 | INSERT | there is no row to filter, so the write raises: HTTP 403, SQLSTATE 42501. Assert on the error code |
 | Any table access by `anon` | no grant at all, so it is refused before RLS is consulted: SQLSTATE 42501 |
+| DELETE on `products` by `authenticated` | no grant since `20260913040000`, the same 42501; deletion is `delete_product_draft()` |
 
 An empty-array assertion on an INSERT passes vacuously, because `data` is null whenever
 there is an error. Every negative case is also paired with a service-role read confirming
@@ -294,6 +295,22 @@ collapse at once.
 6. `storage.objects` policies read the workspace id from the first path segment,
    via `storage_object_workspace_id()`. The cast is deliberately total: a
    malformed path returns null and denies, rather than raising.
+7. **No signed-in user may delete a product directly.** Until 13 September 2026 any
+   workspace member could `DELETE` from `products` through PostgREST, which bypassed every
+   rule about what may be deleted. Migration `20260913040000_delete_product_draft` revokes
+   `DELETE` on `products` from `authenticated` and drops the delete policy, so the attempt is
+   refused before RLS is consulted (SQLSTATE 42501, the no-grant shape in the table above).
+   Deletion is `delete_product_draft()`, which is `security definer` precisely because the
+   caller has no grant: it requires `auth.uid()`, checks `is_workspace_owner()` itself before
+   it locks or reveals anything, pins `search_path` to `''`, schema-qualifies every relation,
+   and is executable by `authenticated` only. Another workspace's product, a product the
+   caller does not own, and a missing id all answer `not_found`. It deletes only a product
+   with no external or public footprint (see `docs/data-model.md`, "Deleting a product
+   draft"), and it does not weaken the snapshot, event or asset immutability triggers: a
+   product with activity history is simply not deletable. The service role keeps its delete
+   grant, for test teardown and nothing in the application. Stored objects are removed only
+   after the transaction commits, so a refusal can never leave a row pointing at a missing
+   file.
 
 ## Import sources and recordings
 

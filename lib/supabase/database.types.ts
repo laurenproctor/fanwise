@@ -1783,11 +1783,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      delete_product_draft: { Args: { p_product_id: string }; Returns: Json }
       is_workspace_member: {
         Args: { p_workspace_id: string }
         Returns: boolean
       }
       is_workspace_owner: { Args: { p_workspace_id: string }; Returns: boolean }
+      product_draft_deletion_blocker: {
+        Args: { p_product_id: string }
+        Returns: string
+      }
       profile_links_snapshot: {
         Args: { p_public_profile_id: string }
         Returns: Json

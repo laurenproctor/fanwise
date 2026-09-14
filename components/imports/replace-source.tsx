@@ -19,7 +19,9 @@ import { validateSourceUrl } from "@/lib/imports/url"
  *   - **Discarding is a different thing**, and it is offered separately rather
  *     than being what Replace quietly does. It deletes the product, which is
  *     the right answer for a paste that was a mistake and the wrong one for a
- *     link that has simply moved.
+ *     link that has simply moved. A discard the server refuses — the product
+ *     has been published since, say — leaves the creator here with the
+ *     server's sentence, rather than nowhere.
  *
  * The shape check runs here as well as on the server, to save a round trip on
  * an obvious mistake. The boundary is `lib/net/outbound.ts` and its answer is
@@ -34,7 +36,8 @@ export function ReplaceSourceDialog({
   currentUrl: string
   onReplace: (url: string) => Promise<string | null>
   onCancel: () => void
-  onDiscard: () => void
+  /** Resolves with the server's refusal, or not at all once it has redirected. */
+  onDiscard: () => Promise<string | null>
 }) {
   const [url, setUrl] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -112,7 +115,15 @@ export function ReplaceSourceDialog({
         <button
           type="button"
           disabled={pending}
-          onClick={onDiscard}
+          onClick={() => {
+            setError(null)
+            // An async transition, so `pending` holds for the whole request and
+            // a second press cannot send a second discard.
+            startTransition(async () => {
+              const refusal = await onDiscard()
+              startTransition(() => setError(refusal))
+            })
+          }}
           className="ml-auto min-h-11 rounded-[6px] text-[13px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-accent)]"
         >
           Discard this import and its product

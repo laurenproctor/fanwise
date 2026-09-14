@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { eligibilityFromBlocker, type DraftDeletionEligibility } from "./draft-deletion"
 import type { Product, ProductAsset } from "./types"
 
 /**
@@ -58,6 +59,33 @@ export async function getAsset(assetId: string): Promise<ProductAsset | null> {
 
   if (error) throw error
   return data
+}
+
+/**
+ * Whether the product page should offer Delete draft, and if not, why.
+ *
+ * Asks the database the same question `delete_product_draft()` asks under
+ * lock, rather than re-deriving it from what the page happened to load, so the
+ * offer and the outcome come from one definition. It is still only an offer:
+ * the deletion checks again. A read that fails hides the section, because a
+ * control that might not work is worse than one that is not there.
+ */
+export async function getDraftDeletionEligibility(
+  productId: string,
+): Promise<DraftDeletionEligibility> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc("product_draft_deletion_blocker", {
+    p_product_id: productId,
+  })
+
+  if (error) {
+    console.error("[products] could not read draft deletion eligibility", {
+      productId,
+      code: error.code,
+    })
+    return { kind: "hidden" }
+  }
+  return eligibilityFromBlocker(data)
 }
 
 /** Groups derivatives under the source they came from, for the asset list. */

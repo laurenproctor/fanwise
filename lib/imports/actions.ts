@@ -7,7 +7,8 @@ import { jobs } from "@/lib/jobs"
 import { routes } from "@/lib/routes"
 import { toJson } from "./json"
 import { linkLabel } from "./composer"
-import { removeStoredSource } from "./source-storage"
+import { deleteProductDraft } from "@/lib/products/delete-draft"
+import { draftDeletionErrorMessage } from "@/lib/products/draft-deletion"
 import { getImport, listDeliverables } from "./queries"
 import { CUSTOM_LICENSE_ID, RIGHTS_ATTESTATION_VERSION, licenseEntry, versionFor } from "./licenses"
 import { importReadiness } from "./readiness"
@@ -134,12 +135,24 @@ export async function retrySourceAction(
 }
 
 /**
- * Abandon an import.
+ * Abandon an import, and the draft product it made.
  *
- * Sets `discarded` rather than deleting, which keeps the record of what was
- * attempted and frees the URL for a fresh import through the partial unique
- * index. The product goes with it: a draft nobody finished, created by a paste,
- * is not something to leave in a catalog.
+ * A draft nobody finished, created by a paste, is not something to leave in a
+ * catalog, so discarding deletes the product — through `deleteProductDraft`,
+ * the same guarded deletion the product page's Delete draft uses, not a delete
+ * of its own. The import and its sources cascade with the product, and the
+ * service removes both the source files and the product's own uploads from
+ * storage once the database has committed.
+ *
+ * This used to mark the import discarded, remove the source files, delete the
+ * product straight from the table, ignore whether that worked, and redirect
+ * either way — leaving the product's uploads in storage, and on a failure
+ * leaving a creator in the catalog believing a draft was gone that was not.
+ * Now a refusal stays on the import screen with a sentence. In particular, an
+ * import whose product has since been published, logged or given a public page
+ * is no longer a new draft, and says so.
+ *
+ * Replacing the source is a different action and never reaches this one.
  */
 export async function discardImportAction(
   workspaceSlug: string,
@@ -148,42 +161,17 @@ export async function discardImportAction(
   const { supabase, workspace } = await requireWorkspace(workspaceSlug)
 
   const record = await getImport(supabase, workspace.id, importId)
-  if (!record) return { error: null }
+  if (!record) return { error: "That import could not be found." }
 
-  const { error } = await supabase
-    .from("product_imports")
-    .update({ status: "discarded" })
-    .eq("id", importId)
-    .eq("workspace_id", workspace.id)
-
-  if (error) {
-    console.error("[imports] could not discard", { importId, error })
-    return { error: "That could not be discarded. Try again." }
+  const outcome = await deleteProductDraft({
+    workspaceSlug,
+    productId: record.row.product_id,
+  })
+  if (outcome.kind !== "deleted") {
+    return { error: draftDeletionErrorMessage(outcome, "import") }
   }
 
-  // Pasted and uploaded sources have no use once their import is abandoned.
-  // Best effort: an object left behind is private, and wastes only space.
-  const paths = [
-    record.row.source_path,
-    ...record.sources.map((source) => source.storage_path),
-  ].filter((path): path is string => Boolean(path))
-  for (const path of new Set(paths)) await removeStoredSource(path).catch(() => undefined)
-  await supabase
-    .from("product_import_sources")
-    .update({ status: "removed", error_code: null, error_message: null })
-    .eq("import_id", importId)
-    .eq("workspace_id", workspace.id)
-
-  // The import row cascades with the product, so the product is deleted last
-  // and the discarded status above is what survives if this fails.
-  await supabase
-    .from("products")
-    .delete()
-    .eq("id", record.row.product_id)
-    .eq("workspace_id", workspace.id)
-
-  revalidatePath(routes.workspace(workspaceSlug))
-  redirect(routes.workspace(workspaceSlug))
+  redirect(routes.workspace(outcome.workspaceSlug))
 }
 
 export interface SaveDraftInput {

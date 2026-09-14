@@ -64,6 +64,22 @@ const AUTHENTICATED_MAY_EXECUTE = new Set([
     tests/db/import-deliverable-removal.test.ts holds that from outside.
   */
   "remove_import_deliverable(p_product_id uuid, p_asset_id uuid)",
+  /*
+    Delete draft, from the product page and the import screen's discard. The
+    only way a signed-in user deletes a product: DELETE on products is revoked
+    from authenticated. Security definer for exactly that reason, so it checks
+    auth.uid() and is_workspace_owner() itself, before locking anything, and
+    answers not_found for anything the caller does not own.
+    tests/db/product-draft-deletion.test.ts holds that from outside.
+  */
+  "delete_product_draft(p_product_id uuid)",
+  /*
+    The same question without the deletion, for the product page to decide
+    whether to offer it. Security invoker and stable: it reads only what the
+    caller's RLS already shows them, and delete_product_draft() calls it again
+    under lock.
+  */
+  "product_draft_deletion_blocker(p_product_id uuid)",
   "release_public_handle(p_public_profile_id uuid, p_new_handle text)",
   "release_public_product_slug(p_public_product_page_id uuid, p_new_slug text)",
   /*

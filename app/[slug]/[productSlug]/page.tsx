@@ -1,7 +1,12 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
-import { getProductBySlug, groupDerivatives, listProductAssets } from "@/lib/products/queries"
+import {
+  getDraftDeletionEligibility,
+  getProductBySlug,
+  groupDerivatives,
+  listProductAssets,
+} from "@/lib/products/queries"
 import { listChannels, listConnections, listProductListings } from "@/lib/channels/queries"
 import { listProductEvents, loadPublicationViews } from "@/lib/publishing/queries"
 import { planRun, runInputs } from "@/lib/publishing/run"
@@ -21,6 +26,7 @@ import { createPublicProductPageAction } from "@/lib/public/actions"
 import { Button } from "@/components/ui/button"
 import { ButtonLink } from "@/components/ui/button"
 import { PublicPageForm } from "./public-page-form"
+import { DeleteProductDraft } from "./delete-product-draft"
 import { awaitingReview } from "@/lib/ai/review"
 
 export const metadata = { title: "Product · Fanwise" }
@@ -187,6 +193,10 @@ export default async function ProductPage({
   // have a public page and be on none.
   const publicPage = await getProductPageForEditor(workspace.id, product.id)
 
+  // Whether this caller may delete the product outright, asked of the same
+  // database function the deletion itself runs under lock.
+  const deletion = await getDraftDeletionEligibility(product.id)
+
   return (
     <div className="flex flex-col gap-12">
       <div className="flex flex-col gap-2">
@@ -303,6 +313,20 @@ export default async function ProductPage({
         <h2 className="label-mono">Activity</h2>
         <ActivityLog events={events} />
       </section>
+
+      {/*
+        After everything, including history. Absent for anyone who does not
+        own the workspace; for a product that has been anywhere, a sentence
+        saying why it stays instead of a button.
+      */}
+      {deletion.kind !== "hidden" ? (
+        <DeleteProductDraft
+          workspaceSlug={slug}
+          productId={product.id}
+          productName={product.name}
+          eligibility={deletion}
+        />
+      ) : null}
     </div>
   )
 }

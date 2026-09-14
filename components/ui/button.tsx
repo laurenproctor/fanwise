@@ -4,8 +4,13 @@ import type { ComponentProps } from "react"
 /**
  * Pill buttons, per docs/design-system.md. Solid for primary, hairline border
  * for secondary. The radius was tried square and reverted; leave it alone.
+ *
+ * `danger` is for the one press that cannot be undone, and only inside the
+ * confirmation that says so. It has its own tokens rather than borrowing
+ * `--color-bad`, which is a status colour tuned for dark surfaces and too
+ * light to carry text on the light theme.
  */
-type Variant = "primary" | "secondary"
+type Variant = "primary" | "secondary" | "danger"
 
 const base =
   "inline-flex items-center justify-center gap-2 rounded-[var(--radius-pill)] border px-[22px] py-[12px] " +
@@ -19,6 +24,9 @@ const variants: Record<Variant, string> = {
   secondary:
     "border-[var(--color-rule)] bg-transparent text-[var(--color-ink)] " +
     "hover:border-[var(--color-ink-3)] hover:bg-[var(--color-paper-2)]",
+  danger:
+    "border-[var(--color-danger)] bg-[var(--color-danger)] text-[var(--color-on-danger)] " +
+    "hover:border-[var(--color-danger-hover)] hover:bg-[var(--color-danger-hover)]",
 }
 
 export function Button({
