@@ -62,6 +62,35 @@ export function isMostlyCode(lines: readonly string[]): boolean {
   return code / meaningful.length >= 0.4
 }
 
+/**
+ * Whether a line reads as running prose rather than a label.
+ *
+ * Three or more words of two letters or more, mostly lower case, and not
+ * shattered into single letters. "GLYPHS", "THIN · 100", "OTF TTF VF" and a
+ * kerned-apart "W ORD M AR K STORE FRONT" are labels; "A wide display face
+ * that lives between two worlds" is prose.
+ */
+export function isProseLine(line: string): boolean {
+  const tokens = line.split(/\s+/).filter((token) => token.length > 0)
+  const words = tokens.filter((token) => /\p{L}{2,}/u.test(token))
+  if (words.length < 3) return false
+  const singles = tokens.filter((token) => /^\p{L}$/u.test(token)).length
+  if (singles / tokens.length > 0.3) return false
+  const letters = line.match(/\p{L}/gu) ?? []
+  const lower = line.match(/\p{Ll}/gu) ?? []
+  return lower.length / letters.length >= 0.5
+}
+
+/** A short line that ends the sentence the previous line left open. */
+function finishesSentence(previous: string, line: string): boolean {
+  return (
+    !/[.!?:;]["'”’)\]]?$/.test(previous) &&
+    /\p{Ll}/u.test(line) &&
+    /[.!?]["'”’)\]]?$/.test(line) &&
+    line.split(/\s+/).length <= 3
+  )
+}
+
 /** Lines with their markup markers removed and their contents made safe. */
 function cleanLine(raw: string): string {
   return sanitizeText(raw.replace(HEADING, "").replace(BULLET, ""), HTML_LIMITS.maxFeatureLength)
@@ -102,15 +131,30 @@ export function readPlainText(raw: string): TextReading {
       ? firstClean
       : null
 
-  // The first run of ordinary lines after the title, joined: a paragraph.
-  const rest = title ? nonEmpty.slice(1) : nonEmpty
+  /*
+    The first run of prose lines after the title, joined: a paragraph.
+
+    Labels before it are passed over — a PDF of a web page opens with its
+    navigation, eyebrows and figures, one short line each — and the run ends at
+    a blank line, a heading, a bullet or the next label, so the summary is one
+    paragraph rather than the whole document up to the length cap. A wrapped
+    paragraph's last visual line is often a word or two ("lowercase."), and is
+    kept when it finishes the sentence the line before it left open.
+  */
+  const trimmed = lines.map((line) => line.trim())
+  const titleIndex = title ? trimmed.findIndex((line) => line.length > 0) : -1
   const paragraph: string[] = []
-  for (const line of rest) {
-    if (HEADING.test(line) || BULLET.test(line)) {
+  for (const line of trimmed.slice(titleIndex + 1)) {
+    if (line.length === 0 || HEADING.test(line) || BULLET.test(line)) {
       if (paragraph.length > 0) break
       continue
     }
-    paragraph.push(line)
+    if (isProseLine(line)) {
+      paragraph.push(line)
+    } else if (paragraph.length > 0) {
+      if (finishesSentence(paragraph[paragraph.length - 1]!, line)) paragraph.push(line)
+      break
+    }
     if (paragraph.join(" ").length >= HTML_LIMITS.maxSummaryLength) break
   }
   const joined = sanitizeText(paragraph.join(" "), HTML_LIMITS.maxSummaryLength)

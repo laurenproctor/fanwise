@@ -78,7 +78,7 @@ export async function readPdf(bytes: Uint8Array): Promise<PdfReading> {
       // A PDF with broken metadata still has pages worth reading.
     }
 
-    const pages: string[] = []
+    const pages: string[][] = []
     let total = 0
     for (let number = 1; number <= Math.min(pageCount, PDF_LIMITS.maxPages); number += 1) {
       if (total >= PDF_LIMITS.maxCharacters) break
@@ -89,18 +89,21 @@ export async function readPdf(bytes: Uint8Array): Promise<PdfReading> {
       for (const item of content.items as TextItemLike[]) {
         if (typeof item.str === "string") line += item.str
         if (item.hasEOL === true) {
-          lines.push(line)
+          lines.push(collapseLetterSpacing(line))
           line = ""
         }
       }
-      if (line.length > 0) lines.push(line)
-      const text = lines.join("\n")
-      pages.push(text)
-      total += text.length
+      if (line.length > 0) lines.push(collapseLetterSpacing(line))
+      pages.push(lines)
+      total += lines.join("\n").length
       page.cleanup()
     }
 
-    return { pageCount, metadataTitle, text: pages.join("\n\n").slice(0, PDF_LIMITS.maxCharacters) }
+    const text = withoutRunningLines(pages)
+      .map((lines) => lines.join("\n"))
+      .join("\n\n")
+      .slice(0, PDF_LIMITS.maxCharacters)
+    return { pageCount, metadataTitle, text }
   } catch (error) {
     if (error instanceof ImportError) throw error
     const name = error instanceof Error ? error.name : "unknown"
@@ -108,6 +111,60 @@ export async function readPdf(bytes: Uint8Array): Promise<PdfReading> {
   } finally {
     await document.loadingTask.destroy().catch(() => undefined)
   }
+}
+
+/**
+ * A line with its letter-spacing taken out: "F A C E T T E" becomes "FACETTE".
+ *
+ * Tracked-out type — eyebrows, navigation, small caps — reaches the text layer
+ * as one glyph per word, which a model reads as noise and a summary shows as
+ * noise. A run of three or more single characters separated by single spaces is
+ * joined; anything with a real word in it is left alone. Word boundaries inside
+ * the run were never in the text layer, so "TESTER WEIGHTS" printed tracked out
+ * comes back as "TESTERWEIGHTS": better than letters, and the reason such lines
+ * are never offered as a summary.
+ */
+export function collapseLetterSpacing(line: string): string {
+  return line.replace(/(?<!\S)(?:\S )+\S(?!\S)/g, (run) =>
+    run.split(" ").length >= 3 ? run.replace(/ /g, "") : run,
+  )
+}
+
+/** How many lines at each end of a page can be a running header or footer. */
+const PAGE_EDGE_LINES = 3
+
+/**
+ * Pages with their running headers and footers removed.
+ *
+ * A browser's "Save as PDF" stamps every page with the date, the page's title,
+ * its address and "3/9". Those are not the document's words, and left in they
+ * become its summary. A line is running matter when, with its digits ignored, it
+ * sits within three lines of the top or bottom of most pages — at least two, and
+ * at least three in five. A heading that happens to repeat mid-page is kept.
+ */
+export function withoutRunningLines(pages: readonly (readonly string[])[]): string[][] {
+  const signature = (line: string) => line.trim().toLowerCase().replace(/\d+/g, "#")
+  const edges = (lines: readonly string[]) =>
+    new Set(
+      [...lines.slice(0, PAGE_EDGE_LINES), ...lines.slice(-PAGE_EDGE_LINES)]
+        .map(signature)
+        .filter((key) => key.length >= 4),
+    )
+
+  const counts = new Map<string, number>()
+  for (const page of pages) {
+    for (const key of edges(page)) counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const threshold = Math.max(2, Math.ceil(pages.length * 0.6))
+  const running = new Set([...counts].filter(([, count]) => count >= threshold).map(([key]) => key))
+  if (running.size === 0) return pages.map((lines) => [...lines])
+
+  return pages.map((lines) =>
+    lines.filter((line, index) => {
+      const atEdge = index < PAGE_EDGE_LINES || index >= lines.length - PAGE_EDGE_LINES
+      return !(atEdge && running.has(signature(line)))
+    }),
+  )
 }
 
 /** `%PDF-` within the first kilobyte, which is where the specification allows it. */
