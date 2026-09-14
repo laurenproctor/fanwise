@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import {
   RLS_DENIED,
@@ -50,6 +51,12 @@ async function asset(actor: Actor, productId: string, assetType: string, filenam
 }
 
 beforeAll(async () => {
+  // Tokens are sealed. CI's tenancy job carries no key, and this suite needs one
+  // of its own rather than a real one: credential-binding does the same.
+  if (!process.env.CREDENTIALS_ENCRYPTION_KEY) {
+    process.env.CREDENTIALS_ENCRYPTION_KEY = randomBytes(32).toString("base64")
+  }
+
   alice = await createActor("delivery-a")
   bob = await createActor("delivery-b")
 
