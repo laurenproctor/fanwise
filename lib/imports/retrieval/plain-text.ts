@@ -77,10 +77,12 @@ function cleanLine(raw: string): string {
  */
 export function readPlainText(raw: string): TextReading {
   const lines = raw.replace(/\r\n?/g, "\n").split("\n")
+  // Blank lines kept, each run as one: they are where the paragraphs are, and
+  // the draft is written from this text.
   const body = lines
     .map((line) => sanitizeText(line, TEXT_LIMITS.maxBodyLength))
-    .filter((line) => line.length > 0)
     .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
     .slice(0, TEXT_LIMITS.maxBodyLength)
     .trim()
 
@@ -102,10 +104,17 @@ export function readPlainText(raw: string): TextReading {
       ? firstClean
       : null
 
-  // The first run of ordinary lines after the title, joined: a paragraph.
-  const rest = title ? nonEmpty.slice(1) : nonEmpty
+  // The first run of ordinary lines after the title, joined: a paragraph. A
+  // blank line ends it, because that is where the writer ended it.
+  const trimmed = lines.map((line) => line.trim())
+  const titleIndex = title ? trimmed.findIndex((line) => line.length > 0) : -1
+  const rest = trimmed.slice(titleIndex + 1)
   const paragraph: string[] = []
   for (const line of rest) {
+    if (line.length === 0) {
+      if (paragraph.length > 0) break
+      continue
+    }
     if (HEADING.test(line) || BULLET.test(line)) {
       if (paragraph.length > 0) break
       continue

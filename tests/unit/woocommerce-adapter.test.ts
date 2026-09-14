@@ -255,6 +255,7 @@ describe("publish", () => {
     expect(result).toMatchObject({
       externalListingId: "900",
       externalUrl: adminProductUrl("https://shop.example.com", 900),
+      publicUrl: "https://shop.example.com/product/aster-grotesk/",
       externalState: "draft",
       purchasable: false,
     })

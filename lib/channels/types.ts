@@ -201,6 +201,16 @@ export interface PublishResult {
    */
   purchasable?: boolean | null
   /**
+   * The address a buyer would use, when the object has one.
+   *
+   * `externalUrl` is the creator's address, and on a storefront that is the
+   * admin editor because nothing else works for a draft. This is the page a
+   * visitor lands on. The runner stores it only while the listing is live and
+   * not known to be unpurchasable, so an adapter returns it whenever the
+   * provider says what it is, without deciding liveness a second time.
+   */
+  publicUrl?: string | null
+  /**
    * The provider's own response, persisted to publication_jobs. Never rendered,
    * and never a credential: adapters return what came back from a write.
    */

@@ -70,6 +70,10 @@ export function toSeoDescription(text: string | null): string | null {
 }
 
 /** The admin URL for a product, which is stable and works before it is live. */
+export function storefrontProductUrl(shopDomain: string, handle: string): string {
+  return `https://${shopDomain}/products/${encodeURIComponent(handle)}`
+}
+
 export function adminProductUrl(shopDomain: string, legacyResourceId: string): string {
   return `https://${shopDomain}/admin/products/${legacyResourceId}`
 }

@@ -347,6 +347,8 @@ async function writeProduct(
     // The admin URL: it works before the product is live, which is every
     // product this adapter has just created.
     externalUrl: adminProductUrl(storeUrl, product.id),
+    // The product page on the store, which WordPress names the permalink.
+    publicUrl: product.permalink ?? null,
     externalState: product.status === "publish" ? "live" : "draft",
     providerResponse: current === null ? product : { product, stateBefore: current },
   }

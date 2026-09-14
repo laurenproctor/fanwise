@@ -142,6 +142,8 @@ describe("publishing once", () => {
     expect(listing.status).toBe("published")
     expect(listing.external_listing_id).toBe(`mock-api-${listingId}`)
     expect(listing.external_url).toContain(listingId)
+    // Live on arrival, so the buyer's address is kept for the public page.
+    expect(listing.public_url).toContain(listingId)
     // A provider API confirmed it, so the claim is verified rather than
     // self-reported. The database trigger would refuse this on an assisted
     // channel.

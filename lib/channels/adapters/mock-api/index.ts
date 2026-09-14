@@ -142,6 +142,7 @@ export const mockApiAdapter: ChannelAdapter = {
     return {
       externalListingId: `mock-api-${listing.id}`,
       externalUrl: `https://mock-storefront.test/listings/${listing.id}`,
+      publicUrl: `https://mock-storefront.test/listings/${listing.id}`,
       // Live immediately, because this channel received the deliverable.
       externalState: "live",
       providerResponse: { ok: true, id: `mock-api-${listing.id}` },
@@ -152,6 +153,7 @@ export const mockApiAdapter: ChannelAdapter = {
     return {
       externalListingId: listing.external_listing_id ?? `mock-api-${listing.id}`,
       externalUrl: listing.external_url,
+      publicUrl: listing.external_url,
       externalState: "live",
       providerResponse: { ok: true, updated: true },
     }

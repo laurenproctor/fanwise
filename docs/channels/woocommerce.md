@@ -200,7 +200,8 @@ the store currency. `scopes` is `["read_write"]`. Credentials are `{ consumerKey
 consumerSecret }`, sealed.
 
 `channel_listings.external_listing_id` is the numeric product id as a string;
-`external_url` is the admin edit URL, which works before the product is live.
+`external_url` is the admin edit URL, which works before the product is live; `public_url` is the
+product's `permalink`, kept only while the product is on sale.
 
 ## 13. Open questions to resolve against a live store
 

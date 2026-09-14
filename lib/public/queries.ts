@@ -259,7 +259,7 @@ export async function resolveProductPage(
       .order("sort_order", { ascending: true }),
     supabase
       .from("channel_listings")
-      .select("id, product_id, channel_id, external_url, price, currency")
+      .select("id, product_id, channel_id, public_url, price, currency")
       .eq("product_id", page.product_id),
   ])
 
@@ -313,7 +313,7 @@ async function loadDestinations(
   listings: Array<{
     id: string
     channel_id: string
-    external_url: string | null
+    public_url: string | null
     price: number | null
     currency: string
   }>,
@@ -334,7 +334,7 @@ async function loadDestinations(
       if (!channel) return []
       if (!findAdapter(channel.key)) return []
 
-      const url = safeExternalUrl(listing.external_url)
+      const url = safeExternalUrl(listing.public_url)
       if (!url) return []
 
       return [

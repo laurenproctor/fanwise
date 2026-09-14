@@ -25,11 +25,15 @@ export function escapeHtml(text: string): string {
 
 export function plainTextToHtml(text: string | null): string {
   if (!text) return ""
-  return text
-    .replace(/\r\n/g, "\n")
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter((block) => block.length > 0)
-    .map((block) => `<p>${escapeHtml(block).replace(/\n/g, "<br>")}</p>`)
-    .join("")
+  return (
+    text
+      .replace(/\r\n?/g, "\n")
+      // A line holding only spaces is a blank line to anyone reading the text,
+      // so it separates paragraphs here too rather than becoming two breaks.
+      .split(/\n[^\S\n]*\n\s*/)
+      .map((block) => block.trim())
+      .filter((block) => block.length > 0)
+      .map((block) => `<p>${escapeHtml(block).replace(/\n/g, "<br>")}</p>`)
+      .join("")
+  )
 }

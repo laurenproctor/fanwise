@@ -318,6 +318,7 @@ describe("publish", () => {
     expect(result).toMatchObject({
       externalListingId: "900",
       externalUrl: "https://www.etsy.com/listing/900",
+      publicUrl: "https://www.etsy.com/listing/900",
       externalState: "live",
       purchasable: true,
     })

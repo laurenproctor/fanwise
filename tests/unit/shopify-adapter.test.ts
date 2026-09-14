@@ -284,6 +284,11 @@ describe("transforms", () => {
     expect(toDescriptionHtml("One.\n\nTwo.")).toBe("<p>One.</p><p>Two.</p>")
   })
 
+  it("treats a line holding only spaces as the blank line it looks like", () => {
+    expect(toDescriptionHtml("One.\n  \nTwo.")).toBe("<p>One.</p><p>Two.</p>")
+    expect(toDescriptionHtml("One.\r\n\r\nTwo.\rThree.")).toBe("<p>One.</p><p>Two.<br>Three.</p>")
+  })
+
   it("turns a single newline into a break rather than a paragraph", () => {
     expect(toDescriptionHtml("One.\nTwo.")).toBe("<p>One.<br>Two.</p>")
   })
@@ -625,6 +630,9 @@ describe("publish", () => {
     expect(result.externalState).toBe("draft")
     expect(result.externalListingId).toBe("gid://shopify/Product/900")
     expect(result.externalUrl).toBe("https://aster-type.myshopify.com/admin/products/900")
+    // The storefront address from the handle, since a draft has no
+    // onlineStoreUrl. The runner decides whether to keep it.
+    expect(result.publicUrl).toBe("https://aster-type.myshopify.com/products/aster-grotesk")
   })
 
   it("marks the variant as not requiring shipping, so a font is not quoted postage", async () => {

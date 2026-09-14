@@ -348,6 +348,7 @@ function result(listing: Listing, provider: unknown): PublishResult {
       listing.state === "active"
         ? (listing.url ?? listingUrl(listing.listing_id))
         : editUrl(listing.listing_id),
+    publicUrl: listing.url ?? listingUrl(listing.listing_id),
     externalState: listing.state === "active" ? "live" : "draft",
     purchasable: listing.state === "active",
     providerResponse: provider,

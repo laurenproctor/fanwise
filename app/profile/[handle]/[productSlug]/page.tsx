@@ -278,11 +278,16 @@ export default async function PublicProductPage({ params, searchParams }: Params
             */}
             <div className="flex max-w-prose flex-col gap-4 text-[16px] leading-relaxed text-[var(--color-ink-2)]">
               {product.description
-                .split(/\n{2,}/)
+                .replace(/\r\n?/g, "\n")
+                .split(/\n[^\S\n]*\n\s*/)
                 .map((paragraph) => paragraph.trim())
                 .filter((paragraph) => paragraph.length > 0)
                 .map((paragraph, index) => (
-                  <p key={index}>{paragraph}</p>
+                  // pre-line keeps a single newline a line break, which is how a
+                  // list typed one item per line stays a list.
+                  <p key={index} className="whitespace-pre-line">
+                    {paragraph}
+                  </p>
                 ))}
             </div>
           </section>

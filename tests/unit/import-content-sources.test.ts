@@ -11,6 +11,7 @@ import {
   readSummaryParagraph,
   readVisibleFeatures,
   readVisibleText,
+  sanitizeProse,
 } from "@/lib/imports/retrieval/html"
 import { IMPORT_LIMITS, megabytes } from "@/lib/imports/limits"
 import { isPlausibleDocumentTitle, readPdf } from "@/lib/imports/retrieval/pdf"
@@ -134,6 +135,24 @@ describe("reading plain text", () => {
     expect(reading.title).toBe("Aster Grotesk")
     expect(reading.body).not.toContain(hidden)
     expect(reading.body).not.toContain(nul)
+  })
+
+  it("keeps the paragraphs of a pasted text, and ends the summary where the first one ends", () => {
+    const reading = readPlainText(
+      [
+        "Aster Grotesk",
+        "",
+        "A six-weight grotesque for screens.",
+        "",
+        "",
+        "",
+        "Drawn for long reading, with tabular figures.",
+      ].join("\n"),
+    )
+    expect(reading.summary).toBe("A six-weight grotesque for screens.")
+    expect(reading.body).toBe(
+      "Aster Grotesk\n\nA six-weight grotesque for screens.\n\nDrawn for long reading, with tabular figures.",
+    )
   })
 
   it("reads nothing from whitespace", () => {
@@ -672,5 +691,24 @@ describe("the recovery a file is offered, on screen", () => {
     expect(markup).toContain("Paste the text instead")
     expect(markup).not.toContain("Paste a different link")
     expect(markup).not.toContain("Not built yet")
+  })
+})
+
+describe("prose read from markup keeps its paragraphs", () => {
+  it("separates block elements with a blank line and list items with a newline", () => {
+    const text = readVisibleText(
+      "<body><h1>Aster</h1><p>A grotesque\n  wrapped in source.</p><ul><li>Six weights</li><li>Tabular figures</li></ul><p>Line one<br>Line two</p></body>",
+      2000,
+    )
+    expect(text).toBe(
+      "Aster\n\nA grotesque wrapped in source.\n\nSix weights\nTabular figures\n\nLine one\nLine two",
+    )
+  })
+
+  it("sanitizes prose like text but leaves its line structure", () => {
+    const nul = String.fromCharCode(0)
+    expect(sanitizeProse(`One  <b>bold</b>${nul}\r\n\r\n\r\n  Two\nThree`, 500)).toBe(
+      "One bold\n\nTwo\nThree",
+    )
   })
 })
