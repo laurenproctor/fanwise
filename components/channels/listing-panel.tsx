@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation"
 import { Button, ButtonLink } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { buildListingAction } from "@/lib/channels/actions"
-import { publishChangesAction, publishListingAction } from "@/lib/publishing/actions"
+import {
+  publishChangesAction,
+  publishListingAction,
+  takeListingLiveAction,
+} from "@/lib/publishing/actions"
 import { useBackgroundRefresh } from "@/lib/use-background-refresh"
 import { resolveSend } from "@/lib/publishing/send-outcome"
 import { ReadinessBar } from "./readiness-bar"
@@ -63,6 +67,11 @@ export interface ChannelListingCard {
    */
   awaitingReview: boolean
   deliverable: { assetId: string; filename: string } | null
+  /**
+   * On the channel, not on sale, and owing no step. Without this the card says
+   * "not on sale there yet" and offers nothing to do about it.
+   */
+  canTakeLive: boolean
 }
 
 /** How long to keep asking whether a publication finished, and how often. */
@@ -241,6 +250,20 @@ export function ListingPanel({
       // refusal both return a notice and nothing to wait for, and watching for
       // a landing that will never come would hang the message again.
       if (result.sending) setSending(listingId)
+      router.refresh()
+    })
+  }
+
+  function takeLive(connectionId: string, listingId: string) {
+    setError(null)
+    setNotice(null)
+    setActingOn(connectionId)
+    startTransition(async () => {
+      const result = await takeListingLiveAction(workspaceSlug, listingId)
+      setError(result.error)
+      setNotice(result.notice)
+      setActingOn(null)
+      if (result.activating) setActivating(listingId)
       router.refresh()
     })
   }
@@ -447,6 +470,15 @@ export function ListingPanel({
                         : card.awaitingReview
                           ? "Review and publish changes"
                           : "Publish changes"}
+                    </Button>
+                  ) : null}
+
+                  {card.canTakeLive && card.listingId !== activating ? (
+                    <Button
+                      onClick={() => takeLive(card.connectionId, card.listingId!)}
+                      disabled={pending}
+                    >
+                      {busy ? "Taking it live…" : "Take it live"}
                     </Button>
                   ) : null}
 

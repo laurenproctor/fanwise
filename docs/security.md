@@ -276,6 +276,34 @@ The consequences are structural, and A3 onward must preserve them:
 If a future step ever accepts a client-supplied storage path, all three of these
 collapse at once.
 
+## Durable deliverable addresses are bearer capabilities, on purpose
+
+Added 13 September 2026, ADR 0012. Every other link to a stored object lives five minutes or
+an hour. `/api/public/deliverable/<filename>?token=<token>` does not expire, because a channel
+that stores a download as a URL (WooCommerce) fetches it whenever a buyer downloads, for as
+long as the product is on sale. Whoever holds the address gets the paid file. What keeps that
+acceptable, and must be preserved:
+
+1. **It is handed to the channel and nobody else.** Minted only inside the publication runner,
+   through `PublishContext.deliverableUrl`, and sent only in the channel write. It is never
+   rendered in Fanwise's UI, never logged, never returned to the browser.
+2. **The table alone yields nothing.** `listing_deliverable_links` holds a SHA-256 for lookup
+   and the token sealed with the credentials keyring, bound to listing and asset. RLS on, no
+   policies, no grant to `anon` or `authenticated`. The public route hashes the incoming
+   token and never opens a sealed one.
+3. **Everything that limits it is checked per request.** Not revoked, the listing and the
+   asset still exist (both cascade), the asset still a `ready` `deliverable` or `archive`.
+   Every refusal is the same `no-store` 404, so the route confirms nothing about which tokens
+   existed. The success is a `no-store` 307 to a five-minute signed download link, with
+   `Referrer-Policy: no-referrer`.
+4. **The filename segment is cosmetic.** Only the token is served. A route that ever looked
+   something up by the filename would turn a guessable name into a file.
+
+What it does not protect against, stated so nobody assumes otherwise: a store set to
+`Redirect only` shows the address to buyers, and WooCommerce's REST products endpoint shows
+`downloads` to anyone who can read the product through the API. Revocation is the remedy, and
+setting `revoked_at` takes effect on the next request.
+
 ## RLS decisions worth not relearning
 
 1. Membership lookups are `security definer` functions with `set search_path = ''`. A policy

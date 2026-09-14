@@ -550,6 +550,67 @@ export type Database = {
         }
         Relationships: []
       }
+      listing_deliverable_links: {
+        Row: {
+          asset_id: string
+          channel_listing_id: string
+          created_at: string
+          id: string
+          key_version: number
+          last_downloaded_at: string | null
+          revoked_at: string | null
+          token_hash: string
+          token_sealed: string
+          workspace_id: string
+        }
+        Insert: {
+          asset_id: string
+          channel_listing_id: string
+          created_at?: string
+          id?: string
+          key_version: number
+          last_downloaded_at?: string | null
+          revoked_at?: string | null
+          token_hash: string
+          token_sealed: string
+          workspace_id: string
+        }
+        Update: {
+          asset_id?: string
+          channel_listing_id?: string
+          created_at?: string
+          id?: string
+          key_version?: number
+          last_downloaded_at?: string | null
+          revoked_at?: string | null
+          token_hash?: string
+          token_sealed?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_deliverable_links_asset_fk"
+            columns: ["asset_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "product_assets"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "listing_deliverable_links_listing_fk"
+            columns: ["channel_listing_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "channel_listings"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "listing_deliverable_links_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_manual_steps: {
         Row: {
           channel_listing_id: string

@@ -113,6 +113,10 @@ function context(overrides: Partial<PublishContext> = {}): PublishContext {
     } as unknown as ChannelConnection,
     subject: subject(),
     assetUrl: async (a) => `https://signed.example/${a.filename}`,
+    // Etsy takes the file by upload and must never ask for a durable address.
+    deliverableUrl: async () => {
+      throw new Error("Etsy asked for a durable deliverable address")
+    },
     ...overrides,
   }
 }

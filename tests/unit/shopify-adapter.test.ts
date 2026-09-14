@@ -146,6 +146,10 @@ function context(overrides: Partial<PublishContext> = {}): PublishContext {
     } as unknown as ChannelConnection,
     subject: subject(),
     assetUrl: async () => "https://signed.example/cover.png",
+    // Shopify cannot take the file at all and must never ask for an address.
+    deliverableUrl: async () => {
+      throw new Error("Shopify asked for a durable deliverable address")
+    },
     ...overrides,
   }
 }

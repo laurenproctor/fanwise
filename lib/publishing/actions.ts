@@ -9,7 +9,7 @@ import { findAdapter } from "@/lib/channels/registry"
 import type { AdapterSubject, Channel, ChannelListing } from "@/lib/channels/types"
 import type { Product, ProductAsset } from "@/lib/products/types"
 import { imagesFingerprint } from "@/lib/channels/images"
-import { mergeManualSteps, readyToActivate } from "./manual-steps"
+import { mergeManualSteps, outstandingRequired, readyToActivate } from "./manual-steps"
 import { awaitingReview } from "@/lib/ai/review"
 import { approveListing } from "@/lib/ai/approve"
 import { startPublication } from "./start"
@@ -400,6 +400,79 @@ export async function completeManualStepAction(
   }
 
   return { error: null, notice: `Taking the product live on ${adapter.name}.`, activating: true }
+}
+
+/**
+ * Takes a product the channel holds as a draft live, when nothing is left for
+ * a person to do.
+ *
+ * The other way into activate. Completing the last gating step is the usual
+ * one, but a listing can be on the channel, off sale, and owe no step at all:
+ * a channel that has since learned to do the step itself, whose older drafts
+ * would otherwise sit with no button beside them, or a store that answered a
+ * publish without the file. The adapter's activate decides whether live is
+ * actually possible and says so if it is not; this action only refuses the
+ * cases where asking would be meaningless.
+ */
+export async function takeListingLiveAction(
+  workspaceSlug: string,
+  listingId: string,
+): Promise<PublishState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const loaded = await loadListing(supabase, workspace.id, listingId)
+  if (!loaded) return { error: "That listing could not be found.", notice: null }
+
+  const { listing, channel, product } = loaded
+
+  const adapter = findAdapter(channel.key)
+  if (!adapter?.activate) {
+    return { error: "This channel cannot take a product live from Fanwise.", notice: null }
+  }
+
+  if (listing.status !== "published" || !listing.external_listing_id) {
+    return { error: "Publish this listing first.", notice: null }
+  }
+
+  const { data: rows } = await supabase
+    .from("listing_manual_steps")
+    .select("*")
+    .eq("channel_listing_id", listingId)
+    .eq("workspace_id", workspace.id)
+
+  // A step still owed is the step's own button to press, which checks the
+  // claim it records. Going around it would put a product on sale on the
+  // strength of nobody having said the work was done.
+  if (outstandingRequired(mergeManualSteps(adapter.manualSteps, rows ?? [])).length > 0) {
+    return { error: "Finish the steps for this channel first.", notice: null }
+  }
+
+  const outcome = await startPublication({
+    supabase,
+    workspaceId: workspace.id,
+    listingId,
+    kind: "activate",
+    draft: listingToDraft(listing),
+    generation: listing.publish_generation,
+  })
+
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
+
+  switch (outcome.kind) {
+    case "error":
+      return {
+        error: `${adapter.name} could not be told to take the product live. Try again.`,
+        notice: null,
+      }
+    case "already_done":
+      return { error: null, notice: `${adapter.name} already has this product live.` }
+    default:
+      return {
+        error: null,
+        notice: `Taking the product live on ${adapter.name}.`,
+        activating: true,
+      }
+  }
 }
 
 /**

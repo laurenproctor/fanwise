@@ -25,7 +25,7 @@ Current reality, from `docs/channel-feasibility.md`:
 | Channel | Type | Publish | Update | Transactions | File upload | Image upload |
 |---|---|---|---|---|---|---|
 | Shopify | api | yes | yes | yes | **no**, see note | yes |
-| WooCommerce | api | yes | yes | yes | **no**, by decision, see `docs/channels/woocommerce.md` §6 | yes |
+| WooCommerce | api | yes | yes | yes | yes, by a durable Fanwise address, `docs/channels/woocommerce.md` §6 and ADR 0012 | yes |
 | Etsy | api | yes | yes | yes | **yes**, 5 files at 20 MB, built at A6 | yes |
 | Creative Market | assisted | no | no | no | no | no |
 | Behance | assisted | no | no | no | no | no |

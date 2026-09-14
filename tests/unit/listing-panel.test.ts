@@ -16,6 +16,7 @@ vi.mock("@/lib/channels/actions", () => ({ buildListingAction: async () => ({ er
 vi.mock("@/lib/publishing/actions", () => ({
   publishListingAction: async () => ({ error: null }),
   publishChangesAction: async () => ({ error: null }),
+  takeListingLiveAction: async () => ({ error: null }),
 }))
 
 import { ListingPanel, type ChannelListingCard } from "@/components/channels/listing-panel"
@@ -70,6 +71,7 @@ function card(overrides: Partial<ChannelListingCard>): ChannelListingCard {
     lastError: null,
     awaitingReview: false,
     deliverable: null,
+    canTakeLive: false,
     ...overrides,
   }
 }
@@ -157,5 +159,21 @@ describe("the listing card's publish affordance", () => {
       "const canPublishSomewhere = runChannels.some((channel) => channel.canPublish && channel.connected)",
     )
     expect(source).toMatch(/\{canPublishSomewhere \? \(/)
+  })
+
+  it("offers Take it live only where the card says the channel can, and never beside Publish", () => {
+    for (const liveness of LIVENESSES) {
+      const markup = render([card({ liveness, canTakeLive: false })])
+      expect(
+        buttons(markup).some((b) => b.text === "Take it live"),
+        liveness,
+      ).toBe(false)
+    }
+
+    const stranded = render([card({ liveness: "published_not_live", canTakeLive: true })])
+    expect(buttons(stranded)).toContainEqual({ text: "Take it live", disabled: false })
+    expect(buttons(stranded).some((b) => b.text === "Publish")).toBe(false)
+    // The dead end it replaces: the sentence used to be the whole card.
+    expect(stranded).toContain("The channel has the product, but it is not on sale there yet.")
   })
 })

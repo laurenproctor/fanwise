@@ -487,6 +487,27 @@ URL, which resolves before the product is live.
 `billable = false` takes decision 23's recommended reading, and the migration says so in a
 comment. Flipping it is one migration, and nothing bills before C1 either way.
 
+### `listing_deliverable_links`
+
+Added 13 September 2026, migration `20260913070000_deliverable_links`, ADR 0012. A durable,
+revocable address a channel's own server fetches a buyer file from. WooCommerce is the first
+channel to use one; nothing in the table names a channel.
+
+id, workspace_id, channel_listing_id, asset_id, token_hash (unique), token_sealed,
+key_version, revoked_at, created_at, last_downloaded_at
+
+- Composite foreign keys `(channel_listing_id, workspace_id)` and `(asset_id, workspace_id)`,
+  both cascading, so an address can never pair one workspace's listing with another's file,
+  and deleting either takes the address down.
+- Partial unique index on `(channel_listing_id, asset_id) where revoked_at is null`: one live
+  address per listing and file. That is what keeps the address stable and settles two
+  writes racing to make it.
+- `token_hash` is SHA-256 and is what a request looks up. `token_sealed` is the token under
+  the credentials keyring, bound to listing and asset, so the runner can hand a store the
+  same address on every write. `key_version` as on `channel_connection_secrets`.
+- RLS on, **no policies**, and no grant to `anon` or `authenticated`. The runner and the
+  public route use the service role. Proven in `tests/db/deliverable-links.test.ts`.
+
 ## C1: billing
 
 Built. Migration `20260908200000_billing`.

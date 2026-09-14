@@ -15,7 +15,7 @@ one hard problem, which this spec inherits rather than solves: **the file**.
 | Claim | Where it is answered |
 |---|---|
 | A store connects with nothing but its own address | §9 |
-| A real product publishes as a draft and goes live only with the file on it | §5, §6 |
+| A real product publishes live with its file, and is never on sale without it | §5, §6 |
 | A second click creates nothing | §7, shared with every channel |
 
 ## 2. Adapter definition
@@ -30,15 +30,15 @@ capabilities: {
   automaticUpdate: true,     // PUT /products/{id}, implemented
   metrics: false,            // exists on the provider, arrives at B6
   transactions: false,       // GET /orders exists, arrives at B5
-  digitalFileUpload: false,  // Fanwise will not, see §6. The provider can, badly
+  digitalFileUpload: true,   // downloads[].file, a Fanwise address, §6
   imageUpload: true,         // images[].src, sideloaded by the store
-  drafts: true,              // status: draft, and load-bearing
+  drafts: true,              // the fallback when a store drops the file, §6
 }
 ```
 
-`digitalFileUpload` is false for the second of the two reasons `docs/channel-adapters.md`
-names: not because the provider cannot, but because the one API path that can puts the file
-somewhere public. That is a Fanwise decision, recorded in §6, and it could change.
+`digitalFileUpload` was false at B8, by decision, and became true on 13 September 2026 (ADR
+0012). It is not an upload in the store's own sense: the file stays with Fanwise and the
+store is given a durable address it fetches from. §6 has the mechanism and its limits.
 
 ## 3. Canonical product to listing field map
 
@@ -53,7 +53,7 @@ somewhere public. That is a Fanwise decision, recorded in §6, and it could chan
 | `seo_title`, `seo_description` | **nothing** | No native fields. Left null, profile says leave empty |
 | `category` | **nothing** | Store-defined terms. Left null; the creator assigns in the admin |
 | `cover_image`, then `preview_image` assets | `images[].src` | Sideloaded on create, resent only when the store is short |
-| `deliverable` asset | **nothing** | §6 |
+| ready `deliverable` and `archive` assets | `downloads[]` of `{ name, file }` | `file` is a Fanwise address, §6 |
 | — | `type: simple`, `virtual: true`, `downloadable: true`, `sold_individually: true` | Constants for a digital product |
 
 No `slug` is sent, on the lesson Shopify taught: WordPress uniquifies a slug it derives and
@@ -65,7 +65,7 @@ would refuse one it is given that is taken.
 |---|---|---|---|
 | `title` | 3–200 chars | error | A post title; 200 is a house limit |
 | `price` | set, ≥ 0 | error | A digital product with no price is not a product |
-| `deliverable` | ≥ 1 ready `deliverable` or `archive` asset | error | §6: there must be a file to attach, and activate checks for it |
+| `deliverable` | ≥ 1 ready `deliverable` or `archive` asset | error | §6: never on sale without a file |
 | `tags` | each ≤ 200 chars | error | WordPress term name limit |
 | `description` | ≥ 40 chars | warning | Publishes without one, sells badly |
 | `short_description` | ≤ 1000 chars when set | warning | Optional; house limit |
@@ -86,31 +86,67 @@ reasons: whether the store holds fewer images than the listing sends, whether th
 on sale (an update preserves that), and whether it exists at all (§15 of the Shopify spec, the
 same rule).
 
-## 6. Digital delivery, and the draft gate
+## 6. Digital delivery
+
+Rewritten 13 September 2026 by ADR 0012. Until then this section described an assisted file
+step: publish made a draft, the creator uploaded the file in the admin and marked the step
+done, and `activate` checked `downloads` before going live. The first real product stopped at
+that step, and the ADR records why it went.
 
 WooCommerce has downloadable products: `downloadable: true` and a `downloads` array of name
-and file URL. The API sets every part of that except the file's existence. `downloads[].file`
-must be a URL the store can already serve, and:
+and file URL. The store fetches the URL itself whenever a buyer downloads. What it offers for
+getting a file there:
 
-- the WooCommerce API has no upload for one;
-- the WordPress media API can upload a file, into `wp-content/uploads`, which is public by
-  address, and it needs a second credential the authorization flow does not grant;
-- the protected folder, `woocommerce_uploads`, is written only by the admin's product-file
-  upload.
+- no WooCommerce endpoint writes into the protected folder, `woocommerce_uploads`;
+- the WordPress media API can upload, into `wp-content/uploads`, which is public by address,
+  and only with a second credential the authorization flow does not grant;
+- **any URL the store can fetch is a valid download.** This is the path Fanwise takes.
 
-So the file step is assisted. `publish` creates the product as `status: draft`, the creator
-attaches the file in Product data, Downloadable files, and marks the step done.
+**The address.** Each ready `deliverable` or `archive` asset gets one durable Fanwise address,
+`<app>/api/public/deliverable/<filename>?token=<token>`, from
+`lib/publishing/deliverable-links.ts` through `PublishContext.deliverableUrl`. The filename is
+the last segment because the store names the buyer's download after the basename; the token
+is in the query so every address shares one directory. The address is stable per listing and
+asset, because the store grants buyers access per download entry. The token is stored as a
+SHA-256 for lookup and sealed with the credentials keyring for reuse, in
+`listing_deliverable_links`, which nobody signed in can read. The route checks, per request,
+that the address is not revoked and the asset is still a ready buyer file, then redirects to
+a five-minute signed download link. Every refusal is the same uncached 404.
 
-**Activate checks.** Unlike Shopify, the product read carries `downloads`. `activate` reads
-the product first and refuses, with a message naming the admin screen, if the list is empty.
-Only with a file present does it set `status: publish`. The step is still a person's claim,
-but here the claim is verified before it has consequences.
+**The write.** `publish` creates the product with `status: publish` and `downloads` in the same
+body. `update` and `activate` send `downloads` only when the store's list differs from what
+Fanwise would send, and they edit only Fanwise's own entries, recognized by the token. A
+creator's own files added in the admin stay, and so does every entry id.
 
-`purchasable` is true only when the read-back product is `publish`, has at least one
+**Never on sale without a file.** If the store answers `publish` with an empty `downloads`,
+the adapter sets the product back to `draft` by id at once. From `publish` that is reported as
+a draft, not a failure, so the product is recorded and a second Publish cannot duplicate it.
+From `activate` it is a failure with a sentence.
+
+**The store's two checks.** `WC_Product_Download::check_is_valid` refuses an address whose
+extension is not an allowed WordPress file type (fonts are outside the defaults; an address
+with no extension is not type-checked), and, with Approved Download Directories on, an
+address outside the list. The adapter retries a refusal once with the extension removed. A
+second refusal is the directory list: a site administrator's key approves Fanwise's
+directory automatically, a shop manager's adds it switched off, and the message names the
+setting to turn on.
+
+**Take it live.** `activate` remains, reached from a **Take it live** button on any listing
+that is on the channel, off sale, and owes no step. It exists for drafts created under the
+assisted step and for a store that dropped the file. It attaches the file on the way.
+
+`purchasable` is true only when the product the store returns is `publish`, has at least one
 download, and is not `catalog_visibility: hidden`.
 
-**[verify]** whether a file attached in the admin appears in the API's `downloads` array with
-its protected URL, and whether the store's download method setting affects that.
+**The download mode matters.** In the default, `Force downloads`, the store streams the file
+and the buyer never sees the address. In `Redirect only` the buyer is sent to the address and
+could share it. WooCommerce's REST products endpoint also shows `downloads` to anyone who can
+read the product through the API (woocommerce/woocommerce#21732). Either way the address is
+revocable, which a file in `wp-content/uploads` is not.
+
+**[verify]** against the live store: the refusal code is `product_invalid_download`; a
+force-download fetch follows the route's 307; the directory is approved automatically under
+the connecting user's key.
 
 ## 7. Idempotency
 
@@ -202,10 +238,16 @@ consumerSecret }`, sealed.
 `channel_listings.external_listing_id` is the numeric product id as a string;
 `external_url` is the admin edit URL, which works before the product is live.
 
+`listing_deliverable_links` holds one row per listing and buyer file: `token_hash`,
+`token_sealed` and `key_version`, `revoked_at`, `last_downloaded_at`. No `listing_manual_steps`
+row is created any more. Rows left from before 13 September 2026 are ignored, because the
+adapter no longer declares the step.
+
 ## 13. Open questions to resolve against a live store
 
 1. The POST-versus-redirect order in §9.
-2. Whether `downloads` reflects an admin-attached file, §6.
+2. ~~Whether `downloads` reflects an admin-attached file, §6.~~ No longer decides code: Fanwise
+   writes the download itself. Replaced by the three **[verify]** items at the end of §6.
 3. Whether the site name from the REST index is readable with WooCommerce keys alone, or
    needs no auth at all. The adapter falls back to the address.
 4. Whether sideloading a Supabase signed URL completes inside the URL's lifetime on typical

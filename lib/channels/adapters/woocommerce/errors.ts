@@ -14,6 +14,13 @@ import type { OutboundError } from "@/lib/net/outbound"
 
 const CHANNEL = "WooCommerce"
 
+/**
+ * The store refused a download entry: a file type it does not allow, or an
+ * address outside its approved download directories. WooCommerce raises both
+ * from one validation, under one code.
+ */
+export const DOWNLOAD_REFUSED = "product_invalid_download"
+
 export interface WooErrorBody {
   code?: string
   message?: string
@@ -62,6 +69,18 @@ export function httpError(status: number, body: WooErrorBody | string | null): N
     return normalized(
       "provider_unavailable",
       `${CHANNEL} is not responding. This will be retried automatically.`,
+      body,
+    )
+  }
+  if (status === 400 && code === DOWNLOAD_REFUSED) {
+    // Reached only after the adapter has already retried without the file
+    // extension, so what is left is the store's directory allow-list. The key
+    // pair belongs to a store user who cannot approve a new directory, and the
+    // store added Fanwise's to the list switched off.
+    return normalized(
+      "validation_rejected",
+      `${CHANNEL} would not accept the download address for this product's file. In WooCommerce, ` +
+        "open Settings, Products, Approved download directories, enable the Fanwise entry, then publish again.",
       body,
     )
   }

@@ -93,6 +93,10 @@ currently tolerates in either order, and whether an admin-attached file shows in
 `downloads` array, which is what `activate` checks before it lets a product go live. If the
 second is wrong the draft gate is a false refusal and B8 is not done.
 
+*13 September 2026:* the second question no longer decides code. ADR 0012 has Fanwise write
+the download itself, so nothing waits on an admin-attached file. The live store now has to
+confirm three different things, listed at the end of spec §6.
+
 The same store unblocks A7 on its own: a second live channel to orchestrate against Shopify,
 without waiting on Etsy's exit.
 

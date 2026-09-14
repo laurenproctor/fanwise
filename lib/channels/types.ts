@@ -216,12 +216,19 @@ export type ExternalListingState = "draft" | "live"
  * lib/products/storage. Providers that ingest media by URL get a time-limited
  * signed link; the adapter asks for one and does not know or care where the
  * bytes live.
+ *
+ * `deliverableUrl` is the durable counterpart, for a provider that stores a
+ * download as a URL and fetches it whenever a buyer downloads, long after any
+ * signed link would have expired. It is stable: the same listing and asset get
+ * the same address on every call, so an adapter may ask on every write. See
+ * lib/publishing/deliverable-links.ts.
  */
 export interface PublishContext {
   listing: ChannelListing
   connection: ChannelConnection
   subject: AdapterSubject
   assetUrl(asset: ProductAsset): Promise<string>
+  deliverableUrl(asset: ProductAsset): Promise<string>
 }
 
 /**

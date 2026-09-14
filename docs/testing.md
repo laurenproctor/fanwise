@@ -146,9 +146,12 @@ the product heading, usually.
     two checkouts, and `tests/db/billing.test.ts` proves the ledger, the tenancy and the sync
     job against real Postgres with the provider scripted. Unrun in the browser: it needs a
     provider account in test mode)*
-11. Connect WooCommerce, publish a draft, attach the file, activate. *(code complete at B8,
-    unverified: needs a live store. The authorization handshake and the adapter are covered
-    in `tests/unit/woocommerce-oauth.test.ts` and `tests/unit/woocommerce-adapter.test.ts`)*
+11. Connect WooCommerce, publish, confirm the product is live with its file, and buy it to
+    confirm the download arrives. *(code complete at B8, file attached automatically since 13
+    September 2026, ADR 0012; unverified: needs a live store. The authorization handshake and
+    the adapter are covered in `tests/unit/woocommerce-oauth.test.ts` and
+    `tests/unit/woocommerce-adapter.test.ts`, the address in `tests/unit/deliverable-link.test.ts`
+    and `tests/db/deliverable-links.test.ts`)*
 12. Generate a Behance project and asset package, hand off, capture the project URL.
     *(planned at B9, not built; waits on A8's handoff machinery and on a profile with Stripe
     connected, decision 26)*

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createIngestUrl } from "@/lib/products/storage"
+import { ensureDeliverableLink } from "@/lib/publishing/deliverable-links"
 import { evaluate, listingToDraft, snapshotPayload } from "@/lib/channels/listings"
 import { findAdapter } from "@/lib/channels/registry"
 import { normalizeUnknown } from "@/lib/channels/errors"
@@ -311,6 +312,10 @@ async function execute(
     // requested is never created, so a channel that cannot take images never
     // causes a signed URL for one to exist.
     assetUrl: (asset) => createIngestUrl(asset.storage_path),
+    // Durable, so made only on request and only for this listing. A channel
+    // that never stores a download by URL never causes one to exist.
+    deliverableUrl: (asset) =>
+      ensureDeliverableLink({ admin, workspaceId, listingId: listing.id, asset }),
   }
 
   let result: PublishResult

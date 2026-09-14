@@ -12,7 +12,7 @@ import { listProductEvents, loadPublicationViews } from "@/lib/publishing/querie
 import { planRun, runInputs } from "@/lib/publishing/run"
 import { PublishEverywhere } from "@/components/channels/publish-everywhere"
 import { ActivityLog } from "@/components/channels/activity-log"
-import { liveness, mergeManualSteps } from "@/lib/publishing/manual-steps"
+import { liveness, mergeManualSteps, outstandingRequired } from "@/lib/publishing/manual-steps"
 import { ListingPanel, type ChannelListingCard } from "@/components/channels/listing-panel"
 import { ListingImages, type ListingImage } from "@/components/channels/listing-images"
 import { listingImageSlots } from "@/lib/channels/images"
@@ -160,6 +160,16 @@ export default async function ProductPage({
         // attempt that has since been superseded is a message about the past.
         lastError: lastJob?.status === "failed" ? (lastJob.normalized_error_message ?? null) : null,
         awaitingReview: view ? awaitingReview(view.listing) : false,
+        /*
+         * The same three facts takeListingLiveAction checks, so the button is
+         * offered only where the action would try. The adapter decides whether
+         * live is possible once asked.
+         */
+        canTakeLive:
+          typeof adapter!.activate === "function" &&
+          view !== undefined &&
+          liveness(view.listing, steps) === "published_not_live" &&
+          outstandingRequired(steps).length === 0,
         deliverable: deliverable
           ? { assetId: deliverable.id, filename: deliverable.filename }
           : null,

@@ -305,9 +305,10 @@ on 8 September 2026, and it changes A7's blocker rather than its exit. The exit 
 two live URLs. What has changed is that the second live channel no longer has to be Etsy: a
 WooCommerce store needs no approval, so A7 could have been proven on Shopify and WooCommerce
 while A6's exit waited on its shop. Etsy landed on 11 September 2026, so A7 now has its two
-live channels without B8's exit, and WooCommerce joins as a third when that runs. One thing A7 must
-decide with WooCommerce connected: `activate` refusing a product with no file attached is the
-creator's step still owed, not a provider failure, and the progress surface has to say which.
+live channels without B8's exit, and WooCommerce joins as a third when that runs. Since 13
+September 2026 (ADR 0012) WooCommerce owes no manual step: publish attaches the file and goes
+live in one job, so the step-versus-failure distinction this paragraph used to ask A7 to draw
+no longer arises on this channel.
 
 ## The A6 exit run, 11 September 2026
 
@@ -519,6 +520,16 @@ draft, attach the file in the admin, mark the step done, and confirm that `activ
 the download and the product is buyable. The five questions in
 §13 of the spec, including the order of the store's POST and its redirect, can only be
 settled there. Journey 11 in `docs/testing.md` is that run.
+
+**Changed 13 September 2026, ADR 0012.** The draft gate and the file step above are history.
+The first real product, Blimpie, stopped at the step, and the founder chose to automate it:
+the adapter now sets `downloads[].file` to a durable Fanwise address
+(`listing_deliverable_links`, migration `20260913070000_deliverable_links`, route
+`/api/public/deliverable`), publish creates the product live with its file, and a store that
+drops the file gets the product back as a draft. `digitalFileUpload` is true and
+`manualSteps` is empty. Drafts made before the change, Blimpie's included, go live from the new
+**Take it live** button. The exit run is now connect, publish, buy, download; the store's
+three checks it has to confirm are the **[verify]** items in spec §6.
 
 What B8 changes elsewhere in this file:
 

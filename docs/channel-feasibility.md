@@ -406,7 +406,7 @@ customer, the way in is their fonts and graphics, not their Framer templates.
 |---|---|---|---|---|
 | Shopify | Automatic | API, file delivery needs a decision | API + webhooks | **V1** |
 | Etsy | Automatic | Full API | API | **V1** |
-| WooCommerce | Automatic | API, file step assisted, and `activate` verifies the file is on the product | API | **V1**, B8, code complete 8 Sep 2026, exit needs a live store. Billing is decision 23 |
+| WooCommerce | Automatic | API, file attached by a durable Fanwise address since 13 Sep 2026 (ADR 0012) | API | **V1**, B8, code complete 8 Sep 2026, exit needs a live store. Billing is decision 23 |
 | Creative Market | Assisted | Manual, no automation permitted | None | **V1** |
 | Adobe Stock | Assisted | SFTP + 5,000-row CSV, manual submit | None | **V2, highest leverage** |
 | MyFonts | Assisted | Portal only, exact specs | CSV download | **V2, if fonts are the wedge** |
