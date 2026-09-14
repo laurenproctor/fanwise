@@ -29,6 +29,8 @@ import { PublicPageForm, type ProductWording } from "./public-page-form"
 import { DeleteProductDraft } from "./delete-product-draft"
 import { offeredDraftDeletion } from "@/lib/products/draft-deletion"
 import { awaitingReview } from "@/lib/ai/review"
+import { loadFontWorkspace } from "@/lib/fonts/queries"
+import { FontWorkspace } from "@/components/fonts/font-workspace"
 
 export const metadata = { title: "Product · Fanwise" }
 
@@ -45,6 +47,77 @@ export default async function ProductPage({
 
   const product = await getProductBySlug(workspace.id, productSlug)
   if (!product) notFound()
+
+  /*
+   * A font gets the publishing workspace: one surface with its files, family,
+   * coverage, specimens, licensing and channel drafts. Every other product type
+   * renders the page below exactly as it did before. The workspace reads the
+   * same rows through the same queries; it is a different arrangement of the
+   * canonical product, not a different product model.
+   */
+  if (product.product_type === "font") {
+    const data = await loadFontWorkspace({
+      workspaceId: workspace.id,
+      workspaceSlug: slug,
+      product,
+    })
+    const [events, publicPage, eligibility] = await Promise.all([
+      listProductEvents(workspace.id, product.id),
+      getProductPageForEditor(workspace.id, product.id),
+      getDraftDeletionEligibility(product.id),
+    ])
+    const deletion = offeredDraftDeletion(eligibility)
+
+    return (
+      <div data-workspace-canvas="full" className="flex flex-col gap-14 pb-16">
+        <FontWorkspace
+          workspaceSlug={slug}
+          productId={product.id}
+          defaultSection="family"
+          initialValues={data.values}
+          initialMetadata={data.metadata}
+          files={data.files}
+          family={data.family}
+          images={data.images}
+          channels={data.channels}
+          hasLicenseFile={data.hasLicenseFile}
+          attemptableChannels={data.plan.starts.length}
+          canPublishSomewhere={data.canPublishSomewhere}
+        />
+
+        <div className="mx-auto grid w-full max-w-[1560px] gap-x-10 gap-y-12 border-t border-[var(--color-rule)] pt-10 xl:grid-cols-2">
+          <section className="flex flex-col gap-5">
+            <h2 className="label-mono">Public page</h2>
+            <p className="max-w-prose text-[15px] text-[var(--color-ink-2)]">
+              A page on the open web that shows this product and sends buyers to its channels.
+              Fanwise takes no payment here.
+            </p>
+            <PublicPageSection
+              workspaceSlug={slug}
+              productSlug={product.slug}
+              publicPage={publicPage}
+              hasDestinations={data.channels.some((channel) => channel.externalUrl !== null)}
+              hasContact={false}
+            />
+          </section>
+          <section className="flex flex-col gap-5">
+            <h2 className="label-mono">Activity</h2>
+            <ActivityLog events={events} />
+          </section>
+          {deletion ? (
+            <div className="xl:col-span-2">
+              <DeleteProductDraft
+                workspaceSlug={slug}
+                productId={product.id}
+                productName={product.name}
+                eligibility={deletion}
+              />
+            </div>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
 
   const assets = await listProductAssets(product.id)
 

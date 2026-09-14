@@ -885,7 +885,7 @@ describe("the layout at the widths the repository already tests", () => {
   })
 })
 
-describe("only the importer asks for the whole window", () => {
+describe("only the importer and the font workspace ask for the whole window", () => {
   /**
    * The browser used to measure `<main>` on three other workspace routes at
    * 1600px to prove none of them had been widened. What decides that is one CSS
@@ -903,12 +903,16 @@ describe("only the importer asks for the whole window", () => {
     })
   }
 
-  it("is the one component that carries the wide-canvas attribute", () => {
+  it("are the only surfaces that carry the wide-canvas attribute", () => {
     const carriers = [...sourceFiles("app"), ...sourceFiles("components"), ...sourceFiles("lib")]
       .filter((path) => readFileSync(join(ROOT, path), "utf8").includes("data-workspace-canvas"))
       .sort()
 
+    // The product page carries it for font products only: the font publishing
+    // workspace is three columns (sections, editor, storefront preview) and
+    // does not fit the reading column. Every other product type keeps it.
     expect(carriers).toEqual([
+      join("app", "[slug]", "[productSlug]", "page.tsx"),
       join("app", "globals.css"),
       join("components", "imports", "import-chrome.tsx"),
     ])

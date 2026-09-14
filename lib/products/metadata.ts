@@ -14,6 +14,68 @@ import { PRODUCT_TYPES } from "./types"
  * belongs to the adapter.
  */
 
+/**
+ * Classification is Fanwise's own word for what kind of type this is. A channel
+ * that files fonts under its own tree maps from this in its adapter.
+ */
+export const FONT_CLASSIFICATIONS = [
+  "sans_serif",
+  "serif",
+  "slab_serif",
+  "display",
+  "script",
+  "handwritten",
+  "monospace",
+  "blackletter",
+  "decorative",
+] as const
+
+export const FONT_LICENSE_KINDS = ["desktop", "web", "app", "epub"] as const
+export type FontLicenseKind = (typeof FONT_LICENSE_KINDS)[number]
+
+const shortText = z.string().trim().min(1).max(64)
+
+/**
+ * One style of the family, as the creator stands behind it.
+ *
+ * Seeded from what the uploaded files say and then theirs to correct. `key` is
+ * the PostScript name where a file had one, which is what ties a correction to
+ * the files it describes across a re-upload of the same face.
+ */
+const fontStyle = z.object({
+  key: z.string().trim().min(1).max(200),
+  name: z.string().trim().min(1).max(120),
+  weight: z.number().int().min(1).max(1000).optional(),
+  width: z.number().int().min(1).max(9).optional(),
+  italic: z.boolean().optional(),
+})
+
+const fontAxis = z.object({
+  tag: z.string().trim().min(1).max(4),
+  name: z.string().trim().max(64).optional(),
+  min: z.number(),
+  default: z.number(),
+  max: z.number(),
+})
+
+/**
+ * A licence type the creator sells, and its limits.
+ *
+ * Only the types they enable exist in the list, so an absent `app` means "not
+ * sold" rather than "unanswered". Limits are optional because a creator may
+ * sell an unlimited desktop licence; readiness asks for the one that a web
+ * licence cannot sensibly go without.
+ */
+const fontLicense = z.object({
+  kind: z.enum(FONT_LICENSE_KINDS),
+  /** Price for this licence in the product's currency. Absent means the base price. */
+  price: z.number().min(0).max(1_000_000).optional(),
+  seats: z.number().int().min(1).max(1_000_000).optional(),
+  monthlyPageviews: z.number().int().min(1).max(10_000_000_000).optional(),
+  apps: z.number().int().min(1).max(10_000).optional(),
+  terms: z.string().trim().max(2000).optional(),
+})
+
 const fontMetadata = z.object({
   kind: z.literal("font"),
   styleCount: z.number().int().min(1).max(500).optional(),
@@ -21,7 +83,25 @@ const fontMetadata = z.object({
   formats: z.array(z.enum(["otf", "ttf", "woff", "woff2", "eot"])).optional(),
   languageSupport: z.array(z.string().min(2).max(64)).max(200).optional(),
   glyphCount: z.number().int().min(1).max(100_000).optional(),
+  classification: z.enum(FONT_CLASSIFICATIONS).optional(),
+  scripts: z.array(shortText).max(64).optional(),
+  features: z.array(z.string().trim().min(1).max(4)).max(512).optional(),
+  axes: z.array(fontAxis).max(64).optional(),
+  styles: z.array(fontStyle).max(500).optional(),
+  /**
+   * Search keywords for the product, entered once. Not a channel field: each
+   * channel's listing keeps its own tags, and those remain what it is sent.
+   */
+  tags: z.array(z.string().trim().min(1).max(40)).max(50).optional(),
+  licenses: z.array(fontLicense).max(FONT_LICENSE_KINDS.length).optional(),
+  eulaUrl: z.url().max(2000).optional(),
 })
+
+export type FontMetadata = z.infer<typeof fontMetadata>
+export type FontStyle = z.infer<typeof fontStyle>
+export type FontLicense = z.infer<typeof fontLicense>
+export type FontClassification = (typeof FONT_CLASSIFICATIONS)[number]
+export const fontMetadataSchema = fontMetadata
 
 const templateMetadata = z.object({
   kind: z.literal("template"),

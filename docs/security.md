@@ -271,7 +271,15 @@ The consequences are structural, and A3 onward must preserve them:
 3. **Nothing the client says about the bytes is trusted.** Size and content type
    from the browser are hints. The finalize job downloads the stored object and
    measures it: SHA-256, byte size, and a magic-number sniff. The row stays
-   `pending` until that has happened.
+   `pending` until that has happened. For a font it also parses the stored bytes
+   (`lib/fonts/inspect.ts`), bounds-checked and with decompression capped at
+   128 MB, so a hostile WOFF2 becomes a `fontProblem` rather than a crashed job.
+
+The creator-facing preview route (`app/[slug]/assets/[assetId]/preview`) serves
+images and, since the font workspace, fonts: an RLS read of the row, then a
+short-lived signed URL without an attachment header. The mime type it checks is
+the one the finalize job sniffed, never the browser's. The workspace fetches the
+font and hands the buffer to the FontFace API, so `font-src` is not widened.
 
 If a future step ever accepts a client-supplied storage path, all three of these
 collapse at once.

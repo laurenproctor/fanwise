@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createPreviewUrl } from "@/lib/products/storage"
+import { isFontMimeType } from "@/lib/fonts/read-upload"
 
 /**
  * An image, rendered inline in Fanwise's own UI.
@@ -13,10 +14,15 @@ import { createPreviewUrl } from "@/lib/products/storage"
  * who cannot select the asset row gets a 404, identical to one that does not
  * exist.
  *
- * Images only, judged by the mime type the finalize job sniffed from the stored
- * bytes rather than by anything the browser claimed at upload. Without that
- * check this route would render any uploaded file inline on request, which is
- * not a hole worth leaving open to save a condition.
+ * Images and fonts only, judged by the mime type the finalize job sniffed from
+ * the stored bytes rather than by anything the browser claimed at upload.
+ * Without that check this route would render any uploaded file inline on
+ * request, which is not a hole worth leaving open to save a condition.
+ *
+ * Fonts are admitted for the font workspace's live preview, which fetches the
+ * bytes and hands them to the FontFace API. A font cannot run script, and the
+ * reader is already a member of the workspace that owns it: this is the same
+ * file the download route would give them, without the attachment header.
  */
 export async function GET(
   _request: Request,
@@ -36,7 +42,11 @@ export async function GET(
     .eq("id", assetId)
     .maybeSingle()
 
-  if (!asset || asset.asset_state !== "ready" || !asset.mime_type?.startsWith("image/")) {
+  if (
+    !asset ||
+    asset.asset_state !== "ready" ||
+    !(asset.mime_type?.startsWith("image/") || isFontMimeType(asset.mime_type))
+  ) {
     return new NextResponse("Not found", { status: 404 })
   }
 

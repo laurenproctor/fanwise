@@ -2,6 +2,8 @@ import { createHash } from "node:crypto"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { renderDerivative, specHash, derivativeFilename, type ImageSpec } from "./derivatives"
 import { isDerivableImage, sniffMimeType } from "./sniff"
+import { describeUpload } from "@/lib/fonts/read-upload"
+import { toJson } from "@/lib/imports/json"
 import {
   buildStoragePath,
   downloadObject,
@@ -58,6 +60,10 @@ export async function finalizeAsset(payload: FinalizeAssetPayload): Promise<void
   try {
     const data = await downloadObject(asset.storage_path)
     const mimeType = sniffMimeType(data)
+    // What a font says about itself, or an image's dimensions. Measured here
+    // with everything else, and written in the same update so a ready font is
+    // never briefly a font with no reading.
+    const described = await describeUpload(data, mimeType)
 
     await admin
       .from("product_assets")
@@ -67,6 +73,14 @@ export async function finalizeAsset(payload: FinalizeAssetPayload): Promise<void
         byte_size: data.byteLength,
         mime_type: mimeType,
         failure_reason: null,
+        ...(described
+          ? {
+              metadata: toJson({
+                ...((asset.metadata as Record<string, unknown>) ?? {}),
+                ...described,
+              }),
+            }
+          : {}),
       })
       .eq("id", asset.id)
       .eq("workspace_id", payload.workspaceId)
