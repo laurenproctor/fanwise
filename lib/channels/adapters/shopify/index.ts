@@ -27,6 +27,7 @@ import {
   SEO_DESCRIPTION_LIMIT,
   SEO_TITLE_LIMIT,
   adminProductUrl,
+  storefrontProductUrl,
   toDescriptionHtml,
   toMoney,
   toProductType,
@@ -675,6 +676,10 @@ async function productSet(context: PublishContext, intent: PublishIntent): Promi
     // The admin URL, not the storefront one. onlineStoreUrl is null while a
     // product is a draft, which is every product this adapter has just created.
     externalUrl: adminProductUrl(shopDomain, product.legacyResourceId),
+    // The storefront page. onlineStoreUrl is null until the product is on the
+    // Online Store, which activate does after this write, so the handle stands
+    // in: the shop's myshopify address redirects to its primary domain.
+    publicUrl: product.onlineStoreUrl ?? storefrontProductUrl(shopDomain, product.handle),
     externalState: product.status === "ACTIVE" ? "live" : "draft",
     /*
       The read travels with the write. A publish that reported success while

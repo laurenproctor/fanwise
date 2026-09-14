@@ -272,9 +272,16 @@ A3 creates this table and never writes to it. The credentials service arrives at
 A5 with the first real connection.
 
 **channel_listings** — id, workspace_id, product_id, channel_id,
-channel_connection_id, external_listing_id, external_url, status, status_source,
+channel_connection_id, external_listing_id, external_url, public_url, status, status_source,
 title, description, short_description, price, currency, category, tags, metadata,
 generated_at, approved_at, published_at, last_synced_at, created_at, updated_at
+
+`external_url` is the creator's address for the object and may be an admin page; `public_url`
+is the buyer's. The publishing runner writes `public_url` only while the adapter reports the
+object live and it is not known to be unpurchasable, and clears it otherwise. The public product
+page reads `public_url` and nothing else: `anon` holds a column grant on it and none on
+`external_url`, and the anonymous listing policy requires it to be set
+(`20260913050000_listing_public_url`).
 
 `status_source` is `verified` or `self_reported`. An assisted channel can only
 ever produce `self_reported`, and nothing that implies verification may read
@@ -482,7 +489,7 @@ store address, host or host/path with no scheme; `external_account_name` is the 
 `metadata.currency` is the store currency, read at grant time and compared by the
 `currency_matches_store` requirement; `scopes` is `["read_write"]`. On the listing,
 `external_listing_id` is the numeric product id as a string and `external_url` the admin edit
-URL, which resolves before the product is live.
+URL, which resolves before the product is live; `public_url` is the product's `permalink`.
 
 `billable = false` takes decision 23's recommended reading, and the migration says so in a
 comment. Flipping it is one migration, and nothing bills before C1 either way.

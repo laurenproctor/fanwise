@@ -327,7 +327,8 @@ time the creator clicked, which is the duplicate §7 exists to prevent.
   `external_account_name` the shop's display name, `metadata` the shop currency and plan.
 - `channel_connection_secrets` — the sealed offline access token, with `key_version`.
 - `channel_listings` — `external_listing_id` is the product GID,
-  `external_url` the admin product URL, `status_source = verified`. `publish_generation`
+  `external_url` the admin product URL, `public_url` the storefront page (`onlineStoreUrl`, or
+  `/products/<handle>` on the shop domain while that is null), `status_source = verified`. `publish_generation`
   is incremented, and every one of those fields cleared, when a product is found deleted.
 - `publication_jobs` — one row per logical publish, carrying the idempotency key.
 - `listing_manual_steps` — one row, `attach_digital_file`.

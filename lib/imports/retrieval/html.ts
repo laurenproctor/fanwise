@@ -157,6 +157,31 @@ export function sanitizeText(input: string, maxLength: number): string {
     .trim()
 }
 
+/**
+ * `sanitizeText` for prose, which keeps its paragraphs.
+ *
+ * Everything `sanitizeText` removes is removed here too. The one difference is
+ * the whitespace: runs of spaces collapse within a line, a single newline stays
+ * a newline, and any blank run becomes exactly one blank line. A description
+ * flattened to one line reaches the draft with its structure gone, and nothing
+ * downstream can put it back.
+ */
+export function sanitizeProse(input: string, maxLength: number): string {
+  const withoutTags = input.replace(/<[^>]*>/g, " ")
+  const decoded = decodeEntities(withoutTags)
+  return decoded
+    .replace(/\r\n?/g, "\n")
+    .replace(CONTROL_CHARACTERS, "")
+    .replace(INVISIBLE_CHARACTERS, "")
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, maxLength)
+    .trim()
+}
+
 /** The markup with every opaque element's contents removed. */
 export function stripOpaqueElements(html: string): string {
   return removeElements(html, OPAQUE_ELEMENTS)
@@ -385,7 +410,7 @@ export function readJsonLd(html: string): JsonLdFacts {
         facts.name = sanitizeText(record.name, HTML_LIMITS.maxTitleLength) || null
       }
       if (!facts.description && typeof record.description === "string") {
-        facts.description = sanitizeText(record.description, HTML_LIMITS.maxSummaryLength) || null
+        facts.description = sanitizeProse(record.description, HTML_LIMITS.maxSummaryLength) || null
       }
       const image = record.image
       if (typeof image === "string") facts.images.push(image)
@@ -514,28 +539,38 @@ export function readSummaryParagraph(html: string): string | null {
 }
 
 /**
- * The words a document shows, in reading order, one block per line.
+ * The words a document shows, in reading order, a blank line between blocks.
  *
  * Opaque elements are gone before this runs, so a script body cannot become
- * prose. Block-level boundaries become line breaks, and the markup's own line
- * breaks do not, so a paragraph wrapped at eighty columns in the source stays
- * one paragraph. The boundary marker is a private-use character, removed from
- * the input first, so the document cannot forge one.
+ * prose. A paragraph-level boundary becomes a blank line and a `<br>` or a list
+ * item a single newline, so the draft is written from text that still has its
+ * paragraphs. The markup's own line breaks do not count, so a paragraph wrapped
+ * at eighty columns in the source stays one paragraph. The boundary markers are
+ * private-use characters, removed from the input first, so the document cannot
+ * forge one.
  */
 const BLOCK_BREAK = String.fromCharCode(0xe000)
+const LINE_BREAK = String.fromCharCode(0xe001)
 
 export function readVisibleText(html: string, maxLength: number): string {
-  const marked = stripOpaqueElements(html.split(BLOCK_BREAK).join(""))
+  const marked = stripOpaqueElements(html.split(BLOCK_BREAK).join("").split(LINE_BREAK).join(""))
     .replace(/<head\b[\s\S]*?<\/head\s*>/gi, " ")
+    .replace(/<(br|li)\b[^>]*>|<\/li\s*>/gi, LINE_BREAK)
     .replace(
-      /<(br|p|div|li|h[1-6]|tr|section|article|header|footer|blockquote|pre)\b[^>]*>|<\/(p|div|li|h[1-6]|tr|section|article|header|footer|blockquote|pre)\s*>/gi,
+      /<(p|div|h[1-6]|tr|ul|ol|section|article|header|footer|blockquote|pre)\b[^>]*>|<\/(p|div|h[1-6]|tr|ul|ol|section|article|header|footer|blockquote|pre)\s*>/gi,
       BLOCK_BREAK,
     )
   return marked
     .split(BLOCK_BREAK)
-    .map((block) => sanitizeText(block, maxLength))
+    .map((block) =>
+      block
+        .split(LINE_BREAK)
+        .map((line) => sanitizeText(line, maxLength))
+        .filter((line) => line.length > 0)
+        .join("\n"),
+    )
     .filter((block) => block.length > 0)
-    .join("\n")
+    .join("\n\n")
     .slice(0, maxLength)
     .trim()
 }

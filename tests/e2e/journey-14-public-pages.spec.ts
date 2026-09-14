@@ -82,6 +82,7 @@ async function seedLiveProducts(slug: string, names: string[]): Promise<void> {
       // Unique per channel across every workspace, so it carries the slug.
       external_listing_id: `j14-${slug}-${index}`,
       external_url: `https://example.com/${productSlug}`,
+      public_url: `https://example.com/${productSlug}`,
     })
     if (listingError) throw listingError
   }

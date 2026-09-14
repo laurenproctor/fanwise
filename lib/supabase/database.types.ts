@@ -364,6 +364,7 @@ export type Database = {
           metadata: Json
           price: number | null
           product_id: string
+          public_url: string | null
           publish_generation: number
           published_at: string | null
           seo_description: string | null
@@ -395,6 +396,7 @@ export type Database = {
           metadata?: Json
           price?: number | null
           product_id: string
+          public_url?: string | null
           publish_generation?: number
           published_at?: string | null
           seo_description?: string | null
@@ -426,6 +428,7 @@ export type Database = {
           metadata?: Json
           price?: number | null
           product_id?: string
+          public_url?: string | null
           publish_generation?: number
           published_at?: string | null
           seo_description?: string | null

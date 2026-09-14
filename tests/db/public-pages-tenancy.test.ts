@@ -104,7 +104,8 @@ async function seedFor(actor: Actor, handle: string, productSlug: string) {
     channel_connection_id: connection!.id,
     title: "Aster Grotesk",
     status: "published",
-    external_url: "https://shop.example/aster-grotesk",
+    external_url: "https://shop.example/admin/aster-grotesk",
+    public_url: "https://shop.example/aster-grotesk",
     price: 48,
   })
 
@@ -271,6 +272,37 @@ describe("a visitor reads named columns and nothing else", () => {
   it("cannot reach the connection id on a listing, which is the field that points at a credential", async () => {
     const { error } = await anon().from("channel_listings").select("channel_connection_id")
     expect(error?.code).toBe(RLS_DENIED)
+  })
+
+  it("reads a listing's buyer address and never its admin address", async () => {
+    const buyer = await anon()
+      .from("channel_listings")
+      .select("public_url")
+      .eq("product_id", aliceProductId)
+    expect(buyer.error).toBeNull()
+    expect(buyer.data?.map((row) => row.public_url)).toEqual(["https://shop.example/aster-grotesk"])
+
+    const { error } = await anon().from("channel_listings").select("external_url")
+    expect(error?.code).toBe(RLS_DENIED)
+  })
+
+  it("cannot see a published listing that is not on sale", async () => {
+    await alice.client
+      .from("channel_listings")
+      .update({ public_url: null })
+      .eq("product_id", aliceProductId)
+    try {
+      const { data } = await anon()
+        .from("channel_listings")
+        .select("id")
+        .eq("product_id", aliceProductId)
+      expect(data).toEqual([])
+    } finally {
+      await alice.client
+        .from("channel_listings")
+        .update({ public_url: "https://shop.example/aster-grotesk" })
+        .eq("product_id", aliceProductId)
+    }
   })
 
   it("cannot reach an asset's storage path", async () => {

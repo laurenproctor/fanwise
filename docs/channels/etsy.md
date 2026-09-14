@@ -160,7 +160,7 @@ needs a limit increase before there are customers who reach it.
 `external_account_id` is the shop id; `external_account_name` the shop name;
 `metadata.currencyCode` and `metadata.shopUrl`. Credentials: `accessToken`, `refreshToken`,
 `expiresAt`, `shopId`, `userId`, sealed. `external_listing_id` is the listing id;
-`external_url` the public listing URL once active.
+`external_url` the public listing URL once active, and `public_url` the same address.
 
 ## 13. Questions settled against a live shop, 11 September 2026
 

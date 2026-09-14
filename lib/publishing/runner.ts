@@ -442,6 +442,7 @@ async function forgetExternalObject(
     .update({
       external_listing_id: null,
       external_url: null,
+      public_url: null,
       status: "draft",
       status_source: "self_reported",
       last_sent_fingerprint: null,
@@ -527,11 +528,22 @@ async function recordSuccess(params: {
    */
   const draftSent = listingToDraft({ ...listing, metadata: metadata as never })
 
+  /*
+   * The buyer's address, only while there is something to buy. The public page
+   * reads nothing else, so a draft, or an active object no buyer can reach,
+   * clears it rather than leaving yesterday's link on a page that says "View".
+   * Outstanding manual steps need no check here: every adapter that declares
+   * one returns a draft until the step's activate has run.
+   */
+  const onSale = result.externalState === "live" && metadata.purchasable !== false
+  const publicUrl = onSale ? (result.publicUrl ?? null) : null
+
   await admin
     .from("channel_listings")
     .update({
       external_listing_id: result.externalListingId,
       external_url: result.externalUrl,
+      public_url: publicUrl,
       status: "published",
       last_sent_fingerprint: sentFingerprint(draftSent, imagesFingerprint(subject)),
       // A provider API confirmed this. The database trigger refuses `verified`
