@@ -66,6 +66,9 @@ test("the canonical record saves and survives a reload", async ({ page }) => {
 
   await page.goto(`/${slug}/new`)
   await page.getByLabel("Product name").fill("Editable Product")
+  // A template, not a font: this is about the generic product page, and a font
+  // opens the font workspace instead (tests/e2e/journey-05-publish.spec.ts).
+  await page.getByLabel("Product type").selectOption("template")
   await page.getByRole("button", { name: "Create product" }).click()
   await page.waitForURL(productUrl(slug))
 
@@ -112,6 +115,9 @@ async function fileTransfer(page: Page, path: string, type: string, name?: strin
 async function createProduct(page: Page, slug: string, name: string) {
   await page.goto(`/${slug}/new`)
   await page.getByLabel("Product name").fill(name)
+  // A template, not a font: this is about the generic product page, and a font
+  // opens the font workspace instead (tests/e2e/journey-05-publish.spec.ts).
+  await page.getByLabel("Product type").selectOption("template")
   await page.getByRole("button", { name: "Create product" }).click()
   await page.waitForURL(productUrl(slug))
   await expect(page.getByRole("heading", { name })).toBeVisible()

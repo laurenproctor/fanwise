@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { newCreator, productUrl } from "./support"
-import { listingCard } from "./publish-support"
+import { listingCard, openFontSection } from "./publish-support"
 
 /**
  * A3's exit test, driven through the browser.
@@ -14,6 +14,9 @@ import { listingCard } from "./publish-support"
  * checked in tests/unit/capability-list.test.ts against every adapter's real
  * capabilities; that an assisted adapter has no publish method at all is
  * tests/unit/channels.test.ts and tests/unit/channel-boundaries.test.ts.
+ *
+ * The product is a font, so the cards are the ones in the font workspace's
+ * Marketplace drafts section: the same component the generic page renders.
  *
  * This is not journey 3 from docs/testing.md, which needs a real Shopify
  * connection at A5. It is the mock-channel proof that the contract holds first.
@@ -49,6 +52,7 @@ test("one product yields two independent listings, judged by different rules", a
   await expect(cards.filter({ hasText: "Mock Marketplace" }).getByText("Connected")).toBeVisible()
 
   await createProduct(page, slug, "Aster Grotesk")
+  await openFontSection(page, "Marketplace drafts")
 
   // Both connected channels offer to build, before either has a listing.
   const buildButtons = page.getByRole("button", { name: "Build listing" })
@@ -61,11 +65,13 @@ test("one product yields two independent listings, judged by different rules", a
   await expect(page.getByRole("button", { name: "Rebuild" })).toHaveCount(2)
 
   await page.reload()
+  await openFontSection(page, "Marketplace drafts")
 
   // Two listings from one product, each with its own readiness. They disagree,
   // which is the point: the assisted channel demands tags and previews that the
-  // storefront does not.
-  const bars = page.getByRole("progressbar")
+  // storefront does not. Scoped to the drafts: the workspace has a readiness bar
+  // of its own for the product.
+  const bars = page.locator("#font-drafts").getByRole("progressbar")
   await expect(bars).toHaveCount(2)
 
   const values = await bars.evaluateAll((nodes) =>
@@ -74,7 +80,7 @@ test("one product yields two independent listings, judged by different rules", a
   expect(new Set(values).size).toBe(2)
 
   // The assisted channel says exactly what it would reject.
-  const assistedCard = page.locator("section").filter({ hasText: "Mock Marketplace" })
+  const assistedCard = listingCard(page, "Mock Marketplace", "Mock Storefront")
   await expect(assistedCard.getByText("Add at least 3 tags. There are 0.")).toBeVisible()
   await expect(assistedCard.getByText("Status here is self-reported")).toBeVisible()
 
@@ -103,6 +109,7 @@ test("disconnecting a channel takes its listings with it", async ({ page }) => {
   await expect(page.getByText("Connected")).toBeVisible()
 
   await createProduct(page, slug, "Doomed Listing")
+  await openFontSection(page, "Marketplace drafts")
   await page.getByRole("button", { name: "Build listing" }).click()
   await expect(page.getByRole("button", { name: "Rebuild" })).toBeVisible()
 
@@ -128,5 +135,6 @@ test("disconnecting a channel takes its listings with it", async ({ page }) => {
   // the next action, and the action's accessible name ends with the product's
   // so a screen reader can tell one row's action from another's.
   await page.getByRole("link", { name: "Doomed Listing", exact: true }).click()
-  await expect(page.getByText("No channels connected")).toBeVisible()
+  await openFontSection(page, "Marketplace drafts")
+  await expect(page.getByText("No channels are connected yet.")).toBeVisible()
 })

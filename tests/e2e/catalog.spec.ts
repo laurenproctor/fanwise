@@ -43,7 +43,7 @@ test("the catalog says what is here, where it is live, and what to do next", asy
   const { slug } = await newCreator(page, "catlive", "Catalog Studio")
   await connect(page, slug, "Mock Storefront")
 
-  await createProduct(page, slug, "Aster Grotesk", "font")
+  await createProduct(page, slug, "Aster Grotesk", "template")
   await upload(page, "cover_image", "tests/fixtures/small-800x600.png", 0)
   await upload(page, "deliverable", "tests/fixtures/specimen-3000x2000.jpg", 1)
 

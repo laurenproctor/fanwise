@@ -197,7 +197,7 @@ export async function signOut(page: Page): Promise<void> {
   await page.waitForURL(/\/sign-in$/)
 }
 
-function escapeRegExp(value: string): string {
+export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 

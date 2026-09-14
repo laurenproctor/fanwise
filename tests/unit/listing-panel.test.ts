@@ -153,7 +153,14 @@ describe("the listing card's publish affordance", () => {
       "utf8",
     )
 
-    expect(source).toContain("canPublish: adapter!.capabilities.automaticPublish,")
+    // The card mapping is shared with the font workspace, so both pages read the
+    // capability from the adapter in one place, and the page must use it.
+    const cards = readFileSync(
+      join(__dirname, "..", "..", "lib", "channels", "listing-cards.ts"),
+      "utf8",
+    )
+    expect(cards).toContain("canPublish: adapter!.capabilities.automaticPublish,")
+    expect(source).toContain("listingCards({ connections, listings, publications, assets })")
     expect(source).toContain(
       "const canPublishSomewhere = runChannels.some((channel) => channel.canPublish && channel.connected)",
     )

@@ -1,6 +1,15 @@
 import { expect, test } from "@playwright/test"
 import { newCreator } from "./support"
-import { connect, upload, waitForProductPage, writeListing } from "./publish-support"
+import {
+  clearFontBlockers,
+  connect,
+  listingCard,
+  openFontSection,
+  uploadFontFile,
+  uploadSpecimenImage,
+  waitForProductPage,
+  writeListing,
+} from "./publish-support"
 
 /**
  * A5's exit test, the two thirds of it a mock channel can prove:
@@ -31,43 +40,50 @@ test("a product publishes, and clicking publish again creates nothing", async ({
   await page.getByLabel("Product type").selectOption("font")
   await page.getByRole("button", { name: "Create product" }).click()
   await waitForProductPage(page, slug, "Aster Grotesk")
-  const productPage = page.url()
+  // A font opens its workspace, where the channel cards are the Marketplace
+  // drafts section. Addressed by hash so a reload lands back on it.
+  const productPage = `${page.url().split("#")[0]}#drafts`
 
+  await openFontSection(page, "Marketplace drafts")
   await page.getByRole("button", { name: "Build listing" }).click()
   await expect(page.getByRole("link", { name: "Edit listing" })).toHaveCount(1)
 
-  // A listing that is not ready cannot be published. No deliverable, no cover
-  // image, no description: the channel's own rules say so, and the button is
-  // offered but refuses rather than being hidden, because the creator needs to
-  // see that publishing is the next step once they fix it.
-  await expect(page.getByText("Resolve what is blocking before publishing.")).toBeVisible()
-  await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeDisabled()
+  const card = () => listingCard(page, "Mock Storefront", "Mock Marketplace")
 
-  await upload(page, "cover_image", "tests/fixtures/small-800x600.png", 0)
-  await upload(page, "deliverable", "tests/fixtures/specimen-3000x2000.jpg", 1)
+  // Nothing can be sent yet, and the card says why beside a button that is
+  // offered but refuses: the font's own blockers (no buyer file, no price, no
+  // licence) come before the channel's rules, and the server refuses the same.
+  await expect(card().getByText(/^Publishing is blocked by \d+ issues/)).toBeVisible()
+  await expect(card().getByRole("button", { name: "Publish", exact: true })).toBeDisabled()
 
+  await uploadSpecimenImage(page, "tests/fixtures/small-800x600.png")
+  await uploadFontFile(page, "Aster Grotesk")
+  await clearFontBlockers(page)
+
+  await openFontSection(page, "Marketplace drafts")
   await writeListing(page, slug)
   await page.goto(productPage)
 
   // Nothing has been sent yet, and the card says so rather than staying blank.
-  await expect(page.getByText("Not published")).toBeVisible()
-  await expect(page.getByText("Resolve what is blocking before publishing.")).toHaveCount(0)
+  await expect(card().getByText("Not published")).toBeVisible()
+  await expect(card().getByText("Resolve what is blocking before publishing.")).toHaveCount(0)
+  await expect(card().getByText(/^Publishing is blocked/)).toHaveCount(0)
 
-  await page.getByRole("button", { name: "Publish", exact: true }).click()
+  await card().getByRole("button", { name: "Publish", exact: true }).click()
 
   // Publishing runs in a background job, so the card resolves rather than
   // updating instantly. Live is the state that means a buyer can reach it.
-  await expect(page.getByText("Live", { exact: true })).toBeVisible({ timeout: 30_000 })
+  await expect(card().getByText("Live", { exact: true })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole("link", { name: /View on Mock Storefront/ })).toHaveCount(1)
 
   // The second click is impossible rather than merely harmless: a published
   // listing offers no Publish button, because the only outcome would be
   // "already published".
-  await expect(page.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0)
+  await expect(card().getByRole("button", { name: "Publish", exact: true })).toHaveCount(0)
 
   // And it survives a reload as one listing, one link, one published state.
   await page.reload()
-  await expect(page.getByText("Live", { exact: true })).toBeVisible()
+  await expect(card().getByText("Live", { exact: true })).toBeVisible()
   await expect(page.getByRole("link", { name: /View on Mock Storefront/ })).toHaveCount(1)
-  await expect(page.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0)
+  await expect(card().getByRole("button", { name: "Publish", exact: true })).toHaveCount(0)
 })

@@ -29,9 +29,15 @@ export function PublishEverywhere({
   productId,
   attemptable,
   skips,
+  blocker = null,
 }: {
   workspaceSlug: string
   productId: string
+  /**
+   * Why the product may not go to any channel yet, before any channel's own
+   * rules (a font's readiness blockers). The action refuses the same thing.
+   */
+  blocker?: string | null
   /** How many channels one click would actually send to, decided on the server. */
   attemptable: number
   skips: RunChannelSummary[]
@@ -80,10 +86,16 @@ export function PublishEverywhere({
           channels below explain why, and a button that vanishes teaches
           nothing. It is the page's one primary action either way.
         */}
-        <Button type="button" onClick={run} disabled={pending || attemptable === 0}>
+        <Button
+          type="button"
+          onClick={run}
+          disabled={pending || attemptable === 0 || blocker !== null}
+        >
           {pending ? "Starting…" : "Publish everywhere"}
         </Button>
       </div>
+
+      {blocker ? <p className="text-[14px] text-[var(--color-ink-2)]">{blocker}</p> : null}
 
       <FormError message={error} />
 

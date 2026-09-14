@@ -111,6 +111,25 @@ ready asset; replacing a file creates a new row. `sort_order` and `metadata` sta
 editable because they are presentation, not content. This is what makes the
 derivative cache key sound, see below.
 
+**Font products: detected versus canonical.** The finalize job reads every
+upload that sniffs as a font (OTF, TTF, WOFF, WOFF2) and writes what the file
+says onto that asset's `metadata.font` (family, style, PostScript name, weight,
+width, italic, version, glyph count, variation axes, scripts, languages, Unicode
+blocks, OpenType features, embedding permission), or `metadata.fontProblem`
+when it cannot be read (`lib/fonts/detected.ts`). Decodable images get
+`metadata.width` and `height`; the font workspace adds `metadata.altText`. None
+of this is on the product. The product's own `metadata` (the `font` member of
+the union) holds what the creator stands behind: classification, scripts,
+languages, features, axes, the style list, search tags, the licence types sold
+and their limits, and a EULA link. The workspace seeds unanswered product fields
+from the files once and never replaces a value the creator has set
+(`adoptionPatch` in `lib/fonts/workspace.ts`). No migration was needed for any
+of it: both are the existing jsonb columns, validated with Zod on write. The
+workspace's Marketplace drafts section reads listing inheritance from the row, not
+by comparing strings: an empty `title`, `description` or `price` column is shown as
+"From the product" with the value being typed, a filled one as "Only this
+channel", and the price review warning is raised only for a customized price.
+
 **The tenant boundary is a foreign key, not just a policy.** `product_assets`
 references `products (id, workspace_id)` as a pair, and `derived_from` references
 `product_assets (id, workspace_id)` as a pair. Referencing `products(id)` alone

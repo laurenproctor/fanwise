@@ -20,11 +20,14 @@ test("a creator deletes a draft with an uploaded file and returns to the catalog
   // The product that stays, so the catalog the creator returns to is populated.
   await page.goto(`/${slug}/new`)
   await page.getByLabel("Product name").fill("Kept Grotesk")
+  // Templates: this is the generic page's Files section and Danger zone.
+  await page.getByLabel("Product type").selectOption("template")
   await page.getByRole("button", { name: "Create product" }).click()
   await page.waitForURL(productUrl(slug))
 
   await page.goto(`/${slug}/new`)
   await page.getByLabel("Product name").fill("Doomed Grotesk")
+  await page.getByLabel("Product type").selectOption("template")
   await page.getByRole("button", { name: "Create product" }).click()
   await page.waitForURL(productUrl(slug))
   await expect(page.getByRole("heading", { level: 1, name: "Doomed Grotesk" })).toBeVisible()
