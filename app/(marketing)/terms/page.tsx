@@ -9,13 +9,6 @@ export const metadata: Metadata = {
     "You own your products, Fanwise publishes them where you tell it to, you pay a flat subscription, and you can export everything and leave whenever you like.",
 }
 
-const NAV = [
-  { label: "Product", href: marketingRoutes.landing },
-  { label: "Marketplaces", href: marketingRoutes.marketplaces },
-  { label: "Pricing", href: marketingRoutes.pricing },
-  { label: "About", href: marketingRoutes.about },
-]
-
 const FOOTER = [
   { label: "Product", href: marketingRoutes.landing },
   { label: "Pricing", href: marketingRoutes.pricing },
@@ -25,7 +18,7 @@ const FOOTER = [
 
 export default function TermsPage() {
   return (
-    <MarketingPage nav={{ links: NAV, signIn: false }} footer={FOOTER} reveal={false} legal>
+    <MarketingPage nav={{ signIn: false }} footer={FOOTER} reveal={false} legal>
       <header className="fw-legal__header">
         <span className="fw-eyebrow">Legal</span>
         <h1 className="fw-legal__h1">Terms of Service</h1>

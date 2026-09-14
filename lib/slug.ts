@@ -24,6 +24,8 @@ export const RESERVED_WORKSPACE_SLUGS: ReadonlySet<string> = new Set([
   "about",
   "api",
   "auth",
+  // The public creator directory. Already a reserved handle (20260912010000).
+  "creators",
   "forgot-password",
   "how-it-works",
   "marketplaces",

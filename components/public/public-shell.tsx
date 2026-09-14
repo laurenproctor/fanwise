@@ -21,10 +21,12 @@ import { marketingRoutes } from "@/lib/routes"
  * The nav links are the ones the mockup shows, mapped onto routes that
  * actually exist. The mockup's "Discover" and "For creators" have no pages
  * behind them yet, and a header link to a 404 is worse than a header without
- * it, so this ships How it works and Pricing until they do.
+ * it, so this ships How it works and Pricing until they do. "Discover" has
+ * since become the creator directory, which is linked here as Creators.
  */
 
 const NAV_LINKS = [
+  { label: "Creators", href: marketingRoutes.creators },
   { label: "How it works", href: marketingRoutes.howItWorks },
   { label: "Pricing", href: marketingRoutes.pricing },
 ] as const

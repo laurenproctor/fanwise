@@ -590,7 +590,29 @@ export type Database = {
           token_hash?: string
           workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "delivery_links_asset_workspace_fkey"
+            columns: ["product_asset_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "product_assets"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "delivery_links_listing_workspace_fkey"
+            columns: ["channel_listing_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "channel_listings"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "delivery_links_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       listing_manual_steps: {
         Row: {
@@ -1066,6 +1088,39 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      public_featured_profiles: {
+        Row: {
+          created_at: string
+          public_profile_id: string
+          rank: number
+        }
+        Insert: {
+          created_at?: string
+          public_profile_id: string
+          rank: number
+        }
+        Update: {
+          created_at?: string
+          public_profile_id?: string
+          rank?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_featured_profiles_public_profile_id_fkey"
+            columns: ["public_profile_id"]
+            isOneToOne: true
+            referencedRelation: "public_creator_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "public_featured_profiles_public_profile_id_fkey"
+            columns: ["public_profile_id"]
+            isOneToOne: true
+            referencedRelation: "public_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1784,7 +1839,42 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_creator_directory: {
+        Row: {
+          city: string | null
+          country_code: string | null
+          display_name: string | null
+          featured_rank: number | null
+          handle: string | null
+          has_avatar: boolean | null
+          id: string | null
+          latest_published_at: string | null
+          location: string | null
+          previews: Json | null
+          product_count: number | null
+          product_types: Database["public"]["Enums"]["product_type"][] | null
+          search_text: string | null
+          short_bio: string | null
+          sort_name: string | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
+      public_creator_locations: {
+        Row: {
+          city: string | null
+          country_code: string | null
+        }
+        Relationships: []
+      }
+      public_creator_product_types: {
+        Row: {
+          product_count: number | null
+          product_type: Database["public"]["Enums"]["product_type"] | null
+          public_profile_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       create_import_session: {

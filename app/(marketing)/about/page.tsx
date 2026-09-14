@@ -9,13 +9,6 @@ export const metadata: Metadata = {
     "The product record belongs to the person who made the product. Why Fanwise treats every marketplace as a destination, not an authority.",
 }
 
-const NAV = [
-  { label: "Product", href: marketingRoutes.landing },
-  { label: "Marketplaces", href: marketingRoutes.marketplaces },
-  { label: "How it works", href: marketingRoutes.howItWorks },
-  { label: "Pricing", href: marketingRoutes.pricing },
-]
-
 const FOOTER = [
   { label: "Product", href: marketingRoutes.landing },
   { label: "Pricing", href: marketingRoutes.pricing },
@@ -60,7 +53,7 @@ const NOTS = [
 
 export default function AboutPage() {
   return (
-    <MarketingPage nav={{ links: NAV }} footer={FOOTER}>
+    <MarketingPage nav={{ current: "about" }} footer={FOOTER}>
       <header className="fw-page__header">
         <span className="fw-eyebrow">About</span>
         <h1 className="fw-h1">The product record belongs to the person who made the product.</h1>

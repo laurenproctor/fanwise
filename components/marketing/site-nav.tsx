@@ -3,7 +3,26 @@ import { FanMark } from "./logo"
 import { ThemeToggle } from "./theme-toggle"
 import { marketingRoutes } from "@/lib/routes"
 
-export type NavLink = { label: string; href: string }
+/**
+ * The public destinations, in the one order every page shows them.
+ *
+ * The handoff gave each page its own set, dropping its own entry and adding
+ * in-page anchors. When Creators became a first-class destination (September
+ * 2026) the founder chose one shared set instead, with the current page marked
+ * rather than removed, so the header reads the same everywhere and a visitor
+ * can always see where they are. "Marketplaces" still means the channels
+ * Fanwise publishes to; the directory of Fanwise members is "Creators".
+ */
+export const PUBLIC_NAV = [
+  { key: "product", label: "Product", href: marketingRoutes.landing },
+  { key: "creators", label: "Creators", href: marketingRoutes.creators },
+  { key: "marketplaces", label: "Marketplaces", href: marketingRoutes.marketplaces },
+  { key: "how-it-works", label: "How it works", href: marketingRoutes.howItWorks },
+  { key: "pricing", label: "Pricing", href: marketingRoutes.pricing },
+  { key: "about", label: "About", href: marketingRoutes.about },
+] as const
+
+export type PublicNavKey = (typeof PUBLIC_NAV)[number]["key"]
 
 /**
  * The marketing nav.
@@ -12,17 +31,17 @@ export type NavLink = { label: string; href: string }
  * Get Started page, and `hero` is the landing, which trades the gap between
  * links for a hover pill behind each one and runs a smaller CTA.
  *
- * The link set differs per page in the handoff — each page drops its own entry
- * and some add an in-page anchor — so it is passed in rather than derived. That
- * is the design, not an oversight to normalize away.
+ * `current` marks the page the visitor is on, with `aria-current` and the
+ * underline in marketing.css. Pages outside the set (Terms, Privacy, a 404)
+ * pass nothing and no link is marked.
  */
 export function SiteNav({
-  links,
+  current,
   variant = "light",
   signIn = true,
   cta = { label: "Get started", href: marketingRoutes.signUp },
 }: {
-  links: NavLink[]
+  current?: PublicNavKey
   variant?: "light" | "dark" | "hero"
   signIn?: boolean
   cta?: { label: string; href: string } | null
@@ -52,8 +71,12 @@ export function SiteNav({
               : "fw-nav__links"
         }
       >
-        {links.map((link) => (
-          <Link key={link.href} href={link.href}>
+        {PUBLIC_NAV.map((link) => (
+          <Link
+            key={link.key}
+            href={link.href}
+            aria-current={link.key === current ? "page" : undefined}
+          >
             {link.label}
           </Link>
         ))}

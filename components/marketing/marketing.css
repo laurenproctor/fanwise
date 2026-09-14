@@ -380,6 +380,26 @@
   color: var(--fw-ink);
 }
 
+/*
+ * The current page. A 2px rule under the label in the restrained green, with
+ * the label in full ink. Every link carries the transparent rule, so marking
+ * one never shifts the row.
+ */
+.fw-nav__links:not(.fw-nav__links--pills) a {
+  padding-block: 6px;
+  border-bottom: 2px solid transparent;
+}
+
+.fw-nav__links:not(.fw-nav__links--pills) a[aria-current="page"] {
+  color: var(--fw-ink);
+  border-bottom-color: var(--fw-ok);
+}
+
+.fw-nav__links--dark a[aria-current="page"] {
+  color: var(--fw-on-dark);
+  border-bottom-color: var(--fw-ok-dark);
+}
+
 .fw-nav__links--dark {
   color: var(--fw-on-dark-2);
 }
@@ -401,6 +421,11 @@
 }
 
 .fw-nav__links--pills a:hover {
+  color: var(--fw-on-dark);
+  background: var(--fw-lift);
+}
+
+.fw-nav__links--pills a[aria-current="page"] {
   color: var(--fw-on-dark);
   background: var(--fw-lift);
 }
