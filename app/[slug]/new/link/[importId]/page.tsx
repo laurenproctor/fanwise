@@ -7,6 +7,7 @@ import {
   deliverablesFor,
   draftFor,
   evidenceChanges,
+  htmlSourcesWithoutPictures,
   licenseFor,
   rightsFor,
   sourceModeFor,
@@ -62,6 +63,8 @@ export default async function ImportDetailPage({
       rights={rightsFor(record)}
       missingInformation={record.missingInformation}
       withheld={record.withheld}
+      trimmed={record.trimmed}
+      htmlWithoutPictures={htmlSourcesWithoutPictures(record)}
       aiUnavailable={record.aiUnavailable}
       changes={evidenceChanges(record)}
       sourceMode={sourceModeFor(record)}

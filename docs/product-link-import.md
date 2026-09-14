@@ -903,7 +903,12 @@ the handoff are unchanged. A handed-over source is a kind of import, not a secon
   (`retrieval/plain-text.ts`): first line as a title unless it looks like code, first
   paragraph as a summary, headings and bullets as visible lines. HTML gets the same
   parse-never-render reading as a fetched page, minus an address, so relative image URLs are
-  dropped. A PDF is read with PDF.js through `unpdf` (`retrieval/pdf.ts`): the title property
+  dropped. Its summary is Open Graph, then the meta description, then JSON-LD, and only when
+  all three are absent the first substantial visible `<p>` (40–600 characters, outside opaque
+  elements and `nav`, `footer`, `aside`, forms and controls, not editable, hidden or classed as
+  a hint), recorded as observed with origin `dom`. Its one-word `h1`–`h3` headings are kept
+  ("Kerning", "Cyrillic"); one-word list items are still dropped as navigation. JSON-LD images
+  count as preview images for a file, not for a link. A PDF is read with PDF.js through `unpdf` (`retrieval/pdf.ts`): the title property
   if it is a real title, the text layer of the first 40 pages, and nothing else — no rendering,
   images, forms, annotations or attachments.
 - **`bodyText`.** Handed-over sources carry up to 20,000 characters of running text in
@@ -916,11 +921,22 @@ the handoff are unchanged. A handed-over source is a kind of import, not a secon
   pasting the text too, for links and files alike. A handed-over import is never offered
   "replace link" or "publish a public link".
 - **The prompt** names the kind of source and moved to version `2026-09-12.2`.
+- **The claims check removes wording before it withholds a field.** A list loses the entry
+  that made an unsupported claim and prose loses the sentence; the cleaned value is checked
+  again, and the field is withheld only if a claim remains or nothing meaningful is left.
+  Titles, product types, price guidance and any field stating a value the sources disagree
+  about are still withheld whole. Every violation is recorded with `resolution` `removed` or
+  `withheld`, `suggestions.trimmed` lists the fields offered with wording removed, and the
+  review screen shows "Some wording removed" apart from "Held back".
+- **An HTML source with no importable picture says so.** Fanwise never runs a file, so a
+  specimen whose visuals its script draws has nothing to import; the review screen names it and
+  asks for screenshots or preview images.
 
 ### Not built
 
 - No OCR. A scanned PDF says it has no text and offers pasting.
-- No images from a PDF, and none from an HTML file's relative or `data:` URLs.
+- No images from a PDF, and none from an HTML file's relative or `data:` URLs, nor from what its
+  script would draw. No rendering or screenshot service.
 - The uploaded file is a source, never a buyer file. Whether an artifact is what buyers receive
   is the open question in the artifact-import plan; a creator still adds buyer files in the
   checklist.

@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import type { Product, ProductAsset } from "@/lib/products/types"
 import { parseEvidence, type ProductSourceEvidence } from "./evidence"
-import { draftOutputSchema, type DraftField, type DraftOutput } from "./draft-output"
+import { DRAFT_FIELDS, draftOutputSchema, type DraftField, type DraftOutput } from "./draft-output"
 import { IMPORT_ERROR_MESSAGES, type ImportErrorCode } from "./errors"
 
 /**
@@ -36,8 +36,10 @@ export interface ImportRecord {
   evidence: ProductSourceEvidence | null
   /** The suggestions that survived the claims check, or null. */
   draft: Partial<DraftOutput> | null
-  /** Fields a model proposed and the claims check withheld. */
+  /** Fields a model proposed and the claims check withheld entirely. */
   withheld: DraftField[]
+  /** Fields offered with some wording the claims check removed. */
+  trimmed: DraftField[]
   /** True when the page was read but no model was configured to draft from it. */
   aiUnavailable: boolean
   missingInformation: string[]
@@ -57,22 +59,36 @@ export interface ImportRecord {
 function parseSuggestions(value: unknown): {
   draft: Partial<DraftOutput> | null
   withheld: DraftField[]
+  trimmed: DraftField[]
   aiUnavailable: boolean
   missingInformation: string[]
 } {
-  const empty = { draft: null, withheld: [], aiUnavailable: false, missingInformation: [] }
+  const empty = {
+    draft: null,
+    withheld: [],
+    trimmed: [],
+    aiUnavailable: false,
+    missingInformation: [],
+  }
   if (typeof value !== "object" || value === null) return empty
 
   const record = value as Record<string, unknown>
   const aiUnavailable = record.unavailable === true
   const rawDraft = record.draft
 
-  const withheld = Array.isArray(record.withheld)
-    ? record.withheld.filter((field): field is DraftField => typeof field === "string")
-    : []
+  // A row written before `trimmed` existed has none, which reads as none.
+  const fields = (list: unknown): DraftField[] =>
+    Array.isArray(list)
+      ? list.filter(
+          (field): field is DraftField =>
+            typeof field === "string" && (DRAFT_FIELDS as readonly string[]).includes(field),
+        )
+      : []
+  const withheld = fields(record.withheld)
+  const trimmed = fields(record.trimmed)
 
   if (typeof rawDraft !== "object" || rawDraft === null) {
-    return { ...empty, withheld, aiUnavailable }
+    return { ...empty, withheld, trimmed, aiUnavailable }
   }
 
   const draftRecord = rawDraft as Record<string, unknown>
@@ -92,6 +108,7 @@ function parseSuggestions(value: unknown): {
   return {
     draft: Object.keys(draft).length > 0 ? (draft as Partial<DraftOutput>) : null,
     withheld,
+    trimmed,
     aiUnavailable,
     missingInformation,
   }

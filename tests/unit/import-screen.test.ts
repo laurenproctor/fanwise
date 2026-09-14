@@ -160,6 +160,8 @@ function detailProps() {
     rights: null,
     missingInformation: [] as const,
     withheld: [] as const,
+    trimmed: [] as const,
+    htmlWithoutPictures: [] as const,
     aiUnavailable: false,
     productId: "22222222-2222-4222-8222-222222222222",
     changes: [] as const,
@@ -258,6 +260,56 @@ describe("the import detail screen", () => {
     expect(text).toContain("Held back")
     expect(text).toContain("longDescription")
     expect(text).toContain("a claim the page does not support")
+    expect(text).toContain("withheld the entire suggestion")
+    expect(text).not.toContain("Some wording removed")
+  })
+
+  it("tells removed wording apart from a withheld field", () => {
+    const trimmed = render(
+      createElement(ImportDetail, { ...detailProps(), trimmed: ["longDescription"] }),
+    )
+    const text = textOf(trimmed)
+    expect(text).toContain("Some wording removed")
+    expect(text).toContain("still offers its suggestion for longDescription")
+    expect(text).not.toContain("Held back")
+
+    const both = textOf(
+      render(
+        createElement(ImportDetail, {
+          ...detailProps(),
+          withheld: ["title"],
+          trimmed: ["features"],
+        }),
+      ),
+    )
+    expect(both).toContain("Held back")
+    expect(both).toContain("Some wording removed")
+  })
+
+  it("explains an HTML file with no importable pictures, without rendering any of it", () => {
+    const markup = render(
+      createElement(ImportDetail, {
+        ...detailProps(),
+        sourceMode: "content" as const,
+        htmlWithoutPictures: ["blimp-display-specimen.html"],
+      }),
+    )
+    const text = textOf(markup)
+    expect(text).toContain("No preview images found")
+    expect(text).toContain(
+      "This HTML builds its visuals with code and does not contain importable preview images.",
+    )
+    expect(text).toContain("Upload screenshots or preview images to complete the listing.")
+    expect(markup).toContain(`href="${routes.product(SLUG, "type-scale-studio")}"`)
+    // The explanation is the whole of it: the file is never framed or executed.
+    expect(markup).not.toContain("<iframe")
+    expect(markup).not.toContain("<object")
+    expect(markup).not.toContain("<embed")
+    expect(markup).not.toContain("<script")
+
+    expect(textOf(render(createElement(ImportDetail, detailProps())))).not.toContain(
+      "No preview images found",
+    )
   })
 
   it("says plainly when there was no model to draft with", () => {
