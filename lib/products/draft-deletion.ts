@@ -78,9 +78,7 @@ export type DeleteDraftResult = z.infer<typeof deleteDraftResultSchema>
  * for either, so it never has to know which.
  */
 export type DraftDeletionEligibility =
-  | { kind: "eligible" }
-  | { kind: "blocked"; blocker: DraftDeletionBlocker }
-  | { kind: "hidden" }
+  { kind: "eligible" } | { kind: "blocked"; blocker: DraftDeletionBlocker } | { kind: "hidden" }
 
 export function eligibilityFromBlocker(value: unknown): DraftDeletionEligibility {
   if (value === null) return { kind: "eligible" }

@@ -180,7 +180,10 @@ describe("a successful deletion", () => {
     "still counts as deleted when storage call %i fails, and logs it without the paths",
     async (failing) => {
       const log = vi.spyOn(console, "error").mockImplementation(() => {})
-      state.answer = deletedAnswer(["workspace-1/p/cover.png"], ["workspace-1/import-sources/a.pdf"])
+      state.answer = deletedAnswer(
+        ["workspace-1/p/cover.png"],
+        ["workspace-1/import-sources/a.pdf"],
+      )
       state.failStorageCall = failing
 
       await expect(run()).rejects.toThrow("redirected to /northbound-type")
@@ -310,7 +313,10 @@ describe("the vocabulary", () => {
 
   it("reads the page's eligibility from the database's answer, hiding anything it does not recognise", () => {
     expect(eligibilityFromBlocker(null)).toEqual({ kind: "eligible" })
-    expect(eligibilityFromBlocker("public_page")).toEqual({ kind: "blocked", blocker: "public_page" })
+    expect(eligibilityFromBlocker("public_page")).toEqual({
+      kind: "blocked",
+      blocker: "public_page",
+    })
     expect(eligibilityFromBlocker("not_found")).toEqual({ kind: "hidden" })
     expect(eligibilityFromBlocker("something_new")).toEqual({ kind: "hidden" })
     expect(eligibilityFromBlocker(undefined)).toEqual({ kind: "hidden" })
