@@ -10,7 +10,7 @@ vi.mock("@/lib/credentials", () => ({
 
 import { woocommerceAdapter } from "@/lib/channels/adapters/woocommerce"
 import { adminProductUrl, toMoney } from "@/lib/channels/adapters/woocommerce/transform"
-import { evaluate } from "@/lib/channels/listings"
+import { evaluate, resolveDraft } from "@/lib/channels/listings"
 import { constraintsFor } from "@/lib/channels/constraints"
 import type {
   AdapterSubject,
@@ -210,15 +210,24 @@ describe("declaration", () => {
     expect(woocommerceAdapter.manualSteps[0]!.gatesActivation).toBe(true)
   })
 
-  it("builds a draft with no category and no meta fields", () => {
-    const draft = woocommerceAdapter.buildListing(subject())
-    expect(draft.category).toBeNull()
-    expect(draft.seoTitle).toBeNull()
-    expect(draft.price).toBe(48)
+  it("has no category and no meta fields, and takes its words from the product", () => {
+    expect(woocommerceAdapter.fields).not.toContain("category")
+    expect(woocommerceAdapter.fields).not.toContain("seoTitle")
+
+    const s = subject()
+    const read = resolveDraft(woocommerceAdapter.buildListing(s), s.product, woocommerceAdapter)
+    expect(read.category).toBeNull()
+    expect(read.seoTitle).toBeNull()
+    expect(read.price).toBe(48)
+    expect(read.title).toBe("Aster Grotesk")
   })
 
   it("is ready with a title, a price and a deliverable, and warns on currency", () => {
-    const draft = woocommerceAdapter.buildListing(subject())
+    const draft = resolveDraft(
+      woocommerceAdapter.buildListing(subject()),
+      subject().product,
+      woocommerceAdapter,
+    )
     const { readiness, results } = evaluate(
       woocommerceAdapter,
       draft,

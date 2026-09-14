@@ -758,6 +758,16 @@ export const shopifyAdapter: ChannelAdapter = {
   key: "shopify",
   name: "Shopify",
   integrationType: "api",
+  fields: [
+    "title",
+    "description",
+    "shortDescription",
+    "seoTitle",
+    "seoDescription",
+    "price",
+    "category",
+    "tags",
+  ],
   capabilities: {
     automaticPublish: true,
     automaticUpdate: true,
@@ -781,9 +791,11 @@ export const shopifyAdapter: ChannelAdapter = {
 
   buildListing({ product }: AdapterSubject): ChannelListingDraft {
     return {
-      title: product.canonical_title ?? product.name,
-      description: product.canonical_description,
-      shortDescription: product.short_description,
+      // Title, descriptions and price are left empty: an empty field uses the
+      // product's value when the listing is read (lib/channels/listings.ts).
+      title: null,
+      description: null,
+      shortDescription: null,
       // Null, not a copy of the fields they fall back to. Writing the fallback
       // into the row would turn "the creator did not override this" into "the
       // creator chose exactly this", and every later edit to the title would
@@ -791,7 +803,7 @@ export const shopifyAdapter: ChannelAdapter = {
       // not. The adapter resolves the fallback at the moment it sends.
       seoTitle: null,
       seoDescription: null,
-      price: product.base_price === null ? null : Number(product.base_price),
+      price: null,
       currency: product.currency,
       // A Shopify taxonomy label rather than the Fanwise product type. The
       // column is shared across channels but its meaning is the channel's, and

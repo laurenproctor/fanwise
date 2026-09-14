@@ -9,6 +9,8 @@ import { EMPTY_PAGE_STATE, type PublicProductPageState } from "@/lib/public/form
 import { PUBLIC_SLUG_LIMITS, canonicalHandle, checkPublicSlug } from "@/lib/public/handles"
 import { publicRoutes, routes } from "@/lib/routes"
 import { MarkdownEditor } from "@/components/ui/markdown-editor"
+import { InheritToggle, InheritedValue } from "@/components/ui/inherited-field"
+import { markdownToPlainText } from "@/lib/text/markdown"
 import type { PublicPageStatus } from "@/lib/public/types"
 
 /**
@@ -25,6 +27,15 @@ import type { PublicPageStatus } from "@/lib/public/types"
  * which products a profile shows and publishes them together; this section
  * edits what the page says, and reports where it stands.
  */
+
+/** The product's own wording, which the public page uses wherever it says nothing. */
+export interface ProductWording {
+  title: string
+  summary: string
+  description: string
+}
+
+type WordingKey = "titleOverride" | "summaryOverride" | "descriptionOverride"
 
 export interface PublicPageFields {
   slug: string
@@ -45,6 +56,7 @@ export function PublicPageForm({
   profileStatus,
   page,
   images,
+  product,
 }: {
   workspaceSlug: string
   productSlug: string
@@ -54,6 +66,7 @@ export function PublicPageForm({
   profileStatus: PublicPageStatus
   page: PublicPageFields
   images: Array<{ id: string; filename: string; assetType: string }>
+  product: ProductWording
 }) {
   const action = savePublicProductPageAction.bind(null, workspaceSlug, productSlug)
   const [state, formAction, pending] = useActionState<PublicProductPageState, FormData>(
@@ -83,6 +96,38 @@ export function PublicPageForm({
 
   function set<K extends keyof PublicPageFields>(key: K, value: string) {
     setFields((current) => ({ ...current, [key]: value }))
+  }
+
+  /*
+   * An empty override is the product's wording. Customizing starts from the
+   * product's words, and "customizing" is tracked apart from the value so a
+   * field whose product wording is empty can still be opened and written.
+   */
+  const [customizing, setCustomizing] = useState<ReadonlySet<WordingKey>>(
+    () =>
+      new Set(
+        (["titleOverride", "summaryOverride", "descriptionOverride"] as const).filter(
+          (key) => page[key] !== "",
+        ),
+      ),
+  )
+
+  const productValue: Record<WordingKey, string> = {
+    titleOverride: product.title,
+    summaryOverride: product.summary,
+    descriptionOverride: product.description,
+  }
+
+  function toggleWording(key: WordingKey) {
+    const next = new Set(customizing)
+    if (customizing.has(key)) {
+      next.delete(key)
+      set(key, "")
+    } else {
+      next.add(key)
+      set(key, productValue[key])
+    }
+    setCustomizing(next)
   }
 
   const published = status === "published"
@@ -230,49 +275,70 @@ export function PublicPageForm({
           <legend className="sr-only">Public wording</legend>
           <p className="text-[14px] text-[var(--color-ink-2)]">
             <span className="label-mono block pb-1">Public wording</span>
-            Optional. Leave a field empty and the public page uses the product&rsquo;s own.
+            The public page uses the product&rsquo;s own wording. Customize a field to say something
+            different here only.
           </p>
 
-          <TextField
-            id={ids.title}
-            name="titleOverride"
+          <WordingField
             label="Title"
-            maxLength={200}
-            value={fields.titleOverride}
-            onChange={(value) => set("titleOverride", value)}
-            error={state.fieldErrors.titleOverride ?? null}
-          />
+            customized={customizing.has("titleOverride")}
+            onToggle={() => toggleWording("titleOverride")}
+            name="titleOverride"
+            inherited={product.title}
+          >
+            <TextField
+              id={ids.title}
+              name="titleOverride"
+              label="Title"
+              hideLabel
+              maxLength={200}
+              value={fields.titleOverride}
+              onChange={(value) => set("titleOverride", value)}
+              error={state.fieldErrors.titleOverride ?? null}
+            />
+          </WordingField>
 
-          <TextField
-            id={ids.summary}
-            name="summaryOverride"
+          <WordingField
             label="Summary"
-            maxLength={300}
-            value={fields.summaryOverride}
-            onChange={(value) => set("summaryOverride", value)}
-            error={state.fieldErrors.summaryOverride ?? null}
+            customized={customizing.has("summaryOverride")}
+            onToggle={() => toggleWording("summaryOverride")}
+            name="summaryOverride"
+            inherited={product.summary}
             hint="The line under the product name."
-          />
+          >
+            <TextField
+              id={ids.summary}
+              name="summaryOverride"
+              label="Summary"
+              hideLabel
+              maxLength={300}
+              value={fields.summaryOverride}
+              onChange={(value) => set("summaryOverride", value)}
+              error={state.fieldErrors.summaryOverride ?? null}
+            />
+          </WordingField>
 
-          <div className="flex flex-col gap-2">
+          <WordingField
+            label="Description"
+            customized={customizing.has("descriptionOverride")}
+            onToggle={() => toggleWording("descriptionOverride")}
+            name="descriptionOverride"
+            inherited={markdownToPlainText(product.description)}
+            hint="Headings, lists, bold, italic and links are shown on the page."
+          >
             <MarkdownEditor
               id={ids.description}
               name="descriptionOverride"
-              label="Description"
+              ariaLabel="Description"
               rows={6}
               value={fields.descriptionOverride}
               onChange={(value) => set("descriptionOverride", value)}
-              describedBy={`${ids.description}-hint`}
             />
-            <p id={`${ids.description}-hint`} className="text-[13px] text-[var(--color-ink-3)]">
-              Headings, lists, bold, italic and links are shown on the page. Leave empty to use the
-              product&apos;s description.
-            </p>
             <FieldError
               id={`${ids.description}-error`}
               message={state.fieldErrors.descriptionOverride ?? null}
             />
-          </div>
+          </WordingField>
         </fieldset>
 
         {/* Search ------------------------------------------------------------ */}
@@ -457,10 +523,60 @@ function CopyUrl({ url }: { url: string }) {
   )
 }
 
+/**
+ * One piece of public wording: the product's, until it is customized here.
+ *
+ * While inherited, the field submits nothing of its own — an empty override,
+ * which is what "use the product's" means to the page.
+ */
+function WordingField({
+  label,
+  customized,
+  onToggle,
+  name,
+  inherited,
+  hint,
+  children,
+}: {
+  label: string
+  customized: boolean
+  onToggle: () => void
+  name: WordingKey
+  inherited: string
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="label-mono">{label}</span>
+        <InheritToggle
+          field={label}
+          overridden={customized}
+          onToggle={onToggle}
+          place="the public page"
+        />
+      </div>
+      {customized ? (
+        children
+      ) : (
+        <>
+          <input type="hidden" name={name} value="" />
+          <InheritedValue empty={inherited.trim() === ""}>
+            <span className="line-clamp-4 whitespace-pre-line">{inherited}</span>
+          </InheritedValue>
+        </>
+      )}
+      {hint ? <p className="text-[13px] text-[var(--color-ink-3)]">{hint}</p> : null}
+    </div>
+  )
+}
+
 function TextField({
   id,
   name,
   label,
+  hideLabel = false,
   value,
   onChange,
   error,
@@ -470,6 +586,8 @@ function TextField({
   id: string
   name: string
   label: string
+  /** For a field whose visible label is drawn by its parent. */
+  hideLabel?: boolean
   value: string
   onChange: (value: string) => void
   error: string | null
@@ -477,7 +595,7 @@ function TextField({
 } & Omit<React.ComponentProps<"input">, "id" | "name" | "value" | "onChange">) {
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor={id} className="label-mono">
+      <label htmlFor={id} className={hideLabel ? "sr-only" : "label-mono"}>
         {label}
       </label>
       <input

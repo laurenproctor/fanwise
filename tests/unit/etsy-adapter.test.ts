@@ -17,7 +17,7 @@ import {
   taxonomyId,
 } from "@/lib/channels/adapters/etsy/categories"
 import { toTags } from "@/lib/channels/adapters/etsy/transform"
-import { evaluate } from "@/lib/channels/listings"
+import { evaluate, resolveDraft } from "@/lib/channels/listings"
 import type {
   AdapterSubject,
   ChannelConnection,
@@ -257,7 +257,7 @@ describe("declaration", () => {
   })
 
   it("is ready with a title, price, category, image and a file under 20 MB", () => {
-    const draft = etsyAdapter.buildListing(subject())
+    const draft = resolveDraft(etsyAdapter.buildListing(subject()), subject().product, etsyAdapter)
     const { readiness } = evaluate(etsyAdapter, draft, subject())
     expect(readiness.ready).toBe(true)
     const big = subject({

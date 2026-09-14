@@ -115,10 +115,14 @@ export async function writeListing(page: Page, slug: string, card?: Locator) {
   await (card ?? page).getByRole("link", { name: "Edit listing" }).first().click()
   await page.waitForURL(listingUrl(slug))
 
+  // Each field is the product's until customized for this channel.
+  await page.getByRole("button", { name: "Customize title for this channel" }).click()
   await page.getByLabel("Title", { exact: true }).fill("Aster Grotesk Display")
+  await page.getByRole("button", { name: "Customize description for this channel" }).click()
   await page
     .getByLabel("Description", { exact: true })
     .fill("A grotesque in nine weights, drawn for long text and set tight at display sizes.")
+  await page.getByRole("button", { name: "Customize price for this channel" }).click()
   await page.getByLabel("Price", { exact: true }).fill("48")
   await page.getByRole("button", { name: "Save listing" }).click()
   await expect(page.getByRole("status")).toHaveText("Saved")

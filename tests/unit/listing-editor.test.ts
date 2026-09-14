@@ -186,6 +186,22 @@ describe("the editor payload schema", () => {
     expect(updateListingSchema.safeParse({ ...base, currency: "dollars" }).success).toBe(false)
   })
 
+  it("accepts a form that carries no fields for what the listing inherits", () => {
+    // FormData.get returns null for a control that was not rendered, which is
+    // every field left to the product.
+    const parsed = updateListingSchema.parse({
+      ...base,
+      title: null,
+      description: null,
+      shortDescription: null,
+      price: null,
+      currency: null,
+    })
+    expect(parsed.title).toBeNull()
+    expect(parsed.price).toBeNull()
+    expect(parsed.currency).toBeNull()
+  })
+
   it("treats an empty price as unset, not as zero", () => {
     expect(updateListingSchema.parse({ ...base, price: "" }).price).toBeNull()
     expect(updateListingSchema.parse({ ...base, price: "0" }).price).toBe(0)

@@ -364,6 +364,7 @@ export const woocommerceAdapter: ChannelAdapter = {
   key: "woocommerce",
   name: "WooCommerce",
   integrationType: "api",
+  fields: ["title", "description", "shortDescription", "price", "tags"],
   capabilities: {
     automaticPublish: true,
     automaticUpdate: true,
@@ -383,13 +384,15 @@ export const woocommerceAdapter: ChannelAdapter = {
 
   buildListing({ product }: AdapterSubject): ChannelListingDraft {
     return {
-      title: product.canonical_title ?? product.name,
-      description: product.canonical_description,
-      shortDescription: product.short_description,
+      // Title, descriptions and price are left empty: an empty field uses the
+      // product's value when the listing is read (lib/channels/listings.ts).
+      title: null,
+      description: null,
+      shortDescription: null,
       // WooCommerce has no search-result fields of its own.
       seoTitle: null,
       seoDescription: null,
-      price: product.base_price === null ? null : Number(product.base_price),
+      price: null,
       currency: product.currency,
       // Categories are the store's own terms, not a taxonomy Fanwise can map
       // to; the creator assigns one in the admin if they want one.

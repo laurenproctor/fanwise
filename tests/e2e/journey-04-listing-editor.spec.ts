@@ -66,8 +66,8 @@ test("a creator hand-writes a listing and watches readiness resolve", async ({ p
   await connect(page, slug, "Mock Marketplace")
   await createProductWithListings(page, slug, "Aster Grotesk")
 
-  // A canonical title that differs from the product's name, so a pull below
-  // can only come from the canonical record.
+  // A canonical title that differs from the product's name, so the inherited
+  // title below can only come from the canonical record.
   await page.getByLabel("Canonical title").fill("The Canonical Title")
   await page.getByRole("button", { name: "Save changes" }).click()
   // The product form reports how long ago it saved ("Saved just now"); the
@@ -83,18 +83,26 @@ test("a creator hand-writes a listing and watches readiness resolve", async ({ p
   const before = Number(await bar.getAttribute("aria-valuenow"))
   expect(before).toBeLessThan(100)
 
-  // A field can be pulled from the canonical product on purpose: a title
-  // diverged by hand comes back from the canonical record on request.
-  await page.getByLabel("Title", { exact: true }).fill("Diverged by hand")
-  await page.getByRole("button", { name: "Use canonical title" }).click()
+  // A new listing says nothing of its own: the title is the product's, shown
+  // rather than copied. Customizing starts from those words, and going back
+  // returns the field to the product.
+  await expect(page.getByText("The Canonical Title")).toBeVisible()
+  await expect(page.getByLabel("Title", { exact: true })).toHaveCount(0)
+  await page.getByRole("button", { name: "Customize title for this channel" }).click()
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue("The Canonical Title")
+  await page.getByLabel("Title", { exact: true }).fill("Diverged by hand")
+  await page.getByRole("button", { name: "Use the product's title" }).click()
+  await expect(page.getByLabel("Title", { exact: true })).toHaveCount(0)
+  await page.getByRole("button", { name: "Customize title for this channel" }).click()
 
   // Readiness moves while typing, before anything is saved.
   await page.getByLabel("Title", { exact: true }).fill("Aster Grotesk Display")
   await page.getByLabel("Tags", { exact: true }).fill("grotesque, sans serif, editorial")
   await expect(page.getByText("Add at least 3 tags. There are 0.")).toBeHidden()
 
+  await page.getByRole("button", { name: "Customize description for this channel" }).click()
   await page.getByLabel("Description", { exact: true }).fill("y".repeat(220))
+  await page.getByRole("button", { name: "Customize price for this channel" }).click()
   await page.getByLabel("Price", { exact: true }).fill("48")
 
   const after = Number(await bar.getAttribute("aria-valuenow"))
@@ -130,6 +138,7 @@ test("two channels judge the same hand-written copy differently", async ({ page 
   // Editing one channel does not touch the other: listings are independent rows.
   await page.getByRole("link", { name: "Edit listing" }).first().click()
   await page.waitForURL(/\/channels\/[^/]+$/)
+  await page.getByRole("button", { name: "Customize title for this channel" }).click()
   await page.getByLabel("Title", { exact: true }).fill("Only this channel")
   await page.getByRole("button", { name: "Save listing" }).click()
   await expect(page.getByRole("status")).toHaveText("Saved")

@@ -211,6 +211,21 @@ Since A4 a creator can hand-edit a listing, so readiness is judged on what is **
 on what the adapter would rebuild. Judging the rebuild would tell someone their edits were
 fine when the thing that would actually be submitted is not.
 
+## Inheritance and declared fields
+
+Since 13 September 2026 a listing's `title`, `description`, `short_description` and `price`
+inherit from the product while the column is empty. `buildListing` leaves them empty, and
+`resolveListing` / `resolveDraft` in `lib/channels/listings.ts` fill them from the product on
+every read: readiness, the runner's `PublishContext.listing`, the unsent-changes fingerprint,
+snapshots, and the editor in the browser all call the same function. An inherited price brings
+the product's currency. Customizing a field in the editor writes a value; "Use the product's"
+empties it again.
+
+Each adapter declares `fields`, the listing fields its channel has. The editor shows only those,
+and resolution empties any other, so a product edit to a field a channel never sends does not
+read as an unsent change there. Migration `20260913060000_listing_inheritance` emptied every
+stored value that still matched its product.
+
 ## Constraints, for the editor
 
 `lib/channels/constraints.ts` derives field limits from the same specs the evaluator walks,

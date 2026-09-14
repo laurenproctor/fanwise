@@ -69,21 +69,25 @@ export const updateListingSchema = z.object({
   seoTitle: optionalText(500),
   seoDescription: optionalText(2000),
   category: optionalText(200),
+  // Absent when the listing uses the product's price, which the form then does
+  // not render: null and empty both mean "the product's".
   price: z
     .string()
     .trim()
-    .optional()
-    .transform((v) => (v === "" || v === undefined ? null : Number(v)))
+    .nullish()
+    .transform((v) => (v === "" || v === undefined || v === null ? null : Number(v)))
     .refine(
       (v) => v === null || (Number.isFinite(v) && v >= 0),
       "Enter a price of zero or more, or leave it empty.",
     ),
+  // Absent with an inherited price; the action then records the product's.
   currency: z
     .string()
     .trim()
     .toUpperCase()
     .regex(/^[A-Z]{3}$/, "Use a three-letter currency code.")
-    .default("USD"),
+    .nullish()
+    .transform((v) => v ?? null),
   tags: tagsSchema,
 })
 

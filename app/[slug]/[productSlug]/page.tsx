@@ -25,7 +25,7 @@ import { getProductPageForEditor } from "@/lib/public/workspace-queries"
 import { createPublicProductPageAction } from "@/lib/public/actions"
 import { Button } from "@/components/ui/button"
 import { ButtonLink } from "@/components/ui/button"
-import { PublicPageForm } from "./public-page-form"
+import { PublicPageForm, type ProductWording } from "./public-page-form"
 import { DeleteProductDraft } from "./delete-product-draft"
 import { awaitingReview } from "@/lib/ai/review"
 
@@ -138,7 +138,7 @@ export default async function ProductPage({
           view.listing.external_listing_id !== null &&
           view.unsentChanges,
         listingId,
-        title: view?.listing.title ?? null,
+        title: view?.draft.title ?? null,
         statusSource: view?.listing.status_source ?? null,
         readiness: view?.evaluation?.readiness ?? null,
         results: view?.evaluation?.results ?? [],
@@ -299,6 +299,11 @@ export default async function ProductPage({
           workspaceSlug={slug}
           productSlug={product.slug}
           publicPage={publicPage}
+          productWording={{
+            title: product.canonical_title ?? product.name,
+            summary: product.short_description ?? "",
+            description: product.canonical_description ?? "",
+          }}
           hasDestinations={cards.some((card) => card.externalUrl !== null)}
           hasContact={false}
         />
@@ -342,10 +347,12 @@ function PublicPageSection({
   workspaceSlug,
   productSlug,
   publicPage,
+  productWording,
   hasDestinations,
 }: {
   workspaceSlug: string
   productSlug: string
+  productWording: ProductWording
   publicPage: Awaited<ReturnType<typeof getProductPageForEditor>>
   hasDestinations: boolean
   hasContact: boolean
@@ -415,6 +422,7 @@ function PublicPageSection({
         seoDescription: publicPage.page.seo_description ?? "",
       }}
       images={publicPage.images}
+      product={productWording}
     />
   )
 }

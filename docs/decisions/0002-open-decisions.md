@@ -40,7 +40,7 @@ Keep these here only as pointers. Do not relitigate them from this file.
 | Readiness arithmetic | Errors resolved over errors total. Warnings never block. `ready` is never a threshold | `docs/channel-adapters.md` |
 | When `listing_snapshots` arrives | A3, so the insert-only constraint lands with the schema | `docs/data-model.md`, A3 |
 | Where credentials live | Their own table with no grant to `authenticated` at all. RLS filters rows, not columns | `docs/data-model.md`, A3 revision |
-| Listing editing model | Independent rows plus a per-field pull from canonical. Never a live binding | `docs/channel-adapters.md` |
+| Listing editing model | Title, description, short description and price inherit from the product while the listing column is empty, and are customized per channel. Replaced the per-field pull on 13 September 2026 at the founder's request | `docs/channel-adapters.md`, migration `20260913060000_listing_inheritance` |
 | Re-verify ADR 0001 before A5 | Done, 4 September 2026. Shopify still has no digital-file API, so the ADR stands unchanged | this file |
 | Reconnect gaming | A connection bills for a minimum of one full period | `CLAUDE.md`, pricing |
 | V1 roles | Owner only. The enum holds four, the UI exposes one | `docs/data-model.md`, A1 |

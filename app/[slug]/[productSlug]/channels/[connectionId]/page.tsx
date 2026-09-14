@@ -143,10 +143,12 @@ export default async function ListingPage({
         }}
         initial={listingToDraft(view.listing)}
         canonical={{
-          title: product.canonical_title ?? product.name,
-          description: product.canonical_description ?? "",
-          shortDescription: product.short_description ?? "",
-          price: product.base_price === null ? "" : String(product.base_price),
+          name: product.name,
+          canonical_title: product.canonical_title,
+          canonical_description: product.canonical_description,
+          short_description: product.short_description,
+          base_price: product.base_price,
+          currency: product.currency,
         }}
         review={{ aiConfigured: configured, inFlight }}
       />
