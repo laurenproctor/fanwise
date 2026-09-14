@@ -138,7 +138,7 @@ export async function listProductListings(
       connection,
       adapter,
       evaluation: adapter ? evaluate(adapter, draft, subject) : null,
-      unsentChanges: hasUnsentChanges(listing, draft, subject),
+      unsentChanges: hasUnsentChanges(listing, draft, subject, adapter ?? undefined),
     }
   })
 }

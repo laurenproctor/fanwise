@@ -113,6 +113,7 @@ function context(overrides: Partial<PublishContext> = {}): PublishContext {
     } as unknown as ChannelConnection,
     subject: subject(),
     assetUrl: async (a) => `https://signed.example/${a.filename}`,
+    deliveryUrl: async (a) => `https://fanwise.test/api/public/delivery/token-${a.id}`,
     ...overrides,
   }
 }

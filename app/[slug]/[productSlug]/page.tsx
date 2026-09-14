@@ -137,6 +137,15 @@ export default async function ProductPage({
           view.listing.status === "published" &&
           view.listing.external_listing_id !== null &&
           view.unsentChanges,
+        /*
+         * A channel that serves a Fanwise download address, on a listing that
+         * has one to replace.
+         */
+        canReplaceDeliveryLink:
+          adapter!.deliversByLink === true &&
+          view !== undefined &&
+          view.listing.status === "published" &&
+          view.listing.external_listing_id !== null,
         listingId,
         title: view?.draft.title ?? null,
         statusSource: view?.listing.status_source ?? null,

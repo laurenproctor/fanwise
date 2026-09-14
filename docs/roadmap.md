@@ -514,9 +514,9 @@ reads included either way).
 permalinks, which is any WordPress host and no approval, and a Fanwise at a public HTTPS
 address, because the store posts the keys server to server and a local dev server cannot
 receive them (spec §9, learned 9 September 2026). The store exists as of that day; the run
-is on the hosted deployment: connect from the store's own authorization screen, publish a
-draft, attach the file in the admin, mark the step done, and confirm that `activate` sees
-the download and the product is buyable. The five questions in
+is on the hosted deployment: connect from the store's own authorization screen, publish, and
+confirm the product is on sale and a test buyer's download arrives through the Fanwise link
+(ADR 0012, 13 September 2026, replaced the draft, the admin file step and `activate`). The five questions in
 §13 of the spec, including the order of the store's POST and its redirect, can only be
 settled there. Journey 11 in `docs/testing.md` is that run.
 

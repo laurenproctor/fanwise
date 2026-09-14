@@ -232,6 +232,13 @@ export interface PublishContext {
   connection: ChannelConnection
   subject: AdapterSubject
   assetUrl(asset: ProductAsset): Promise<string>
+  /**
+   * A permanent download address for a deliverable on this listing, for a
+   * channel that serves the file to buyers by URL (ADR 0012). The same address
+   * on every call for the same file. Injected, like `assetUrl`, so no adapter
+   * reaches into delivery or storage itself.
+   */
+  deliveryUrl(asset: ProductAsset): Promise<string>
 }
 
 /**
@@ -467,6 +474,11 @@ export interface ChannelAdapter {
    * edit to a field nobody sends never reads as a change to send.
    */
   fields: readonly ChannelField[]
+  /**
+   * True when the channel delivers the file by serving a Fanwise download
+   * address (ADR 0012), which the creator can replace to cut off a leaked link.
+   */
+  deliversByLink?: boolean
   /** The rules this channel enforces, as data. See lib/channels/requirements.ts. */
   requirements: readonly RequirementSpec[]
   /** Work this channel's API cannot do. Empty for a channel that needs none. */

@@ -146,9 +146,11 @@ the product heading, usually.
     two checkouts, and `tests/db/billing.test.ts` proves the ledger, the tenancy and the sync
     job against real Postgres with the provider scripted. Unrun in the browser: it needs a
     provider account in test mode)*
-11. Connect WooCommerce, publish a draft, attach the file, activate. *(code complete at B8,
-    unverified: needs a live store. The authorization handshake and the adapter are covered
-    in `tests/unit/woocommerce-oauth.test.ts` and `tests/unit/woocommerce-adapter.test.ts`)*
+11. Connect WooCommerce, publish, buy as a test buyer and download through the Fanwise link,
+    then replace the link and see the old one stop. *(rewritten for ADR 0012 on 13 September
+    2026; unverified: needs a live store. Covered without one by
+    `tests/unit/woocommerce-oauth.test.ts`, `tests/unit/woocommerce-adapter.test.ts`,
+    `tests/unit/delivery-route.test.ts` and `tests/db/delivery-links.test.ts`)*
 12. Generate a Behance project and asset package, hand off, capture the project URL.
     *(planned at B9, not built; waits on A8's handoff machinery and on a profile with Stripe
     connected, decision 26)*
@@ -168,11 +170,11 @@ Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, 
 is broken in the way that matters most.
 
 **Journey 11 was added on 8 September 2026**, after the list was written, because
-WooCommerce arrived at B8. It is not a copy of journey 3 with a different store. The ten were
-written before a channel existed whose provider could confirm the manual step, and that
-confirmation is what the journey exists to see: `activate` refusing until the file is on the
-product, and a product that goes live only afterwards. The count in `CLAUDE.md` moved with
-it.
+WooCommerce arrived at B8. As written it watched `activate` refuse until the file was on the
+product. **ADR 0012 changed it on 13 September 2026**: WooCommerce now delivers through a Fanwise
+download link and has no manual step, so the journey is one Publish producing a purchasable
+product, a test buyer's download arriving through the Fanwise address, and Replace download link
+stopping the old address. The count in `CLAUDE.md` moved with it.
 
 **Journey 12 was added on 11 September 2026**, when Behance was planned as B9. It is journey
 7 with a different shape: a portfolio project composed around the product rather than a

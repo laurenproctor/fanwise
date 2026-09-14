@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createIngestUrl } from "@/lib/products/storage"
+import { deliveryUrlFor } from "@/lib/delivery/links"
 import { evaluate, listingToDraft, resolveListing, snapshotPayload } from "@/lib/channels/listings"
 import { findAdapter } from "@/lib/channels/registry"
 import { normalizeUnknown } from "@/lib/channels/errors"
@@ -319,6 +320,10 @@ async function execute(
     // requested is never created, so a channel that cannot take images never
     // causes a signed URL for one to exist.
     assetUrl: (asset) => createIngestUrl(asset.storage_path),
+    // Minted on first request and reused after, so a channel that delivers by
+    // URL keeps one address per file for the life of the listing.
+    deliveryUrl: (asset) =>
+      deliveryUrlFor({ workspaceId, listingId: listing.id, assetId: asset.id }),
   }
 
   let result: PublishResult

@@ -23,10 +23,11 @@ import type { Product, ProductAsset } from "@/lib/products/types"
 /**
  * The WooCommerce adapter, with the store replaced by a fetch that answers
  * from a script. Nothing here reaches a live store; what is proved is
- * Fanwise's side of the wire: a publish creates a draft digital product with
- * no slug, an update preserves the store's status, tags are created by name
- * and matched when they exist, a deleted product is raised by the one code
- * the runner acts on, and activate refuses a product with no file on it.
+ * Fanwise's side of the wire: a publish creates a digital product on sale with
+ * its Fanwise download attached and no slug, an update keeps each download's id
+ * so past buyers keep their file, tags are created by name and matched when
+ * they exist, and a deleted product is raised by the one code the runner acts
+ * on.
  */
 
 function listing(overrides: Partial<ChannelListing> = {}): ChannelListing {
@@ -104,6 +105,7 @@ function context(overrides: Partial<PublishContext> = {}): PublishContext {
     } as unknown as ChannelConnection,
     subject: subject(),
     assetUrl: async () => "https://signed.example/cover.png",
+    deliveryUrl: async (a) => `https://fanwise.test/api/public/delivery/token-${a.id}`,
     ...overrides,
   }
 }
@@ -185,14 +187,31 @@ function store(
           ...(body ?? {}),
           id: 900,
           images: options.held?.images ?? [],
+          downloads: withIds(body?.downloads),
         }),
       )
     }
     if (url.endsWith("/products") && method === "POST") {
-      return json(productOk({ status: String(body?.status), images: [{ id: 1 }] }), 201)
+      return json(
+        productOk({
+          status: String(body?.status),
+          images: [{ id: 1 }],
+          downloads: withIds(body?.downloads),
+        }),
+        201,
+      )
     }
     return json({ code: "rest_no_route", message: "No route", data: { status: 404 } }, 404)
   })
+}
+
+/** The store gives each new download an id, as WooCommerce does. */
+function withIds(downloads: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(downloads)) return []
+  return downloads.map((download: Record<string, unknown>, index) => ({
+    id: download.id ?? `new-${index}`,
+    ...download,
+  }))
 }
 
 const write = (calls: Call[], method: string) =>
@@ -203,11 +222,12 @@ afterEach(() => {
 })
 
 describe("declaration", () => {
-  it("needs no app credentials and declares the file step", () => {
+  it("needs no app credentials, delivers the file itself, and leaves nothing to do by hand", () => {
     expect(woocommerceAdapter.oauth?.grant).toBeDefined()
-    expect(woocommerceAdapter.capabilities.digitalFileUpload).toBe(false)
-    expect(woocommerceAdapter.manualSteps.map((s) => s.key)).toEqual(["attach_digital_file"])
-    expect(woocommerceAdapter.manualSteps[0]!.gatesActivation).toBe(true)
+    expect(woocommerceAdapter.capabilities.digitalFileUpload).toBe(true)
+    expect(woocommerceAdapter.capabilities.drafts).toBe(false)
+    expect(woocommerceAdapter.manualSteps).toEqual([])
+    expect(woocommerceAdapter.activate).toBeUndefined()
   })
 
   it("has no category and no meta fields, and takes its words from the product", () => {
@@ -240,7 +260,7 @@ describe("declaration", () => {
 })
 
 describe("publish", () => {
-  it("creates a draft digital product with images, tags by id, and no slug", async () => {
+  it("creates the product on sale, with its Fanwise download, images, tags by id, and no slug", async () => {
     const calls: Call[] = []
     scriptStore(store(calls, { existingTags: ["sans"] }))
 
@@ -251,7 +271,7 @@ describe("publish", () => {
     expect(create.body).toMatchObject({
       name: "Aster Grotesk",
       type: "simple",
-      status: "draft",
+      status: "publish",
       virtual: true,
       downloadable: true,
       sold_individually: true,
@@ -259,15 +279,29 @@ describe("publish", () => {
       description: "<p>A grotesque in nine weights.</p><p>Drawn for long text.</p>",
       tags: [{ id: 101 }, { id: 55 }],
       images: [{ src: "https://signed.example/cover.png", alt: "Aster Grotesk" }],
+      // The deliverable, at its Fanwise address. The cover image is not one.
+      downloads: [
+        { name: "aster.zip", file: "https://fanwise.test/api/public/delivery/token-asset-2" },
+      ],
     })
     expect(create.body).not.toHaveProperty("slug")
     expect(result).toMatchObject({
       externalListingId: "900",
       externalUrl: adminProductUrl("https://shop.example.com", 900),
       publicUrl: "https://shop.example.com/product/aster-grotesk/",
-      externalState: "draft",
-      purchasable: false,
+      externalState: "live",
+      purchasable: true,
     })
+  })
+
+  it("is not purchasable when the product has no deliverable to attach", async () => {
+    const calls: Call[] = []
+    scriptStore(store(calls))
+    const result = await woocommerceAdapter.publish!(
+      context({ subject: subject({ assets: [asset()] }) }),
+    )
+    expect(write(calls, "POST")!.body!.downloads).toEqual([])
+    expect(result.purchasable).toBe(false)
   })
 
   it("does not read the store before a create", async () => {
@@ -279,9 +313,23 @@ describe("publish", () => {
 })
 
 describe("update", () => {
-  it("reads first, preserves a live product's status, and omits images the store already holds", async () => {
+  it("reads first, keeps each download's id, and omits images the store already holds", async () => {
     const calls: Call[] = []
-    scriptStore(store(calls, { held: { status: "publish", images: [{ id: 1 }] } }))
+    scriptStore(
+      store(calls, {
+        held: {
+          status: "publish",
+          images: [{ id: 1 }],
+          downloads: [
+            {
+              id: "d-1",
+              name: "aster.zip",
+              file: "https://fanwise.test/api/public/delivery/token-asset-2",
+            },
+          ],
+        },
+      }),
+    )
 
     const result = await woocommerceAdapter.update!(
       context({ listing: listing({ external_listing_id: "900", metadata: {} }) }),
@@ -292,7 +340,34 @@ describe("update", () => {
     expect(put.url).toBe("https://shop.example.com/wp-json/wc/v3/products/900")
     expect(put.body!.status).toBe("publish")
     expect(put.body).not.toHaveProperty("images")
+    // The same address the store holds goes back with its id, so every past
+    // buyer's download still points at the file.
+    expect(put.body!.downloads).toEqual([
+      {
+        id: "d-1",
+        name: "aster.zip",
+        file: "https://fanwise.test/api/public/delivery/token-asset-2",
+      },
+    ])
     expect(result.externalState).toBe("live")
+    expect(result.purchasable).toBe(true)
+  })
+
+  it("puts a draft left over from the old manual file step on sale, with its download", async () => {
+    const calls: Call[] = []
+    scriptStore(store(calls, { held: { status: "draft", downloads: [], images: [{ id: 1 }] } }))
+    const result = await woocommerceAdapter.update!(
+      context({
+        listing: listing({
+          external_listing_id: "900",
+          metadata: { externalState: "draft", purchasable: false },
+        }),
+      }),
+    )
+    const put = write(calls, "PUT")!
+    expect(put.body!.status).toBe("publish")
+    expect(put.body!.downloads).toHaveLength(1)
+    expect(result.purchasable).toBe(true)
   })
 
   it("resends images when the store holds fewer than the listing sends", async () => {
@@ -309,40 +384,6 @@ describe("update", () => {
       woocommerceAdapter.update!(context({ listing: listing({ external_listing_id: "900" }) })),
     ).rejects.toMatchObject({ normalized: { code: "external_object_missing" } })
     expect(calls.some((c) => c.method === "PUT")).toBe(false)
-  })
-})
-
-describe("activate", () => {
-  it("refuses while no download file is on the product", async () => {
-    const calls: Call[] = []
-    scriptStore(store(calls, { held: { downloads: [] } }))
-    await expect(
-      woocommerceAdapter.activate!(context({ listing: listing({ external_listing_id: "900" }) })),
-    ).rejects.toMatchObject({ normalized: { code: "validation_rejected" } })
-    expect(calls.some((c) => c.method === "PUT")).toBe(false)
-  })
-
-  it("publishes once the file is there and reports the product purchasable", async () => {
-    const calls: Call[] = []
-    scriptStore(
-      store(calls, {
-        held: {
-          downloads: [
-            {
-              name: "aster.zip",
-              file: "https://shop.example.com/wp-content/uploads/woocommerce_uploads/aster.zip",
-            },
-          ],
-          images: [{ id: 1 }],
-        },
-      }),
-    )
-    const result = await woocommerceAdapter.activate!(
-      context({ listing: listing({ external_listing_id: "900" }) }),
-    )
-    expect(write(calls, "PUT")!.body!.status).toBe("publish")
-    expect(result.externalState).toBe("live")
-    expect(result.purchasable).toBe(true)
   })
 })
 

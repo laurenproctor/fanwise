@@ -6,11 +6,11 @@ import type {
   AdapterSubject,
   ChannelAdapter,
   ChannelListingDraft,
-  ManualStepSpec,
   PublishContext,
   PublishResult,
   RequirementSpec,
 } from "@/lib/channels/types"
+import type { ProductAsset } from "@/lib/products/types"
 import type { WooClient } from "./client"
 import { productMissing } from "./errors"
 import { woocommerceMerchandising } from "./merchandising"
@@ -27,13 +27,13 @@ import {
  * WooCommerce. The second owned storefront.
  *
  * The field-level spec is docs/channels/woocommerce.md. The short version:
- * WooCommerce has native downloadable products, and the API can set every
- * field of one except the file. A download has to be a URL the store can
- * already serve, the API offers no upload into the protected folder, and the
- * media library it does offer is public by address. So the file step is
- * assisted, as on Shopify, and this adapter can do one thing Shopify's
- * cannot: read the product back and see whether the file is there before it
- * puts the product on sale.
+ * WooCommerce has native downloadable products, and a download is an address
+ * the store serves to each buyer. The API cannot upload into the protected
+ * folder and the media library is public by address, so the address is a
+ * Fanwise one (ADR 0012): a permanent link per file that re-checks the listing
+ * and the file on every request and hands the buyer a five-minute download.
+ * With that, a publish is complete in one call, and the product goes on sale
+ * the moment the store confirms it holds the file.
  */
 
 const requirements: readonly RequirementSpec[] = [
@@ -59,10 +59,10 @@ const requirements: readonly RequirementSpec[] = [
     key: "deliverable",
     label: "A deliverable",
     // WooCommerce itself publishes a downloadable product with no file. It is
-    // an error because the channel as Fanwise implements it needs one: the
-    // attach step cannot be performed without a file, and activate refuses a
-    // product whose download list is empty.
-    description: "You attach this to the product in WooCommerce yourself, once.",
+    // an error here because a product on sale with nothing to download takes
+    // money and gives nothing back.
+    description:
+      "Fanwise gives WooCommerce a download link for it; buyers download it from Fanwise.",
     severity: "error",
     assetTypes: ["deliverable", "archive"],
     minCount: 1,
@@ -128,25 +128,18 @@ const requirements: readonly RequirementSpec[] = [
   },
 ]
 
-export const ATTACH_DIGITAL_FILE = "attach_digital_file"
+const DELIVERABLE_TYPES = ["deliverable", "archive"] as const
 
-const manualSteps: readonly ManualStepSpec[] = [
-  {
-    key: ATTACH_DIGITAL_FILE,
-    label: "Attach the download file",
-    description:
-      "WooCommerce's API cannot put a file in the protected downloads folder, so this step is manual, once per product. " +
-      "The product stays a draft until Fanwise sees the file on it, so nobody can buy it before it is there.",
-    instructions: [
-      "Download the deliverable from Fanwise.",
-      "Open the product in WooCommerce and scroll to Product data.",
-      "Under Downloadable files, add a file, upload the deliverable, and Update the product.",
-    ],
-    required: true,
-    gatesActivation: true,
-    needsDeliverable: true,
-  },
-]
+/** The files a buyer receives, in the order the creator arranged them. */
+function deliverables(assets: readonly ProductAsset[]): ProductAsset[] {
+  return assets
+    .filter(
+      (asset) =>
+        asset.asset_state === "ready" &&
+        (DELIVERABLE_TYPES as readonly string[]).includes(asset.asset_type),
+    )
+    .sort((a, b) => a.sort_order - b.sort_order)
+}
 
 /** What a product read or write returns, as far as this adapter reads it. */
 const productSchema = z.object({
@@ -156,7 +149,13 @@ const productSchema = z.object({
   catalog_visibility: z.string().nullish(),
   downloadable: z.boolean().nullish(),
   downloads: z
-    .array(z.object({ name: z.string().nullish(), file: z.string().nullish() }))
+    .array(
+      z.object({
+        id: z.string().nullish(),
+        name: z.string().nullish(),
+        file: z.string().nullish(),
+      }),
+    )
     .default([]),
   images: z.array(z.object({ id: z.number().nullish() })).default([]),
 })
@@ -268,6 +267,43 @@ async function ensureTagIds(client: WooClient, names: readonly string[]): Promis
 }
 
 /**
+ * The download list to send: one entry per deliverable, each at its Fanwise
+ * address.
+ *
+ * WooCommerce replaces the whole list on every write and keys a buyer's access
+ * on each entry's id. An entry the store already holds for the same address is
+ * sent back with its id, so an edit changes nothing for anyone who has already
+ * bought; an entry without one would be a new download, and past buyers would
+ * lose the file they paid for.
+ */
+async function downloadsFor(
+  context: PublishContext,
+  current: Product | null,
+): Promise<Array<{ id?: string; name: string; file: string }>> {
+  const held = new Map(
+    (current?.downloads ?? [])
+      .filter((download) => download.file && download.id)
+      .map((download) => [download.file!, download.id!]),
+  )
+  return Promise.all(
+    deliverables(context.subject.assets).map(async (asset) => {
+      const file = await context.deliveryUrl(asset)
+      const id = held.get(file)
+      return { ...(id ? { id } : {}), name: asset.filename, file }
+    }),
+  )
+}
+
+/** On sale, with a file to deliver, and findable. What "live" has to mean here. */
+function isPurchasable(product: Product): boolean {
+  return (
+    product.status === "publish" &&
+    product.downloads.length > 0 &&
+    product.catalog_visibility !== "hidden"
+  )
+}
+
+/**
  * The one external write this adapter makes: a create without an id, an
  * update with one, which is what makes a retry converge instead of
  * duplicating. It reads before it writes whenever the product should exist,
@@ -323,6 +359,7 @@ async function writeProduct(
     sold_individually: true,
     catalog_visibility: "visible",
     tags: tagIds.map((id) => ({ id })),
+    downloads: await downloadsFor(context, current),
   }
 
   /*
@@ -356,6 +393,7 @@ async function writeProduct(
     // The product page on the store, which WordPress names the permalink.
     publicUrl: product.permalink ?? null,
     externalState: product.status === "publish" ? "live" : "draft",
+    purchasable: isPurchasable(product),
     providerResponse: current === null ? product : { product, stateBefore: current },
   }
 }
@@ -365,20 +403,22 @@ export const woocommerceAdapter: ChannelAdapter = {
   name: "WooCommerce",
   integrationType: "api",
   fields: ["title", "description", "shortDescription", "price", "tags"],
+  deliversByLink: true,
   capabilities: {
     automaticPublish: true,
     automaticUpdate: true,
     // Exist on the provider; the steps that use them are B5 and B6.
     metrics: false,
     transactions: false,
-    // False because Fanwise will not, rather than because the store cannot:
-    // the only API path puts the file somewhere public. See the spec, §6.
-    digitalFileUpload: false,
+    // True since ADR 0012: the file reaches buyers through a Fanwise download
+    // link the product carries, rather than an upload the API cannot make.
+    digitalFileUpload: true,
     imageUpload: true,
-    drafts: true,
+    // A publish puts the product on sale; there is no step to wait for.
+    drafts: false,
   },
   requirements,
-  manualSteps,
+  manualSteps: [],
   merchandising: woocommerceMerchandising,
   oauth: woocommerceOAuth,
 
@@ -402,59 +442,27 @@ export const woocommerceAdapter: ChannelAdapter = {
     }
   },
 
-  /** Creates the product as a draft. Nobody can buy it yet, on purpose. */
-  async publish(context: PublishContext): Promise<PublishResult> {
-    const result = await writeProduct(context, "draft")
-    return { ...result, purchasable: false }
-  },
-
-  update(context: PublishContext): Promise<PublishResult> {
-    const metadata = context.listing.metadata as Record<string, unknown> | null
-    const recorded = metadata?.["externalState"]
-    if (recorded === "live") return writeProduct(context, "publish")
-    if (recorded === "draft") return writeProduct(context, "draft")
-    return writeProduct(context, "preserve")
+  /**
+   * Creates the product on sale, with its download attached.
+   *
+   * One write: the file is an address rather than an upload, so there is
+   * nothing to wait for between creating the product and selling it. Whether a
+   * buyer can actually buy it is read from what the store sent back.
+   */
+  publish(context: PublishContext): Promise<PublishResult> {
+    return writeProduct(context, "publish")
   },
 
   /**
-   * Puts the product on sale, and only if the file is on it.
+   * Updates in place, and puts the product on sale.
    *
-   * The step is a person's claim that they attached the file. Here, unlike on
-   * Shopify, the claim can be checked: the product read carries its download
-   * list, and an empty one means the claim is not yet true. Refusing is the
-   * whole point of the draft gate: a published downloadable product with no
-   * file takes money and gives nothing back.
+   * Other channels preserve a draft on update, because on them a draft means a
+   * step is outstanding. Here nothing is ever outstanding, so a draft is either
+   * a product published before ADR 0012 that is still waiting on the manual
+   * file step it no longer needs, or a product somebody took off sale in the
+   * admin — and Publish changes is a person asking for the listing to be sold.
    */
-  async activate(context: PublishContext): Promise<PublishResult> {
-    const externalId = context.listing.external_listing_id
-    if (!externalId) {
-      throw new ChannelError(
-        normalized("unknown", "This listing has not been published to WooCommerce yet."),
-      )
-    }
-    const { client } = await clientFor(context)
-    const before = await readProduct(client, externalId)
-    if (before.downloads.length === 0) {
-      throw new ChannelError(
-        normalized(
-          "validation_rejected",
-          "No download file is attached to this product in WooCommerce yet. Add it under " +
-            "Downloadable files, save the product, then mark the step done again.",
-          before,
-        ),
-      )
-    }
-
-    const result = await writeProduct(context, "publish")
-    const after = productSchema.parse(
-      (result.providerResponse as { product?: unknown })?.product ?? result.providerResponse,
-    )
-    return {
-      ...result,
-      purchasable:
-        after.status === "publish" &&
-        after.downloads.length > 0 &&
-        after.catalog_visibility !== "hidden",
-    }
+  update(context: PublishContext): Promise<PublishResult> {
+    return writeProduct(context, "publish")
   },
 }

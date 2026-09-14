@@ -553,6 +553,45 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_links: {
+        Row: {
+          channel_listing_id: string
+          created_at: string
+          encrypted_token: string
+          id: string
+          key_version: number
+          last_used_at: string | null
+          product_asset_id: string
+          revoked_at: string | null
+          token_hash: string
+          workspace_id: string
+        }
+        Insert: {
+          channel_listing_id: string
+          created_at?: string
+          encrypted_token: string
+          id?: string
+          key_version?: number
+          last_used_at?: string | null
+          product_asset_id: string
+          revoked_at?: string | null
+          token_hash: string
+          workspace_id: string
+        }
+        Update: {
+          channel_listing_id?: string
+          created_at?: string
+          encrypted_token?: string
+          id?: string
+          key_version?: number
+          last_used_at?: string | null
+          product_asset_id?: string
+          revoked_at?: string | null
+          token_hash?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       listing_manual_steps: {
         Row: {
           channel_listing_id: string

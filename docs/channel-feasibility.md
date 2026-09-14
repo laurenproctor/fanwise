@@ -99,6 +99,11 @@ already serve, and the WooCommerce API has no upload for it. Three ways through:
   WooCommerce admin, which puts it in the protected folder, and marks the step done. The
   manual-step machinery from A5 carries over unchanged.
 
+**Superseded on 13 September 2026 by ADR 0012:** WooCommerce now takes the first route in a
+revocable form — a Fanwise address per file that re-checks the listing on every request and
+redirects to a five-minute download — and is fully automatic. What follows is the reasoning as
+it stood.
+
 So the channel takes Shopify's shape: automatic everything, assisted file, `digitalFileUpload:
 false` for the second reason on this page — Fanwise will not, rather than the provider
 cannot. **[verify]** the public-URL finding against a real store before building, because if
