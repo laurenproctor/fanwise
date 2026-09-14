@@ -159,10 +159,10 @@ export function sanitizeText(input: string, maxLength: number): string {
 
 /** The markup with every opaque element's contents removed. */
 export function stripOpaqueElements(html: string): string {
-  return stripElements(html, OPAQUE_ELEMENTS)
+  return removeElements(html, OPAQUE_ELEMENTS)
 }
 
-function stripElements(html: string, tags: readonly string[]): string {
+function removeElements(html: string, tags: readonly string[]): string {
   let out = html
   for (const tag of tags) {
     out = out.replace(new RegExp(`<${tag}\\b[\\s\\S]*?<\\/${tag}\\s*>`, "gi"), " ")
@@ -476,7 +476,7 @@ function cutAtSentence(text: string): string | null {
  * rather than a million.
  */
 export function readSummaryParagraph(html: string): string | null {
-  const body = stripElements(stripOpaqueElements(html), CHROME_ELEMENTS).replace(
+  const body = removeElements(stripOpaqueElements(html), CHROME_ELEMENTS).replace(
     /<head\b[\s\S]*?<\/head\s*>/gi,
     " ",
   )
