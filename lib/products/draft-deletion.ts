@@ -108,14 +108,49 @@ const BLOCKER_REASONS: Record<DraftDeletionBlocker, string> = {
 }
 
 /** Blockers a creator can clear by waiting or tidying up, rather than never. */
-const TEMPORARY: ReadonlySet<DraftDeletionBlocker> = new Set([
+export const TEMPORARY_DRAFT_DELETION_BLOCKERS = [
   "import_in_progress",
   "generation_in_progress",
   "upload_in_progress",
-])
+] as const satisfies readonly DraftDeletionBlocker[]
 
-export function isTemporaryBlocker(blocker: DraftDeletionBlocker): boolean {
+export type TemporaryDraftDeletionBlocker = (typeof TEMPORARY_DRAFT_DELETION_BLOCKERS)[number]
+
+const TEMPORARY: ReadonlySet<DraftDeletionBlocker> = new Set(TEMPORARY_DRAFT_DELETION_BLOCKERS)
+
+export function isTemporaryBlocker(
+  blocker: DraftDeletionBlocker,
+): blocker is TemporaryDraftDeletionBlocker {
   return TEMPORARY.has(blocker)
+}
+
+/** What the product page's Danger zone is given, when it renders at all. */
+export type OfferedDraftDeletion =
+  { kind: "eligible" } | { kind: "blocked"; blocker: TemporaryDraftDeletionBlocker }
+
+/**
+ * Whether the product page shows a Danger zone, and with what.
+ *
+ * Only when there is something to do: a draft that may be deleted now, or one
+ * that will be deletable once an upload, an import or a generation finishes. A
+ * product that has left Fanwise — a public page, a channel listing, publishing
+ * history — can never be deleted by this feature, and a section saying so at
+ * the bottom of every published product is a dead end that reads as a problem.
+ * So it gets nothing. Removing a published product is a separate feature
+ * (archive, retire), not yet built.
+ *
+ * The permanent blockers still matter: the database refuses on them, and the
+ * import screen's discard still explains them, because there a creator did
+ * ask to remove the product.
+ */
+export function offeredDraftDeletion(
+  eligibility: DraftDeletionEligibility,
+): OfferedDraftDeletion | null {
+  if (eligibility.kind === "eligible") return eligibility
+  if (eligibility.kind === "blocked" && isTemporaryBlocker(eligibility.blocker)) {
+    return { kind: "blocked", blocker: eligibility.blocker }
+  }
+  return null
 }
 
 /**
