@@ -12,8 +12,8 @@ import { listProductEvents, loadPublicationViews } from "@/lib/publishing/querie
 import { planRun, runInputs } from "@/lib/publishing/run"
 import { PublishEverywhere } from "@/components/channels/publish-everywhere"
 import { ActivityLog } from "@/components/channels/activity-log"
-import { liveness, mergeManualSteps } from "@/lib/publishing/manual-steps"
-import { ListingPanel, type ChannelListingCard } from "@/components/channels/listing-panel"
+import { ListingPanel } from "@/components/channels/listing-panel"
+import { listingCards } from "@/lib/channels/listing-cards"
 import { ListingImages, type ListingImage } from "@/components/channels/listing-images"
 import { listingImageSlots } from "@/lib/channels/images"
 import { isReorderable } from "@/lib/products/image-order"
@@ -28,7 +28,6 @@ import { ButtonLink } from "@/components/ui/button"
 import { PublicPageForm, type ProductWording } from "./public-page-form"
 import { DeleteProductDraft } from "./delete-product-draft"
 import { offeredDraftDeletion } from "@/lib/products/draft-deletion"
-import { awaitingReview } from "@/lib/ai/review"
 import { loadFontWorkspace } from "@/lib/fonts/queries"
 import { FontWorkspace } from "@/components/fonts/font-workspace"
 
@@ -80,6 +79,11 @@ export default async function ProductPage({
           family={data.family}
           images={data.images}
           channels={data.channels}
+          cards={data.cards}
+          skips={data.plan.skips.map((skip) => ({
+            channelName: skip.channelName,
+            reason: skip.reason,
+          }))}
           hasLicenseFile={data.hasLicenseFile}
           attemptableChannels={data.plan.starts.length}
           canPublishSomewhere={data.canPublishSomewhere}
@@ -166,92 +170,7 @@ export default async function ProductPage({
     listings.map((l) => l.listing.id),
   )
 
-  /**
-   * The file a creator hands to a channel that cannot receive one through its
-   * API. Sorted the same way the asset manager sorts, so "the deliverable"
-   * means the same file in both places.
-   */
-  const deliverable =
-    assets.find(
-      (asset) =>
-        asset.asset_state === "ready" &&
-        (asset.asset_type === "deliverable" || asset.asset_type === "archive"),
-    ) ?? null
-
-  // One card per connected channel, whether or not a listing exists yet. The
-  // capability flags come from the adapter and never from the listing row, so a
-  // channel that cannot publish cannot acquire the affordance by having data.
-  const listingByConnection = new Map(listings.map((l) => [l.listing.channel_connection_id, l]))
-
-  const cards: ChannelListingCard[] = connections
-    .filter((c) => c.adapter !== null)
-    .map(({ connection, channel, adapter }) => {
-      const view = listingByConnection.get(connection.id)
-      const listingId = view?.listing.id ?? null
-
-      const steps = view
-        ? mergeManualSteps(
-            adapter!.manualSteps,
-            publications.manualSteps.get(view.listing.id) ?? [],
-          )
-        : []
-
-      const lastJob = listingId ? publications.latestJob.get(listingId) : undefined
-
-      return {
-        connectionId: connection.id,
-        channelName: channel.name,
-        integrationType: adapter!.integrationType,
-        canPublish: adapter!.capabilities.automaticPublish,
-        /*
-         * Offered only where all three are true: the provider can take an
-         * update, the channel already has the product, and the listing holds
-         * something it has not been sent. The third is what stops this being a
-         * button whose only outcome is already_done — the same reason there is
-         * no second Publish.
-         */
-        canPublishChanges:
-          adapter!.capabilities.automaticUpdate &&
-          view !== undefined &&
-          view.listing.status === "published" &&
-          view.listing.external_listing_id !== null &&
-          view.unsentChanges,
-        /*
-         * A channel that serves a Fanwise download address, on a listing that
-         * has one to replace.
-         */
-        canReplaceDeliveryLink:
-          adapter!.deliversByLink === true &&
-          view !== undefined &&
-          view.listing.status === "published" &&
-          view.listing.external_listing_id !== null,
-        listingId,
-        title: view?.draft.title ?? null,
-        statusSource: view?.listing.status_source ?? null,
-        readiness: view?.evaluation?.readiness ?? null,
-        results: view?.evaluation?.results ?? [],
-        // Derived, never stored. ADR 0001: published and live are not the same
-        // claim, and only one of them may be made about a product a buyer
-        // cannot yet receive anything from.
-        liveness: view ? liveness(view.listing, steps) : "unpublished",
-        externalUrl: view?.listing.external_url ?? null,
-        manualSteps: steps.map((state) => ({
-          key: state.spec.key,
-          label: state.spec.label,
-          description: state.spec.description,
-          instructions: [...state.spec.instructions],
-          completed: state.completedAt !== null,
-          needsDeliverable: state.spec.needsDeliverable,
-        })),
-        // Only a failure that is still the latest word. A message from an
-        // attempt that has since been superseded is a message about the past.
-        lastError: lastJob?.status === "failed" ? (lastJob.normalized_error_message ?? null) : null,
-        awaitingReview: view ? awaitingReview(view.listing) : false,
-        deliverable: deliverable
-          ? { assetId: deliverable.id, filename: deliverable.filename }
-          : null,
-      }
-    })
+  const cards = listingCards({ connections, listings, publications, assets })
 
   // What one Publish Everywhere click would do, decided from the same facts the
   // action will read and by the same function, so the button cannot promise

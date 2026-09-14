@@ -44,7 +44,9 @@ async function connect(page: Page, slug: string, channelName: string) {
 async function createProductWithListings(page: Page, slug: string, name: string) {
   await page.goto(`/${slug}/new`)
   await page.getByLabel("Product name").fill(name)
-  await page.getByLabel("Product type").selectOption("font")
+  // A template: the listing editor is the same for every type, and this journey
+  // sets the canonical title through the generic product form.
+  await page.getByLabel("Product type").selectOption("template")
   await page.getByRole("button", { name: "Create product" }).click()
   await waitForProductPage(page, slug)
   await expect(page.getByRole("heading", { name })).toBeVisible()

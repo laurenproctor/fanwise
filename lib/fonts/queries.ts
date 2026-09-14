@@ -3,6 +3,8 @@ import { listChannels, listConnections, listProductListings } from "@/lib/channe
 import { loadPublicationViews } from "@/lib/publishing/queries"
 import { liveness, mergeManualSteps } from "@/lib/publishing/manual-steps"
 import { planRun, runInputs, type RunPlan } from "@/lib/publishing/run"
+import { listingCards } from "@/lib/channels/listing-cards"
+import type { ChannelListingCard } from "@/components/channels/listing-panel"
 import { fontMetadataSchema, type FontMetadata } from "@/lib/products/metadata"
 import type { Product, ProductAsset } from "@/lib/products/types"
 import { routes } from "@/lib/routes"
@@ -35,6 +37,8 @@ export interface FontWorkspaceData {
   family: DetectedFamily
   images: SpecimenImageView[]
   channels: ChannelDraftView[]
+  /** The same cards the product page shows, with every per-channel action. */
+  cards: ChannelListingCard[]
   hasLicenseFile: boolean
   plan: RunPlan
   canPublishSomewhere: boolean
@@ -153,6 +157,7 @@ export async function loadFontWorkspace(params: {
     family,
     images,
     channels: channelViews,
+    cards: listingCards({ connections, listings, publications, assets }),
     hasLicenseFile,
     plan: planRun(runChannels),
     canPublishSomewhere: runChannels.some((channel) => channel.canPublish && channel.connected),

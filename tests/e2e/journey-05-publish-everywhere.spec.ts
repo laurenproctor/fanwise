@@ -1,6 +1,15 @@
 import { expect, test } from "@playwright/test"
 import { newCreator } from "./support"
-import { connect, listingCard, upload, waitForProductPage, writeListing } from "./publish-support"
+import {
+  clearFontBlockers,
+  connect,
+  listingCard,
+  openFontSection,
+  uploadFontFile,
+  uploadSpecimenImage,
+  waitForProductPage,
+  writeListing,
+} from "./publish-support"
 
 /**
  * A7's exit test, the part a mock channel can prove.
@@ -31,8 +40,11 @@ test("one click publishes what it can and names what it skipped", async ({ page 
   await page.getByLabel("Product type").selectOption("font")
   await page.getByRole("button", { name: "Create product" }).click()
   await waitForProductPage(page, slug, "Aster Grotesk")
-  const productPage = page.url()
+  // A font's channel cards and Publish Everywhere are in its workspace's
+  // Marketplace drafts section, addressed by hash so every visit opens it.
+  const productPage = `${page.url().split("#")[0]}#drafts`
 
+  await openFontSection(page, "Marketplace drafts")
   await page.getByRole("button", { name: "Build listing" }).click()
   await expect(page.getByRole("link", { name: "Edit listing" })).toHaveCount(1)
 
@@ -52,10 +64,12 @@ test("one click publishes what it can and names what it skipped", async ({ page 
   // Nothing has happened yet, and the log says so rather than sitting empty.
   await expect(page.getByText("Nothing has been published from here yet.")).toBeVisible()
 
-  await upload(page, "cover_image", "tests/fixtures/small-800x600.png", 0)
-  await upload(page, "deliverable", "tests/fixtures/specimen-3000x2000.jpg", 1)
+  await uploadSpecimenImage(page, "tests/fixtures/small-800x600.png")
+  await uploadFontFile(page, "Aster Grotesk")
+  await clearFontBlockers(page)
 
   // One listing per connected channel, then write the one that can be sent.
+  await openFontSection(page, "Marketplace drafts")
   await page.getByRole("button", { name: "Build listing" }).first().click()
   await expect(page.getByRole("link", { name: "Edit listing" })).toHaveCount(2)
 

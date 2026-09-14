@@ -92,8 +92,13 @@ test("a creator goes from a pasted link to the marketplace drafts", async ({ pag
   await reviewButton(page).click()
   await expect(page).toHaveURL(new RegExp(`/${slug}/[a-z0-9-]+$`), { timeout: 20_000 })
   await expect(page.getByRole("heading", { name: "Aster Grotesk Pro" })).toBeVisible()
-  // The product page is where channel drafts have always been built.
-  await expect(page.getByRole("heading", { name: /Channels/i }).first()).toBeVisible()
+  // The product page is where channel drafts are built. An imported font opens
+  // the font workspace, whose Marketplace drafts section holds them.
+  await expect(
+    page
+      .getByRole("navigation", { name: "Listing sections" })
+      .getByRole("button", { name: /^Marketplace drafts \(/ }),
+  ).toBeVisible()
 
   // 10: going back preserves everything, and made no second product.
   await page.goto(importUrl)

@@ -5,11 +5,14 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { SaveStatusIndicator } from "@/components/ui/save-status"
+import type { ChannelListingCard } from "@/components/channels/listing-panel"
+import type { RunChannelSummary } from "@/components/channels/publish-everywhere"
 import { routes } from "@/lib/routes"
 import { productNameSchema, productSlugSchema } from "@/lib/products/schemas"
 import { RESERVED_PRODUCT_SLUGS } from "@/lib/slug"
 import type { FontMetadata } from "@/lib/products/metadata"
-import { publishFontEverywhereAction, saveFontProductAction } from "@/lib/fonts/actions"
+import { saveFontProductAction } from "@/lib/fonts/actions"
+import { publishEverywhereAction } from "@/lib/publishing/actions"
 import { evaluateFontReadiness, type ReadinessRule } from "@/lib/fonts/readiness"
 import type { PatchField } from "@/lib/fonts/save"
 import { useAutosave } from "@/lib/fonts/use-autosave"
@@ -60,6 +63,9 @@ export interface FontWorkspaceProps {
   family: DetectedFamily
   images: SpecimenImageView[]
   channels: ChannelDraftView[]
+  /** The product page's channel cards, with every per-channel action. */
+  cards: ChannelListingCard[]
+  skips: RunChannelSummary[]
   hasLicenseFile: boolean
   attemptableChannels: number
   canPublishSomewhere: boolean
@@ -347,6 +353,10 @@ export function FontWorkspace(props: FontWorkspaceProps) {
     family: props.family,
     images: props.images,
     channels: props.channels,
+    cards: props.cards,
+    attemptableChannels: props.attemptableChannels,
+    skips: props.skips,
+    canPublishSomewhere: props.canPublishSomewhere,
     readiness,
     hasLicenseFile: props.hasLicenseFile,
     openSection,
@@ -359,12 +369,23 @@ export function FontWorkspace(props: FontWorkspaceProps) {
     [metadata, props.family, props.files],
   )
 
+  /*
+   * Publish is offered only where some connected channel can publish. Absent
+   * rather than disabled otherwise, as on the product page: a greyed-out button
+   * on a workspace whose channels are all assisted promises an action that will
+   * never work there (invariant 8). Where it is offered, it disables itself
+   * with a reason.
+   */
+  const alreadySent =
+    props.skips.length > 0 && props.skips.every((skip) => skip.reason === "already_published")
   const publishBlockedReason = !readiness.canPublish
     ? `${readiness.blockingAll.length} ${readiness.blockingAll.length === 1 ? "issue blocks" : "issues block"} publishing. See Listing readiness.`
     : !props.canPublishSomewhere
-      ? "Connect a channel Fanwise can publish to."
+      ? "No connected channel can be published to from Fanwise."
       : props.attemptableChannels === 0
-        ? "No channel draft is ready to send yet. See Marketplace drafts."
+        ? alreadySent
+          ? "Every channel already has this version. Nothing new to send."
+          : "No channel draft is ready to send yet. See Marketplace drafts."
         : null
 
   async function publish() {
@@ -372,7 +393,7 @@ export function FontWorkspace(props: FontWorkspaceProps) {
     setPublishResult(null)
     try {
       await autosave.flush()
-      const result = await publishFontEverywhereAction(props.workspaceSlug, props.productId)
+      const result = await publishEverywhereAction(props.workspaceSlug, props.productId)
       setPublishResult(result)
       router.refresh()
     } catch {
@@ -476,16 +497,18 @@ export function FontWorkspace(props: FontWorkspaceProps) {
             >
               Preview
             </Button>
-            <Button
-              className="px-[20px] py-[9px]"
-              disabled={publishing || publishBlockedReason !== null}
-              aria-describedby={publishBlockedReason ? "font-publish-blocked" : undefined}
-              onClick={() => void publish()}
-            >
-              {publishing ? "Publishing…" : "Publish"}
-            </Button>
+            {props.canPublishSomewhere ? (
+              <Button
+                className="px-[20px] py-[9px]"
+                disabled={publishing || publishBlockedReason !== null}
+                aria-describedby={publishBlockedReason ? "font-publish-blocked" : undefined}
+                onClick={() => void publish()}
+              >
+                {publishing ? "Publishing…" : "Publish"}
+              </Button>
+            ) : null}
           </div>
-          {publishBlockedReason ? (
+          {props.canPublishSomewhere && publishBlockedReason ? (
             <p id="font-publish-blocked" className="text-[12.5px] text-[var(--color-ink-3)]">
               {publishBlockedReason}
             </p>

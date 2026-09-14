@@ -4,11 +4,9 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
-import { publishEverywhereAction, type PublishState } from "@/lib/publishing/actions"
 import { routes } from "@/lib/routes"
 import { toJson } from "@/lib/imports/json"
 import type { Product } from "@/lib/products/types"
-import { loadFontWorkspace } from "./queries"
 import { mergeFontMetadata, patchColumns, productPatchSchema, type PatchField } from "./save"
 
 /**
@@ -16,8 +14,9 @@ import { mergeFontMetadata, patchColumns, productPatchSchema, type PatchField } 
  *
  * Every one re-establishes the caller and the workspace, and reads the row
  * through RLS before writing it (docs/security.md rule 7). None of them runs a
- * long external call: saving is a row update, and publishing hands over to the
- * existing Publish Everywhere action, which enqueues its jobs.
+ * long external call: saving is a row update. Publishing is not here at all:
+ * the shared publish actions apply a font's blockers themselves
+ * (lib/products/publish-gate.ts), whichever button is pressed.
  */
 
 async function requireWorkspace(workspaceSlug: string) {
@@ -194,49 +193,4 @@ export async function setImageAltTextAction(
     return { error: "That alt text could not be saved. Try again." }
   }
   return { error: null }
-}
-
-/**
- * Publish Everywhere, for a font product, behind its readiness blockers.
- *
- * The button is disabled while a blocker stands, and that is a convenience: a
- * disabled button can be pressed by anything that can post. The rules are
- * evaluated again here from the stored rows, and only when none that blocks
- * every channel is open does this hand over to the shared action, which then
- * applies each channel's own requirements as it always has.
- */
-export async function publishFontEverywhereAction(
-  workspaceSlug: string,
-  productId: string,
-): Promise<PublishState> {
-  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
-
-  const { data: product } = await supabase
-    .from("products")
-    .select("*")
-    .eq("id", productId)
-    .eq("workspace_id", workspace.id)
-    .maybeSingle()
-
-  if (!product) return { error: "That product could not be found.", notice: null }
-
-  if (product.product_type === "font") {
-    const data = await loadFontWorkspace({
-      workspaceId: workspace.id,
-      workspaceSlug,
-      product: product as Product,
-    })
-    const first = data.readiness.blockingAll[0]
-    if (first) {
-      return {
-        error:
-          data.readiness.blockingAll.length === 1
-            ? `Publishing is blocked: ${first.label.toLowerCase()}.`
-            : `Publishing is blocked by ${data.readiness.blockingAll.length} issues, starting with: ${first.label.toLowerCase()}.`,
-        notice: null,
-      }
-    }
-  }
-
-  return publishEverywhereAction(workspaceSlug, productId)
 }

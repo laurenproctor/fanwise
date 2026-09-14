@@ -1,5 +1,9 @@
+import { randomUUID } from "node:crypto"
+import { mkdirSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 import { expect, type Locator, type Page } from "@playwright/test"
-import { listingUrl, productUrl } from "./support"
+import { buildSfnt } from "../unit/font-fixtures"
+import { listingUrl, localAdmin, productUrl } from "./support"
 
 /**
  * The setup every publishing journey needs: a connected channel, a product with
@@ -126,4 +130,110 @@ export async function writeListing(page: Page, slug: string, card?: Locator) {
   await page.getByLabel("Price", { exact: true }).fill("48")
   await page.getByRole("button", { name: "Save listing" }).click()
   await expect(page.getByRole("status")).toHaveText("Saved")
+}
+
+/*
+ * The font workspace.
+ *
+ * A font product does not render the generic page: its channel cards and
+ * Publish Everywhere live in the Marketplace drafts section, its buyer files in
+ * Font files, its pictures in Specimen images. The helpers below drive those,
+ * so a publishing journey about a font goes through the screen a font creator
+ * actually uses.
+ */
+
+/** Opens one section of the font workspace by its name in the section list. */
+export async function openFontSection(page: Page, label: string) {
+  await page
+    .getByRole("navigation", { name: "Listing sections" })
+    .getByRole("button", { name: new RegExp(`^${label.replace(/[&]/g, "\\$&")} \\(`) })
+    .click()
+  await expect(page.locator("#font-section-heading")).toHaveText(label)
+}
+
+/**
+ * A small font file the parser reads, written to disk once per call.
+ *
+ * Built rather than committed, the same way tests/unit/font-fixtures.ts builds
+ * them for the parser's own tests.
+ */
+function fontFixture(name: string): string {
+  const dir = join(process.cwd(), "test-results", "fonts")
+  mkdirSync(dir, { recursive: true })
+  const path = join(dir, `${name}-${randomUUID().slice(0, 8)}.otf`)
+  writeFileSync(
+    path,
+    buildSfnt({
+      family: name,
+      style: "Regular",
+      postscriptName: `${name.replace(/\s+/g, "")}-Regular`,
+      version: "Version 1.000",
+      weight: 400,
+      glyphCount: 240,
+      ranges: [[0x20, 0x7e]],
+      cff: true,
+    }),
+  )
+  return path
+}
+
+/** Uploads one buyer font file and waits until the finalize job has read it. */
+export async function uploadFontFile(page: Page, family: string) {
+  await openFontSection(page, "Font files")
+  await page
+    .locator('input[type="file"][accept*=".otf"][multiple]')
+    .setInputFiles(fontFixture(family))
+  // The section reads complete only once a ready file has been parsed as a font.
+  await expect(
+    page
+      .getByRole("navigation", { name: "Listing sections" })
+      .getByRole("button", { name: /^Font files \(complete\)/ }),
+  ).toBeVisible({ timeout: 60_000 })
+}
+
+/** Uploads a specimen image and waits for its tile. */
+export async function uploadSpecimenImage(page: Page, fixture: string) {
+  await openFontSection(page, "Specimen images")
+  const filename = fixture.split("/").pop()!
+  await page.locator('input[type="file"][accept="image/*"]').setInputFiles(fixture)
+  await expect(page.getByRole("img", { name: filename }).first()).toBeVisible({ timeout: 60_000 })
+}
+
+/**
+ * Answers the font's own blockers — a price, a licence and its terms — so only
+ * the channels' rules stand between the product and a channel.
+ */
+export async function clearFontBlockers(page: Page) {
+  await openFontSection(page, "Licensing & pricing")
+  await page.getByLabel("Base price").fill("48")
+  await page.getByRole("switch", { name: /Desktop/ }).click()
+  await page.getByLabel("License summary").fill("Desktop use for one studio.")
+
+  // Autosave is debounced, and the server decides from what is stored, so wait
+  // for the row rather than for a status line that may be left from a save
+  // before this one.
+  const [, workspaceSlug, productSlug] = new URL(page.url()).pathname.split("/")
+  const admin = localAdmin()
+  await expect
+    .poll(
+      async () => {
+        const { data: workspace } = await admin
+          .from("workspaces")
+          .select("id")
+          .eq("slug", workspaceSlug!)
+          .single()
+        const { data: product } = await admin
+          .from("products")
+          .select("base_price, license_summary, metadata")
+          .eq("workspace_id", workspace!.id)
+          .eq("slug", productSlug!)
+          .single()
+        const licenses = (product?.metadata as { licenses?: unknown[] } | null)?.licenses ?? []
+        return (
+          Number(product?.base_price) === 48 && !!product?.license_summary && licenses.length > 0
+        )
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(true)
 }

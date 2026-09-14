@@ -17,6 +17,7 @@ import { startPublication } from "./start"
 import { listChannels, listConnections, listProductListings } from "@/lib/channels/queries"
 import { planRun, runInputs, runSummary } from "./run"
 import { recordEvent } from "./events"
+import { productPublishBlocker } from "@/lib/products/publish-gate"
 
 /**
  * Publishing, from the creator's side.
@@ -158,6 +159,13 @@ export async function publishListingAction(
     }
   }
 
+  const blocker = await productPublishBlocker({
+    workspaceId: workspace.id,
+    workspaceSlug,
+    product: product as Product,
+  })
+  if (blocker) return { error: blocker, notice: null }
+
   const draft = resolvedDraft(listing, product, adapter)
   const { readiness } = evaluate(adapter, draft, subject)
   if (!readiness.ready) {
@@ -258,6 +266,13 @@ export async function publishChangesAction(
       notice: null,
     }
   }
+
+  const blocker = await productPublishBlocker({
+    workspaceId: workspace.id,
+    workspaceSlug,
+    product: product as Product,
+  })
+  if (blocker) return { error: blocker, notice: null }
 
   // An update is an edit to something that exists. Without an external id there
   // is nothing to update, and productSet without an identifier would create a
@@ -509,6 +524,13 @@ export async function publishEverywhereAction(
 
   if (!productRow) return { error: "That product could not be found.", notice: null }
   const product = productRow as Product
+
+  const blocker = await productPublishBlocker({
+    workspaceId: workspace.id,
+    workspaceSlug,
+    product: product as Product,
+  })
+  if (blocker) return { error: blocker, notice: null }
 
   const [channels, connections, listings] = await Promise.all([
     listChannels(),

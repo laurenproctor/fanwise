@@ -77,11 +77,18 @@ export function ListingPanel({
   productSlug,
   productId,
   cards,
+  blocker = null,
 }: {
   workspaceSlug: string
   productSlug: string
   productId: string
   cards: ChannelListingCard[]
+  /**
+   * Why nothing about this product may be sent to any channel yet, before any
+   * channel's own rules: a font's readiness blockers. The server refuses the
+   * same sends (lib/products/publish-gate.ts); this says so beside the buttons.
+   */
+  blocker?: string | null
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -441,7 +448,7 @@ export function ListingPanel({
                   {card.canPublish && card.liveness === "unpublished" ? (
                     <Button
                       onClick={() => publish(card.connectionId, card.listingId!)}
-                      disabled={pending || !card.readiness?.ready}
+                      disabled={pending || !card.readiness?.ready || blocker !== null}
                     >
                       {busy
                         ? "Publishing…"
@@ -460,7 +467,7 @@ export function ListingPanel({
                   {card.canPublishChanges ? (
                     <Button
                       onClick={() => publishChanges(card.connectionId, card.listingId!)}
-                      disabled={pending || !card.readiness?.ready}
+                      disabled={pending || !card.readiness?.ready || blocker !== null}
                     >
                       {busy
                         ? "Sending…"
@@ -489,13 +496,22 @@ export function ListingPanel({
                   {card.canPublish && card.liveness === "failed" ? (
                     <Button
                       onClick={() => publish(card.connectionId, card.listingId!)}
-                      disabled={pending}
+                      disabled={pending || blocker !== null}
                     >
                       {busy ? "Retrying…" : "Try again"}
                     </Button>
                   ) : null}
 
-                  {card.canPublish &&
+                  {blocker !== null &&
+                  card.canPublish &&
+                  (card.liveness === "unpublished" ||
+                    card.liveness === "failed" ||
+                    card.canPublishChanges) ? (
+                    <span className="text-[13px] text-[var(--color-ink-3)]">{blocker}</span>
+                  ) : null}
+
+                  {blocker === null &&
+                  card.canPublish &&
                   card.liveness === "unpublished" &&
                   card.readiness &&
                   !card.readiness.ready ? (
@@ -509,7 +525,10 @@ export function ListingPanel({
                     edit cannot be sent until it is fixed, and saying so is the
                     difference between a disabled button and a mystery.
                   */}
-                  {card.canPublishChanges && card.readiness && !card.readiness.ready ? (
+                  {blocker === null &&
+                  card.canPublishChanges &&
+                  card.readiness &&
+                  !card.readiness.ready ? (
                     <span className="text-[13px] text-[var(--color-ink-3)]">
                       Resolve what is blocking before sending these changes.
                     </span>

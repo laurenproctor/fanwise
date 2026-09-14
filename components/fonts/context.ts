@@ -1,3 +1,5 @@
+import type { ChannelListingCard } from "@/components/channels/listing-panel"
+import type { RunChannelSummary } from "@/components/channels/publish-everywhere"
 import type { FontMetadata } from "@/lib/products/metadata"
 import type { FontReadiness } from "@/lib/fonts/readiness"
 import type { PatchField } from "@/lib/fonts/save"
@@ -45,6 +47,11 @@ export interface SectionContext {
   family: DetectedFamily
   images: SpecimenImageView[]
   channels: ChannelDraftView[]
+  cards: ChannelListingCard[]
+  /** What one Publish Everywhere click would send to, and what it would skip. */
+  attemptableChannels: number
+  skips: RunChannelSummary[]
+  canPublishSomewhere: boolean
   readiness: FontReadiness
   hasLicenseFile: boolean
   openSection: (section: FontSection, fieldId?: string | null) => void
