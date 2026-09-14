@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { expect, type Locator, type Page } from "@playwright/test"
 import { buildSfnt } from "../unit/font-fixtures"
-import { listingUrl, localAdmin, productUrl } from "./support"
+import { escapeRegExp, listingUrl, localAdmin, productUrl } from "./support"
 
 /**
  * The setup every publishing journey needs: a connected channel, a product with
@@ -146,7 +146,7 @@ export async function writeListing(page: Page, slug: string, card?: Locator) {
 export async function openFontSection(page: Page, label: string) {
   await page
     .getByRole("navigation", { name: "Listing sections" })
-    .getByRole("button", { name: new RegExp(`^${label.replace(/[&]/g, "\\$&")} \\(`) })
+    .getByRole("button", { name: new RegExp(`^${escapeRegExp(label)} \\(`) })
     .click()
   await expect(page.locator("#font-section-heading")).toHaveText(label)
 }
