@@ -239,3 +239,10 @@ Done on 4 September 2026 against shopify.dev and current third-party documentati
 - `2026-07` is the current stable Admin API version and is what the adapter pins.
 
 The premise holds. Option C stands.
+
+## Note, 13 September 2026: WooCommerce
+
+ADR 0012 gives WooCommerce a different answer: a Fanwise download address per file, revocable
+and re-checked on every request. It applies to WooCommerce only, because WooCommerce stores a
+download as an address; Shopify has no API that attaches a buyer-downloadable file at all, so
+this ADR stands unchanged for Shopify.

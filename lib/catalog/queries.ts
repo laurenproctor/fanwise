@@ -164,7 +164,7 @@ function factsFor(
       liveness: liveness(listing, steps),
       ready: evaluate(adapter, draft, subject).readiness.ready,
       awaitingReview: awaitingReview(listing),
-      unsentChanges: hasUnsentChanges(listing, draft, subject),
+      unsentChanges: hasUnsentChanges(listing, draft, subject, adapter),
       canUpdate: adapter.capabilities.automaticUpdate && adapter.update !== undefined,
       canPublish: adapter.capabilities.automaticPublish && adapter.publish !== undefined,
     },

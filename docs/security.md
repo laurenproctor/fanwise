@@ -374,6 +374,16 @@ published, and only then mint a short signed URL. Buckets stay private. A public
 bucket would have left a creator's avatar and product shots fetchable by URL after
 they took the page down, which is not what anybody means by unpublish.
 
+**A WooCommerce download address is a bearer capability, and is treated as one** (ADR 0012).
+`/api/public/delivery/<token>` answers without a session. The token is 32 random bytes; the
+`delivery_links` table stores its SHA-256 for lookup and the token sealed by the credentials
+service for reuse, with no grant to `anon` or `authenticated`. Each request re-checks that the
+link is not revoked, the listing is published and the asset is a ready deliverable of the listed
+product, then redirects to a five-minute signed URL, uncached and with no referrer; every refusal
+is the same 404. It cannot stop a buyer sharing the address. It can be withdrawn: **Replace
+download link** revokes and re-sends. `tests/db/delivery-links.test.ts` proves the table is
+closed and each check withdraws the download on its own.
+
 **A description is creator Markdown rendered as HTML, so the sanitizer is the boundary.** The
 public product page, and every storefront a product is published to, receive
 `markdownToHtml` (`lib/text/markdown-html.ts`): an allowlist of text elements, no attributes but

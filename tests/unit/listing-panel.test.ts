@@ -59,6 +59,7 @@ function card(overrides: Partial<ChannelListingCard>): ChannelListingCard {
     integrationType: "api",
     canPublish: true,
     canPublishChanges: false,
+    canReplaceDeliveryLink: false,
     listingId: "l1",
     title: "Aster Grotesk Display",
     statusSource: "verified",
@@ -157,5 +158,15 @@ describe("the listing card's publish affordance", () => {
       "const canPublishSomewhere = runChannels.some((channel) => channel.canPublish && channel.connected)",
     )
     expect(source).toMatch(/\{canPublishSomewhere \? \(/)
+  })
+})
+
+describe("replacing a download link", () => {
+  it("is offered only where the card says the channel delivers by link", () => {
+    const offered = render([card({ liveness: "live", canReplaceDeliveryLink: true })])
+    expect(offered).toContain("Replace download link")
+
+    const absent = render([card({ liveness: "live", canReplaceDeliveryLink: false })])
+    expect(absent).not.toContain("Replace download link")
   })
 })

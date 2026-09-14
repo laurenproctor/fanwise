@@ -1,5 +1,10 @@
 import { imagesFingerprint } from "@/lib/channels/images"
-import type { AdapterSubject, ChannelListing, ChannelListingDraft } from "@/lib/channels/types"
+import type {
+  AdapterSubject,
+  ChannelAdapter,
+  ChannelListing,
+  ChannelListingDraft,
+} from "@/lib/channels/types"
 import { sentFingerprint } from "./idempotency"
 
 /**
@@ -22,10 +27,29 @@ import { sentFingerprint } from "./idempotency"
  * every export in it must be an async server action.
  */
 export function hasUnsentChanges(
-  listing: Pick<ChannelListing, "last_sent_fingerprint">,
+  listing: Pick<ChannelListing, "last_sent_fingerprint"> &
+    Partial<Pick<ChannelListing, "status" | "metadata">>,
   draft: ChannelListingDraft,
   subject: AdapterSubject,
+  adapter?: Pick<ChannelAdapter, "manualSteps">,
 ): boolean {
+  /*
+   * Published, known not to be on sale, and no step the creator must finish
+   * first: sending the listing again is the way forward, so it is offered.
+   * The case this exists for is a listing published under a channel's old
+   * manual file step, which the channel no longer has (ADR 0012) — without
+   * this it would read "not on sale there yet" with nothing on the card to do.
+   */
+  const metadata = (listing.metadata as Record<string, unknown> | null) ?? {}
+  if (
+    adapter &&
+    listing.status === "published" &&
+    metadata["purchasable"] === false &&
+    !adapter.manualSteps.some((step) => step.gatesActivation)
+  ) {
+    return true
+  }
+
   const recorded = listing.last_sent_fingerprint
   if (!recorded) return true
   return recorded !== sentFingerprint(draft, imagesFingerprint(subject))

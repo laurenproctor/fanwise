@@ -146,6 +146,7 @@ function context(overrides: Partial<PublishContext> = {}): PublishContext {
     } as unknown as ChannelConnection,
     subject: subject(),
     assetUrl: async () => "https://signed.example/cover.png",
+    deliveryUrl: async (a) => `https://fanwise.test/api/public/delivery/token-${a.id}`,
     ...overrides,
   }
 }
@@ -711,6 +712,7 @@ describe("publish", () => {
         // Names the asset in the URL, so the assertion can be about order
         // rather than only about how many went.
         assetUrl: async (a) => `https://signed.example/${a.filename}`,
+        deliveryUrl: async (a) => `https://fanwise.test/api/public/delivery/token-${a.id}`,
       }),
     )
 
@@ -779,6 +781,7 @@ describe("publish", () => {
         listing: listing({ external_listing_id: "gid://shopify/Product/900" }),
         subject: { ...subject(), assets: [cover, one, two] },
         assetUrl: async (a) => `https://signed.example/${a.filename}`,
+        deliveryUrl: async (a) => `https://fanwise.test/api/public/delivery/token-${a.id}`,
       }),
     )
 

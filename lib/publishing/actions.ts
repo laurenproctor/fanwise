@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { routes } from "@/lib/routes"
 import { evaluate, resolvedDraft } from "@/lib/channels/listings"
+import { revokeDeliveryLinks } from "@/lib/delivery/links"
 import { findAdapter } from "@/lib/channels/registry"
 import type { AdapterSubject, Channel, ChannelListing } from "@/lib/channels/types"
 import type { Product, ProductAsset } from "@/lib/products/types"
@@ -317,6 +318,74 @@ export async function publishChangesAction(
       return { error: null, notice: `Trying ${adapter.name} again.`, sending: true }
     default:
       return { error: null, notice: `Sending your changes to ${adapter.name}.`, sending: true }
+  }
+}
+
+/**
+ * Withdraws a listing's download addresses and sends the channel new ones.
+ *
+ * For a channel that delivers by link (ADR 0012), this is how a creator cuts
+ * off an address that has been shared. The old addresses stop working the
+ * moment they are revoked; the update that follows gives the channel new ones,
+ * and until it lands a buyer who tries to download is refused rather than
+ * served through the leaked link.
+ *
+ * A fresh operation every time, so the update is never mistaken for the last
+ * one: the listing's words have not changed, and without the revocation's own
+ * mark in the key the idempotency check would answer "already has these
+ * changes" and the new addresses would never be sent.
+ */
+export async function replaceDeliveryLinksAction(
+  workspaceSlug: string,
+  listingId: string,
+): Promise<PublishState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const loaded = await loadListing(supabase, workspace.id, listingId)
+  if (!loaded) return { error: "That listing could not be found.", notice: null }
+  const { listing, channel, connection, product, subject } = loaded
+
+  const adapter = findAdapter(channel.key)
+  if (!adapter?.deliversByLink || !adapter.update) {
+    return { error: "This channel does not deliver through a Fanwise link.", notice: null }
+  }
+  if (!connection || connection.status !== "active") {
+    return { error: `${adapter.name} is not connected. Reconnect it and try again.`, notice: null }
+  }
+  if (listing.status !== "published" || !listing.external_listing_id) {
+    return { error: `Publish this listing to ${adapter.name} first.`, notice: null }
+  }
+
+  const revokedAt = new Date().toISOString()
+  try {
+    await revokeDeliveryLinks({ workspaceId: workspace.id, listingId })
+  } catch (cause) {
+    console.error("[delivery] could not revoke links", cause)
+    return { error: "The download link could not be replaced. Try again.", notice: null }
+  }
+
+  const outcome = await startPublication({
+    supabase,
+    workspaceId: workspace.id,
+    listingId,
+    kind: "update",
+    draft: resolvedDraft(listing, product, adapter),
+    images: `${imagesFingerprint(subject)}#delivery-links-replaced:${revokedAt}`,
+    generation: listing.publish_generation,
+  })
+
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
+
+  if (outcome.kind === "error") {
+    return {
+      error: `The old link is withdrawn, but ${adapter.name} could not be sent the new one yet. Use Publish changes to try again.`,
+      notice: null,
+    }
+  }
+  return {
+    error: null,
+    notice: `The old download link no longer works. Sending ${adapter.name} the new one.`,
+    sending: true,
   }
 }
 

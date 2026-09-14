@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation"
 import { Button, ButtonLink } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { buildListingAction } from "@/lib/channels/actions"
-import { publishChangesAction, publishListingAction } from "@/lib/publishing/actions"
+import {
+  publishChangesAction,
+  publishListingAction,
+  replaceDeliveryLinksAction,
+} from "@/lib/publishing/actions"
 import { useBackgroundRefresh } from "@/lib/use-background-refresh"
 import { resolveSend } from "@/lib/publishing/send-outcome"
 import { ReadinessBar } from "./readiness-bar"
@@ -47,6 +51,8 @@ export interface ChannelListingCard {
   integrationType: "api" | "assisted"
   canPublish: boolean
   canPublishChanges: boolean
+  /** Offered where buyers download through a Fanwise address the creator can replace. */
+  canReplaceDeliveryLink: boolean
   listingId: string | null
   title: string | null
   statusSource: "verified" | "self_reported" | null
@@ -240,6 +246,20 @@ export function ListingPanel({
       // Only when something is actually on its way. `already_done` and a
       // refusal both return a notice and nothing to wait for, and watching for
       // a landing that will never come would hang the message again.
+      if (result.sending) setSending(listingId)
+      router.refresh()
+    })
+  }
+
+  function replaceDeliveryLink(connectionId: string, listingId: string) {
+    setError(null)
+    setNotice(null)
+    setActingOn(connectionId)
+    startTransition(async () => {
+      const result = await replaceDeliveryLinksAction(workspaceSlug, listingId)
+      setError(result.error)
+      setNotice(result.notice)
+      setActingOn(null)
       if (result.sending) setSending(listingId)
       router.refresh()
     })
@@ -448,6 +468,22 @@ export function ListingPanel({
                           ? "Review and publish changes"
                           : "Publish changes"}
                     </Button>
+                  ) : null}
+
+                  {/*
+                    Secondary, and phrased as what it does to buyers: the old
+                    address stops working at once.
+                  */}
+                  {card.canReplaceDeliveryLink ? (
+                    <button
+                      type="button"
+                      onClick={() => replaceDeliveryLink(card.connectionId, card.listingId!)}
+                      disabled={pending}
+                      title="Stops the current download address working and gives the channel a new one. Use it if the link has been shared."
+                      className="text-[13px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Replace download link
+                    </button>
                   ) : null}
 
                   {card.canPublish && card.liveness === "failed" ? (

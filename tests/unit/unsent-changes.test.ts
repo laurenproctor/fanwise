@@ -92,6 +92,33 @@ describe("unsent changes", () => {
     expect(hasUnsentChanges(listing(before), draft, swapped)).toBe(true)
   })
 
+  it("offers a resend for a published listing known not to be on sale, when no step gates it", () => {
+    const recorded = sentFingerprint(draft, "asset-1")
+    const offSale = {
+      ...listing(recorded),
+      status: "published" as const,
+      metadata: { purchasable: false },
+    }
+    // Nothing edited, but the channel has the product and nobody can buy it.
+    expect(hasUnsentChanges(offSale, draft, subject(), { manualSteps: [] })).toBe(true)
+    // Where a step still gates it, the step is the way forward, not a resend.
+    expect(
+      hasUnsentChanges(offSale, draft, subject(), {
+        manualSteps: [
+          {
+            key: "attach",
+            label: "Attach",
+            description: "",
+            instructions: [],
+            required: true,
+            gatesActivation: true,
+            needsDeliverable: true,
+          },
+        ],
+      }),
+    ).toBe(false)
+  })
+
   it("offers the action when nothing was ever recorded", () => {
     // Every listing published before the column existed, including the two
     // that were stranded. Null is "cannot prove there is nothing to send", and
