@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button"
 import { ButtonLink } from "@/components/ui/button"
 import { PublicPageForm, type ProductWording } from "./public-page-form"
 import { DeleteProductDraft } from "./delete-product-draft"
+import { offeredDraftDeletion } from "@/lib/products/draft-deletion"
 import { awaitingReview } from "@/lib/ai/review"
 
 export const metadata = { title: "Product · Fanwise" }
@@ -194,8 +195,9 @@ export default async function ProductPage({
   const publicPage = await getProductPageForEditor(workspace.id, product.id)
 
   // Whether this caller may delete the product outright, asked of the same
-  // database function the deletion itself runs under lock.
-  const deletion = await getDraftDeletionEligibility(product.id)
+  // database function the deletion itself runs under lock, and whether that
+  // answer is worth a section on the page.
+  const deletion = offeredDraftDeletion(await getDraftDeletionEligibility(product.id))
 
   return (
     <div className="flex flex-col gap-12">
@@ -320,11 +322,11 @@ export default async function ProductPage({
       </section>
 
       {/*
-        After everything, including history. Absent for anyone who does not
-        own the workspace; for a product that has been anywhere, a sentence
-        saying why it stays instead of a button.
+        After everything, including history. Only when there is something to
+        do: absent for anyone who does not own the workspace, and absent for a
+        product that has left Fanwise, which this can never delete.
       */}
-      {deletion.kind !== "hidden" ? (
+      {deletion ? (
         <DeleteProductDraft
           workspaceSlug={slug}
           productId={product.id}
