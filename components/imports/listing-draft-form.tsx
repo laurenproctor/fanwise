@@ -4,6 +4,7 @@ import { FIELD_INPUT_CLASS } from "@/components/ui/field"
 import { TagInput } from "@/components/channels/tag-input"
 import { PRODUCT_TYPES, PRODUCT_TYPE_LABELS, type ProductType } from "@/lib/products/types"
 import { fieldsAwaitingReview, listingIssues, LISTING_FIELD_LABELS } from "@/lib/imports/draft"
+import { IMPORT_LIMITS } from "@/lib/imports/limits"
 import { joinWords } from "@/lib/imports/prose"
 import type { ListingDraft, ListingFieldKey } from "@/lib/imports/types"
 import { DraftField, describedByFor } from "./draft-field"
@@ -30,7 +31,7 @@ import { OriginBadge } from "./origin-badge"
  * value becomes the creator's, and `setListingField` marks it so.
  */
 
-const DESCRIPTION_LIMIT = 1000
+const DESCRIPTION_LIMIT = IMPORT_LIMITS.maxListingDescription
 
 export function ListingDraftForm({
   draft,

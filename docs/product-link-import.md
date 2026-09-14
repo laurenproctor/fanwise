@@ -910,7 +910,13 @@ the handoff are unchanged. A handed-over source is a kind of import, not a secon
   ("Kerning", "Cyrillic"); one-word list items are still dropped as navigation. JSON-LD images
   count as preview images for a file, not for a link. A PDF is read with PDF.js through `unpdf` (`retrieval/pdf.ts`): the title property
   if it is a real title, the text layer of the first 40 pages, and nothing else — no rendering,
-  images, forms, annotations or attachments.
+  images, forms, annotations or attachments. Tracked-out letters are joined ("F A C E T T E"
+  → "FACETTE"), and running headers and footers — lines that repeat, digits aside, within
+  three lines of the top or bottom of most pages, like a browser's print date and address —
+  are dropped. A text or PDF summary is the first run of prose lines after the title: labels
+  before it are skipped and it ends at the paragraph, not at the length cap. A description the
+  review screen fills in from a source or a draft is cut to the field's 1,000 characters at a
+  sentence end; a description the creator saved is never cut.
 - **`bodyText`.** Handed-over sources carry up to 20,000 characters of running text in
   evidence, rendered into the prompt and added to the claims corpus. Link imports do not, so
   their hashes and prompts are unchanged; a unit test pins a link import's hash to the value it

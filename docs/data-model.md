@@ -169,6 +169,15 @@ same decision without the deletion, which the product page reads to decide what 
 the deletion calls it again under lock, so the offer and the outcome have one definition.
 Neither reads `products.status`, which is not the product's lifecycle (ADR 0005).
 
+The product page shows its Danger zone only when there is something to do: Delete draft for
+a product that may go now, or one sentence for a draft that will be deletable once an
+upload, import or AI generation finishes. A product blocked for a reason that never clears
+(a public page, an external reference, a live listing, publishing or activity history) gets
+no section at all, since this feature can never delete it and a permanent notice at the
+bottom of every published product is a dead end. That choice is `offeredDraftDeletion` in
+`lib/products/draft-deletion.ts`. The import screen's discard still explains every blocker,
+because there the creator did ask to remove the product.
+
 Owner only. A product in another workspace, a product the caller is a member but not owner
 of, and an id that does not exist all return `not_found`.
 
