@@ -9,7 +9,7 @@ import {
   DELETE_CONFIRMATION_WORD,
   canConfirmDraftDeletion,
   draftDeletionBlockedMessage,
-  type DraftDeletionEligibility,
+  type OfferedDraftDeletion,
 } from "@/lib/products/draft-deletion"
 
 /**
@@ -22,10 +22,11 @@ import {
  *
  * What the page is handed decides what renders, and the database decided that
  * (`product_draft_deletion_blocker()`): a product that may go gets the control,
- * a product that may not gets one sentence saying why and no button, and a
- * caller who does not own it gets nothing at all — the page does not render
- * this component for `hidden`. None of that is the authorization. The action
- * asks the database again, under lock.
+ * and a product that will be deletable once some work finishes gets one
+ * sentence saying what to wait for and no button. Everyone and everything else
+ * — a caller who does not own it, a product that has left Fanwise — is never
+ * rendered this component at all; see `offeredDraftDeletion`. None of that is
+ * the authorization. The action asks the database again, under lock.
  *
  * The confirmation is a native <dialog>, following the profile's Publish all:
  * labelled and described by its own heading and copy, Escape closes it while
@@ -42,7 +43,7 @@ export function DeleteProductDraft({
   workspaceSlug: string
   productId: string
   productName: string
-  eligibility: Exclude<DraftDeletionEligibility, { kind: "hidden" }>
+  eligibility: OfferedDraftDeletion
 }) {
   const headingId = useId()
 

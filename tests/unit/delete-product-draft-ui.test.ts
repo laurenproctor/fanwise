@@ -39,7 +39,13 @@ vi.mock("@/lib/products/actions", () => ({
 }))
 
 import { DeleteProductDraft } from "@/app/[slug]/[productSlug]/delete-product-draft"
-import { draftDeletionBlockedMessage } from "@/lib/products/draft-deletion"
+import {
+  DRAFT_DELETION_BLOCKERS,
+  TEMPORARY_DRAFT_DELETION_BLOCKERS,
+  draftDeletionBlockedMessage,
+  isTemporaryBlocker,
+  offeredDraftDeletion,
+} from "@/lib/products/draft-deletion"
 
 function render(
   eligibility: Parameters<typeof DeleteProductDraft>[0]["eligibility"],
@@ -160,12 +166,13 @@ describe("an eligible draft, for its owner", () => {
   })
 })
 
-describe("an ineligible product", () => {
-  it.each(["publication_history", "public_page", "upload_in_progress"] as const)(
-    "offers no control for %s, only the reason",
+describe("a draft that will be deletable once work finishes", () => {
+  it.each(TEMPORARY_DRAFT_DELETION_BLOCKERS)(
+    "offers no control for %s, only what to wait for",
     (blocker) => {
       const markup = render({ kind: "blocked", blocker })
 
+      expect(textOf(markup)).toContain("Danger zone")
       expect(buttons(markup)).toEqual([])
       expect(markup).not.toContain("<dialog")
       expect(markup).not.toContain("<form")
@@ -174,11 +181,53 @@ describe("an ineligible product", () => {
   )
 })
 
+describe("whether the page shows a Danger zone at all", () => {
+  it("shows one for a draft that may be deleted now", () => {
+    expect(offeredDraftDeletion({ kind: "eligible" })).toEqual({ kind: "eligible" })
+  })
+
+  it.each(TEMPORARY_DRAFT_DELETION_BLOCKERS)(
+    "shows one while %s, so it says what to wait for",
+    (blocker) => {
+      expect(offeredDraftDeletion({ kind: "blocked", blocker })).toEqual({
+        kind: "blocked",
+        blocker,
+      })
+    },
+  )
+
+  const permanent = DRAFT_DELETION_BLOCKERS.filter((blocker) => !isTemporaryBlocker(blocker))
+
+  it("treats exactly the blockers that never clear as permanent", () => {
+    expect([...permanent].sort()).toEqual(
+      [
+        "activity_history",
+        "listing_external_reference",
+        "listing_live",
+        "public_page",
+        "publication_history",
+      ].sort(),
+    )
+  })
+
+  it.each(permanent)(
+    "shows nothing for a product blocked by %s, which this can never delete",
+    (blocker) => {
+      expect(offeredDraftDeletion({ kind: "blocked", blocker })).toBeNull()
+    },
+  )
+
+  it("shows nothing to a caller the database hid it from, which is every non-owner", () => {
+    expect(offeredDraftDeletion({ kind: "hidden" })).toBeNull()
+  })
+})
+
 describe("the product page", () => {
   const page = readFileSync(join(ROOT, "app", "[slug]", "[productSlug]", "page.tsx"), "utf8")
 
-  it("renders nothing for a caller the database hid it from, which is every non-owner", () => {
-    expect(page).toMatch(/deletion\.kind !== "hidden" \? \(\s*<DeleteProductDraft/)
+  it("renders the section only for what offeredDraftDeletion offers", () => {
+    expect(page).toMatch(/offeredDraftDeletion\(await getDraftDeletionEligibility\(product\.id\)\)/)
+    expect(page).toMatch(/\{deletion \? \(\s*<DeleteProductDraft/)
   })
 
   it("puts it after Activity, outside the product form", () => {
