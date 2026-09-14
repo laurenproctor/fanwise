@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { listProducts } from "@/lib/products/queries"
 import { awaitingReview } from "@/lib/ai/review"
 import { listingImageSlots } from "@/lib/channels/images"
-import { evaluate, listingToDraft } from "@/lib/channels/listings"
+import { evaluate, resolvedDraft } from "@/lib/channels/listings"
 import { findAdapter } from "@/lib/channels/registry"
 import { hasUnsentChanges } from "@/lib/publishing/changes"
 import { liveness, mergeManualSteps, type ManualStepRow } from "@/lib/publishing/manual-steps"
@@ -155,7 +155,7 @@ function factsFor(
     connectionMetadata: (connection?.metadata as Record<string, unknown>) ?? {},
   }
 
-  const draft = listingToDraft(listing)
+  const draft = resolvedDraft(listing as ChannelListing, product, adapter)
   const steps = mergeManualSteps(adapter.manualSteps, stepsByListing.get(listing.id) ?? [])
 
   return [

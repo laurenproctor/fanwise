@@ -101,15 +101,15 @@ export const GLOSSARY = {
 
   listingTitle: {
     label: "Title",
-    body: "The title buyers see on this channel, and this channel only. It starts as a copy of the product's title and is yours to change, since channels differ on length and on what reads well. Use canonical puts the product's title back, and saves immediately rather than waiting for Save listing.",
+    body: "The title buyers see on this channel. It is the product's title until you customize it here, and edits to the product's title reach every channel that has not. Customize when a channel wants something different, since channels differ on length and on what reads well; Use the product's goes back.",
   },
   listingDescription: {
     label: "Description",
-    body: "The full description for this channel alone. Editing it here changes nothing on any other channel and nothing on the product. Use canonical replaces it with the product's description, and saves immediately rather than waiting for Save listing.",
+    body: "The full description for this channel. It is the product's description until you customize it here; a customized one changes nothing on any other channel and nothing on the product. Use the product's goes back to the product's words.",
   },
   listingShortDescription: {
     label: "Short description",
-    body: "A one- or two-line summary. Some channels show it in search results or on a card and some ignore it entirely. Use canonical replaces it with the product's short description, and saves immediately rather than waiting for Save listing.",
+    body: "A one- or two-line summary, shown only for channels that have such a field. It is the product's short description until you customize it here.",
   },
   listingSeoTitle: {
     label: "Meta title",
@@ -121,7 +121,7 @@ export const GLOSSARY = {
   },
   listingPrice: {
     label: "Price",
-    body: "What this channel sells at. Price is per channel, so you can charge differently in different places — a marketplace that takes a cut is the usual reason. Use canonical puts the product's base price and currency back, and saves immediately rather than waiting for Save listing.",
+    body: "What this channel sells at. It is the product's base price and currency until you customize it, so one change on the product reprices every channel that has not. Customize to charge differently here — a marketplace that takes a cut is the usual reason.",
   },
   listingCurrency: {
     label: "Currency",

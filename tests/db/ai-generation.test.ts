@@ -210,7 +210,7 @@ describe("a fabricated claim", () => {
 describe("a supported listing", () => {
   let id: string
 
-  it("lands on the listing, keeps price and category, and is traceable", async () => {
+  it("lands on the listing, leaves the price to the product, fills the category, and is traceable", async () => {
     id = await generate(
       scripted({
         title: "Aster Grotesk — a grotesque for long text",
@@ -232,10 +232,10 @@ describe("a supported listing", () => {
     expect(listing.title).toBe("Aster Grotesk — a grotesque for long text")
     expect(listing.tags).toEqual(["grotesque", "sans"])
     expect(listing.seo_title).toBeNull()
-    // Not the model's to write. The listing had no price and no category, so
-    // both are taken from the product through the adapter, as a build would.
-    expect(Number(listing.price)).toBe(48)
-    expect(listing.currency).toBe("USD")
+    // Not the model's to write. The price stays empty, which means the
+    // product's price; the category, which does not inherit, is taken from the
+    // product through the adapter, as a build would.
+    expect(listing.price).toBeNull()
     expect(listing.category).toBe("font")
     expect(listing.generated_at).not.toBeNull()
     expect((listing.metadata as Record<string, unknown>).composedAt).toBeTruthy()
@@ -254,6 +254,12 @@ describe("a supported listing", () => {
     >
     expect(generation.id).toBe(id)
     expect(generation.factsheetHash).toBe((await generationRow(id)).factsheet_hash)
+    // The snapshot records the listing as it reads, so the inherited price is
+    // there even though the row holds none.
+    const recorded = (data![0]!.payload as { listing: { price: number | null; currency: string } })
+      .listing
+    expect(recorded.price).toBe(48)
+    expect(recorded.currency).toBe("USD")
   })
 
   it("refuses a second generation while one is in flight", async () => {

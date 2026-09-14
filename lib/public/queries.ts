@@ -269,7 +269,7 @@ export async function resolveProductPage(
     (a) => GALLERY_TYPES.has(a.asset_type) && a.mime_type?.startsWith("image/"),
   )
 
-  const destinations = await loadDestinations(listings ?? [])
+  const destinations = await loadDestinations(listings ?? [], product)
   const title = page.title_override ?? product.canonical_title ?? product.name
   const metadata = parseMetadata(product.metadata)
 
@@ -309,6 +309,22 @@ export async function resolveProductPage(
  * adapter is a row from a channel this build does not support, and offering it
  * would be a link Fanwise cannot stand behind.
  */
+/**
+ * A listing's price as a visitor sees it.
+ *
+ * A listing with no price of its own is sold at the product's, in the product's
+ * currency (lib/channels/listings.ts). The public page resolves the same way
+ * the rest of Fanwise does, or a channel that never set its own price would
+ * show "See price" beside a product with one.
+ */
+function quoted<T extends { price: number | null; currency: string }>(
+  listing: T,
+  product: { base_price: number | null; currency: string },
+): T {
+  if (listing.price !== null) return listing
+  return { ...listing, price: product.base_price, currency: product.currency }
+}
+
 async function loadDestinations(
   listings: Array<{
     id: string
@@ -317,6 +333,7 @@ async function loadDestinations(
     price: number | null
     currency: string
   }>,
+  product: { base_price: number | null; currency: string },
 ): Promise<PublicDestination[]> {
   if (listings.length === 0) return []
 
@@ -329,6 +346,7 @@ async function loadDestinations(
   const channelById = new Map((channels ?? []).map((c) => [c.id, c]))
 
   return listings
+    .map((listing) => quoted(listing, product))
     .flatMap((listing) => {
       const channel = channelById.get(listing.channel_id)
       if (!channel) return []
@@ -392,8 +410,9 @@ function pickCover(assets: Array<{ id: string; asset_type: string; sort_order: n
  */
 function startingPrice(
   product: { base_price: number | null; currency: string },
-  listings: Array<{ price: number | null; currency: string }>,
+  rawListings: Array<{ price: number | null; currency: string }>,
 ): { amount: number; currency: string } | null {
+  const listings = rawListings.map((listing) => quoted(listing, product))
   const priced = listings.filter(
     (l): l is { price: number; currency: string } => typeof l.price === "number" && l.price > 0,
   )

@@ -279,6 +279,10 @@ channel_connection_id, external_listing_id, external_url, public_url, status, st
 title, description, short_description, price, currency, category, tags, metadata,
 generated_at, approved_at, published_at, last_synced_at, created_at, updated_at
 
+`title`, `description`, `short_description` and `price` are empty when the listing uses the
+product's value, and hold a value only when customized for the channel (see
+`docs/channel-adapters.md`, "Inheritance and declared fields").
+
 `external_url` is the creator's address for the object and may be an admin page; `public_url`
 is the buyer's. The publishing runner writes `public_url` only while the adapter reports the
 object live and it is not known to be unpurchasable, and clears it otherwise. The public product

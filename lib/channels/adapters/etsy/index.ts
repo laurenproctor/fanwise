@@ -359,6 +359,7 @@ export const etsyAdapter: ChannelAdapter = {
   key: "etsy",
   name: "Etsy",
   integrationType: "api",
+  fields: ["title", "description", "price", "category", "tags"],
   capabilities: {
     automaticPublish: true,
     automaticUpdate: true,
@@ -378,12 +379,14 @@ export const etsyAdapter: ChannelAdapter = {
 
   buildListing({ product }: AdapterSubject): ChannelListingDraft {
     return {
-      title: product.canonical_title ?? product.name,
-      description: product.canonical_description,
+      // Title, descriptions and price are left empty: an empty field uses the
+      // product's value when the listing is read (lib/channels/listings.ts).
+      title: null,
+      description: null,
       shortDescription: null,
       seoTitle: null,
       seoDescription: null,
-      price: product.base_price === null ? null : Number(product.base_price),
+      price: null,
       currency: product.currency,
       category: defaultCategoryLabel(product.product_type),
       tags: [],

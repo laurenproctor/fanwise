@@ -472,7 +472,10 @@ export async function updateListingAction(
     seoTitle: parsed.data.seoTitle,
     seoDescription: parsed.data.seoDescription,
     price: parsed.data.price,
-    currency: parsed.data.currency,
+    // An inherited price is quoted in the product's currency, and the row
+    // keeps that so it reads the same with or without resolution.
+    currency:
+      parsed.data.price === null ? product.currency : (parsed.data.currency ?? product.currency),
     category: parsed.data.category,
     tags: parsed.data.tags,
     metadata: (existing.metadata as Record<string, unknown>) ?? {},
@@ -516,61 +519,4 @@ export async function updateListingAction(
 
   revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
   return { error: null, savedAt: Date.now() }
-}
-
-/**
- * Copies one field from the canonical product onto the listing.
- *
- * Listings are independent rows, and pulling is something the creator does to
- * one field on purpose. A live binding to the product would silently overwrite
- * hand-written channel copy the moment the canonical record changed, which is
- * the opposite of what a per-channel listing is for.
- */
-export async function pullFromCanonicalAction(
-  workspaceSlug: string,
-  listingId: string,
-  field: "title" | "description" | "shortDescription" | "price",
-): Promise<ActionState> {
-  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
-
-  const { data: listing, error: readError } = await supabase
-    .from("channel_listings")
-    .select("id, product_id")
-    .eq("id", listingId)
-    .eq("workspace_id", workspace.id)
-    .maybeSingle()
-
-  if (readError) throw readError
-  if (!listing) return { error: "That listing could not be found." }
-
-  const { data: product, error: productError } = await supabase
-    .from("products")
-    .select("*")
-    .eq("id", listing.product_id)
-    .eq("workspace_id", workspace.id)
-    .maybeSingle()
-
-  if (productError) throw productError
-  if (!product) return { error: "That product could not be found." }
-
-  const columns = {
-    title: { title: product.canonical_title ?? product.name },
-    description: { description: product.canonical_description },
-    shortDescription: { short_description: product.short_description },
-    price: { price: product.base_price, currency: product.currency },
-  }[field]
-
-  const { error } = await supabase
-    .from("channel_listings")
-    .update(columns)
-    .eq("id", listingId)
-    .eq("workspace_id", workspace.id)
-
-  if (error) {
-    console.error("[channels] pull from canonical failed", error)
-    return { error: "That field could not be updated. Try again." }
-  }
-
-  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
-  return { error: null }
 }

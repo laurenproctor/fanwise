@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createIngestUrl } from "@/lib/products/storage"
-import { evaluate, listingToDraft, snapshotPayload } from "@/lib/channels/listings"
+import { evaluate, listingToDraft, resolveListing, snapshotPayload } from "@/lib/channels/listings"
 import { findAdapter } from "@/lib/channels/registry"
 import { normalizeUnknown } from "@/lib/channels/errors"
 import type {
@@ -303,8 +303,16 @@ async function execute(
     connectionMetadata: (connection.metadata as Record<string, unknown>) ?? {},
   }
 
+  /*
+   * What this listing says, inherited where it says nothing. The adapters read
+   * `context.listing` directly, so the resolution happens once here rather than
+   * in each of them, and an adapter cannot accidentally send a null title for a
+   * product that has one.
+   */
+  const resolved = resolveListing(listing, product as Product, adapter)
+
   const context: PublishContext = {
-    listing,
+    listing: resolved,
     connection: connection as ChannelConnection,
     subject,
     // Minted per asset, only when an adapter asks. A link that is never
@@ -526,7 +534,10 @@ async function recordSuccess(params: {
    * a listing whose fingerprint were recorded only on update would offer
    * "Publish changes" the moment it was first published, with nothing changed.
    */
-  const draftSent = listingToDraft({ ...listing, metadata: metadata as never })
+  const draftSent = listingToDraft({
+    ...resolveListing(listing, subject.product, adapter),
+    metadata: metadata as never,
+  })
 
   /*
    * The buyer's address, only while there is something to buy. The public page

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { routes } from "@/lib/routes"
-import { evaluate, listingToDraft } from "@/lib/channels/listings"
+import { evaluate, resolvedDraft } from "@/lib/channels/listings"
 import { findAdapter } from "@/lib/channels/registry"
 import type { AdapterSubject, Channel, ChannelListing } from "@/lib/channels/types"
 import type { Product, ProductAsset } from "@/lib/products/types"
@@ -157,7 +157,7 @@ export async function publishListingAction(
     }
   }
 
-  const draft = listingToDraft(listing)
+  const draft = resolvedDraft(listing, product, adapter)
   const { readiness } = evaluate(adapter, draft, subject)
   if (!readiness.ready) {
     const first = readiness.blocking[0]
@@ -265,7 +265,7 @@ export async function publishChangesAction(
     return { error: `Publish this listing to ${adapter.name} first.`, notice: null }
   }
 
-  const draft = listingToDraft(listing)
+  const draft = resolvedDraft(listing, product, adapter)
   const { readiness } = evaluate(adapter, draft, subject)
   if (!readiness.ready) {
     const first = readiness.blocking[0]
@@ -388,7 +388,7 @@ export async function completeManualStepAction(
     workspaceId: workspace.id,
     listingId,
     kind: "activate",
-    draft: listingToDraft(listing),
+    draft: resolvedDraft(listing, product, adapter),
     generation: listing.publish_generation,
   })
 
@@ -489,6 +489,11 @@ export async function publishEverywhereAction(
     }
 
     const { listing, subject } = loaded
+    const adapter = findAdapter(loaded.channel.key)
+    if (!adapter) {
+      refused.push(start.channelName)
+      continue
+    }
 
     // The click is the approval, stamped before the send, exactly as it is on a
     // single channel. docs/ai-merchandising.md: no first generation reaches a
@@ -506,7 +511,7 @@ export async function publishEverywhereAction(
       }
     }
 
-    const draft = listingToDraft(listing)
+    const draft = resolvedDraft(listing, product, adapter)
     const outcome = await startPublication(
       start.kind === "update"
         ? {

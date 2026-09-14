@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest"
 import { evaluateRequirements } from "@/lib/channels/requirements"
 import { computeReadiness, readinessPercent } from "@/lib/channels/readiness"
-import { buildDraft, evaluate, listingToDraft, snapshotPayload } from "@/lib/channels/listings"
+import {
+  buildDraft,
+  evaluate,
+  listingToDraft,
+  resolveDraft,
+  snapshotPayload,
+} from "@/lib/channels/listings"
 import { missingScopes } from "@/lib/channels/oauth"
 import { getAdapter, listAdapters } from "@/lib/channels/registry"
 import type {
@@ -279,19 +285,44 @@ describe("the adapters", () => {
     expect(s.product).toEqual(before)
   })
 
-  it("falls back to the product name when there is no canonical title", () => {
+  it("builds a listing that says nothing of its own, and reads as the product", () => {
+    const adapter = getAdapter("mock_api")
     const s = subject({ product: product({ canonical_title: null }) })
-    expect(buildDraft(getAdapter("mock_api"), s).title).toBe("Aster Grotesk")
+    const built = buildDraft(adapter, s)
+
+    // Nothing is copied in: an empty field is the product's field, for good.
+    expect(built.title).toBeNull()
+    expect(built.description).toBeNull()
+    expect(built.price).toBeNull()
+
+    // And it reads as the product, including the name standing in for a
+    // canonical title that was never written.
+    const read = resolveDraft(built, s.product, adapter)
+    expect(read.title).toBe("Aster Grotesk")
+    expect(read.description).toBe(s.product.canonical_description)
+    expect(read.price).toBe(48)
+    expect(read.currency).toBe(s.product.currency)
+  })
+
+  it("keeps a field the channel was given, and drops one the channel has not got", () => {
+    const adapter = getAdapter("mock_api")
+    const s = subject()
+    const read = resolveDraft(
+      { ...buildDraft(adapter, s), title: "This channel's own title", seoTitle: "Ignored" },
+      s.product,
+      adapter,
+    )
+    expect(read.title).toBe("This channel's own title")
+    // mock_api has no meta fields, so nothing it is given for them is sent.
+    expect(read.seoTitle).toBeNull()
   })
 
   it("gives two channels genuinely independent listings from one product", () => {
     const s = subject()
-    const api = evaluate(getAdapter("mock_api"), buildDraft(getAdapter("mock_api"), s), s)
-    const assisted = evaluate(
-      getAdapter("mock_assisted"),
-      buildDraft(getAdapter("mock_assisted"), s),
-      s,
-    )
+    const read = (key: "mock_api" | "mock_assisted") =>
+      resolveDraft(buildDraft(getAdapter(key), s), s.product, getAdapter(key))
+    const api = evaluate(getAdapter("mock_api"), read("mock_api"), s)
+    const assisted = evaluate(getAdapter("mock_assisted"), read("mock_assisted"), s)
 
     // Same product, different verdicts: the assisted channel wants tags and the
     // API one does not. This is the whole point of the requirements engine.

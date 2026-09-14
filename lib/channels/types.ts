@@ -442,11 +442,31 @@ export interface MerchandisingProfile {
  * first real publish implementation, B5 brings fetchTransactions, and neither
  * is declared here as a capability until it exists.
  */
+/**
+ * A listing field a channel may or may not have. Currency travels with price
+ * and metadata belongs to the adapter, so neither is one.
+ */
+export type ChannelField =
+  | "title"
+  | "description"
+  | "shortDescription"
+  | "seoTitle"
+  | "seoDescription"
+  | "price"
+  | "category"
+  | "tags"
+
 export interface ChannelAdapter {
   key: ChannelKey
   name: string
   integrationType: IntegrationType
   capabilities: ChannelCapabilities
+  /**
+   * The listing fields this channel has. The editor shows these and no others,
+   * and a listing resolves a field the channel lacks to empty, so a product
+   * edit to a field nobody sends never reads as a change to send.
+   */
+  fields: readonly ChannelField[]
   /** The rules this channel enforces, as data. See lib/channels/requirements.ts. */
   requirements: readonly RequirementSpec[]
   /** Work this channel's API cannot do. Empty for a channel that needs none. */

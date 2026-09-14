@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { listProductAssets } from "@/lib/products/queries"
 import { hasUnsentChanges } from "@/lib/publishing/changes"
 import { findAdapter } from "./registry"
-import { evaluate, listingToDraft } from "./listings"
+import { evaluate, listingToDraft, resolvedDraft } from "./listings"
 import type { Evaluation } from "./listings"
 import type {
   AdapterSubject,
@@ -10,6 +10,7 @@ import type {
   ChannelAdapter,
   ChannelConnection,
   ChannelListing,
+  ChannelListingDraft,
 } from "./types"
 import type { Product } from "@/lib/products/types"
 
@@ -65,6 +66,12 @@ export async function listConnections(workspaceId: string): Promise<ConnectionWi
 
 export interface ListingView {
   listing: ChannelListing
+  /**
+   * The listing as it reads: the row, with the product's words wherever the row
+   * holds none, and nothing at all for a field this channel does not have. What
+   * the creator sees and what would be sent, which is not always the row.
+   */
+  draft: ChannelListingDraft
   channel: Channel
   connection: ChannelConnection | null
   adapter: ChannelAdapter | null
@@ -121,10 +128,12 @@ export async function listProductListings(
       connectionMetadata: (connection?.metadata as Record<string, unknown>) ?? {},
     }
 
-    const draft = listingToDraft(listing)
+    const draft = adapter ? resolvedDraft(listing, product, adapter) : listingToDraft(listing)
 
     return {
       listing,
+      /** The listing as it reads, inherited where the row says nothing. */
+      draft,
       channel,
       connection,
       adapter,

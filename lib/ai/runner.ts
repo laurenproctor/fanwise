@@ -284,10 +284,6 @@ async function execute(
    * complete in every field but the one the model is forbidden to touch.
    */
   const fresh = adapter.buildListing(subject)
-  const priceFill =
-    field === null && listing.price === null && fresh.price !== null
-      ? { price: fresh.price, currency: fresh.currency }
-      : {}
   const categoryFill =
     field === null && listing.category === null && fresh.category !== null
       ? { category: fresh.category }
@@ -300,7 +296,7 @@ async function execute(
     channel,
     adapter,
     subject,
-    columns: { ...outputToColumns(output), ...priceFill, ...categoryFill },
+    columns: { ...outputToColumns(output), ...categoryFill },
     snapshot: {
       type: "generate",
       record: {

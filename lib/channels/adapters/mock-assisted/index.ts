@@ -93,6 +93,7 @@ export const mockAssistedAdapter: ChannelAdapter = {
   key: "mock_assisted",
   name: "Mock Marketplace",
   integrationType: "assisted",
+  fields: ["title", "description", "shortDescription", "price", "category", "tags"],
   capabilities: {
     // Every one of these is false because Fanwise genuinely cannot do it here.
     automaticPublish: false,
@@ -130,13 +131,15 @@ export const mockAssistedAdapter: ChannelAdapter = {
 
   buildListing({ product }: AdapterSubject): ChannelListingDraft {
     return {
-      title: product.canonical_title ?? product.name,
-      description: product.canonical_description,
-      shortDescription: product.short_description,
+      // Title, descriptions and price are left empty: an empty field uses the
+      // product's value when the listing is read (lib/channels/listings.ts).
+      title: null,
+      description: null,
+      shortDescription: null,
       // A mock channel has no search surface, so it has nothing to override.
       seoTitle: null,
       seoDescription: null,
-      price: product.base_price === null ? null : Number(product.base_price),
+      price: null,
       currency: product.currency,
       category: product.product_type,
       tags: [],

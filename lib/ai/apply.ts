@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
-import { evaluate, listingToDraft, snapshotPayload } from "@/lib/channels/listings"
+import { evaluate, resolvedDraft, snapshotPayload } from "@/lib/channels/listings"
 import { listingImages } from "@/lib/channels/images"
 import type { AdapterSubject, ChannelAdapter, ChannelListing } from "@/lib/channels/types"
 import type { ListingField, ListingOutput } from "./output"
@@ -95,7 +95,7 @@ export async function applyCopy(params: ApplyCopyParams): Promise<ApplyCopyOutco
     return { ok: false, reason: "update_failed" }
   }
 
-  const draft = listingToDraft(updated as ChannelListing)
+  const draft = resolvedDraft(updated as ChannelListing, subject.product, adapter)
   const evaluation = evaluate(adapter, draft, subject)
 
   // Invariant 4. The copy that landed, the verdict it received, and where it

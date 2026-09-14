@@ -6,22 +6,30 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { InfoTip } from "@/components/ui/info-tip"
-import {
-  pullFromCanonicalAction,
-  updateListingAction,
-  type SaveState,
-} from "@/lib/channels/actions"
+import { updateListingAction, type SaveState } from "@/lib/channels/actions"
 import { regenerateFieldAction } from "@/lib/ai/actions"
 import type { ListingField } from "@/lib/ai/output"
-import { evaluate } from "@/lib/channels/listings"
+import {
+  canonicalValue,
+  evaluate,
+  resolveDraft,
+  type CanonicalValues,
+  type InheritedField,
+} from "@/lib/channels/listings"
 import { getAdapter } from "@/lib/channels/registry"
 import { constraintsFor, type TextConstraint } from "@/lib/channels/constraints"
-import type { AdapterSubject, ChannelKey, ChannelListingDraft } from "@/lib/channels/types"
+import type {
+  AdapterSubject,
+  ChannelField,
+  ChannelKey,
+  ChannelListingDraft,
+} from "@/lib/channels/types"
 import type { GlossaryTerm } from "@/lib/ui/glossary"
 import { ReadinessBar } from "./readiness-bar"
 import { RequirementList } from "./requirement-list"
 import { TagInput } from "./tag-input"
 import { MarkdownEditor } from "@/components/ui/markdown-editor"
+import { InheritToggle, InheritedValue } from "@/components/ui/inherited-field"
 import { markdownToPlainText } from "@/lib/text/markdown"
 
 /**
@@ -115,31 +123,6 @@ function RegenerateButton({
   )
 }
 
-function PullButton({
-  field,
-  onPull,
-  disabled,
-}: {
-  field: string
-  onPull: () => void
-  disabled: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onPull}
-      disabled={disabled}
-      // The accessible name says which field this acts on. Six identical
-      // "Use canonical" buttons on one screen are six buttons a screen reader
-      // user cannot tell apart.
-      aria-label={`Use canonical ${field.toLowerCase()}`}
-      className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-ink-3)] underline underline-offset-4 hover:text-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      Use canonical
-    </button>
-  )
-}
-
 /**
  * A labelled control with its explanation, counter and actions beside the label.
  *
@@ -183,12 +166,8 @@ function FieldShell({
   )
 }
 
-export interface CanonicalSource {
-  title: string
-  description: string
-  shortDescription: string
-  price: string
-}
+/** The product's values, which a listing uses wherever it holds none. */
+export type CanonicalSource = CanonicalValues
 
 export interface ReviewProps {
   /** False when no model is configured: no Regenerate buttons are offered. */
@@ -219,7 +198,7 @@ export function ListingEditor({
   const router = useRouter()
 
   const [draft, setDraft] = useState<ChannelListingDraft>(initial)
-  const [pulling, startPull] = useTransition()
+  /** A regeneration's refusal, shown with the save error. */
   const [pullError, setPullError] = useState<string | null>(null)
   const [reviewing, startReview] = useTransition()
   const [reviewNotice, setReviewNotice] = useState<string | null>(null)
@@ -286,30 +265,58 @@ export function ListingEditor({
     )
   }
 
+  const has = (field: ChannelField) => adapter.fields.includes(field)
+
+  /*
+   * What this listing says, with the product's words where it says nothing.
+   * The same function the server resolves with (lib/channels/listings.ts), so
+   * the readiness a creator watches while typing is the verdict a publish
+   * records, and neither side can drift from the other.
+   */
+  const resolved = useMemo(
+    () => resolveDraft(draft, canonical, adapter),
+    [draft, canonical, adapter],
+  )
+
+  /** What the product says for one field, as text for the panel that shows it. */
+  const fromProduct = (field: InheritedField) => {
+    const value = canonicalValue(field, canonical)
+    return value === null ? "" : String(value)
+  }
+
   // The same function the server calls. Recomputed on every keystroke, which is
   // affordable precisely because requirements are pure and synchronous.
-  const evaluation = useMemo(() => evaluate(adapter, draft, subject), [adapter, draft, subject])
+  const evaluation = useMemo(
+    () => evaluate(adapter, resolved, subject),
+    [adapter, resolved, subject],
+  )
 
   function set<K extends keyof ChannelListingDraft>(key: K, value: ChannelListingDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
   }
 
-  function pull(field: "title" | "description" | "shortDescription" | "price") {
-    setPullError(null)
-    startPull(async () => {
-      const result = await pullFromCanonicalAction(workspaceSlug, listingId, field)
-      if (result.error) {
-        setPullError(result.error)
-        return
-      }
-      // Mirror the server's write locally so readiness reflects it immediately
-      // rather than after the route refreshes.
-      if (field === "price") {
-        set("price", canonical.price === "" ? null : Number(canonical.price))
-      } else {
-        set(field, canonical[field] === "" ? null : canonical[field])
-      }
-    })
+  /**
+   * An empty field is the product's field. Customizing copies the product's
+   * words in as a starting point, because an empty box to rewrite from is not
+   * a starting point; going back empties the column again.
+   */
+  function toggleInherit(field: InheritedField) {
+    const inherited = draft[field] === null
+    // Customizing a field the product has left empty opens an empty field, not
+    // a null one: null would be the product's again, and the click would do
+    // nothing visible.
+    const value = inherited
+      ? (canonicalValue(field, canonical) ?? (field === "price" ? null : ""))
+      : null
+    if (field === "price") {
+      setDraft((current) => ({
+        ...current,
+        price: (value as number | null) ?? (inherited ? 0 : null),
+        currency: inherited ? current.currency : canonical.currency,
+      }))
+      return
+    }
+    setDraft((current) => ({ ...current, [field]: value }))
   }
 
   const inputClass =
@@ -320,85 +327,120 @@ export function ListingEditor({
       <form action={formAction} className="flex flex-col gap-5">
         <FormError message={state.error ?? pullError} />
 
-        <FieldShell
-          id="listing-title"
-          label="Title"
-          term="listingTitle"
-          aside={
-            <>
-              <Counter value={draft.title ?? ""} constraint={constraints.text.title} />
-              {regen("title", "Title")}
-              <PullButton field="Title" onPull={() => pull("title")} disabled={pulling} />
-            </>
-          }
-        >
-          <input
+        {has("title") ? (
+          <FieldShell
             id="listing-title"
-            name="title"
-            value={draft.title ?? ""}
-            onChange={(e) => set("title", e.target.value)}
-            className={inputClass}
-          />
-        </FieldShell>
+            label="Title"
+            term="listingTitle"
+            aside={
+              <>
+                <Counter value={resolved.title ?? ""} constraint={constraints.text.title} />
+                {draft.title !== null ? regen("title", "Title") : null}
+                <InheritToggle
+                  field="Title"
+                  place="this channel"
+                  overridden={draft.title !== null}
+                  onToggle={() => toggleInherit("title")}
+                />
+              </>
+            }
+          >
+            {draft.title === null ? (
+              <InheritedValue empty={fromProduct("title") === ""}>
+                {fromProduct("title")}
+              </InheritedValue>
+            ) : (
+              <input
+                id="listing-title"
+                name="title"
+                value={draft.title}
+                onChange={(e) => set("title", e.target.value)}
+                className={inputClass}
+              />
+            )}
+          </FieldShell>
+        ) : null}
 
-        <FieldShell
-          id="listing-description"
-          label="Description"
-          term="listingDescription"
-          aside={
-            <>
-              <Counter
-                value={draft.description ?? ""}
-                constraint={constraints.text.description}
-                markdown
-              />
-              {regen("description", "Description")}
-              <PullButton
-                field="Description"
-                onPull={() => pull("description")}
-                disabled={pulling}
-              />
-            </>
-          }
-        >
-          <MarkdownEditor
+        {has("description") ? (
+          <FieldShell
             id="listing-description"
-            name="description"
-            ariaLabel="Description"
-            rows={10}
-            value={draft.description ?? ""}
-            onChange={(value) => set("description", value)}
-          />
-        </FieldShell>
+            label="Description"
+            term="listingDescription"
+            aside={
+              <>
+                <Counter
+                  value={resolved.description ?? ""}
+                  constraint={constraints.text.description}
+                  markdown
+                />
+                {draft.description !== null ? regen("description", "Description") : null}
+                <InheritToggle
+                  field="Description"
+                  place="this channel"
+                  overridden={draft.description !== null}
+                  onToggle={() => toggleInherit("description")}
+                />
+              </>
+            }
+          >
+            {draft.description === null ? (
+              <InheritedValue empty={fromProduct("description") === ""}>
+                <span className="line-clamp-6 whitespace-pre-line">
+                  {markdownToPlainText(fromProduct("description"))}
+                </span>
+              </InheritedValue>
+            ) : (
+              <MarkdownEditor
+                id="listing-description"
+                name="description"
+                ariaLabel="Description"
+                rows={10}
+                value={draft.description}
+                onChange={(value) => set("description", value)}
+              />
+            )}
+          </FieldShell>
+        ) : null}
 
-        <FieldShell
-          id="listing-short-description"
-          label="Short description"
-          term="listingShortDescription"
-          aside={
-            <>
-              <Counter
-                value={draft.shortDescription ?? ""}
-                constraint={constraints.text.shortDescription}
-              />
-              {regen("shortDescription", "Short description")}
-              <PullButton
-                field="Short description"
-                onPull={() => pull("shortDescription")}
-                disabled={pulling}
-              />
-            </>
-          }
-        >
-          <textarea
+        {has("shortDescription") ? (
+          <FieldShell
             id="listing-short-description"
-            name="shortDescription"
-            rows={2}
-            value={draft.shortDescription ?? ""}
-            onChange={(e) => set("shortDescription", e.target.value)}
-            className={inputClass}
-          />
-        </FieldShell>
+            label="Short description"
+            term="listingShortDescription"
+            aside={
+              <>
+                <Counter
+                  value={resolved.shortDescription ?? ""}
+                  constraint={constraints.text.shortDescription}
+                />
+                {draft.shortDescription !== null
+                  ? regen("shortDescription", "Short description")
+                  : null}
+                <InheritToggle
+                  field="Short description"
+                  place="this channel"
+                  overridden={draft.shortDescription !== null}
+                  onToggle={() => toggleInherit("shortDescription")}
+                />
+              </>
+            }
+          >
+            {draft.shortDescription === null ? (
+              <InheritedValue empty={fromProduct("shortDescription") === ""}>
+                {fromProduct("shortDescription")}
+              </InheritedValue>
+            ) : (
+              <textarea
+                id="listing-short-description"
+                name="shortDescription"
+                rows={2}
+                value={draft.shortDescription}
+                onChange={(e) => set("shortDescription", e.target.value)}
+                className={inputClass}
+              />
+            )}
+          </FieldShell>
+        ) : null}
 
         {/*
           The search-result pair, together and after the writing they fall back
@@ -406,112 +448,137 @@ export function ListingEditor({
           short description above, which the placeholders say rather than
           leaving the creator to find out by publishing.
         */}
-        <FieldShell
-          id="listing-seo-title"
-          label="Meta title"
-          term="listingSeoTitle"
-          aside={
-            <>
-              <Counter value={draft.seoTitle ?? ""} constraint={constraints.text.seoTitle} />
-              {regen("seoTitle", "Meta title")}
-            </>
-          }
-        >
-          <input
-            id="listing-seo-title"
-            name="seoTitle"
-            value={draft.seoTitle ?? ""}
-            onChange={(e) => set("seoTitle", e.target.value)}
-            placeholder="Defaults to the title above"
-            className={inputClass}
-          />
-        </FieldShell>
-
-        <FieldShell
-          id="listing-seo-description"
-          label="Meta description"
-          term="listingSeoDescription"
-          aside={
-            <>
-              <Counter
-                value={draft.seoDescription ?? ""}
-                constraint={constraints.text.seoDescription}
-              />
-              {regen("seoDescription", "Meta description")}
-            </>
-          }
-        >
-          <textarea
-            id="listing-seo-description"
-            name="seoDescription"
-            rows={2}
-            value={draft.seoDescription ?? ""}
-            onChange={(e) => set("seoDescription", e.target.value)}
-            placeholder="Defaults to the short description above"
-            className={inputClass}
-          />
-        </FieldShell>
-
-        <div className="grid grid-cols-2 gap-4">
+        {has("seoTitle") ? (
           <FieldShell
-            id="listing-price"
-            label="Price"
-            term="listingPrice"
-            aside={<PullButton field="Price" onPull={() => pull("price")} disabled={pulling} />}
+            id="listing-seo-title"
+            label="Meta title"
+            term="listingSeoTitle"
+            aside={
+              <>
+                <Counter value={draft.seoTitle ?? ""} constraint={constraints.text.seoTitle} />
+                {regen("seoTitle", "Meta title")}
+              </>
+            }
           >
             <input
+              id="listing-seo-title"
+              name="seoTitle"
+              value={draft.seoTitle ?? ""}
+              onChange={(e) => set("seoTitle", e.target.value)}
+              placeholder="Defaults to the title above"
+              className={inputClass}
+            />
+          </FieldShell>
+        ) : null}
+
+        {has("seoDescription") ? (
+          <FieldShell
+            id="listing-seo-description"
+            label="Meta description"
+            term="listingSeoDescription"
+            aside={
+              <>
+                <Counter
+                  value={draft.seoDescription ?? ""}
+                  constraint={constraints.text.seoDescription}
+                />
+                {regen("seoDescription", "Meta description")}
+              </>
+            }
+          >
+            <textarea
+              id="listing-seo-description"
+              name="seoDescription"
+              rows={2}
+              value={draft.seoDescription ?? ""}
+              onChange={(e) => set("seoDescription", e.target.value)}
+              placeholder="Defaults to the short description above"
+              className={inputClass}
+            />
+          </FieldShell>
+        ) : null}
+
+        {has("price") ? (
+          <div className="grid grid-cols-2 gap-4">
+            <FieldShell
               id="listing-price"
-              name="price"
-              type="number"
-              step="0.01"
-              min="0"
-              value={draft.price ?? ""}
-              onChange={(e) => set("price", e.target.value === "" ? null : Number(e.target.value))}
-              className={inputClass}
-            />
-          </FieldShell>
-
-          <FieldShell id="listing-currency" label="Currency" term="listingCurrency">
-            <input
-              id="listing-currency"
-              name="currency"
-              value={draft.currency}
-              maxLength={3}
-              onChange={(e) => set("currency", e.target.value.toUpperCase())}
-              className={inputClass}
-            />
-          </FieldShell>
-        </div>
-
-        <FieldShell id="listing-category" label="Category" term="listingCategory">
-          {constraints.text.category?.allowed ? (
-            <select
-              id="listing-category"
-              name="category"
-              value={draft.category ?? ""}
-              onChange={(e) => set("category", e.target.value)}
-              className={inputClass}
+              label="Price"
+              term="listingPrice"
+              aside={
+                <InheritToggle
+                  field="Price"
+                  place="this channel"
+                  overridden={draft.price !== null}
+                  onToggle={() => toggleInherit("price")}
+                />
+              }
             >
-              <option value="">Not set</option>
-              {constraints.text.category.allowed.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              id="listing-category"
-              name="category"
-              value={draft.category ?? ""}
-              onChange={(e) => set("category", e.target.value)}
-              className={inputClass}
-            />
-          )}
-        </FieldShell>
+              {draft.price === null ? (
+                <InheritedValue empty={fromProduct("price") === ""}>
+                  {fromProduct("price")} {canonical.currency}
+                </InheritedValue>
+              ) : (
+                <input
+                  id="listing-price"
+                  name="price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={draft.price}
+                  onChange={(e) =>
+                    set("price", e.target.value === "" ? null : Number(e.target.value))
+                  }
+                  className={inputClass}
+                />
+              )}
+            </FieldShell>
 
-        <div className="flex flex-col gap-2">
-          {review.aiConfigured ? (
+            {draft.price === null ? null : (
+              <FieldShell id="listing-currency" label="Currency" term="listingCurrency">
+                <input
+                  id="listing-currency"
+                  name="currency"
+                  value={draft.currency}
+                  maxLength={3}
+                  onChange={(e) => set("currency", e.target.value.toUpperCase())}
+                  className={inputClass}
+                />
+              </FieldShell>
+            )}
+          </div>
+        ) : null}
+
+        {has("category") ? (
+          <FieldShell id="listing-category" label="Category" term="listingCategory">
+            {constraints.text.category?.allowed ? (
+              <select
+                id="listing-category"
+                name="category"
+                value={draft.category ?? ""}
+                onChange={(e) => set("category", e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Not set</option>
+                {constraints.text.category.allowed.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id="listing-category"
+                name="category"
+                value={draft.category ?? ""}
+                onChange={(e) => set("category", e.target.value)}
+                className={inputClass}
+              />
+            )}
+          </FieldShell>
+        ) : null}
+
+        <div className="flex flex-col gap-2" hidden={!has("tags")}>
+          {review.aiConfigured && has("tags") ? (
             <div className="flex justify-end">{regen("tags", "Tags")}</div>
           ) : null}
           <TagInput

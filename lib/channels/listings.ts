@@ -1,9 +1,11 @@
 import { computeReadiness } from "./readiness"
 import { evaluateRequirements } from "./requirements"
 import type { ProductAsset } from "@/lib/products/types"
+import type { Product } from "@/lib/products/types"
 import type {
   AdapterSubject,
   ChannelAdapter,
+  ChannelField,
   ChannelListing,
   ChannelListingDraft,
   Readiness,
@@ -20,6 +22,104 @@ import type {
  * The direction is one-way by construction: a draft is built from a product,
  * and nothing here ever writes back to one.
  */
+
+/**
+ * The fields a listing takes from the product unless it says otherwise.
+ *
+ * Until 13 September 2026 a build copied these into the row, and a later edit
+ * to the product changed nothing: every channel held a snapshot of the words as
+ * they were when the listing was made, and a creator who fixed a typo fixed it
+ * five times. An empty column now means "whatever the product says", and a
+ * value means "this channel says something else".
+ *
+ * Currency is not one of them because it is not edited on its own: it travels
+ * with the price, and an inherited price brings the product's currency with it.
+ */
+export const INHERITED_FIELDS = ["title", "description", "shortDescription", "price"] as const
+
+export type InheritedField = (typeof INHERITED_FIELDS)[number]
+
+/** The canonical values a listing may inherit. */
+export type CanonicalValues = Pick<
+  Product,
+  | "name"
+  | "canonical_title"
+  | "canonical_description"
+  | "short_description"
+  | "base_price"
+  | "currency"
+>
+
+/** What the product says for one inheritable field. */
+export function canonicalValue(
+  field: InheritedField,
+  product: CanonicalValues,
+): string | number | null {
+  switch (field) {
+    case "title":
+      return product.canonical_title ?? product.name
+    case "description":
+      return product.canonical_description
+    case "shortDescription":
+      return product.short_description
+    case "price":
+      return product.base_price === null ? null : Number(product.base_price)
+  }
+}
+
+/**
+ * A stored row as everything downstream should read it: inherited where the
+ * column is empty, empty where the channel has no such field.
+ *
+ * Every reader goes through this — readiness, the adapters, the fingerprint
+ * that decides whether there are unsent changes, and the snapshot written when
+ * something is published — so "what this listing says" has exactly one answer.
+ */
+export function resolveDraft(
+  draft: ChannelListingDraft,
+  product: CanonicalValues,
+  adapter: Pick<ChannelAdapter, "fields">,
+): ChannelListingDraft {
+  const has = (field: ChannelField) => adapter.fields.includes(field)
+  const inherited = <T extends string | number>(field: InheritedField, value: T | null) => {
+    if (!has(field)) return null
+    return (value ?? canonicalValue(field, product)) as T | null
+  }
+
+  return {
+    ...draft,
+    title: inherited("title", draft.title),
+    description: inherited("description", draft.description),
+    shortDescription: inherited("shortDescription", draft.shortDescription),
+    seoTitle: has("seoTitle") ? draft.seoTitle : null,
+    seoDescription: has("seoDescription") ? draft.seoDescription : null,
+    price: inherited("price", draft.price),
+    // An inherited price is quoted in the product's currency; an overridden one
+    // in whatever the listing was saved with.
+    currency: draft.price === null ? product.currency : draft.currency,
+    category: has("category") ? draft.category : null,
+    tags: has("tags") ? draft.tags : [],
+  }
+}
+
+/** A stored row, resolved. The browser resolves the draft it is editing instead. */
+export function resolveListing(
+  listing: ChannelListing,
+  product: CanonicalValues,
+  adapter: Pick<ChannelAdapter, "fields">,
+): ChannelListing {
+  const draft = resolveDraft(listingToDraft(listing), product, adapter)
+  return { ...listing, ...draftToColumns(draft) }
+}
+
+/** The resolved row as a draft, which is what every rule is written against. */
+export function resolvedDraft(
+  listing: ChannelListing,
+  product: CanonicalValues,
+  adapter: Pick<ChannelAdapter, "fields">,
+): ChannelListingDraft {
+  return resolveDraft(listingToDraft(listing), product, adapter)
+}
 
 export function buildDraft(adapter: ChannelAdapter, subject: AdapterSubject): ChannelListingDraft {
   return adapter.buildListing(subject)
