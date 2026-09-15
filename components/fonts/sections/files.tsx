@@ -161,20 +161,22 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
     for (const removal of removals) {
       if (removalsStarted.current.has(removal.assetId)) continue
       removalsStarted.current.add(removal.assetId)
-      void deleteAssetAction(workspaceSlug, removal.assetId).then((result) => {
-        setRemovals((current) => current.filter((r) => r.assetId !== removal.assetId))
-        if (result.error) {
-          setNotices((n) => [
-            ...n,
-            {
-              id: crypto.randomUUID(),
-              filename: removal.filename,
-              message: `Uploaded, but the file it replaces could not be removed: ${result.error}`,
-            },
-          ])
-        }
-        refresh()
-      })
+      void deleteAssetAction(workspaceSlug, removal.assetId)
+        .catch(() => ({ error: "reload the page and remove it by hand." }))
+        .then((result) => {
+          setRemovals((current) => current.filter((r) => r.assetId !== removal.assetId))
+          if (result.error) {
+            setNotices((n) => [
+              ...n,
+              {
+                id: crypto.randomUUID(),
+                filename: removal.filename,
+                message: `Uploaded, but the file it replaces could not be removed: ${result.error}`,
+              },
+            ])
+          }
+          refresh()
+        })
     }
   }, [removals, workspaceSlug, refresh])
 
@@ -261,7 +263,9 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
     setUploads((current) => current.filter((u) => u.localId !== upload.localId))
     // An interrupted upload leaves a pending row with no bytes behind it.
     if (upload.assetId) {
-      await deleteAssetAction(ctx.workspaceSlug, upload.assetId)
+      // Best effort: the row is already off screen, and an empty pending asset
+      // left behind is listed again on the next load, where it can be removed.
+      await deleteAssetAction(ctx.workspaceSlug, upload.assetId).catch(() => undefined)
       ctx.refresh()
     }
   }
@@ -281,8 +285,20 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
     if (!confirming) return
     setRemoving(true)
     setRemoveError(null)
-    const result = await deleteAssetAction(ctx.workspaceSlug, confirming.id)
-    setRemoving(false)
+    // The action can reject rather than return an error: a session that expired
+    // while the page sat open is answered with a redirect to sign in, which the
+    // client cannot read. Without the catch the dialog stayed on "Removing…".
+    let result: Awaited<ReturnType<typeof deleteAssetAction>>
+    try {
+      result = await deleteAssetAction(ctx.workspaceSlug, confirming.id)
+    } catch {
+      setRemoveError(
+        "The file could not be removed. Reload the page, sign in again if asked, and try again.",
+      )
+      return
+    } finally {
+      setRemoving(false)
+    }
     if (result.error) {
       setRemoveError(result.error)
       return
