@@ -28,7 +28,7 @@ export interface ProductTypeGuidance {
 }
 
 const FONT: ProductTypeGuidance = {
-  version: "2026-09-13.1",
+  version: "2026-09-15.1",
   text: `PRODUCT TYPE GUIDANCE: TYPEFACES
 
 This product is a typeface. The aim is not to make it sound desirable to everyone; it is to make it legible, conceptually and technically, to the people whose projects need it. A buyer should finish the description knowing what kind of type this is, how it feels in use, where it works, and what they receive.
@@ -41,7 +41,16 @@ What to cover, in this order, each only when the facts support it:
 - Design story. The idea, research, period, place or observation behind it, connected to specific decisions in the letterforms. Only a source the creator names. Keep their distinction between direct research, loose inspiration, revival and reinterpretation; do not upgrade an influence into a revival or invent an origin.
 - Visual behaviour. Proportions, contrast, rhythm, spacing, terminals, texture. Tie each feature to its effect in use: narrow proportions let a headline carry more words at the same size, which is worth saying; "condensed" alone is not.
 - Best uses. Three to six credible applications drawn from what the creator says it is for: brand identities, editorial headlines, packaging, posters, album artwork, book covers, websites, signage, long-form reading, small text. Be honest about limits the creator states. If it is meant for large display sizes, say so; do not promise readability at small sizes the creator has not claimed.
-- Family and features. What the buyer receives: styles, weights, italics, widths, variable axes, glyph coverage, writing systems and languages, OpenType features, formats. Only what the facts list. Name writing systems rather than calling a font multilingual. Translate a feature into what it lets the buyer do, instead of only listing it.
+- Family and features. What the buyer receives: styles, weights, italics, widths, variable axes, glyph coverage, writing systems and languages, OpenType features, formats. Only what the facts list. Name writing systems rather than calling a font multilingual. Translate a feature into what it lets the buyer do, instead of only listing it: small capitals for acronyms and running heads, oldstyle figures that sit quietly in text, tabular figures that line up in tables, stylistic sets that shift the voice without changing families.
+
+Reading the facts:
+
+- The facts may give a classification. Use it in the opening, sharpened by the creator's description where they are more specific (a sans serif the creator calls a grotesk is a grotesk).
+- Weights, italic styles and widths are counted for you. Describe the range in words, lightest to heaviest, and say whether there are true italics. The style list is for reference; do not paste it.
+- Variable axes come with their ranges. Say what an axis lets the buyer do; give the range only where the channel's buyers would care.
+- OpenType features are given in words with their tag beside them. Write the words, never the tag. A feature without words beside it is a tag the facts could not name: leave it out.
+- License types sold are names only. Mention them only where the channel profile asks for the license.
+- The creator's search keywords are their own words for the product. Use the true ones where a buyer would search with them, never as a list pasted into prose.
 - Closing. End on the design opportunity the typeface creates, not on generic sales language.
 
 Word choice:

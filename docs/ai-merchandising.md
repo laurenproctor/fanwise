@@ -89,13 +89,28 @@ What enforces which part:
 | Never state a visual quality not in the facts | The rules block. The model cannot see the letterforms, so mood, classification and features come from the creator's description |
 | Structure, word choice, use cases, no placeholders | The guidance, and review |
 
-What the standard asks for that the FactSheet cannot yet hold: classification, weights and
-italics, widths, variable axes and ranges, writing systems and OpenType features. Font facts
-today are style count, variable or not, formats, languages and glyph count, so on a typical
-product sections 6 to 8 of the standard are mostly left out, which the guidance tells the
-model to do. The font workspace branch (`feat/font-publishing-workspace-rebased`) adds those
-fields to the product's metadata; rendering them into the FactSheet, and admitting them to
-the validator's corpus, follows once it is on `main`.
+**Font facts in the FactSheet**, added 15 September 2026 after the font workspace (#105) put
+them on the product. The FactSheet now carries the creator's confirmed classification (in
+words), styles with weight, width and italic, variable axes with their ranges, writing
+systems, OpenType feature tags, the license types sold (names only, never prices, limits or
+the EULA address) and the creator's search keywords. `renderFactSheet` states them the way a
+buyer reads them: "Weights: 3 (Thin, Regular, Bold)", "Weight (wght): 100 to 700, default
+400", "Small capitals (smcp)", with the counts a description would want (weights, italic
+styles, stylistic sets) derived deterministically. What the files detected but the creator
+has not confirmed stays on the asset rows and is not a fact.
+
+The validator admits all of it to the corpus and the allowed numbers, including the counts
+derived from it and the number of languages and writing systems. It also gained two
+vocabularies, used for every product type:
+
+- **OpenType features** ("small caps", "oldstyle figures", "discretionary ligatures",
+  "stylistic sets", "swashes", "italics", "variable font" and so on), each a group of ways
+  to say one feature. A term passes when any term of its group is in the facts' words or its
+  tag is in the feature list, so "small caps" passes for `smcp`.
+- **Writing systems** (Latin, Latin Extended, Greek, Cyrillic, Arabic, Hebrew, Devanagari,
+  Kana, Hangul and others). "Latin Extended" is judged before "Latin"; "Arabic numerals" is
+  ordinary English and ignored. Language names are not checked: they collide with design
+  history ("Swiss", "Dutch") too often to refuse deterministically.
 
 The guidance is part of the cached prefix, so the prefix is now the same bytes per channel
 and product type rather than per channel. Its version is appended to `prompt_version` as
