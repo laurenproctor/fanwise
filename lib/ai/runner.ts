@@ -179,7 +179,7 @@ async function execute(
   // One field or the whole listing. The prefix is the same either way; only
   // the ask and the schema narrow.
   const field = claimed.generation_type === "field" ? listingFieldSchema.parse(claimed.field) : null
-  const prompt = buildPrompt(adapter, sheet, field ?? undefined)
+  const prompt = buildPrompt(adapter, sheet, field ?? undefined, (product as Product).product_type)
   const outputSchema = field === null ? LISTING_OUTPUT_JSON_SCHEMA : fieldOutputJsonSchema(field)
 
   // Recorded before the call, so a call that never returns still leaves a row

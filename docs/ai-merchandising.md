@@ -64,6 +64,58 @@ Do not write the canonical description four times.
 - **Adobe Stock**: keyword-driven, no prose description, up to 49 keywords.
 - **MyFonts**: type-specific vocabulary, under 500 words.
 
+## Product type guidance
+
+A channel profile says how a channel's buyers read. What a buyer of one kind of product needs
+to learn is the same on every channel, so it is written once per product type and sits
+between the rules and the profile (`lib/ai/guidance.ts`). The profile comes last and decides
+length, structure and markup; the guidance supplies the substance. A type without a written
+standard composes from the rules and the profile alone.
+
+**Typefaces**, adopted 13 September 2026. The full standard is
+[`docs/merchandising/typefaces.md`](merchandising/typefaces.md): classification, mood,
+applications, distinctive features, history, family, language support, OpenType features and
+formats, the search intents buyers combine, and the six-part structure (identity, design
+story, visual behaviour, best uses, family and features, closing). The prompt carries a
+condensed form.
+
+What enforces which part:
+
+| Part of the standard | Enforced by |
+|---|---|
+| Never invent counts, formats, languages, license rights | The factuality validator, as before |
+| A decade or year the creator did not state ("1970s", "'90s") | The validator. Before this, a numeral followed by a letter was skipped, so a decade's plural passed; it is now read as the number |
+| Never invent a history, influence, designer or origin in words | The rules block, for every product type. **No deterministic check.** A named movement the facts lack ("Bauhaus") is not caught; review is the backstop |
+| Never state a visual quality not in the facts | The rules block. The model cannot see the letterforms, so mood, classification and features come from the creator's description |
+| Structure, word choice, use cases, no placeholders | The guidance, and review |
+
+**Font facts in the FactSheet**, added 15 September 2026 after the font workspace (#105) put
+them on the product. The FactSheet now carries the creator's confirmed classification (in
+words), styles with weight, width and italic, variable axes with their ranges, writing
+systems, OpenType feature tags, the license types sold (names only, never prices, limits or
+the EULA address) and the creator's search keywords. `renderFactSheet` states them the way a
+buyer reads them: "Weights: 3 (Thin, Regular, Bold)", "Weight (wght): 100 to 700, default
+400", "Small capitals (smcp)", with the counts a description would want (weights, italic
+styles, stylistic sets) derived deterministically. What the files detected but the creator
+has not confirmed stays on the asset rows and is not a fact.
+
+The validator admits all of it to the corpus and the allowed numbers, including the counts
+derived from it and the number of languages and writing systems. It also gained two
+vocabularies, used for every product type:
+
+- **OpenType features** ("small caps", "oldstyle figures", "discretionary ligatures",
+  "stylistic sets", "swashes", "italics", "variable font" and so on), each a group of ways
+  to say one feature. A term passes when any term of its group is in the facts' words or its
+  tag is in the feature list, so "small caps" passes for `smcp`.
+- **Writing systems** (Latin, Latin Extended, Greek, Cyrillic, Arabic, Hebrew, Devanagari,
+  Kana, Hangul and others). "Latin Extended" is judged before "Latin"; "Arabic numerals" is
+  ordinary English and ignored. Language names are not checked: they collide with design
+  history ("Swiss", "Dutch") too often to refuse deterministically.
+
+The guidance is part of the cached prefix, so the prefix is now the same bytes per channel
+and product type rather than per channel. Its version is appended to `prompt_version` as
+`font.<version>` when present, so a row still says exactly what was asked.
+
 ## Review
 
 No first generation reaches a marketplace without explicit approval. The review UI supports
@@ -111,7 +163,7 @@ the listing, and restoring it would be the one door the validator does not guard
 | Layer | Where | What it does |
 |---|---|---|
 | FactSheet | `lib/ai/factsheet.ts` | Derived from the product, its validated metadata and its ready assets. Deliverable formats are measured from the filenames, not declared. Hashed by canonical JSON |
-| Prompt | `lib/ai/prompt.ts` | Two system blocks, rules then the channel profile, and the FactSheet alone in the user turn. The profile block carries the cache boundary, so the prefix is the same bytes for every product on a channel |
+| Prompt | `lib/ai/prompt.ts` | System blocks for the rules, the product type's guidance when there is one, and the channel profile, then the FactSheet alone in the user turn. The profile block carries the cache boundary, so the prefix is the same bytes for every product of one type on a channel |
 | Zod validation | `lib/ai/output.ts` | Six text fields. Price, currency and category are not the model's to decide and are not in the schema |
 | Factuality validator | `lib/ai/factuality.ts` | Numerals, number words, vague quantities, format tokens, software and platform names, and licensing, support and standing claims. Each is allowed only if the FactSheet states it, as a value or in the creator's own words. Biased to refuse |
 | Provider | `lib/ai/providers/` | One vendor, chosen by which key is present. Its name appears in that folder and nowhere else; a unit test reads the tree |

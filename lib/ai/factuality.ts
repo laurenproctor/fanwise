@@ -1,5 +1,13 @@
 import { markdownToClaimText } from "@/lib/text/markdown"
-import type { FactSheet } from "./factsheet"
+import { featureLabel } from "@/lib/fonts/coverage"
+import { WIDTH_NAMES } from "@/lib/fonts/detected"
+import {
+  axisName,
+  distinctWeights,
+  stylisticSetCount,
+  weightName,
+  type FactSheet,
+} from "./factsheet"
 import type { ListingOutput } from "./output"
 
 /**
@@ -22,7 +30,7 @@ import type { ListingOutput } from "./output"
  * always produce the same verdict.
  */
 
-export type ViolationKind = "number" | "format" | "compatibility" | "claim"
+export type ViolationKind = "number" | "format" | "compatibility" | "claim" | "feature" | "script"
 
 export interface Violation {
   kind: ViolationKind
@@ -219,6 +227,73 @@ const CLAIM_TERMS = [
   "#1",
 ] as const
 
+/**
+ * OpenType features a typeface listing might claim, each group being one
+ * feature said several ways. A term is allowed when any term or tag of its
+ * group is in the facts, so "small caps" passes for a font whose features list
+ * smcp. Longer phrases are matched and consumed before shorter ones, so
+ * "discretionary ligatures" is judged as itself and not as "ligatures".
+ *
+ * Only phrases that mean the feature and little else in ordinary prose:
+ * "fractions" and "ordinals" are in, "alternates" alone and "kerning" are not.
+ */
+const FEATURE_GROUPS: ReadonlyArray<{ terms: readonly string[]; tags: readonly string[] }> = [
+  { terms: ["discretionary ligatures"], tags: ["dlig"] },
+  { terms: ["contextual ligatures"], tags: ["clig"] },
+  { terms: ["contextual alternates"], tags: ["calt"] },
+  { terms: ["stylistic alternates"], tags: ["salt"] },
+  { terms: ["stylistic sets", "stylistic set"], tags: [] },
+  { terms: ["character variants", "character variant"], tags: [] },
+  { terms: ["titling alternates"], tags: ["titl"] },
+  { terms: ["petite capitals", "petite caps"], tags: ["pcap", "c2pc"] },
+  { terms: ["small capitals", "small caps"], tags: ["smcp", "c2sc"] },
+  { terms: ["oldstyle figures", "old-style figures", "old style figures", "oldstyle numerals", "old-style numerals"], tags: ["onum"] },
+  { terms: ["lining figures", "lining numerals"], tags: ["lnum"] },
+  { terms: ["tabular figures", "tabular numerals"], tags: ["tnum"] },
+  { terms: ["proportional figures", "proportional numerals"], tags: ["pnum"] },
+  { terms: ["slashed zero"], tags: ["zero"] },
+  { terms: ["case-sensitive forms", "case-sensitive punctuation"], tags: ["case"] },
+  { terms: ["superscripts", "superscript"], tags: ["sups"] },
+  { terms: ["subscripts", "subscript"], tags: ["subs"] },
+  { terms: ["fractions"], tags: ["frac"] },
+  { terms: ["ordinals"], tags: ["ordn"] },
+  { terms: ["swashes", "swash"], tags: ["swsh", "cswh"] },
+  { terms: ["ligatures"], tags: ["liga", "dlig", "clig", "rlig"] },
+  { terms: ["variable fonts", "variable font"], tags: [] },
+  { terms: ["italics", "italic"], tags: [] },
+] // prettier-ignore
+
+/** Stylistic sets and character variants are tag families, not single tags. */
+const FEATURE_TAG_PREFIX: Record<string, RegExp> = {
+  "stylistic sets": /^ss\d\d$/,
+  "character variants": /^cv\d\d$/,
+}
+
+/**
+ * Writing systems a typeface listing might claim. "Latin extended" first, so
+ * a font that covers the basic alphabet cannot claim the extended one.
+ * "Arabic numerals" is ordinary English for 0 to 9 and is removed before the
+ * check. Short or ambiguous names (Han, Thai as a cuisine) are left out, or
+ * kept only where a listing would rarely use the word for anything else.
+ */
+const SCRIPT_TERMS = [
+  "latin extended",
+  "extended latin",
+  "latin",
+  "greek",
+  "cyrillic",
+  "armenian",
+  "hebrew",
+  "arabic",
+  "devanagari",
+  "georgian",
+  "hiragana",
+  "katakana",
+  "kana",
+  "hangul",
+  "cjk",
+] as const
+
 const NUMBER_WORDS: Record<string, number> = {
   two: 2,
   three: 3,
@@ -264,9 +339,11 @@ const VAGUE = new RegExp(`\\b(${VAGUE_QUANTITIES.join("|")})\\b`, "gi")
  * A number, standing on its own. Not preceded by a letter, digit or dot, so
  * "woff2", "v2.1" and "A4" do not yield a 2, a 1 or a 4; and not followed by a
  * letter, so "1080p" and "2x" are left to the vocabulary. Thousands separators
- * and decimals are one number.
+ * and decimals are one number. A decade's plural is the one letter allowed:
+ * "1970s", "1970's" and "'90s" are periods, and a period is a claim, so they
+ * read as 1970, 1970 and 90 rather than slipping past as words.
  */
-const NUMERAL = /(?<![\w.])(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?![\w])/g
+const NUMERAL = /(?<![\w.])(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:['\u2019]?s)?(?![\w])/g
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -278,7 +355,7 @@ function termPattern(term: string): RegExp {
 }
 
 function parseNumeral(text: string): number {
-  return Number(text.replace(/,/g, ""))
+  return Number(text.replace(/,|['\u2019]?s$/g, ""))
 }
 
 function normalizeFormat(term: string): string {
@@ -303,6 +380,18 @@ function factCorpus(sheet: FactSheet): string {
   switch (d.kind) {
     case "font":
       parts.push(...(d.formats ?? []), ...(d.languageSupport ?? []))
+      if (d.classification) parts.push(d.classification)
+      for (const style of d.styles ?? []) {
+        parts.push(style.name)
+        if (style.weight !== undefined) parts.push(weightName(style.weight) ?? "")
+        if (style.width !== undefined) parts.push(WIDTH_NAMES[style.width] ?? "")
+        if (style.italic) parts.push("italic")
+      }
+      for (const axis of d.axes ?? []) parts.push(axis.tag, axisName(axis))
+      if (d.isVariable === true || (d.axes?.length ?? 0) > 0) parts.push("variable font")
+      parts.push(...(d.scripts ?? []))
+      for (const tag of d.features ?? []) parts.push(tag, featureLabel(tag))
+      parts.push(...(d.licenses ?? []), ...(d.keywords ?? []))
       break
     case "template":
       parts.push(...(d.software ?? []), d.dimensions ?? "")
@@ -333,6 +422,26 @@ function factNumbers(sheet: FactSheet, corpus: string): Set<number> {
     case "font":
       add(d.styleCount)
       add(d.glyphCount)
+      if (d.languageSupport?.length) add(d.languageSupport.length)
+      if (d.scripts?.length) add(d.scripts.length)
+      if (d.styles?.length) {
+        add(d.styles.length)
+        for (const style of d.styles) add(style.weight)
+        const weights = distinctWeights(d.styles)
+        if (weights.length > 0) add(weights.length)
+        const italics = d.styles.filter((style) => style.italic === true).length
+        if (italics > 0) add(italics)
+      }
+      for (const axis of d.axes ?? []) {
+        add(axis.min)
+        add(axis.default)
+        add(axis.max)
+      }
+      if (d.axes?.length) add(d.axes.length)
+      if (d.features) {
+        const sets = stylisticSetCount(d.features)
+        if (sets > 0) add(sets)
+      }
       break
     case "template":
       add(d.pageCount)
@@ -374,10 +483,24 @@ function corpusHas(corpus: string, term: string): boolean {
   return termPattern(term).test(corpus)
 }
 
+/** Whether the facts support a feature group: a term in the text, or a tag. */
+function featureSupported(
+  group: (typeof FEATURE_GROUPS)[number],
+  corpus: string,
+  tags: readonly string[],
+): boolean {
+  if (group.terms.some((term) => corpusHas(corpus, term))) return true
+  if (group.tags.some((tag) => tags.includes(tag))) return true
+  const prefix = FEATURE_TAG_PREFIX[group.terms[0]!]
+  return prefix !== undefined && tags.some((tag) => prefix.test(tag))
+}
+
 interface Allowed {
   numbers: Set<number>
   formats: Set<string>
   corpus: string
+  /** The font's OpenType feature tags, when the product is a font. */
+  featureTags: readonly string[]
 }
 
 function checkField(
@@ -434,6 +557,26 @@ function checkField(
     compat = compat.replace(termPattern(term), " ")
   }
 
+  // OpenType features. Longest phrases first, each consumed once judged.
+  let features = text
+  for (const group of FEATURE_GROUPS) {
+    for (const term of group.terms) {
+      const pattern = termPattern(term)
+      if (!pattern.test(features)) continue
+      if (!featureSupported(group, allowed.corpus, allowed.featureTags)) report("feature", term)
+      features = features.replace(termPattern(term), " ")
+    }
+  }
+
+  // Writing systems. "Arabic numerals" means 0 to 9, not the script.
+  let scripts = text.replace(/\barabic (numerals|numbers|digits)\b/gi, " ")
+  for (const term of SCRIPT_TERMS) {
+    const pattern = termPattern(term)
+    if (!pattern.test(scripts)) continue
+    if (!corpusHas(allowed.corpus, term)) report("script", term)
+    scripts = scripts.replace(termPattern(term), " ")
+  }
+
   // Restricted claims, allowed only where the creator's own words make them.
   let claims = text
   for (const term of CLAIM_TERMS) {
@@ -450,6 +593,7 @@ export function validateFactuality(output: ListingOutput, sheet: FactSheet): Fac
     numbers: factNumbers(sheet, corpus),
     formats: factFormats(sheet, corpus),
     corpus,
+    featureTags: sheet.details.kind === "font" ? (sheet.details.features ?? []) : [],
   }
 
   const violations: Violation[] = []
