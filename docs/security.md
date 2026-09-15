@@ -392,6 +392,11 @@ is the same 404. It cannot stop a buyer sharing the address. It can be withdrawn
 download link** revokes and re-sends. `tests/db/delivery-links.test.ts` proves the table is
 closed and each check withdraws the download on its own.
 
+**Shopify buyers get the same kind of address, in their order email** (ADR 0013). It is written
+onto the product as a metafield with no definition and no storefront access, and printed by the
+shop's order confirmation template only when the order is paid. Because it then sits in buyers'
+inboxes, **Replace download link** warns that it cuts off past buyers before it acts.
+
 **A description is creator Markdown rendered as HTML, so the sanitizer is the boundary.** The
 public product page, and every storefront a product is published to, receive
 `markdownToHtml` (`lib/text/markdown-html.ts`): an allowlist of text elements, no attributes but

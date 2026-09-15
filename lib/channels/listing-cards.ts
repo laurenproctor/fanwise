@@ -77,6 +77,7 @@ export function listingCards(params: {
           view !== undefined &&
           view.listing.status === "published" &&
           view.listing.external_listing_id !== null,
+        replaceDeliveryLinkNote: adapter!.deliveryLinkReplaceNote ?? null,
         listingId,
         title: view?.draft.title ?? null,
         statusSource: view?.listing.status_source ?? null,

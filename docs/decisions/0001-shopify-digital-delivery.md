@@ -246,3 +246,12 @@ ADR 0012 gives WooCommerce a different answer: a Fanwise download address per fi
 and re-checked on every request. It applies to WooCommerce only, because WooCommerce stores a
 download as an address; Shopify has no API that attaches a buyer-downloadable file at all, so
 this ADR stands unchanged for Shopify.
+
+## Note, 15 September 2026: superseded for delivery by ADR 0013
+
+Shopify still has no API that attaches a buyer-downloadable file, and nothing here about that is
+wrong. What changed is how Fanwise answers it: the product carries a Fanwise download link in a
+metafield, the shop's order confirmation email prints it after a one-time snippet, and readiness
+refuses to publish until the creator confirms the snippet is in place. The assisted file step and
+the draft gate are gone. The principle this ADR exists for stands and is enforced by that
+readiness rule: no product goes on sale with nothing behind it.

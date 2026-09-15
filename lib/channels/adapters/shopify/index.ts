@@ -1,4 +1,6 @@
 import { shopifyMerchandising } from "./merchandising"
+import { isDeliverySetupConfirmed } from "@/lib/delivery/setup"
+import type { ProductAsset } from "@/lib/products/types"
 import { z } from "zod"
 import { ChannelError, normalized } from "@/lib/channels/errors"
 import { listingImages } from "@/lib/channels/images"
@@ -7,7 +9,6 @@ import type {
   AdapterSubject,
   ChannelAdapter,
   ChannelListingDraft,
-  ManualStepSpec,
   PublishContext,
   PublishResult,
   RequirementSpec,
@@ -38,15 +39,16 @@ import {
 /**
  * Shopify. The first real channel, and the one Fanwise does not bill for.
  *
- * The field-level spec is docs/channels/shopify.md, and the delivery decision
- * this adapter implements is docs/decisions/0001-shopify-digital-delivery.md.
- * The short version of both:
+ * The field-level spec is docs/channels/shopify.md. Delivery is ADR 0013,
+ * which replaced ADR 0001's manual file step on 15 September 2026:
  *
- *   Shopify has no API for attaching a buyer-downloadable file. So
- *   digitalFileUpload is false, publish() creates the product as a DRAFT, and
- *   the product only becomes purchasable after a human confirms the file is on
- *   it. A Shopify product that can take money with nothing behind it is the one
- *   outcome worth engineering against, and a draft cannot take money.
+ *   Shopify has no API for attaching a buyer-downloadable file, so the file
+ *   never goes to Shopify. Each product carries its Fanwise download link in a
+ *   product metafield, and the shop's order confirmation email prints it —
+ *   a snippet the creator adds to that template once per shop. Until they have
+ *   confirmed that, readiness blocks publishing, because a Shopify product that
+ *   can take money with nothing behind it is the one outcome worth engineering
+ *   against. Once they have, a publish puts the product on sale in one action.
  */
 
 const requirements: readonly RequirementSpec[] = [
@@ -72,14 +74,45 @@ const requirements: readonly RequirementSpec[] = [
     key: "deliverable",
     label: "A deliverable",
     // Shopify itself does not require a file, so on a literal reading this
-    // should be a warning. It is an error because the channel *as Fanwise
-    // implements it* needs one: the manual attach step cannot be performed
-    // without a file to attach, and a live product with nothing behind it is
-    // what ADR 0001 exists to prevent.
-    description: "You attach this to the product in Shopify yourself, once.",
+    // should be a warning. It is an error because a live product with nothing
+    // behind its download link takes money and gives nothing back.
+    description: "Buyers download it through the link in their order confirmation email.",
     severity: "error",
     assetTypes: ["deliverable", "archive"],
     minCount: 1,
+  },
+  {
+    kind: "custom",
+    key: "download_email_ready",
+    label: "Order emails include the download link",
+    description:
+      "Shopify has no field for a digital file, so buyers get their download from a link in the order confirmation email. Set that up once on the Channels page.",
+    severity: "error",
+    evaluate(_draft, subject) {
+      return isDeliverySetupConfirmed(subject.connectionMetadata)
+        ? { satisfied: true }
+        : {
+            satisfied: false,
+            message:
+              "Add the download link to Shopify's order confirmation email, once, from the Channels page.",
+          }
+    },
+  },
+  {
+    kind: "custom",
+    key: "one_download",
+    label: "One file to download",
+    description: "Shopify buyers receive a link to the first deliverable only.",
+    severity: "warning",
+    evaluate(_draft, subject) {
+      const count = deliverables(subject.assets).length
+      return count <= 1
+        ? { satisfied: true }
+        : {
+            satisfied: false,
+            message: `This product has ${count} deliverables. Shopify buyers get a link to the first; zip them into one file to send them all.`,
+          }
+    },
   },
   {
     kind: "tags",
@@ -184,26 +217,51 @@ const requirements: readonly RequirementSpec[] = [
   },
 ]
 
-/** ADR 0001's assisted file step, and the only manual step this channel has. */
-export const ATTACH_DIGITAL_FILE = "attach_digital_file"
+const DELIVERABLE_TYPES = ["deliverable", "archive"] as const
 
-const manualSteps: readonly ManualStepSpec[] = [
-  {
-    key: ATTACH_DIGITAL_FILE,
-    label: "Attach the download file",
-    description:
-      "Shopify has no API for digital files, so this step is manual, once per product. " +
-      "The product stays a draft until you confirm it, so nobody can buy it before the file is on it.",
-    instructions: [
-      "Download the deliverable from Fanwise.",
-      "Open the product in Shopify.",
-      "Add a digital attachment and upload the file.",
-    ],
-    required: true,
-    gatesActivation: true,
-    needsDeliverable: true,
-  },
-]
+/** The files a buyer receives, in the order the creator arranged them. */
+function deliverables(assets: readonly ProductAsset[]): ProductAsset[] {
+  return assets
+    .filter(
+      (asset) =>
+        asset.asset_state === "ready" &&
+        (DELIVERABLE_TYPES as readonly string[]).includes(asset.asset_type),
+    )
+    .sort((a, b) => a.sort_order - b.sort_order)
+}
+
+/**
+ * Where the link lives on the product, and what the email snippet reads.
+ * Changing either breaks every shop's template, so they are named once.
+ */
+export const DOWNLOAD_METAFIELD = {
+  namespace: "fanwise",
+  urlKey: "download_url",
+  nameKey: "download_name",
+} as const
+
+/**
+ * The Liquid a creator pastes into Shopify's order confirmation template.
+ *
+ * It prints a download button for every line whose product carries a Fanwise
+ * link, and only once the order is paid: an order placed with a manual payment
+ * method is confirmed before the money arrives.
+ */
+export const ORDER_EMAIL_SNIPPET = `{% comment %} Fanwise download links {% endcomment %}
+{% for line in line_items %}
+  {% assign fanwise_download = line.product.metafields.${DOWNLOAD_METAFIELD.namespace}.${DOWNLOAD_METAFIELD.urlKey} %}
+  {% if fanwise_download != blank %}
+    {% if financial_status == "paid" %}
+      <p style="margin: 16px 0;">
+        <a href="{{ fanwise_download }}" style="display: inline-block; padding: 12px 20px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;">
+          Download {{ line.product.metafields.${DOWNLOAD_METAFIELD.namespace}.${DOWNLOAD_METAFIELD.nameKey} | default: line.title }}
+        </a>
+      </p>
+    {% else %}
+      <p>Your download link for {{ line.title }} will be sent once your payment is confirmed.</p>
+    {% endif %}
+  {% endif %}
+{% endfor %}`
 
 const PRODUCT_SET = `
   mutation FanwiseProductSet($identifier: ProductSetIdentifiers, $input: ProductSetInput!) {
@@ -428,7 +486,7 @@ async function clientFor(context: PublishContext) {
  * as equal is how an edit silently takes a live product off sale. `preserve`
  * says "ask Shopify" instead of guessing.
  */
-type PublishIntent = "DRAFT" | "ACTIVE" | "preserve"
+type PublishIntent = "DRAFT" | "ACTIVE" | "preserve" | "live"
 
 /**
  * Shopify's own product statuses, which are what `preserve` preserves.
@@ -542,10 +600,10 @@ async function productSet(context: PublishContext, intent: PublishIntent): Promi
    * product off sale.
    */
   let status: (typeof SHOPIFY_STATUSES)[number]
-  if (intent !== "preserve") {
+  if (intent === "DRAFT" || intent === "ACTIVE") {
     status = intent
   } else if (!externalId) {
-    status = "DRAFT"
+    status = intent === "live" ? "ACTIVE" : "DRAFT"
   } else {
     const current = state?.product?.status
     const known = SHOPIFY_STATUSES.find((candidate) => candidate === current)
@@ -559,7 +617,10 @@ async function productSet(context: PublishContext, intent: PublishIntent): Promi
         ),
       )
     }
-    status = known
+    // `live` puts a product on sale unless the creator archived it in Shopify:
+    // archiving is a choice made there, and Publish changes is not a request
+    // to undo it.
+    status = intent === "live" ? (known === "ARCHIVED" ? "ARCHIVED" : "ACTIVE") : known
   }
 
   /*
@@ -613,6 +674,30 @@ async function productSet(context: PublishContext, intent: PublishIntent): Promi
    * change and neither would the answer. Left to Shopify, the handle is
    * derived from the title on create, suffixed if taken, and kept on update.
    */
+  /*
+   * The download link, where the order email reads it (ADR 0013). The first
+   * deliverable only: a Liquid template cannot loop over a list metafield
+   * reliably in every shop, and readiness warns when there is more than one.
+   * The address is the same on every write, so this is a no-op after the first.
+   */
+  const firstDeliverable = deliverables(subject.assets)[0]
+  const downloadMetafields = firstDeliverable
+    ? [
+        {
+          namespace: DOWNLOAD_METAFIELD.namespace,
+          key: DOWNLOAD_METAFIELD.urlKey,
+          type: "url",
+          value: await context.deliveryUrl(firstDeliverable),
+        },
+        {
+          namespace: DOWNLOAD_METAFIELD.namespace,
+          key: DOWNLOAD_METAFIELD.nameKey,
+          type: "single_line_text_field",
+          value: firstDeliverable.filename,
+        },
+      ]
+    : []
+
   const input: Record<string, unknown> = {
     title: listing.title ?? subject.product.name,
     descriptionHtml: toDescriptionHtml(listing.description),
@@ -622,6 +707,7 @@ async function productSet(context: PublishContext, intent: PublishIntent): Promi
     tags: listing.tags ?? [],
     status,
     ...(seo === null ? {} : { seo }),
+    ...(downloadMetafields.length > 0 ? { metafields: downloadMetafields } : {}),
     productOptions: [{ name: OPTION_NAME, values: [{ name: OPTION_VALUE }] }],
     variants: [
       {
@@ -754,6 +840,34 @@ async function publishToSalesChannel(
   return { purchasable: count > 0, publication, count }
 }
 
+/**
+ * ACTIVE, then on a sales channel, and purchasable only if both are true.
+ *
+ * Ordered deliberately. The status write converges — productSet with an
+ * identifier is an update, so a retry costs nothing — and if the channel
+ * publish then fails, the product is ACTIVE and unreachable, which the listing
+ * describes accurately rather than calling it live.
+ */
+async function goLive(context: PublishContext): Promise<PublishResult> {
+  const result = await productSet(context, "live")
+  // An archived product stays archived, and is not put on a channel.
+  if (result.externalState !== "live") return { ...result, purchasable: false }
+  const placement = await publishToSalesChannel(context, result.externalListingId)
+  return {
+    ...result,
+    purchasable: placement.purchasable,
+    providerResponse: {
+      productSet: result.providerResponse,
+      publication: {
+        id: placement.publication.publicationId,
+        resolvedBy: placement.publication.reason,
+        autoPublish: placement.publication.autoPublish,
+        resourcePublicationsCount: placement.count,
+      },
+    },
+  }
+}
+
 export const shopifyAdapter: ChannelAdapter = {
   key: "shopify",
   name: "Shopify",
@@ -777,15 +891,32 @@ export const shopifyAdapter: ChannelAdapter = {
     // offer a sales report that does not exist.
     metrics: false,
     transactions: false,
-    // False because Shopify cannot do it at all. See ADR 0001.
-    digitalFileUpload: false,
+    // True since ADR 0013: the file reaches buyers through a Fanwise download
+    // link the order email prints, rather than an attachment Shopify's API
+    // cannot make.
+    digitalFileUpload: true,
     imageUpload: true,
-    // True and load-bearing: publish creates a draft, and activate is what
-    // makes it live once the file is attached.
-    drafts: true,
+    // A publish puts the product on sale; there is no step to wait for.
+    drafts: false,
+  },
+  deliversByLink: true,
+  deliveryLinkReplaceNote:
+    "Buyers who already have the old link, in an order email, will lose access. Replace it only if the link has been shared.",
+  deliverySetup: {
+    title: "Add download links to order emails",
+    description:
+      "Shopify has no field for a digital file. Fanwise puts each product's download link on the product, and your order confirmation email shows it to the buyer. Do this once for the shop; every product Fanwise publishes uses it.",
+    steps: [
+      "In Shopify admin, open Settings, then Notifications, then Customer notifications.",
+      "Open Order confirmation and click Edit code.",
+      "Paste the snippet below where the download button should appear, for example just after the order summary heading.",
+      "Save, then send yourself a preview to check it renders.",
+      "Come back here and confirm.",
+    ],
+    snippet: ORDER_EMAIL_SNIPPET,
   },
   requirements,
-  manualSteps,
+  manualSteps: [],
   merchandising: shopifyMerchandising,
   oauth: shopifyOAuth,
 
@@ -814,69 +945,26 @@ export const shopifyAdapter: ChannelAdapter = {
     }
   },
 
-  /** Creates the product as a draft. Nobody can buy it yet, on purpose. */
-  async publish(context: PublishContext): Promise<PublishResult> {
-    const result = await productSet(context, "DRAFT")
-    // Stated rather than left unknown. A draft is definitively not purchasable,
-    // and recording that is what lets the UI distinguish it later from a
-    // listing whose purchasability nothing has established.
-    return { ...result, purchasable: false }
+  /**
+   * Creates the product on sale, with its download link, and puts it on the
+   * Online Store.
+   *
+   * One action since ADR 0013. Readiness has already refused a shop whose order
+   * email does not print the link, so nothing is left for a person to do first.
+   */
+  publish(context: PublishContext): Promise<PublishResult> {
+    return goLive(context)
   },
 
   /**
-   * Updates in place, preserving whether the product is currently live. An edit
-   * must not quietly take a live product off sale, and must not quietly put a
-   * draft one on it.
+   * Updates in place, on sale.
    *
-   * The local record is used when it exists and is trusted only when it says
-   * something. It is absent on any listing published before Fanwise wrote it,
-   * and a rebuild used to blank it, so the previous reading of "not live"
-   * turned an ordinary edit into a deactivation. Absence now means unknown,
-   * and unknown is answered by the provider rather than by a default.
+   * The draft this used to preserve was ADR 0001's: a product waiting on the
+   * manual file step. That step is gone, so a draft here is either a product
+   * published before ADR 0013 or one taken off sale in the admin, and Publish
+   * changes is a person asking for the listing to be sold.
    */
   update(context: PublishContext): Promise<PublishResult> {
-    const metadata = context.listing.metadata as Record<string, unknown> | null
-    const recorded = metadata?.["externalState"]
-    if (recorded === "live") return productSet(context, "ACTIVE")
-    if (recorded === "draft") return productSet(context, "DRAFT")
-    return productSet(context, "preserve")
-  },
-
-  /**
-   * The other half of ADR 0001, and now the whole of ADR 0004.
-   *
-   * Two facts have to become true before a buyer can buy, and Shopify keeps
-   * them apart: the product must be ACTIVE, and it must be on a sales channel.
-   * A5's exit test found products that were the first and not the second, and
-   * `activate` claiming success on the first alone is what let Fanwise report
-   * "Live" about a product with no storefront page.
-   *
-   * Ordered deliberately. The status write goes first because it is the one
-   * that converges — `productSet` with an identifier is an update, so a retry
-   * after a failed publish step costs nothing and changes nothing. If the
-   * channel publish then fails, the product is ACTIVE and unreachable, which
-   * is a state the listing now describes accurately instead of one it used to
-   * describe as live.
-   */
-  async activate(context: PublishContext): Promise<PublishResult> {
-    const result = await productSet(context, "ACTIVE")
-    const placement = await publishToSalesChannel(context, result.externalListingId)
-
-    return {
-      ...result,
-      purchasable: placement.purchasable,
-      providerResponse: {
-        productSet: result.providerResponse,
-        publication: {
-          id: placement.publication.publicationId,
-          // How it was chosen, kept because a match on a handle and a shop that
-          // simply had one channel are not equally strong answers, and the job
-          // row is where somebody looks when a product lands somewhere odd.
-          resolvedBy: placement.publication.reason,
-          autoPublish: placement.publication.autoPublish,
-          resourcePublicationsCount: placement.count,
-        },
-      },
-    }
+    return goLive(context)
   },
 }

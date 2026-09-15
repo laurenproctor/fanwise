@@ -13,6 +13,7 @@ import { callbackUrl, createAuthorizationState, grantUrl } from "./oauth"
 import { codeChallenge, generateCodeVerifier } from "./pkce"
 import type { AdapterSubject, ChannelListingDraft } from "./types"
 import { requestBillingSync } from "@/lib/billing/request-sync"
+import { DELIVERY_SETUP_CONFIRMED_KEY } from "@/lib/delivery/setup"
 
 export interface ActionState {
   error: string | null
@@ -191,6 +192,56 @@ export async function beginAuthorizationAction(
       error: `${channel.name} is not configured on this deployment yet. Nothing was changed.`,
     }
   }
+}
+
+/**
+ * Records, or withdraws, a creator's confirmation that a channel's one-time
+ * delivery setup is done (ADR 0013).
+ *
+ * A claim, not a verification: the setup lives in the shop's own admin, which
+ * no API Fanwise holds can read. It is stated as the creator's, per account,
+ * and it is what the channel's readiness rule reads before a product may go on
+ * sale there.
+ */
+export async function setDeliverySetupAction(
+  workspaceSlug: string,
+  connectionId: string,
+  confirmed: boolean,
+): Promise<ActionState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data: connection, error: readError } = await supabase
+    .from("channel_connections")
+    .select("id, metadata, channel:channels(key)")
+    .eq("id", connectionId)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+
+  if (readError) throw readError
+  if (!connection) return { error: "That connection could not be found." }
+
+  const channelKey = (connection as unknown as { channel: { key: string } | null }).channel?.key
+  const adapter = channelKey ? findAdapter(channelKey) : undefined
+  if (!adapter?.deliverySetup) return { error: "This channel has no delivery setup." }
+
+  const metadata = { ...((connection.metadata as Record<string, unknown>) ?? {}) }
+  if (confirmed) metadata[DELIVERY_SETUP_CONFIRMED_KEY] = new Date().toISOString()
+  else delete metadata[DELIVERY_SETUP_CONFIRMED_KEY]
+
+  const { error } = await supabase
+    .from("channel_connections")
+    .update({ metadata: metadata as never })
+    .eq("id", connectionId)
+    .eq("workspace_id", workspace.id)
+
+  if (error) {
+    console.error("[channels] could not record delivery setup", error)
+    return { error: "That could not be saved. Try again." }
+  }
+
+  // Readiness on every product reads this, so every product page is stale.
+  revalidatePath(`/${workspaceSlug}`, "layout")
+  return { error: null }
 }
 
 /**

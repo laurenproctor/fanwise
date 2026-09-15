@@ -7,7 +7,7 @@ vi.mock("@/lib/credentials", () => ({
 }))
 
 import { createShopifyClient } from "@/lib/channels/adapters/shopify/client"
-import { shopifyAdapter } from "@/lib/channels/adapters/shopify"
+import { ORDER_EMAIL_SNIPPET, shopifyAdapter } from "@/lib/channels/adapters/shopify"
 import { constraintsFor } from "@/lib/channels/constraints"
 import { SCOPES } from "@/lib/channels/adapters/shopify/config"
 import { evaluate } from "@/lib/channels/listings"
@@ -152,7 +152,7 @@ function context(overrides: Partial<PublishContext> = {}): PublishContext {
 }
 
 /** A productSet response, as the client's Zod schema expects it. */
-function productSetOk(status: "DRAFT" | "ACTIVE" = "DRAFT") {
+function productSetOk(status: "DRAFT" | "ACTIVE" | "ARCHIVED" = "DRAFT") {
   return {
     data: {
       productSet: {
@@ -189,7 +189,7 @@ function productStateOk(nodes: { id: string; status: string }[] = [], holds = "D
 function respondTo(
   body: unknown,
   options: {
-    status?: "DRAFT" | "ACTIVE"
+    status?: "DRAFT" | "ACTIVE" | "ARCHIVED"
     media?: { id: string; status: string }[]
     /** What Shopify says the product's status currently is. */
     holds?: string
@@ -349,7 +349,7 @@ describe("transforms", () => {
 })
 
 describe("requirements", () => {
-  it("blocks on a missing deliverable, because the manual step needs a file", () => {
+  it("blocks on a missing deliverable, because buyers download it through the order email", () => {
     const withoutFile = subject({ assets: [asset()] })
     const { readiness } = evaluate(
       shopifyAdapter,
@@ -358,6 +358,40 @@ describe("requirements", () => {
     )
     expect(readiness.ready).toBe(false)
     expect(readiness.blocking.map((r) => r.key)).toContain("deliverable")
+  })
+
+  it("blocks until the shop's order email is confirmed to print the link, then clears", () => {
+    const unconfirmed = subject({ connectionMetadata: { currencyCode: "USD" } })
+    const draft = shopifyAdapter.buildListing(unconfirmed)
+    const before = evaluate(shopifyAdapter, draft, unconfirmed)
+    expect(before.readiness.blocking.map((r) => r.key)).toContain("download_email_ready")
+
+    const confirmed = subject({
+      connectionMetadata: { currencyCode: "USD", deliverySetupConfirmedAt: "2026-09-15T10:00:00Z" },
+    })
+    const after = evaluate(shopifyAdapter, draft, confirmed)
+    expect(after.results.find((r) => r.key === "download_email_ready")?.satisfied).toBe(true)
+  })
+
+  it("warns when there is more than one file, since buyers get a link to the first", () => {
+    const two = subject({
+      assets: [
+        asset({ id: "d1", asset_type: "deliverable", filename: "a.zip" }),
+        asset({ id: "d2", asset_type: "deliverable", filename: "b.zip", sort_order: 1 }),
+      ],
+    })
+    const result = evaluate(shopifyAdapter, shopifyAdapter.buildListing(two), two).results.find(
+      (r) => r.key === "one_download",
+    )
+    expect(result?.satisfied).toBe(false)
+    expect(result?.severity).toBe("warning")
+  })
+
+  it("gives the order email snippet the namespace and keys the product is written with", () => {
+    expect(ORDER_EMAIL_SNIPPET).toContain("line.product.metafields.fanwise.download_url")
+    expect(ORDER_EMAIL_SNIPPET).toContain("line.product.metafields.fanwise.download_name")
+    expect(ORDER_EMAIL_SNIPPET).toContain('financial_status == "paid"')
+    expect(shopifyAdapter.deliverySetup?.snippet).toBe(ORDER_EMAIL_SNIPPET)
   })
 
   it("does not block on a missing cover image, which Shopify accepts", () => {
@@ -620,11 +654,11 @@ describe("the search-result fields", () => {
 })
 
 describe("publish", () => {
-  it("creates the product as a DRAFT and sends no identifier", async () => {
+  it("creates the product on sale, with its download link, and sends no identifier", async () => {
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
-      captureFetch(bodies, (body) => respondTo(body, { status: "DRAFT" })),
+      captureFetch(bodies, (body) => respondTo(body, { status: "ACTIVE" })),
     )
 
     const result = await shopifyAdapter.publish!(context())
@@ -633,14 +667,39 @@ describe("publish", () => {
     // No identifier means create. This is the only call in the adapter that
     // may bring a new product into existence.
     expect(variables.identifier).toBeNull()
-    expect((variables.input as { status: string }).status).toBe("DRAFT")
+    const input = variables.input as { status: string; metafields: unknown }
+    expect(input.status).toBe("ACTIVE")
+    // ADR 0013: the link the order email prints, on the product itself.
+    expect(input.metafields).toEqual([
+      {
+        namespace: "fanwise",
+        key: "download_url",
+        type: "url",
+        value: "https://fanwise.test/api/public/delivery/token-asset-2",
+      },
+      {
+        namespace: "fanwise",
+        key: "download_name",
+        type: "single_line_text_field",
+        value: "aster.zip",
+      },
+    ])
 
-    expect(result.externalState).toBe("draft")
+    expect(result.externalState).toBe("live")
+    expect(result.purchasable).toBe(true)
     expect(result.externalListingId).toBe("gid://shopify/Product/900")
     expect(result.externalUrl).toBe("https://aster-type.myshopify.com/admin/products/900")
-    // The storefront address from the handle, since a draft has no
-    // onlineStoreUrl. The runner decides whether to keep it.
-    expect(result.publicUrl).toBe("https://aster-type.myshopify.com/products/aster-grotesk")
+    expect(result.publicUrl).toBe("https://aster.example/products/aster")
+  })
+
+  it("sends no download field for a product with no deliverable", async () => {
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body, { status: "ACTIVE" })),
+    )
+    await shopifyAdapter.publish!(context({ subject: { ...subject(), assets: [] } }))
+    expect(productSetVariables(bodies).input).not.toHaveProperty("metafields")
   })
 
   it("marks the variant as not requiring shipping, so a font is not quoted postage", async () => {
@@ -898,17 +957,18 @@ describe("publish", () => {
       }),
     )
 
-    expect(bodies).toHaveLength(1)
+    const queries = bodies.map((b) => String((b as { query?: string }).query ?? ""))
+    expect(queries.some((q) => q.includes("FanwiseProductState"))).toBe(false)
   })
 
-  it("activates by setting ACTIVE on the existing product", async () => {
+  it("sets ACTIVE on the existing product through an update", async () => {
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
       captureFetch(bodies, (body) => respondTo(body, { status: "ACTIVE" })),
     )
 
-    const result = await shopifyAdapter.activate!(
+    const result = await shopifyAdapter.update!(
       context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
     )
 
@@ -938,11 +998,12 @@ describe("publish", () => {
     expect(input.status).toBe("ACTIVE")
   })
 
-  it("does not put a draft product on sale through an ordinary update", async () => {
+  it("puts a draft left over from the old manual file step on sale", async () => {
+    // ADR 0013: a draft was only ever a product waiting on that step.
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
-      captureFetch(bodies, (body) => respondTo(body, { status: "DRAFT" })),
+      captureFetch(bodies, (body) => respondTo(body, { status: "ACTIVE" })),
     )
 
     await shopifyAdapter.update!(
@@ -955,7 +1016,7 @@ describe("publish", () => {
     )
 
     const input = productSetVariables(bodies).input as { status: string }
-    expect(input.status).toBe("DRAFT")
+    expect(input.status).toBe("ACTIVE")
   })
 
   it("asks Shopify when the listing has no record of whether the product is live", async () => {
@@ -1065,7 +1126,7 @@ describe("putting the product on a sales channel", () => {
       captureFetch(bodies, (body) => respondTo(body, { status: "ACTIVE", holds: "ACTIVE" })),
     )
 
-    const result = await shopifyAdapter.activate!(
+    const result = await shopifyAdapter.update!(
       context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
     )
 
@@ -1089,32 +1150,34 @@ describe("putting the product on a sales channel", () => {
       ),
     )
 
-    const result = await shopifyAdapter.activate!(
+    const result = await shopifyAdapter.update!(
       context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
     )
 
     expect(result.purchasable).toBe(false)
   })
 
-  it("creates a draft as explicitly not purchasable", async () => {
+  it("reports an archived product as not purchasable, and does not put it on a channel", async () => {
+    const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
-      captureFetch([], (body) => respondTo(body)),
+      captureFetch(bodies, (body) => respondTo(body, { holds: "ARCHIVED", status: "ARCHIVED" })),
     )
 
-    const result = await shopifyAdapter.publish!(context())
+    const result = await shopifyAdapter.update!(
+      context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
+    )
 
-    // False rather than absent. Absent means nobody established it, and the two
-    // must stay tellable apart or liveness cannot use either.
+    const queries = bodies.map((b) => String((b as { query?: string }).query ?? ""))
+    expect(queries.some((q) => q.includes("FanwisePublishablePublish"))).toBe(false)
     expect(result.purchasable).toBe(false)
   })
 
-  it("leaves purchasability alone on an ordinary update", async () => {
-    // An update does not look at publications, so it has no opinion. Returning
-    // false here would take a live product's badge away for no reason.
+  it("confirms purchasability on an ordinary update", async () => {
+    // Every update ends on the channel now, so it knows the answer.
     vi.stubGlobal(
       "fetch",
-      captureFetch([], (body) => respondTo(body, { holds: "ACTIVE" })),
+      captureFetch([], (body) => respondTo(body, { status: "ACTIVE", holds: "ACTIVE" })),
     )
 
     const result = await shopifyAdapter.update!(
@@ -1126,7 +1189,7 @@ describe("putting the product on a sales channel", () => {
       }),
     )
 
-    expect(result.purchasable).toBeUndefined()
+    expect(result.purchasable).toBe(true)
   })
 
   it("refuses rather than guessing when the store's channels are ambiguous", async () => {
@@ -1152,7 +1215,7 @@ describe("putting the product on a sales channel", () => {
     )
 
     await expect(
-      shopifyAdapter.activate!(
+      shopifyAdapter.update!(
         context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
       ),
     ).rejects.toThrow(/could not tell which of this store's sales channels is the Online Store/)
@@ -1187,7 +1250,7 @@ describe("putting the product on a sales channel", () => {
       ),
     )
 
-    const result = await shopifyAdapter.activate!(
+    const result = await shopifyAdapter.update!(
       context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
     )
 
@@ -1212,7 +1275,7 @@ describe("putting the product on a sales channel", () => {
       ),
     )
 
-    const result = await shopifyAdapter.activate!(
+    const result = await shopifyAdapter.update!(
       context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
     )
 
@@ -1242,7 +1305,7 @@ describe("putting the product on a sales channel", () => {
     } as ChannelConnection
 
     await expect(
-      shopifyAdapter.activate!({
+      shopifyAdapter.update!({
         ...stale,
         connection,
         listing: listing({ external_listing_id: "gid://shopify/Product/900" }),
@@ -1263,7 +1326,7 @@ describe("putting the product on a sales channel", () => {
     )
 
     const base = context()
-    const result = await shopifyAdapter.activate!({
+    const result = await shopifyAdapter.update!({
       ...base,
       connection: { ...base.connection, scopes: [] } as ChannelConnection,
       listing: listing({ external_listing_id: "gid://shopify/Product/900" }),
@@ -1309,7 +1372,7 @@ describe("a product that is gone from the channel", () => {
       captureFetch([], (body) => respondTo(body, { missing: true })),
     )
 
-    const error = await shopifyAdapter.activate!(
+    const error = await shopifyAdapter.update!(
       context({
         listing: listing({ external_listing_id: "gid://shopify/Product/900", metadata: {} }),
       }),

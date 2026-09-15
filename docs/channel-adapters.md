@@ -24,7 +24,7 @@ Current reality, from `docs/channel-feasibility.md`:
 
 | Channel | Type | Publish | Update | Transactions | File upload | Image upload |
 |---|---|---|---|---|---|---|
-| Shopify | api | yes | yes | yes | **no**, see note | yes |
+| Shopify | api | yes | yes | yes | **yes**, by a Fanwise link in the order email, ADR 0013 | yes |
 | WooCommerce | api | yes | yes | yes | **yes**, by Fanwise download link, ADR 0012 | yes |
 | Etsy | api | yes | yes | yes | **yes**, 5 files at 20 MB, built at A6 | yes |
 | Creative Market | assisted | no | no | no | no | no |
@@ -44,8 +44,10 @@ endpoints this matrix recorded as missing shipped in April 2026. Planned at B10;
 
 **Shopify note, resolved at A5.** The Admin API creates products but has no API for
 attaching a buyer-downloadable file, and Shopify's own Digital Downloads app exposes none.
-Re-verified 4 September 2026: still true. `docs/decisions/0001` takes the assisted file step,
-so Shopify ships with `digitalFileUpload: false` and one manual step. The full spec is
+Re-verified 4 September 2026: still true. `docs/decisions/0001` took the assisted file step.
+**Since 15 September 2026, ADR 0013:** the product carries a Fanwise download link in a
+metafield, the shop's order confirmation email prints it after a one-time snippet (the adapter's
+`deliverySetup`), and Shopify is `digitalFileUpload: true` with no manual step. The full spec is
 `docs/channels/shopify.md`.
 
 **Reading a listing inward is planned at B12 and is not in this matrix yet.** Importing a

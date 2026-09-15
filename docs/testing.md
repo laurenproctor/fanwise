@@ -127,7 +127,10 @@ the product heading, usually.
 2. Product to AI Shopify listing, approved. *(composition ran live at B1; the review loop
    with field regenerate and restore is code complete at B2 and proven in
    `tests/db/ai-review.test.ts`; approval is the publish click; unrun in the browser)*
-3. Connect Shopify, publish. *(code complete at A5, unverified: needs a live shop)*
+3. Connect Shopify, add the order email snippet once, publish, buy as a test buyer and download
+   from the link in the order confirmation email. *(delivery rewritten for ADR 0013 on 15
+   September 2026; the email half is unverified until a live shop's test order. Covered without
+   one by `tests/unit/shopify-adapter.test.ts` and `tests/unit/delivery-setup.test.ts`)*
 4. Connect Etsy, publish. *(ran by hand on 11 September 2026 against the live shop, see
    `docs/roadmap.md`; the OAuth flow and the adapter are covered in
    `tests/unit/etsy-oauth.test.ts` and `tests/unit/etsy-adapter.test.ts`)*

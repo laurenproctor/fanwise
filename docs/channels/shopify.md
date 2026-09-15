@@ -4,9 +4,11 @@ The first real channel, and the only one Fanwise does not bill for: under the pr
 one owned storefront is included in the $9 base. Everything here is written against the
 GraphQL Admin API `2026-07`, verified against shopify.dev in September 2026.
 
-Read `docs/decisions/0001-shopify-digital-delivery.md` first. This document assumes its
-conclusion: **Shopify has no API for attaching a buyer-downloadable file**, so the file step
-is assisted, and the adapter declares `digitalFileUpload: false`.
+Read `docs/decisions/0001-shopify-digital-delivery.md` and then
+`docs/decisions/0013-shopify-order-email-delivery.md`. **Shopify has no API for attaching a
+buyer-downloadable file.** Until 15 September 2026 that made the file step assisted (ADR 0001);
+since then the product carries a Fanwise download link in a metafield, the shop's order
+confirmation email prints it, and a publish puts the product on sale in one action (ADR 0013).
 
 ## 1. What the step proves
 
@@ -16,7 +18,7 @@ A5's exit test is three claims, and each maps to something in this file:
 |---|---|
 | A real product publishes | §4 publish, §5 the mutation |
 | A second click creates nothing | §7 idempotency |
-| The file is actually deliverable to a buyer | §6 the draft gate |
+| The file is actually deliverable to a buyer | §6 the order email link |
 
 ## 2. Adapter definition
 
@@ -30,14 +32,18 @@ capabilities: {
   automaticUpdate: true,     // productSet with an identifier, implemented
   metrics: false,            // exists on the provider, arrives at B6
   transactions: false,       // exists on the provider, arrives at B5
-  digitalFileUpload: false,  // does not exist on the provider at all
+  digitalFileUpload: true,   // a Fanwise link in the order email, ADR 0013. See §6
   imageUpload: true,         // files: [FileSetInput], implemented
-  drafts: true,              // status: DRAFT, and load-bearing. See §6
+  drafts: false,             // a publish puts the product on sale
 }
+deliversByLink: true
+deliverySetup: { … }         // the order email snippet, once per shop
+manualSteps: []
 ```
 
 Three of these are false, for two different reasons, and the difference matters.
-`digitalFileUpload` is false because Shopify cannot do it. `metrics` and `transactions` are
+`digitalFileUpload` was false until ADR 0013, because Shopify cannot attach a file; it is true
+now because Fanwise delivers the file itself. `metrics` and `transactions` are
 false because Fanwise has not built the steps that use them; the capability rule in
 `docs/channel-adapters.md` is that a capability is declared false when the feature exists but
 the step using it has not arrived.
@@ -97,10 +103,14 @@ are rules rather than nothing at all because the editor derives its character
 counters from the requirement specs, and a field with no rule gets no counter.
 
 `deliverable` is the interesting one. Shopify itself does not require a file, so on a literal
-reading it should be a warning. It is an error because the *channel as Fanwise implements it*
-requires one: the manual attach step in §6 is unperformable without a file, and a Shopify
-product that can take money with nothing behind it is the outcome ADR 0001 names as the one
-worth engineering against.
+reading it should be a warning. It is an error because a Shopify product that can take money
+with nothing behind its download link is the outcome ADR 0001 names as the one worth
+engineering against.
+
+Two rules arrived with ADR 0013. `download_email_ready` (error) is unsatisfied until the creator
+confirms, once per connected shop on the Channels page, that the order confirmation email
+prints the link. `one_download` (warning) says when a product has more than one deliverable,
+because the email links only the first.
 
 ## 5. The publish call
 
@@ -163,37 +173,39 @@ address and may apply a shipping rate to a font.
 against a recorded fake in tests and nothing else. §13 is the list of what a live shop has to
 confirm.
 
-## 6. Digital delivery, and the draft gate
+## 6. Digital delivery: the order email link
 
-Per ADR 0001 the deliverable is attached by hand, once per product, in Shopify admin.
-
-Fanwise makes that safe rather than merely documented:
+ADR 0013, 15 September 2026. Shopify has no downloadable-file field, so the file never goes to
+Shopify.
 
 ```
-publish()            product created with status DRAFT
-                     listing.status = published, status_source = verified
-                     manual step attach_digital_file, incomplete
-                     Fanwise reports "Published, not live"
+once per shop        Channels page: copy ORDER_EMAIL_SNIPPET into Settings → Notifications →
+                     Order confirmation → Edit code, then "I've added it"
+                     connection.metadata.deliverySetupConfirmedAt = now
+                     readiness rule download_email_ready now satisfied
 
-mark attached        productSet identifier:{id} status ACTIVE
-                     publishablePublish onto the Online Store publication
-                     resourcePublicationsCount read back and asserted
-                     manual step complete
+publish() / update() productSet status ACTIVE (update keeps ARCHIVED, refuses an unreadable status)
+                     metafields fanwise.download_url   = Fanwise delivery address, first deliverable
+                                fanwise.download_name  = its filename
+                     publishablePublish onto the Online Store, count read back (§16)
                      Fanwise reports "Live"
+
+buyer pays           the order confirmation email prints a Download button per line item whose
+                     product carries fanwise.download_url, when financial_status is paid
+buyer clicks         /api/public/delivery/<token> → 302 to a five-minute signed download (ADR 0012)
 ```
 
-The product is not purchasable until the creator confirms the file is on it. The window in
-which a buyer can pay and receive nothing does not exist, rather than existing and being
-warned about.
+The address is minted once per listing and file and re-sent unchanged on every write. **Replace
+download link** revokes it and writes a new one, after warning that past buyers' emails hold the
+old link.
 
-**This refines ADR 0001's UI sketch**, which showed the product created live with the file
-step outstanding. The ADR's own normative text asks for the opposite — "do not report the
-product as live until [no required manual step is incomplete]" — and creating the product as
-a draft is the reading that satisfies it structurally instead of by label. The ADR carries an
-amendment recording the change.
+**[verify]** on a live shop that the template resolves `line.product.metafields.fanwise.download_url`.
+An order paid by a manual method gets no link, because Shopify sends no second email on payment.
 
-It also makes `drafts: true` load-bearing. A capability that nothing uses is a capability
-nobody checks.
+Until 15 September 2026 this section described the draft gate: publish created a DRAFT, the
+creator attached the file in Shopify admin, marked the `attach_digital_file` step done, and
+`activate` set ACTIVE. Listings published that way are offered **Publish changes**, which puts
+them on sale with their link.
 
 ## 7. Idempotency
 
@@ -332,7 +344,9 @@ time the creator clicked, which is the duplicate §7 exists to prevent.
   `/products/<handle>` on the shop domain while that is null), `status_source = verified`. `publish_generation`
   is incremented, and every one of those fields cleared, when a product is found deleted.
 - `publication_jobs` — one row per logical publish, carrying the idempotency key.
-- `listing_manual_steps` — one row, `attach_digital_file`.
+- `listing_manual_steps` — none since ADR 0013. Rows written before it are ignored.
+- `delivery_links` — one active row per listing and deliverable (ADR 0012).
+- Product metafields `fanwise.download_url` and `fanwise.download_name`, on the Shopify side.
 - `listing_snapshots` — one `publish` snapshot per successful publication.
 
 ## 13. Open questions to resolve against a live shop
@@ -510,7 +524,7 @@ storefront page, no buyer able to reach them. Status and channel publication are
 facts on Shopify, `productSet` sets only the first, and Fanwise was reporting the result as
 "Live".
 
-`activate` now does both, in this order:
+`activate` did both, in this order; since ADR 0013 `publish` and `update` do:
 
 ```
 productSet identifier:{id} status ACTIVE      the status half, and it converges
