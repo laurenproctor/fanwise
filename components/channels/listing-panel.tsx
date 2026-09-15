@@ -53,6 +53,8 @@ export interface ChannelListingCard {
   canPublishChanges: boolean
   /** Offered where buyers download through a Fanwise address the creator can replace. */
   canReplaceDeliveryLink: boolean
+  /** What replacing costs buyers, when it costs them something. Asked before acting. */
+  replaceDeliveryLinkNote?: string | null
   listingId: string | null
   title: string | null
   statusSource: "verified" | "self_reported" | null
@@ -484,7 +486,17 @@ export function ListingPanel({
                   {card.canReplaceDeliveryLink ? (
                     <button
                       type="button"
-                      onClick={() => replaceDeliveryLink(card.connectionId, card.listingId!)}
+                      onClick={() => {
+                        // Where the old link already sits in buyers' inboxes,
+                        // replacing it takes their download away. Asked, not assumed.
+                        if (
+                          card.replaceDeliveryLinkNote &&
+                          !window.confirm(card.replaceDeliveryLinkNote)
+                        ) {
+                          return
+                        }
+                        replaceDeliveryLink(card.connectionId, card.listingId!)
+                      }}
                       disabled={pending}
                       title="Stops the current download address working and gives the channel a new one. Use it if the link has been shared."
                       className="text-[13px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-50"

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { carryDurableMetadata } from "@/lib/delivery/setup"
 import type { NextRequest } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
@@ -125,6 +126,16 @@ export async function GET(
       ...(consumed.codeVerifier ? { codeVerifier: consumed.codeVerifier } : {}),
     })
 
+    // A reconnect of the same account keeps what the account's own setup
+    // established (lib/delivery/setup.ts); the token is new, the shop is not.
+    const { data: previous } = await admin
+      .from("channel_connections")
+      .select("metadata")
+      .eq("workspace_id", consumed.workspaceId)
+      .eq("channel_id", consumed.channelId)
+      .eq("external_account_id", grant.externalAccountId)
+      .maybeSingle()
+
     const { data: connection, error: connectionError } = await admin
       .from("channel_connections")
       .upsert(
@@ -135,7 +146,10 @@ export async function GET(
           external_account_name: grant.externalAccountName,
           status: "active",
           scopes: grant.scopes,
-          metadata: grant.metadata as never,
+          metadata: carryDurableMetadata(
+            previous?.metadata as Record<string, unknown> | null,
+            grant.metadata as Record<string, unknown>,
+          ) as never,
           last_verified_at: new Date().toISOString(),
           expires_at: grant.expiresAt,
         },

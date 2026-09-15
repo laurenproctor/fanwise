@@ -463,6 +463,16 @@ export type ChannelField =
   | "category"
   | "tags"
 
+export interface DeliverySetupSpec {
+  title: string
+  /** Why this is needed, in one or two sentences. */
+  description: string
+  /** Rendered as a numbered list, in order. */
+  steps: readonly string[]
+  /** Text the creator copies into the channel, shown verbatim with a Copy button. */
+  snippet: string
+}
+
 export interface ChannelAdapter {
   key: ChannelKey
   name: string
@@ -479,6 +489,16 @@ export interface ChannelAdapter {
    * address (ADR 0012), which the creator can replace to cut off a leaked link.
    */
   deliversByLink?: boolean
+  /**
+   * What the creator is warned of before replacing a download link, when the
+   * link has already reached buyers somewhere Fanwise cannot update.
+   */
+  deliveryLinkReplaceNote?: string
+  /**
+   * A one-time setup, per connected account, that delivery depends on
+   * (ADR 0013). Rendered on the Channels page; confirmed onto the connection.
+   */
+  deliverySetup?: DeliverySetupSpec
   /** The rules this channel enforces, as data. See lib/channels/requirements.ts. */
   requirements: readonly RequirementSpec[]
   /** Work this channel's API cannot do. Empty for a channel that needs none. */
