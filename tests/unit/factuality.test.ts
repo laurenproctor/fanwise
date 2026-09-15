@@ -205,3 +205,29 @@ describe("Markdown descriptions are read as the words a buyer sees", () => {
     expect(found.map((v) => v.value)).toContain("2024")
   })
 })
+
+describe("a typeface's period", () => {
+  // lib/ai/guidance.ts tells the model a decade or a year is a number. This is
+  // the half of that sentence the validator enforces; the prompt rule against
+  // an invented influence named in words is the other half, and has no
+  // deterministic check.
+  it("refuses a decade the facts do not state", () => {
+    const found = violations(output({ description: "A 1970s editorial grotesque." }))
+    expect(found.map((v) => v.value)).toContain("1970s")
+  })
+
+  it("refuses a decade however it is written", () => {
+    const found = violations(
+      output({ description: "Inspired by 1960's signage and '80s album covers." }),
+    )
+    expect(found.map((v) => v.value)).toEqual(["1960's", "80s"])
+  })
+
+  it("accepts a decade the creator's description states", () => {
+    const result = validateFactuality(output({ description: "A 1970s editorial grotesque." }), {
+      ...sheet,
+      description: `${sheet.description} Drawn from 1970s Swiss magazines.`,
+    })
+    expect(result.ok).toBe(true)
+  })
+})

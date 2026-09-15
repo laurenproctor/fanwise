@@ -264,9 +264,11 @@ const VAGUE = new RegExp(`\\b(${VAGUE_QUANTITIES.join("|")})\\b`, "gi")
  * A number, standing on its own. Not preceded by a letter, digit or dot, so
  * "woff2", "v2.1" and "A4" do not yield a 2, a 1 or a 4; and not followed by a
  * letter, so "1080p" and "2x" are left to the vocabulary. Thousands separators
- * and decimals are one number.
+ * and decimals are one number. A decade's plural is the one letter allowed:
+ * "1970s", "1970's" and "'90s" are periods, and a period is a claim, so they
+ * read as 1970, 1970 and 90 rather than slipping past as words.
  */
-const NUMERAL = /(?<![\w.])(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?![\w])/g
+const NUMERAL = /(?<![\w.])(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:['\u2019]?s)?(?![\w])/g
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -278,7 +280,7 @@ function termPattern(term: string): RegExp {
 }
 
 function parseNumeral(text: string): number {
-  return Number(text.replace(/,/g, ""))
+  return Number(text.replace(/,|['\u2019]?s$/g, ""))
 }
 
 function normalizeFormat(term: string): string {
