@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { planRun, runSummary, SKIP_REASON_TEXT, type RunChannelInput } from "@/lib/publishing/run"
+import {
+  NO_LISTING_TEXT,
+  planRun,
+  runSummary,
+  SKIP_REASON_TEXT,
+  type RunChannelInput,
+} from "@/lib/publishing/run"
 
 /**
  * What one Publish Everywhere click decides.
@@ -20,6 +26,7 @@ function channel(overrides: Partial<RunChannelInput> = {}): RunChannelInput {
     connected: true,
     listingId: "listing-1",
     ready: true,
+    blocking: [],
     hasExternalId: false,
     unsentChanges: false,
     ...overrides,
@@ -51,7 +58,7 @@ describe("planRun", () => {
     const plan = planRun([channel({ connectionId: null, connected: false, listingId: null })])
 
     expect(plan.skips).toEqual([
-      { connectionId: null, channelName: "A Channel", reason: "not_connected" },
+      { connectionId: null, channelName: "A Channel", reason: "not_connected", needs: [] },
     ])
   })
 
@@ -114,6 +121,40 @@ describe("planRun", () => {
       expect(SKIP_REASON_TEXT[skip.reason]).toBeTruthy()
     }
     expect(new Set(plan.skips.map((s) => s.reason)).size).toBe(4)
+  })
+})
+
+describe("what a not-ready skip names", () => {
+  it("lists what the channel would reject, in order", () => {
+    const plan = planRun([
+      channel({
+        ready: false,
+        blocking: ["Price is required to publish.", "Add a cover image."],
+      }),
+    ])
+
+    expect(plan.skips).toEqual([
+      expect.objectContaining({
+        reason: "not_ready",
+        needs: ["Price is required to publish.", "Add a cover image."],
+      }),
+    ])
+  })
+
+  it("tells the creator to build the listing when there is none to judge", () => {
+    const plan = planRun([channel({ listingId: null, ready: false })])
+
+    expect(plan.skips[0]?.needs).toEqual([NO_LISTING_TEXT])
+  })
+
+  it("adds nothing to skips that are not about readiness", () => {
+    const plan = planRun([
+      channel({ canPublish: false, blocking: ["Price is required to publish."] }),
+      channel({ connected: false }),
+      channel({ hasExternalId: true }),
+    ])
+
+    for (const skip of plan.skips) expect(skip.needs).toEqual([])
   })
 })
 

@@ -22,7 +22,10 @@ which is a run a person does by hand. A6 is done; its exit ran on 11 September 2
 a live shop, and the fifth question in `docs/channels/etsy.md` §13, refresh-token rotation,
 still waits on the first refresh. Two things shipped outside the step order and are not part
 of any gate: first-run onboarding on 11 September 2026 as PR #61, and the public creator
-pages (`/@handle`) on 12 September 2026 as PR #72, migration applied and live. B1, B2 and B8
+pages (`/@handle`) on 12 September 2026 as PR #72, migration applied and live. B11, the
+companion window (`docs/companion-window.md`), was opened on 13 September 2026 at the
+founder's request ahead of the evidence its plan waits for; code complete, no migration, exit
+unrun. B1, B2 and B8
 are on `main`; B8's exit needs a live WooCommerce store, which needs no approval. Gate A is
 not passed; A8 waits on a Creative Market seller login and the questions in that spec's
 §13.** See `docs/roadmap.md`. Implement the current step only. Do not build ahead.

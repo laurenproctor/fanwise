@@ -1,23 +1,29 @@
 import { createHash } from "node:crypto"
 import { constraintsFor } from "@/lib/channels/constraints"
 import type { ChannelAdapter, MerchandisingProfile } from "@/lib/channels/types"
+import type { ProductType } from "@/lib/products/types"
 import { renderFactSheet, type FactSheet } from "./factsheet"
+import { guidanceFor } from "./guidance"
 import type { PromptBlock } from "./types"
 import { LISTING_FIELD_LABELS, type ListingField } from "./output"
 
 /**
  * The prompt, and the shape that makes decision 12's price true.
  *
- * Two system blocks and one user message:
+ * Up to three system blocks and one user message:
  *
  *   1. RULES     the same bytes for every channel and every product
- *   2. PROFILE   the same bytes for every product on one channel
- *   3. user      the FactSheet, and nothing else that varies
+ *   2. GUIDANCE  the same bytes for every product of one type, and present
+ *                only for a type with a written standard (lib/ai/guidance.ts)
+ *   3. PROFILE   the same bytes for every product on one channel
+ *   4. user      the FactSheet, and nothing else that varies
  *
- * Blocks 1 and 2 are the stable prefix. The provider is told to cache through
- * the end of block 2, so a second generation on the same channel reads about
- * two thirds of its input from cache. Nothing that changes per request may
- * appear above the boundary: no product name, no timestamp, no id.
+ * The system blocks are the stable prefix. The provider is told to cache
+ * through the end of the profile, so a second generation of the same type on
+ * the same channel reads most of its input from cache. The guidance comes
+ * before the profile so the channel has the last word on shape and markup.
+ * Nothing that changes per request may appear above the boundary: no product
+ * name, no timestamp, no id.
  *
  * The FactSheet is delimited from the instruction, as docs/ai-merchandising.md
  * asks, so the model can tell what it may state from what it is being told to
@@ -27,7 +33,7 @@ import { LISTING_FIELD_LABELS, type ListingField } from "./output"
  */
 
 /** Moves whenever the rules text or the assembly changes. */
-export const RULES_VERSION = "2026-09-13.1"
+export const RULES_VERSION = "2026-09-13.2"
 
 const RULES = `You compose product listings for independent creators who sell digital products: fonts, templates, graphics, photos, illustrations, icons, mockups, brushes, 3D assets and themes. You write for one sales channel at a time, following that channel's profile.
 
@@ -37,6 +43,8 @@ The rule, precisely:
 
 - You may transform positioning, tone, phrasing, structure, vocabulary and keywords freely.
 - You may never introduce a factual claim that is not in the facts. Not a count of anything: styles, weights, glyphs, files, pages, items, images. Not a format. Not a piece of software, a platform or a device the product works with. Not a license term, a warranty, a guarantee, a refund, a support promise or an update promise. Not a year, a version number, a resolution, a size or a price. Not an award, a ranking or a customer count.
+- Not a history, an inspiration, an influence, a designer, a studio, a place of origin or a period the product draws on. These are claims too, and only the creator can make them: use one only when the facts state it, and keep the creator's degree of certainty, so an influence stays an influence.
+- Not a visual or physical quality you were not told about. You cannot see the product; how it looks and feels comes from the facts or is not said.
 - If the facts do not say it, do not say it. Write around the gap. A description that says less and is true is correct; a description that says more and is invented is a defect.
 - Do not use numbers you were not given, including number words. Do not name file formats you were not given. Do not name software you were not given.
 - Do not mention the sales channel by name and do not mention that the listing was composed.
@@ -46,7 +54,10 @@ Output is a single JSON object with exactly these keys: title, description, shor
 export interface BuiltPrompt {
   system: PromptBlock[]
   user: string
-  /** RULES_VERSION and the profile's version, joined. Written to the row. */
+  /**
+   * RULES_VERSION and the profile's version, joined, then the product type's
+   * guidance version when there is guidance. Written to the row.
+   */
   promptVersion: string
   /** SHA-256 of everything sent. */
   inputHash: string
@@ -119,9 +130,12 @@ export function buildPrompt(
   adapter: ChannelAdapter,
   sheet: FactSheet,
   field?: ListingField,
+  productType?: ProductType,
 ): BuiltPrompt {
+  const guidance = productType === undefined ? null : guidanceFor(productType)
   const system: PromptBlock[] = [
     { text: RULES },
+    ...(guidance ? [{ text: guidance.text }] : []),
     { text: renderProfile(adapter), cacheBoundary: true },
   ]
 
@@ -144,7 +158,11 @@ ${ask}`
   return {
     system,
     user,
-    promptVersion: `${RULES_VERSION}+${adapter.merchandising.promptVersion}`,
+    promptVersion: [
+      RULES_VERSION,
+      adapter.merchandising.promptVersion,
+      ...(guidance && productType ? [`${productType}.${guidance.version}`] : []),
+    ].join("+"),
     inputHash: hash.digest("hex"),
   }
 }

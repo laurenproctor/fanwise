@@ -266,6 +266,11 @@ It writes down what would be built, what it may never do as things a test can fa
 layout rule it asks of A8, and the finding that has to arrive first. What is still owed here
 is the founder accepting or amending ADR 0010's constraints, and the evidence itself.
 
+**Opened 13 September 2026 at the founder's request, ahead of the evidence.** Form A is built
+over a minimal handoff, since A8's did not exist; `docs/companion-window.md` §12. The build
+answers "whether to build" by decision rather than by finding. The finding now decides
+whether it stays, and accepting the constraints is still owed.
+
 ---
 
 ## Gate B
