@@ -113,6 +113,10 @@ Not now. A7 is the current step, and A8 has not built the handoff this would sho
   `docs/companion-window.md`. Writing it neither accepts this ADR nor opens the step. It
   exists so that the decision to build is a small one when the evidence arrives, and so that
   the constraints above are already expressed as checks rather than as prose.
+- **Opened 13 September 2026 at the founder's request**, ahead of the evidence below, with
+  form A built over a minimal handoff because A8's did not exist yet
+  (`docs/companion-window.md` §12). This ADR stays proposed: building form A does not accept
+  the constraints on the founder's behalf, though the repository now tests them.
 - **The evidence decides the rest.** A8's exit run and the B2a creator test watch for the
   failure in Creative Market §12. If the order is right and creators still lose their place
   between windows, form A is built, and the creator test is the place to see it work. If they

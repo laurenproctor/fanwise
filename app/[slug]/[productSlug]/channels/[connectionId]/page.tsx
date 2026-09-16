@@ -15,6 +15,9 @@ import { listGenerations, summarize } from "@/lib/ai/queries"
 import { listingFieldSchema } from "@/lib/ai/output"
 import { isAiConfigured } from "@/lib/ai/providers"
 import { awaitingReview } from "@/lib/ai/review"
+import { buildHandoffSteps } from "@/lib/channels/handoff"
+import { HandoffPanel } from "@/components/channels/handoff-panel"
+import { CompanionWindow } from "@/components/channels/companion-window"
 
 export const metadata = { title: "Listing · Fanwise" }
 
@@ -166,6 +169,41 @@ export default async function ListingPage({
         */
         published={Boolean(view.listing.external_listing_id)}
       />
+
+      {/*
+        An assisted channel is submitted by hand, so its listing ends in the
+        list the creator copies from. It reads the saved listing, not the
+        editor's unsaved draft: what gets pasted into a marketplace should be
+        what Fanwise has recorded. The companion window shows the same panel
+        beside the marketplace's editor, and touches nothing on the
+        marketplace's page. docs/companion-window.md; ADR 0010.
+      */}
+      {view.adapter.integrationType === "assisted" ? (
+        <CompanionWindow title={`${view.channel.name} handoff · ${product.name}`}>
+          <HandoffPanel
+            workspaceSlug={slug}
+            channelName={view.channel.name}
+            productName={product.name}
+            readiness={
+              view.evaluation
+                ? {
+                    resolved: view.evaluation.readiness.errorsResolved,
+                    total: view.evaluation.readiness.errorsTotal,
+                  }
+                : null
+            }
+            steps={buildHandoffSteps(
+              listingToDraft(view.listing),
+              images.map((image) => ({
+                assetId: image.id,
+                filename: image.filename,
+                ready: image.state === "ready",
+              })),
+              view.channel.name,
+            )}
+          />
+        </CompanionWindow>
+      ) : null}
     </div>
   )
 }

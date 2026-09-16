@@ -414,7 +414,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B8 | WooCommerce: store authorization, adapter, draft, images, activate with the file verified, idempotency. See `docs/channels/woocommerce.md`. Added 8 September 2026 at the founder's request; **code complete the same day**, exit unrun, see below |
 | B9 | Behance: creative-field and category mapping, the project-and-asset package, two new image derivative specs, guided handoff in new-project and existing-project modes, mark submitted, project URL capture. See `docs/channels/behance.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on A8, see below |
 | B10 | Gumroad: OAuth with PKCE, adapter, presigned multipart file upload, draft then enable, covers and thumbnail, the compensating delete, a platform-wide create pace, idempotency. See `docs/channels/gumroad.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on nothing in code, see below |
-| B11 | The companion window: the assisted handoff shown beside the marketplace's own editor, in a pop-out that touches nothing on the marketplace's page. See `docs/companion-window.md` and `docs/decisions/0010`. **Planned 12 September 2026 at the founder's request, not opened**; conditional on evidence from A8 and B2a, see below |
+| B11 | The companion window: the assisted handoff shown beside the marketplace's own editor, in a pop-out that touches nothing on the marketplace's page. See `docs/companion-window.md` and `docs/decisions/0010`. Planned 12 September 2026. **Opened 13 September 2026 at the founder's request, ahead of its evidence; code complete, exit unrun**, see below |
 | B12 | Import a live listing: an inward read per `api` adapter, listing-URL resolution inside the adapter, a reviewed mapping to a canonical product, fetched images, the `import` snapshot, and the claim that makes a second import a navigation. See `docs/listing-import.md`. **Planned 12 September 2026 at the founder's request, not opened**; opens after Gate A passes, see below |
 
 ### B1, what was built and what is still owed
@@ -687,7 +687,7 @@ B2a is the half of the old B3 that could not move: the creator test that only me
 once AI composes the listing. It is lettered rather than numbered for the same reason the gap
 stays, and it is a test rather than a build step, which is why it carries no code scope.
 
-### B11, what is planned and what it opens on
+### B11, what is planned, what was built, and what is still owed
 
 Planned on 12 September 2026 at the founder's request, after they chose a sidebar over an
 extension that fills in marketplace forms. The decision is `docs/decisions/0010`, still
@@ -734,6 +734,31 @@ scripts a marketplace's page, and it holds no marketplace session. An extension 
 form B in 0010, is not part of it and opens only if the pop-out is built and found wanting,
 with its own ADR and its own section in `docs/security.md` for the second authenticated
 client it would create.
+
+**Opened on 13 September 2026, ahead of the finding, at the founder's request**, on the branch
+`b11-companion-window` in its own worktree. It is an exception to "nothing after a gate
+begins until the gate passes" and to the finding above, recorded as the founder's decision
+rather than as the plan changing. `docs/companion-window.md` §12 has the detail; in short:
+
+- **A8's handoff did not exist, so B11 built the smallest one.** `lib/channels/handoff.ts`
+  derives the steps from the saved listing (title, description, tags, price, images, then a
+  line saying the creator submits it), and `components/channels/handoff-panel.tsx` renders
+  them at any width. It appears on assisted listings only.
+- **The companion itself** is `components/channels/companion-window.tsx` and
+  `lib/ui/companion.ts`: offered only where the browser has Document Picture-in-Picture, the
+  page's styles, theme and fonts carried into the window, the handoff portalled in, the
+  window closed with the page.
+- **Still A8's, and not built here:** mark submitted, the listing URL capture, formatted-text
+  copying for Creative Market's description, and channel-specific step order. A8 extends
+  `HandoffPanel` rather than writing a second handoff.
+- **Tests:** `tests/unit/handoff.test.ts`, `tests/unit/companion.test.ts` (including the ADR
+  0010 constraint scan), and `tests/e2e/companion-window.spec.ts`, which opens the real
+  window in headless Chromium, copies from inside it, and brings it back.
+- **Still no migration, table, server action or capability.**
+
+**What is still owed:** the exit test above, which needs a real creator, a real assisted
+channel, and so A8; the manual browser run in `docs/companion-window.md` §7; and the finding
+itself, which now decides whether the companion stays rather than whether it is built.
 
 ## Gate C: a stranger can pay
 
