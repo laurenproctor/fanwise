@@ -5,7 +5,11 @@ import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { jobs } from "@/lib/jobs"
 import { routes } from "@/lib/routes"
+import { z } from "zod"
+import { parseMetadata } from "@/lib/products/metadata"
 import { toJson } from "./json"
+import { draftDetailsSchema, type DraftDetails } from "./draft-output"
+import { metadataWithDetails } from "./facts"
 import { linkLabel } from "./composer"
 import { deleteProductDraft } from "@/lib/products/delete-draft"
 import { draftDeletionErrorMessage } from "@/lib/products/draft-deletion"
@@ -174,12 +178,19 @@ export async function discardImportAction(
   redirect(routes.workspace(outcome.workspaceSlug))
 }
 
+/** Tags as `productTags` in lib/products/metadata takes them. */
+const savedTagsSchema = z.array(z.string().trim().min(1).max(40)).max(50)
+
 export interface SaveDraftInput {
   title: string
   productType: string
   price: string
   currency: string
+  shortDescription: string
   description: string
+  /** The specifications as reviewed. Mapped into the product's metadata for its type. */
+  details: DraftDetails
+  tags: string[]
   /** Which fields the creator has settled, with the marker they settled from. */
   accepted: Record<string, { origin: string }>
   licenseSummary: string | null
@@ -213,7 +224,7 @@ export async function saveImportDraftAction(
     productType: input.productType,
     canonicalTitle: input.title,
     canonicalDescription: input.description,
-    shortDescription: "",
+    shortDescription: input.shortDescription,
     brandName: "",
     basePrice: input.price,
     currency: input.currency,
@@ -227,9 +238,26 @@ export async function saveImportDraftAction(
     return { error: parsed.error.issues[0]?.message ?? "Check the listing details." }
   }
 
+  const details = draftDetailsSchema.safeParse(input.details)
+  const tags = savedTagsSchema.safeParse(input.tags)
+  if (!details.success || !tags.success) return { error: "Check the product details and tags." }
+
   const rights = input.confirmRights
     ? { rights_confirmed_at: new Date().toISOString(), rights_confirmed_by: user.id }
     : {}
+
+  /*
+   * The metadata follows the type the creator chose, so a product that arrived
+   * as "other" and is now a font gets font metadata, which is what the font
+   * workspace and the FactSheet read. The stated details and the tags fill
+   * what is empty; anything the product already holds stays.
+   */
+  const metadata = metadataWithDetails({
+    existing: parseMetadata(record.product.metadata),
+    productType: parsed.data.productType,
+    details: details.data,
+    tags: tags.data,
+  })
 
   const { error: productError } = await supabase
     .from("products")
@@ -238,6 +266,8 @@ export async function saveImportDraftAction(
       product_type: parsed.data.productType,
       canonical_title: parsed.data.canonicalTitle ?? null,
       canonical_description: parsed.data.canonicalDescription ?? null,
+      short_description: parsed.data.shortDescription ?? null,
+      metadata: toJson(metadata),
       base_price: parsed.data.basePrice ?? null,
       currency: parsed.data.currency,
       license_summary: parsed.data.licenseSummary ?? null,

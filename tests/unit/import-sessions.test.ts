@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { buildSourcesPrompt, renderSources } from "@/lib/imports/compose"
 import { checkDraftClaimsAgainst } from "@/lib/imports/claims"
 import { detectConflicts, readFacts, type LabelledEvidence } from "@/lib/imports/conflicts"
-import type { DraftOutput } from "@/lib/imports/draft-output"
+import { emptyDraftDetails, type DraftOutput } from "@/lib/imports/draft-output"
 import { hashEvidence, type ProductSourceEvidence } from "@/lib/imports/evidence"
 import { sniff, sniffAudio } from "@/lib/imports/file-signature"
 import { combinedEvidenceHash, planSession, type SourceRow } from "@/lib/imports/runner"
@@ -93,6 +93,7 @@ function draft(overrides: Partial<DraftOutput> = {}): DraftOutput {
     audience: suggestion("Commuters"),
     tags: suggestion(["tote"]),
     technicalRequirements: suggestion([]),
+    details: suggestion(emptyDraftDetails()),
     priceGuidance: suggestion({
       amount: null,
       currency: "USD",

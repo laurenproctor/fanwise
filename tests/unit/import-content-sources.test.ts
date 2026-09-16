@@ -522,14 +522,15 @@ describe("a description Fanwise fills in", () => {
   const sentence = "Each stem is heavier than the last, so the family climbs one scale. "
 
   it("fits the field, cut at a sentence end", () => {
-    const fitted = fitDescription(sentence.repeat(40))
+    // Longer than the field, which now takes the canonical product's 8000.
+    const fitted = fitDescription(sentence.repeat(140))
     expect(fitted.length).toBeLessThanOrEqual(IMPORT_LIMITS.maxListingDescription)
     expect(fitted.endsWith("one scale.")).toBe(true)
     expect(fitDescription("Short and whole.")).toBe("Short and whole.")
   })
 
   it("cuts at a word and says so when no sentence ends near the limit", () => {
-    const fitted = fitDescription("word ".repeat(400))
+    const fitted = fitDescription("word ".repeat(2000))
     expect(fitted.length).toBeLessThanOrEqual(IMPORT_LIMITS.maxListingDescription)
     expect(fitted.endsWith("word…")).toBe(true)
   })

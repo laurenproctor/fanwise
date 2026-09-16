@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
-import { getImport, listDeliverables } from "@/lib/imports/queries"
+import { countProductImages, getImport, listDeliverables } from "@/lib/imports/queries"
 import {
   conflictsFor,
   deliverablesFor,
@@ -48,7 +48,10 @@ export default async function ImportDetailPage({
   // A discarded import has no screen of its own; its product is gone with it.
   if (record.row.status === "discarded") redirect(`/${workspace.slug}/new/link`)
 
-  const assets = await listDeliverables(supabase, workspace.id, record.row.product_id)
+  const [assets, imageCount] = await Promise.all([
+    listDeliverables(supabase, workspace.id, record.row.product_id),
+    countProductImages(supabase, workspace.id, record.row.product_id),
+  ])
 
   return (
     <ImportDetail
@@ -59,6 +62,7 @@ export default async function ImportDetailPage({
       state={stateFor(record)}
       draft={draftFor(record)}
       deliverables={deliverablesFor(assets)}
+      imageCount={imageCount}
       license={licenseFor(record)}
       rights={rightsFor(record)}
       missingInformation={record.missingInformation}

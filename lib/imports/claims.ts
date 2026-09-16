@@ -1,6 +1,7 @@
 import type { ProductSourceEvidence } from "./evidence"
 import { CONFLICT_KIND_LABELS, conflictPatterns, type FactConflict } from "./conflicts"
 import { DRAFT_FIELDS, type DraftField, type DraftOutput } from "./draft-output"
+import { DETAIL_LABELS, supportedDetails } from "./facts"
 
 /**
  * What a draft may not claim on the strength of how a page looked.
@@ -52,6 +53,8 @@ export type ClaimKind =
   | "commercial"
   /** The draft states a fact the creator's sources disagree about. */
   | "conflict"
+  /** A structured detail — a count, a format, a script — the sources do not contain. */
+  | "unstated"
 
 export interface ClaimViolation {
   field: DraftField
@@ -168,8 +171,15 @@ const CLAIM_PHRASES: ReadonlyArray<readonly [ClaimKind, readonly string[]]> = [
   ],
 ]
 
-/** Every string in a draft field, so a claim cannot hide inside an array. */
+/**
+ * Every string in a draft field, so a claim cannot hide inside an array.
+ *
+ * The structured details are not swept for phrases: a count or a format name
+ * is not prose, and `supportedDetails` checks each of them against the
+ * sources on its own terms.
+ */
 function textOf(output: DraftOutput, field: DraftField): string[] {
+  if (field === "details") return []
   const value: unknown = output[field].value
   if (typeof value === "string") return [value]
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string")
@@ -379,6 +389,27 @@ export function checkDraftClaimsAgainst(
   const trimmed: DraftField[] = []
   let cleaned = output
 
+  /*
+   * The details, value by value. A detail the sources do not contain is
+   * removed and the rest offered; the field is never withheld, because an
+   * empty set of details is a true statement about a page that gave none.
+   */
+  if (output.details) {
+    const checked = supportedDetails(output.details.value, sweep.corpus)
+    if (checked.dropped.length > 0) {
+      cleaned = { ...cleaned, details: { ...cleaned.details, value: checked.details } }
+      trimmed.push("details")
+      for (const item of checked.dropped) {
+        violations.push({
+          field: "details",
+          kind: "unstated",
+          phrase: `${DETAIL_LABELS[item.field]}: ${item.value}`,
+          resolution: "removed",
+        })
+      }
+    }
+  }
+
   for (const field of DRAFT_FIELDS) {
     const claims = found.get(field)
     if (!claims) continue
@@ -409,6 +440,7 @@ export const CLAIM_KIND_REASONS: Record<ClaimKind, string> = {
   ownership: "it made a claim about who owns the work, which only you can make.",
   commercial: "it described resale or redistribution rights, which only you can grant.",
   conflict: "your sources disagree about it, so the value is yours to choose.",
+  unstated: "it stated a detail your sources do not contain.",
 }
 
 /**

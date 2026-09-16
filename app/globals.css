@@ -249,7 +249,9 @@ main:has(> [data-workspace-canvas="full"]) {
 .fanwise-prose h1,
 .fanwise-prose h2,
 .fanwise-prose h3,
-.fanwise-prose h4 {
+.fanwise-prose h4,
+.fanwise-prose h5,
+.fanwise-prose h6 {
   font-family: var(--font-display);
   color: var(--color-ink);
   letter-spacing: -0.02em;
@@ -267,6 +269,14 @@ main:has(> [data-workspace-canvas="full"]) {
 .fanwise-prose h4 {
   font-size: 1em;
   margin-top: 1.1em;
+}
+.fanwise-prose h5,
+.fanwise-prose h6 {
+  font-size: 0.95em;
+  margin-top: 1em;
+}
+.fanwise-prose h6 {
+  color: var(--color-ink-2);
 }
 .fanwise-prose > :first-child {
   margin-top: 0;

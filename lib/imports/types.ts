@@ -1,4 +1,5 @@
 import type { ProductType } from "@/lib/products/types"
+import type { DraftDetails } from "./draft-output"
 
 /**
  * Importing a product from a link: the vocabulary.
@@ -166,7 +167,9 @@ export const LISTING_FIELD_KEYS = [
   "productType",
   "price",
   "currency",
+  "shortDescription",
   "description",
+  "details",
   "tags",
 ] as const
 export type ListingFieldKey = (typeof LISTING_FIELD_KEYS)[number]
@@ -177,7 +180,14 @@ export interface ListingDraft {
   /** A string, as `updateProductSchema` takes it. Parsed, never stored as a number here. */
   readonly price: DraftField<string>
   readonly currency: DraftField<string>
+  /** One or two plain sentences: the listing card and the public page's summary. */
+  readonly shortDescription: DraftField<string>
   readonly description: DraftField<string>
+  /**
+   * The specifications a source stated, in the product model's terms. Saved
+   * into the product's metadata for the chosen type, filling what is empty.
+   */
+  readonly details: DraftField<DraftDetails>
   readonly tags: DraftField<readonly string[]>
 }
 

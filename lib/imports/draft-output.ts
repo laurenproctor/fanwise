@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { FONT_CLASSIFICATIONS, FONT_FORMATS } from "@/lib/products/metadata"
 import { PRODUCT_TYPES } from "@/lib/products/types"
 
 /**
@@ -20,7 +21,7 @@ import { PRODUCT_TYPES } from "@/lib/products/types"
  * against rather than the one that happens to be current.
  */
 
-export const DRAFT_SCHEMA_VERSION = "2026-09-12.1"
+export const DRAFT_SCHEMA_VERSION = "2026-09-16.1"
 
 /** One proposed value, with what the model thought and what it read. */
 function suggested<T extends z.ZodType>(inner: T) {
@@ -57,6 +58,73 @@ export const priceGuidanceSchema = z.object({
   rationale: z.string().trim().max(600),
 })
 
+const shortText = z.string().trim().min(1).max(64)
+const count = (max: number) => z.number().int().min(1).max(max).nullable()
+
+/**
+ * The structured details a source states, in the product model's own terms.
+ *
+ * One flat shape for every product type, because the model chooses the type
+ * in the same answer and cannot be handed a schema that depends on it. Which
+ * fields matter is decided afterwards: `lib/imports/facts.ts` maps the ones the
+ * chosen type can hold into its metadata and drops the rest. Every field is
+ * nullable or an empty list, and null is the correct answer whenever the
+ * source did not say. The claims check then drops any value the source does
+ * not contain, so a number here is one the creator can find in their own
+ * material.
+ */
+export const draftDetailsSchema = z.object({
+  /** Fonts. */
+  styleCount: count(500),
+  styleNames: z.array(z.string().trim().min(1).max(120)).max(100),
+  isVariable: z.boolean().nullable(),
+  fontFormats: z.array(z.enum(FONT_FORMATS)).max(FONT_FORMATS.length),
+  glyphCount: count(100_000),
+  classification: z.enum(FONT_CLASSIFICATIONS).nullable(),
+  scripts: z.array(shortText).max(64),
+  languages: z.array(z.string().trim().min(2).max(64)).max(200),
+  /** OpenType feature tags, four letters each: liga, salt, ss01, smcp. */
+  features: z.array(z.string().trim().min(1).max(4)).max(64),
+  /** Templates and themes. */
+  software: z.array(shortText).max(20),
+  pageCount: count(10_000),
+  dimensions: z.string().trim().min(1).max(64).nullable(),
+  /** Graphics, photos, illustrations, icons, mockups, brushes. */
+  fileFormats: z.array(z.string().trim().min(1).max(16)).max(20),
+  dpi: count(2400),
+  itemCount: count(100_000),
+})
+
+export type DraftDetails = z.infer<typeof draftDetailsSchema>
+
+/** Nothing stated. The value a source without specifications produces. */
+export function emptyDraftDetails(): DraftDetails {
+  return {
+    styleCount: null,
+    styleNames: [],
+    isVariable: null,
+    fontFormats: [],
+    glyphCount: null,
+    classification: null,
+    scripts: [],
+    languages: [],
+    features: [],
+    software: [],
+    pageCount: null,
+    dimensions: null,
+    fileFormats: [],
+    dpi: null,
+    itemCount: null,
+  }
+}
+
+/** Whether any detail is stated at all. */
+export function hasAnyDetail(details: DraftDetails): boolean {
+  return Object.values(details).some((value) =>
+    Array.isArray(value) ? value.length > 0 : value !== null,
+  )
+}
+
 export const draftOutputSchema = z.object({
   title: suggested(z.string().trim().min(1).max(200)),
   shortDescription: suggested(z.string().trim().max(500)),
@@ -81,6 +149,7 @@ export const draftOutputSchema = z.object({
       }),
   ),
   technicalRequirements: suggested(z.array(z.string().trim().min(1).max(200)).max(8)),
+  details: suggested(draftDetailsSchema),
   priceGuidance: suggested(priceGuidanceSchema),
   /**
    * What the page did not say that a listing usually needs.
@@ -106,6 +175,7 @@ export const DRAFT_FIELDS = [
   "audience",
   "tags",
   "technicalRequirements",
+  "details",
   "priceGuidance",
 ] as const satisfies readonly DraftField[]
 
@@ -136,6 +206,83 @@ function suggestedJson(value: Record<string, unknown>, description: string) {
 }
 
 const stringArray = (maxItems: number) => ({ type: "array", maxItems, items: { type: "string" } })
+const nullableInteger = { type: ["integer", "null"] }
+
+const DETAILS_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "styleCount",
+    "styleNames",
+    "isVariable",
+    "fontFormats",
+    "glyphCount",
+    "classification",
+    "scripts",
+    "languages",
+    "features",
+    "software",
+    "pageCount",
+    "dimensions",
+    "fileFormats",
+    "dpi",
+    "itemCount",
+  ],
+  properties: {
+    styleCount: {
+      ...nullableInteger,
+      description: "Fonts: how many styles, weights or cuts the family includes.",
+    },
+    styleNames: {
+      ...stringArray(100),
+      description: "Fonts: the names of the styles, as the source lists them.",
+    },
+    isVariable: {
+      type: ["boolean", "null"],
+      description: "Fonts: whether the source says it is a variable font.",
+    },
+    fontFormats: {
+      type: "array",
+      maxItems: FONT_FORMATS.length,
+      items: { type: "string", enum: [...FONT_FORMATS] },
+      description: "Fonts: file formats the source names.",
+    },
+    glyphCount: { ...nullableInteger, description: "Fonts: the glyph count the source states." },
+    classification: {
+      type: ["string", "null"],
+      enum: [...FONT_CLASSIFICATIONS, null],
+      description: "Fonts: the classification the source's own words support.",
+    },
+    scripts: {
+      ...stringArray(64),
+      description: "Fonts: writing systems the source names, such as Latin, Cyrillic, Kana.",
+    },
+    languages: { ...stringArray(200), description: "Fonts: languages the source names." },
+    features: {
+      ...stringArray(64),
+      description:
+        "Fonts: OpenType feature tags the source names, four letters each (liga, dlig, salt, ss01, swsh, calt, smcp, frac, tnum, onum, kern).",
+    },
+    software: {
+      ...stringArray(20),
+      description: "Templates and themes: the software the source says it opens in.",
+    },
+    pageCount: { ...nullableInteger, description: "Templates: the page or slide count stated." },
+    dimensions: {
+      type: ["string", "null"],
+      description: "Templates: the dimensions stated, as written.",
+    },
+    fileFormats: {
+      ...stringArray(20),
+      description: "Graphics, photos, icons, mockups, brushes: file formats the source names.",
+    },
+    dpi: { ...nullableInteger, description: "Graphics: the resolution in DPI, when stated." },
+    itemCount: {
+      ...nullableInteger,
+      description: "Graphics and icons: how many items the set contains, when stated.",
+    },
+  },
+}
 
 export const DRAFT_OUTPUT_JSON_SCHEMA: Record<string, unknown> = {
   type: "object",
@@ -146,7 +293,7 @@ export const DRAFT_OUTPUT_JSON_SCHEMA: Record<string, unknown> = {
     shortDescription: suggestedJson({ type: "string" }, "One or two sentences."),
     longDescription: suggestedJson(
       { type: "string" },
-      "Markdown: paragraphs separated by blank lines, bullet lists with '- ' where the evidence lists things. No headings, no links, no emoji.",
+      "Markdown: an opening paragraph or two, then sections under '## ' headings drawn from the source's own structure, '### ' for subsections, paragraphs separated by blank lines, bullet lists with '- ' where the evidence lists things. No '# ' heading, no links, no images, no emoji.",
     ),
     productType: suggestedJson(
       { type: "string", enum: [...PRODUCT_TYPES] },
@@ -155,10 +302,17 @@ export const DRAFT_OUTPUT_JSON_SCHEMA: Record<string, unknown> = {
     features: suggestedJson(stringArray(12), "Things the page shows the product doing."),
     useCases: suggestedJson(stringArray(8), "What somebody would use it for."),
     audience: suggestedJson({ type: "string" }, "Who it appears to be for."),
-    tags: suggestedJson(stringArray(15), "Lowercase keywords."),
+    tags: suggestedJson(
+      stringArray(15),
+      "Eight to fifteen lowercase search keywords a buyer would type: the kind of product, its style, and its uses, drawn from the evidence. Always filled.",
+    ),
     technicalRequirements: suggestedJson(
       stringArray(8),
       "Only requirements the page itself states. Empty array if it states none.",
+    ),
+    details: suggestedJson(
+      DETAILS_JSON_SCHEMA,
+      "Structured details the source states, in its own words. null or an empty list for anything it does not say; Fanwise checks each value against the source and drops what it cannot find there.",
     ),
     priceGuidance: suggestedJson(
       {

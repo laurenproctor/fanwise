@@ -81,36 +81,45 @@ export async function POST(request: Request) {
 
   // And the channel has to be one this product genuinely has a live listing
   // on, so a row cannot be attributed to a channel the creator never used.
-  const { data: listing } = await supabase
+  // A product may hold two listings on one channel — two shops on the same
+  // marketplace are two connections — so this asks for any live one, not
+  // exactly one.
+  const { data: listings } = await supabase
     .from("channel_listings")
     .select("id")
     .eq("product_id", page.product_id)
     .eq("channel_id", channelId)
-    .maybeSingle()
+    .limit(1)
 
-  if (!listing) return noContent()
+  if (!listings || listings.length === 0) return noContent()
 
-  // workspace_id is read rather than accepted: the composite foreign keys
-  // require it to match the page's, and the browser has no business naming it.
-  const admin = createAdminClient()
-  const { data: owner } = await admin
-    .from("public_product_pages")
-    .select("workspace_id")
-    .eq("id", pageId)
-    .maybeSingle()
+  try {
+    // workspace_id is read rather than accepted: the composite foreign keys
+    // require it to match the page's, and the browser has no business naming it.
+    const admin = createAdminClient()
+    const { data: owner } = await admin
+      .from("public_product_pages")
+      .select("workspace_id")
+      .eq("id", pageId)
+      .maybeSingle()
 
-  if (!owner) return noContent()
+    if (!owner) return noContent()
 
-  const { error } = await admin.from("public_outbound_clicks").insert({
-    workspace_id: owner.workspace_id,
-    public_profile_id: page.public_profile_id,
-    public_product_page_id: page.id,
-    channel_id: channelId,
-    referrer_host: referrerHost(request.headers.get("referer")),
-    campaign: campaign && campaign.length > 0 ? campaign : null,
-  })
+    const { error } = await admin.from("public_outbound_clicks").insert({
+      workspace_id: owner.workspace_id,
+      public_profile_id: page.public_profile_id,
+      public_product_page_id: page.id,
+      channel_id: channelId,
+      referrer_host: referrerHost(request.headers.get("referer")),
+      campaign: campaign && campaign.length > 0 ? campaign : null,
+    })
 
-  if (error) console.error("[public] outbound click not recorded", error)
+    if (error) console.error("[public] outbound click not recorded", error)
+  } catch (error) {
+    // A deployment without the service key, or a client that could not be
+    // made: logged, and still 204. The click is not this handler's to break.
+    console.error("[public] outbound click not recorded", error)
+  }
 
   return noContent()
 }

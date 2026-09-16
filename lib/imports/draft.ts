@@ -1,4 +1,5 @@
 import { productNameSchema } from "@/lib/products/schemas"
+import { emptyDraftDetails } from "./draft-output"
 import { PRODUCT_TYPES, type ProductType } from "@/lib/products/types"
 import {
   LISTING_FIELD_KEYS,
@@ -24,11 +25,17 @@ export const LISTING_FIELD_LABELS: Record<ListingFieldKey, string> = {
   productType: "Product type",
   price: "Price",
   currency: "Currency",
+  shortDescription: "Short description",
   description: "Description",
+  details: "Product details",
   tags: "Tags",
 }
 
-/** The fields a listing cannot be called complete without. Tags are not one. */
+/**
+ * The fields a listing cannot be called complete without. Tags, the short
+ * description and the details are not among them: a listing sells without
+ * them, and `gaps.ts` is where their absence is named.
+ */
 export const REQUIRED_LISTING_FIELDS = [
   "title",
   "productType",
@@ -53,7 +60,9 @@ export function emptyListingDraft(): ListingDraft {
     productType: field<ProductType | null>(null),
     price: field(""),
     currency: field("USD"),
+    shortDescription: field(""),
     description: field(""),
+    details: field(emptyDraftDetails()),
     tags: field<readonly string[]>([]),
   }
 }
@@ -150,7 +159,9 @@ export function markSuggestionsReviewed(draft: ListingDraft): ListingDraft {
     productType: reviewed(draft.productType),
     price: reviewed(draft.price),
     currency: reviewed(draft.currency),
+    shortDescription: reviewed(draft.shortDescription),
     description: reviewed(draft.description),
+    details: reviewed(draft.details),
     tags: reviewed(draft.tags),
   }
 }
@@ -161,7 +172,7 @@ export function markSuggestionsReviewed(draft: ListingDraft): ListingDraft {
  * Written per field and listed explicitly above rather than looped over
  * `LISTING_FIELD_KEYS`, because a loop cannot keep `DraftField<T>` and `T`
  * together across an index and the only way to make it compile is an `any`.
- * Six lines of repetition are cheaper than a hole in the types.
+ * Eight lines of repetition are cheaper than a hole in the types.
  */
 function reviewed<T>(current: DraftField<T>): DraftField<T> {
   if (current.origin.kind !== "suggested" || current.origin.reviewed) return current

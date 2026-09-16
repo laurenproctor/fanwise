@@ -28,7 +28,7 @@ import { sentFingerprint } from "./idempotency"
  */
 export function hasUnsentChanges(
   listing: Pick<ChannelListing, "last_sent_fingerprint"> &
-    Partial<Pick<ChannelListing, "status" | "metadata">>,
+    Partial<Pick<ChannelListing, "status" | "metadata" | "public_url">>,
   draft: ChannelListingDraft,
   subject: AdapterSubject,
   adapter?: Pick<ChannelAdapter, "manualSteps">,
@@ -46,6 +46,23 @@ export function hasUnsentChanges(
     listing.status === "published" &&
     metadata["purchasable"] === false &&
     !adapter.manualSteps.some((step) => step.gatesActivation)
+  ) {
+    return true
+  }
+
+  /*
+   * Published, on sale, and no address for a buyer. The public page shows a
+   * channel only through `public_url`, which the runner writes from what the
+   * provider reports on every publish or update. A listing published before
+   * that column existed and never sent since is live on its channel and
+   * missing from the creator's page; sending it again is the whole fix, so it
+   * is offered rather than left for someone to notice.
+   */
+  if (
+    listing.status === "published" &&
+    listing.public_url === null &&
+    metadata["externalState"] === "live" &&
+    metadata["purchasable"] !== false
   ) {
     return true
   }

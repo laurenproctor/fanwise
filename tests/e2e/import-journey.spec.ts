@@ -187,7 +187,7 @@ test("replacing the source keeps everything and shows what changed", async ({ pa
   await expect(page.getByRole("textbox", { name: "Product name" })).toHaveValue(
     "Mine, Not The Page's",
   )
-  await expect(page.getByRole("textbox", { name: "Description" })).toHaveValue(
+  await expect(page.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(
     "My own words about the product.",
   )
   await openChecklistRow(page, "choose license")

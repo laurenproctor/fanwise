@@ -88,6 +88,18 @@ export function listingCards(params: {
         // cannot yet receive anything from.
         liveness: view ? liveness(view.listing, steps) : "unpublished",
         externalUrl: view?.listing.external_url ?? null,
+        /*
+         * Live on the channel and absent from the public page: the runner
+         * writes the buyer's address on every publish or update, and this
+         * listing was last sent before that address existed. The card says so
+         * beside the action that fixes it.
+         */
+        buyerLinkMissing:
+          view !== undefined &&
+          view.listing.status === "published" &&
+          view.listing.public_url === null &&
+          (view.listing.metadata as Record<string, unknown> | null)?.externalState === "live" &&
+          (view.listing.metadata as Record<string, unknown> | null)?.purchasable !== false,
         manualSteps: steps.map((state) => ({
           key: state.spec.key,
           label: state.spec.label,

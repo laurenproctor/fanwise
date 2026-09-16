@@ -1057,3 +1057,71 @@ against any non-local database. The microphone is allowed for this origin only
 - Composition picks the first readable source, in the creator's order, as the preview and the
   observed title.
 
+---
+
+## 16. Complete imports: every field, structured descriptions, stated details
+
+Added 16 September 2026, at the founder's request, on branch
+`feat/import-completeness-and-public-page`. Before this, a draft composed ten fields and the
+review screen used four of them: title, type, price and a description cut to 1,000
+characters. The short description, the tags and everything a specimen states about the
+product (six styles, 524 glyphs, Cyrillic and kana) were composed, stored in
+`product_imports.suggestions`, and never read again. A product that arrived as `other` and was
+saved as a font kept generic metadata, so the font workspace opened empty over a page that
+had said everything.
+
+### What the draft now carries
+
+| Field | Where it lands | Reviewed as |
+|---|---|---|
+| `shortDescription` | `products.short_description`, the listing card and the public summary | Suggested, until read |
+| `longDescription` | `products.canonical_description`, whole, up to the product's own 8,000 characters | Suggested, until read |
+| `tags` | `products.metadata.tags`, on every product type, offered to a listing that has none of its own | Suggested, until read |
+| `details` | `products.metadata`, in the shape of the chosen type (§ below) | Suggested, until read |
+| `productType` | `products.product_type`, chosen by the model from a description of each type; `other` only when nothing fits | Suggested, until read |
+
+Nothing here changes rule 2 of §4 or invariant 5: every value is a suggestion until a person
+has read it, the acknowledgment on the form names the new fields, and `saveImportDraftAction`
+is still the only path to `products`.
+
+### The description is structured
+
+The prompt asks for an opening paragraph or two, then sections under `##` headings drawn
+from what the source covers (what is included, coverage, features, what it is good for,
+formats), `###` for subsections, paragraphs and bullet lists inside them, never a `#`. The
+sanitizer allowlist widened to `h2`–`h6` for it (ADR 0011). The review form's description
+field now takes the whole draft; the 1,000-character fit was cutting a specimen's description
+at the first section.
+
+### Details are checked, not trusted
+
+`details` is one flat shape for every type — style count and names, variable or not, font
+formats, glyph count, classification, writing systems, languages and OpenType feature tags;
+software, page count and dimensions; file formats, resolution and item count — because the
+model chooses the type in the same answer. `lib/imports/facts.ts` keeps a value only when the
+sources contain it: a count as its digits or its word, a format by its name or abbreviation,
+a classification in a word a person used for it, a script or a language as itself. What is
+dropped is named on the screen under "Some wording removed" as `Glyph count: 524`, with the
+new claim kind `unstated`. On save, `metadataWithDetails` writes the surviving values into the
+chosen type's metadata, filling only what is empty, so facts read from uploaded font files and
+facts the creator typed are never displaced. Stored facts are shown on the review screen as
+the creator's own and a model's copy of them is not offered.
+
+The typeface standard (`docs/merchandising/typefaces.md`) rides in the prompt for the case
+the model decides the source is a font.
+
+### What is still missing, deterministically
+
+`lib/imports/gaps.ts` computes, from the draft and the product, each thing a listing of this
+kind still lacks and the upload or the words that supply it: buyer files (for a font, the
+files themselves, from which styles, formats, glyph count and coverage are read), preview
+images, a short description, a fuller description, tags, and the type's details one group at
+a time. It renders above the model's own `missingInformation` under one heading, "What is
+still missing", with the two lists labelled: one is a rule, the other an observation. Gaps
+are not requirements; the five readiness steps are unchanged.
+
+### Tests
+
+`tests/unit/import-facts.test.ts` covers which details the sources support, the mapping into
+metadata, and the gaps. `import-draft.test.ts` pins the prompt's new asks and a composed draft
+losing an unstated glyph count. `markdown.test.ts` pins `h2`–`h6` and the demoted `h1`.

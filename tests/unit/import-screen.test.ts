@@ -156,6 +156,7 @@ function detailProps() {
     state: STATES.analyzed!,
     draft: ANALYZED_DRAFT,
     deliverables: [] as const,
+    imageCount: 1,
     license: null,
     rights: null,
     missingInformation: [] as const,

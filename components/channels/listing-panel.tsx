@@ -62,6 +62,8 @@ export interface ChannelListingCard {
   results: RequirementResult[]
   liveness: ListingLiveness
   externalUrl: string | null
+  /** Live, and with no address a buyer could be sent to. Publish changes fetches one. */
+  buyerLinkMissing?: boolean
   manualSteps: ManualStepCardData[]
   /** The last normalized failure, if the most recent attempt failed. */
   lastError: string | null
@@ -333,6 +335,12 @@ export function ListingPanel({
                           // channel is holding it off sale, not the creator.
                           "The channel has the product, but it is not on sale there yet."
                         : LIVENESS_MEANINGS[card.liveness]}
+                  </p>
+                ) : null}
+                {card.buyerLinkMissing ? (
+                  <p className="max-w-prose text-[13px] text-[var(--color-ink-2)]">
+                    Fanwise has no buyer link for it yet, so your public page does not list this
+                    channel. Publish changes to fetch one.
                   </p>
                 ) : null}
               </div>

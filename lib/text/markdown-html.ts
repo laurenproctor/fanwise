@@ -30,6 +30,8 @@ const ALLOWED_TAGS = [
   "h2",
   "h3",
   "h4",
+  "h5",
+  "h6",
   "blockquote",
   "code",
   "pre",
@@ -58,11 +60,10 @@ export function markdownToHtml(
       allowedSchemes: ["http", "https", "mailto"],
       allowProtocolRelative: false,
       // A top-level heading belongs to the page the description sits in, never
-      // to the description, so a "#" line becomes the next level down.
+      // to the description, so a "#" line becomes the next level down. Every
+      // level below it is kept as written.
       transformTags: {
         h1: "h2",
-        h5: "h4",
-        h6: "h4",
         b: "strong",
         i: "em",
         ...(options.outboundLinks

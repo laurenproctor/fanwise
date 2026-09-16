@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { SaveStatus } from "@/components/ui/save-status"
 import { CompletionChecklist } from "@/components/imports/completion-checklist"
+import { MissingDetails } from "@/components/imports/missing-details"
 import { ImportChrome } from "@/components/imports/import-chrome"
 import { ImportFooter } from "@/components/imports/import-footer"
 import { ListingDraftForm } from "@/components/imports/listing-draft-form"
@@ -31,6 +32,7 @@ import { ConflictsSection } from "@/components/imports/conflicts-section"
 import { SourceChanges } from "@/components/imports/source-changes"
 import { ReplaceSourceDialog } from "@/components/imports/replace-source"
 import { markSuggestionsReviewed, setListingField } from "@/lib/imports/draft"
+import { listingGaps } from "@/lib/imports/gaps"
 import type { ImportState } from "@/lib/imports/machine"
 import { importReadiness, type ImportStepKey } from "@/lib/imports/readiness"
 import type {
@@ -69,6 +71,8 @@ export interface ImportDetailProps {
   state: ImportState
   draft: ListingDraft
   deliverables: readonly BuyerDeliverable[]
+  /** Cover and preview images the product holds, so a missing gallery can be named. */
+  imageCount: number
   license: LicenseSelection | null
   rights: RightsAttestation | null
   missingInformation: readonly string[]
@@ -145,6 +149,11 @@ export function ImportDetail(props: ImportDetailProps) {
     [props.state, props.deliverables, draft, license, rights],
   )
 
+  const gaps = useMemo(
+    () => listingGaps({ draft, deliverables: props.deliverables, imageCount: props.imageCount }),
+    [draft, props.deliverables, props.imageCount],
+  )
+
   const setDraft = useCallback((next: ListingDraft) => {
     setSaveStatus("dirty")
     setEdits(next)
@@ -160,7 +169,15 @@ export function ImportDetail(props: ImportDetailProps) {
   const save = useCallback(async () => {
     setSaveStatus("saving")
     const accepted: Record<string, { origin: string }> = {}
-    for (const key of ["title", "productType", "price", "description", "tags"] as const) {
+    for (const key of [
+      "title",
+      "productType",
+      "price",
+      "shortDescription",
+      "description",
+      "details",
+      "tags",
+    ] as const) {
       const origin = draft[key].origin
       if (origin.kind !== "creator") accepted[key] = { origin: origin.kind }
     }
@@ -170,7 +187,10 @@ export function ImportDetail(props: ImportDetailProps) {
       productType: draft.productType.value ?? "other",
       price: draft.price.value,
       currency: draft.currency.value,
+      shortDescription: draft.shortDescription.value,
       description: draft.description.value,
+      details: draft.details.value,
+      tags: [...draft.tags.value],
       accepted,
       licenseSummary: license?.summary ?? null,
       confirmRights: rights !== null,
@@ -295,8 +315,12 @@ export function ImportDetail(props: ImportDetailProps) {
           <ConflictsSection conflicts={props.conflicts} />
           {props.changes.length > 0 ? <SourceChanges changes={props.changes} /> : null}
           {props.aiUnavailable ? <NoModelNotice mode={props.sourceMode} /> : null}
-          {props.missingInformation.length > 0 ? (
-            <MissingInformation items={props.missingInformation} mode={props.sourceMode} />
+          {!busy ? (
+            <MissingDetails
+              gaps={gaps}
+              observations={props.missingInformation}
+              mode={props.sourceMode}
+            />
           ) : null}
           {props.withheld.length > 0 ? (
             <Withheld fields={props.withheld} mode={props.sourceMode} />
@@ -406,33 +430,6 @@ function NoModelNotice({ mode }: { mode: "link" | "content" }) {
   )
 }
 
-function MissingInformation({
-  items,
-  mode,
-}: {
-  items: readonly string[]
-  mode: "link" | "content"
-}) {
-  return (
-    <section className="flex flex-col gap-2 rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-card)] px-5 py-4">
-      <h2 className="label-mono">
-        {mode === "link" ? "What the page did not say" : "What your sources did not say"}
-      </h2>
-      <ul className="flex flex-col gap-1.5">
-        {items.map((item) => (
-          <li key={item} className="flex items-start gap-2.5">
-            <span
-              aria-hidden
-              className="mt-[7px] h-[5px] w-[5px] shrink-0 rounded-full bg-[var(--color-ink-3)]"
-            />
-            <span className="text-[14px] leading-[1.5] text-[var(--color-ink-2)]">{item}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}
-
 /**
  * Fields a model proposed and the claims check refused to offer at all.
  *
@@ -465,10 +462,11 @@ function Trimmed({ fields, mode }: { fields: readonly string[]; mode: "link" | "
     <section className="flex flex-col gap-2 rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-card)] px-5 py-4">
       <h2 className="label-mono">Some wording removed</h2>
       <p className="text-[14px] leading-[1.55] text-[var(--color-ink-2)]">
-        Fanwise still offers its suggestion for {fields.join(", ")}, with some sentences or items
-        taken out, because they made a claim the {mode === "link" ? "page does" : "sources do"} not
-        support — about files, compatibility, licensing, support, ownership or resale. Add those
-        details yourself if they are true.
+        Fanwise still offers its suggestion for {fields.join(", ")}, with some sentences, items or
+        details taken out, because they stated something the{" "}
+        {mode === "link" ? "page does" : "sources do"} not — a count or a format it could not find
+        there, or a claim about files, compatibility, licensing, support, ownership or resale. Add
+        those details yourself if they are true.
       </p>
     </section>
   )

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
-import type { Product, ProductAsset } from "@/lib/products/types"
+import { IMAGE_ASSET_TYPES, type Product, type ProductAsset } from "@/lib/products/types"
 import { parseEvidence, type ProductSourceEvidence } from "./evidence"
 import { DRAFT_FIELDS, draftOutputSchema, type DraftField, type DraftOutput } from "./draft-output"
 import { IMPORT_ERROR_MESSAGES, type ImportErrorCode } from "./errors"
@@ -177,6 +177,23 @@ export async function getImportForProduct(
 }
 
 /** The product's ready deliverables, for the buyer-files readiness step. */
+/** How many cover and preview images the product holds, in any state. */
+export async function countProductImages(
+  supabase: SupabaseClient<Database>,
+  workspaceId: string,
+  productId: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("product_assets")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", workspaceId)
+    .eq("product_id", productId)
+    .in("asset_type", [...IMAGE_ASSET_TYPES])
+
+  if (error) return 0
+  return count ?? 0
+}
+
 export async function listDeliverables(
   supabase: SupabaseClient<Database>,
   workspaceId: string,
