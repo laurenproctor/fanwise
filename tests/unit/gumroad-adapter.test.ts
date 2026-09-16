@@ -245,7 +245,7 @@ function gumroad(
 
 const apiCalls = (calls: Call[]) =>
   calls
-    .filter((c) => c.url.includes("api.gumroad.com"))
+    .filter((c) => c.url.startsWith("https://api.gumroad.com/v2/"))
     .map((c) => `${c.method} ${c.url.replace("https://api.gumroad.com/v2/", "")}`)
 
 beforeEach(() => {
