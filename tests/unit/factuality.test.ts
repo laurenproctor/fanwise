@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
 import { describeViolations, validateFactuality } from "@/lib/ai/factuality"
-import type { FactSheet } from "@/lib/ai/factsheet"
+import { buildFactSheet, type FactSheet } from "@/lib/ai/factsheet"
 import type { ListingOutput } from "@/lib/ai/output"
+import type { Product } from "@/lib/products/types"
 
 /**
  * The factuality validator: one of the three things that never bend.
@@ -229,5 +230,90 @@ describe("a typeface's period", () => {
       description: `${sheet.description} Drawn from 1970s Swiss magazines.`,
     })
     expect(result.ok).toBe(true)
+  })
+})
+
+describe("a typeface's family and features", () => {
+  const font = buildFactSheet(
+    {
+      name: "Aster Grotesk",
+      canonical_title: "Aster Grotesk",
+      product_type: "font",
+      canonical_description: "A grotesque drawn for long text.",
+      short_description: null,
+      brand_name: null,
+      base_price: null,
+      currency: "USD",
+      version: null,
+      support_url: null,
+      documentation_url: null,
+      license_summary: null,
+      metadata: {
+        kind: "font",
+        classification: "sans_serif",
+        styles: [
+          { key: "t", name: "Thin", weight: 100 },
+          { key: "r", name: "Regular", weight: 400 },
+          { key: "i", name: "Italic", weight: 400, italic: true },
+          { key: "b", name: "Bold", weight: 700 },
+        ],
+        axes: [{ tag: "wght", min: 100, default: 400, max: 700 }],
+        scripts: ["Latin", "Cyrillic"],
+        features: ["liga", "smcp", "onum", "ss01", "ss02", "ss03"],
+      },
+    } as unknown as Product,
+    [],
+  )
+
+  function check(description: string) {
+    const result = validateFactuality(output({ description, shortDescription: "" }), font)
+    return result.ok ? [] : result.violations.map((v) => `${v.kind}:${v.value}`)
+  }
+
+  it("accepts the family stated from the facts, in a buyer's words", () => {
+    expect(
+      check(
+        "A sans serif in three weights, from Thin to Bold, with a true italic. " +
+          "A variable font with a weight axis from 100 to 700. " +
+          "Small caps, oldstyle figures, ligatures and three stylistic sets. " +
+          "Covers Latin and Cyrillic, two writing systems, across four styles.",
+      ),
+    ).toEqual([])
+  })
+
+  it("refuses OpenType features the font does not have", () => {
+    expect(check("With swashes, tabular figures and discretionary ligatures.")).toEqual([
+      "feature:discretionary ligatures",
+      "feature:tabular figures",
+      "feature:swashes",
+    ])
+  })
+
+  it("refuses a stylistic set count or a weight the facts do not give", () => {
+    expect(check("Six stylistic sets and a 900 weight.")).toEqual(["number:900", "number:Six"])
+  })
+
+  it("refuses writing systems the font does not cover, and the extended set", () => {
+    expect(check("Supports Greek, Arabic and Latin Extended.")).toEqual([
+      "script:latin extended",
+      "script:greek",
+      "script:arabic",
+    ])
+  })
+
+  it("does not read arabic numerals as a script", () => {
+    expect(check("Clear Arabic numerals for Latin text.")).toEqual([])
+  })
+
+  it("refuses italics and a variable font when the facts have neither", () => {
+    const plain = { ...sheet, details: { kind: "font" as const, styleCount: 9 } }
+    const result = validateFactuality(
+      output({ description: "A variable font with italics.", shortDescription: "" }),
+      plain,
+    )
+    expect(result.ok ? [] : result.violations.map((v) => v.value)).toEqual([
+      "variable font",
+      "italics",
+    ])
   })
 })

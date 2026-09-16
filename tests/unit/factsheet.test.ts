@@ -93,6 +93,68 @@ describe("buildFactSheet", () => {
   })
 })
 
+describe("a font's family, coverage and features", () => {
+  const rich = product({
+    metadata: {
+      kind: "font",
+      classification: "sans_serif",
+      styles: [
+        { key: "A-Thin", name: "Thin", weight: 100 },
+        { key: "A-Regular", name: "Regular", weight: 400, width: 5 },
+        { key: "A-Italic", name: "Italic", weight: 400, width: 5, italic: true },
+        { key: "A-BoldCond", name: "Bold Condensed", weight: 700, width: 3 },
+      ],
+      axes: [{ tag: "wght", min: 100, default: 400, max: 700 }],
+      scripts: ["Latin", "Cyrillic"],
+      features: ["liga", "SMCP", "ss01", "ss02", "xxxx"],
+      licenses: [{ kind: "desktop" }, { kind: "web", monthlyPageviews: 10000 }],
+      tags: ["grotesk", "editorial"],
+      eulaUrl: "https://example.com/eula",
+    },
+  })
+
+  it("carries the creator's confirmed values, in words where the enum is not a word", () => {
+    const d = buildFactSheet(rich, []).details
+    expect(d).toMatchObject({
+      kind: "font",
+      classification: "Sans serif",
+      scripts: ["Latin", "Cyrillic"],
+      features: ["liga", "smcp", "ss01", "ss02", "xxxx"],
+      licenses: ["Desktop license", "Webfont license"],
+      keywords: ["grotesk", "editorial"],
+    })
+    // The style key is an internal join, not a fact.
+    expect(d.kind === "font" && d.styles?.[0]).toEqual({ name: "Thin", weight: 100 })
+    // License limits and the EULA address are not stated to the model.
+    expect(JSON.stringify(d)).not.toContain("10000")
+    expect(JSON.stringify(d)).not.toContain("eula")
+  })
+
+  it("renders weights, widths, axes and features the way a buyer reads them", () => {
+    const text = renderFactSheet(buildFactSheet(rich, []))
+    expect(text).toContain("Classification: Sans serif")
+    expect(text).toContain("Weights: 3 (Thin, Regular, Bold)")
+    expect(text).toContain("Italic styles: 1")
+    expect(text).toContain("Widths: Normal, Condensed")
+    expect(text).toContain("- Bold Condensed (weight 700, Bold; condensed width)")
+    expect(text).toContain("- Italic (weight 400, Regular; normal width; italic)")
+    expect(text).toContain("- Weight (wght): 100 to 700, default 400")
+    expect(text).toContain("Writing systems: Latin, Cyrillic")
+    expect(text).toContain("Stylistic sets: 2")
+    expect(text).toContain(
+      "OpenType features: Standard ligatures (liga), Small capitals (smcp), Stylistic set 1 (ss01), Stylistic set 2 (ss02), xxxx",
+    )
+    expect(text).toContain("License types sold: Desktop license, Webfont license")
+  })
+
+  it("leaves a font with none of these exactly as it was", () => {
+    const text = renderFactSheet(buildFactSheet(product(), []))
+    for (const label of ["Classification", "Weights", "Styles:", "Variable axes", "OpenType"]) {
+      expect(text).not.toContain(label)
+    }
+  })
+})
+
 describe("factSheetHash", () => {
   it("is stable across key order", () => {
     const a = canonicalJson({ b: 1, a: { d: [1, 2], c: "x" } })

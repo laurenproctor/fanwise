@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto"
 import { PRODUCT_TYPE_LABELS, type Product, type ProductAsset } from "@/lib/products/types"
 import { parseMetadata, type ProductMetadata } from "@/lib/products/metadata"
+import { featureLabel } from "@/lib/fonts/coverage"
+import { WEIGHT_NAMES, WIDTH_NAMES } from "@/lib/fonts/detected"
+import { FONT_CLASSIFICATION_LABELS, FONT_LICENSE_LABELS } from "@/lib/fonts/labels"
 
 /**
  * The FactSheet: the typed, derived set of facts a model is allowed to state.
@@ -48,10 +51,68 @@ export type FactDetails =
       formats?: string[]
       languageSupport?: string[]
       glyphCount?: number
+      /** In words, "Sans serif", never the enum value. */
+      classification?: string
+      styles?: FontStyleFact[]
+      axes?: FontAxisFact[]
+      /** Writing systems, as the creator confirmed them. */
+      scripts?: string[]
+      /** OpenType feature tags, lowercase. Rendered in words beside the tag. */
+      features?: string[]
+      /** The license types sold, by name. Prices and limits are not stated here. */
+      licenses?: string[]
+      /** The creator's own search keywords for the product. */
+      keywords?: string[]
     }
   | { kind: "template"; software?: string[]; pageCount?: number; dimensions?: string }
   | { kind: "raster"; fileFormats?: string[]; dpi?: number; itemCount?: number }
   | { kind: "generic"; notes?: string }
+
+export interface FontStyleFact {
+  name: string
+  weight?: number
+  /** OS/2 width class, 1 to 9. */
+  width?: number
+  italic?: boolean
+}
+
+export interface FontAxisFact {
+  tag: string
+  name?: string
+  min: number
+  default: number
+  max: number
+}
+
+/** The registered axes, named the way a buyer would say them. */
+const REGISTERED_AXIS_NAMES: Record<string, string> = {
+  wght: "Weight",
+  wdth: "Width",
+  ital: "Italic",
+  slnt: "Slant",
+  opsz: "Optical size",
+}
+
+/** The weight name a style's numeric weight rounds to, or null off the scale. */
+export function weightName(weight: number): string | null {
+  return WEIGHT_NAMES[Math.round(weight / 100) * 100] ?? null
+}
+
+/** Distinct named weights across the styles, lightest first. */
+export function distinctWeights(styles: readonly FontStyleFact[]): string[] {
+  const weights = [...new Set(styles.flatMap((s) => (s.weight === undefined ? [] : [s.weight])))]
+  weights.sort((a, b) => a - b)
+  return [...new Set(weights.flatMap((w) => weightName(w) ?? []))]
+}
+
+/** How many stylistic sets the feature list names (ss01 to ss20). */
+export function stylisticSetCount(features: readonly string[]): number {
+  return features.filter((tag) => /^ss\d\d$/.test(tag)).length
+}
+
+export function axisName(axis: FontAxisFact): string {
+  return blank(axis.name) ?? REGISTERED_AXIS_NAMES[axis.tag] ?? axis.tag
+}
 
 function blank(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null
@@ -76,6 +137,38 @@ function details(metadata: ProductMetadata): FactDetails {
           ? { languageSupport: [...metadata.languageSupport] }
           : {}),
         ...(metadata.glyphCount !== undefined ? { glyphCount: metadata.glyphCount } : {}),
+        ...(metadata.classification
+          ? { classification: FONT_CLASSIFICATION_LABELS[metadata.classification] }
+          : {}),
+        ...(metadata.styles?.length
+          ? {
+              styles: metadata.styles.map((style) => ({
+                name: style.name,
+                ...(style.weight !== undefined ? { weight: style.weight } : {}),
+                ...(style.width !== undefined ? { width: style.width } : {}),
+                ...(style.italic !== undefined ? { italic: style.italic } : {}),
+              })),
+            }
+          : {}),
+        ...(metadata.axes?.length
+          ? {
+              axes: metadata.axes.map((axis) => ({
+                tag: axis.tag,
+                ...(blank(axis.name) ? { name: axis.name!.trim() } : {}),
+                min: axis.min,
+                default: axis.default,
+                max: axis.max,
+              })),
+            }
+          : {}),
+        ...(metadata.scripts?.length ? { scripts: [...metadata.scripts] } : {}),
+        ...(metadata.features?.length
+          ? { features: [...new Set(metadata.features.map((tag) => tag.toLowerCase()))] }
+          : {}),
+        ...(metadata.licenses?.length
+          ? { licenses: metadata.licenses.map((license) => FONT_LICENSE_LABELS[license.kind].name) }
+          : {}),
+        ...(metadata.tags?.length ? { keywords: [...metadata.tags] } : {}),
       }
     case "template":
       return {
@@ -166,6 +259,19 @@ export function factSheetHash(sheet: FactSheet): string {
   return createHash("sha256").update(canonicalJson(sheet)).digest("hex")
 }
 
+function describeStyle(style: FontStyleFact): string {
+  const parts: string[] = []
+  if (style.weight !== undefined) {
+    const name = weightName(style.weight)
+    parts.push(name ? `weight ${style.weight}, ${name}` : `weight ${style.weight}`)
+  }
+  if (style.width !== undefined && WIDTH_NAMES[style.width]) {
+    parts.push(`${WIDTH_NAMES[style.width]!.toLowerCase()} width`)
+  }
+  if (style.italic === true) parts.push("italic")
+  return parts.length > 0 ? `${style.name} (${parts.join("; ")})` : style.name
+}
+
 /**
  * The FactSheet as the prompt carries it.
  *
@@ -203,6 +309,43 @@ export function renderFactSheet(sheet: FactSheet): string {
       list("Font formats", d.formats)
       list("Language support", d.languageSupport)
       add("Glyph count", d.glyphCount)
+      add("Classification", d.classification)
+      if (d.styles) {
+        const weights = distinctWeights(d.styles)
+        if (weights.length > 0) {
+          add("Weights", `${weights.length} (${weights.join(", ")})`)
+        }
+        const italics = d.styles.filter((style) => style.italic === true).length
+        if (italics > 0) add("Italic styles", italics)
+        const widths = [
+          ...new Set(d.styles.flatMap((style) => (style.width ? [WIDTH_NAMES[style.width]!] : []))),
+        ]
+        if (widths.length > 0) list("Widths", widths)
+        lines.push("Styles:")
+        for (const style of d.styles) lines.push(`- ${describeStyle(style)}`)
+      }
+      if (d.axes) {
+        lines.push("Variable axes:")
+        for (const axis of d.axes) {
+          lines.push(
+            `- ${axisName(axis)} (${axis.tag}): ${axis.min} to ${axis.max}, default ${axis.default}`,
+          )
+        }
+      }
+      list("Writing systems", d.scripts)
+      if (d.features) {
+        const sets = stylisticSetCount(d.features)
+        if (sets > 0) add("Stylistic sets", sets)
+        list(
+          "OpenType features",
+          d.features.map((tag) => {
+            const label = featureLabel(tag)
+            return label === tag ? tag : `${label} (${tag})`
+          }),
+        )
+      }
+      list("License types sold", d.licenses)
+      list("Creator's search keywords", d.keywords)
       break
     case "template":
       list("Software", d.software)
