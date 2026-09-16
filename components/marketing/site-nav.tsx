@@ -1,7 +1,10 @@
 import Link from "next/link"
 import { FanMark } from "./logo"
 import { ThemeToggle } from "./theme-toggle"
+import { NavMenu } from "./nav-menu"
 import { marketingRoutes } from "@/lib/routes"
+
+export type NavLink = { label: string; href: string }
 
 /**
  * The public destinations, in the one order every page shows them.
@@ -34,6 +37,11 @@ export type PublicNavKey = (typeof PUBLIC_NAV)[number]["key"]
  * `current` marks the page the visitor is on, with `aria-current` and the
  * underline in marketing.css. Pages outside the set (Terms, Privacy, a 404)
  * pass nothing and no link is marked.
+ *
+ * Below 900px the links, Sign in and the CTA move into NavMenu's disclosure;
+ * marketing.css swaps the two rows. Five links, a toggle, Sign in and a pill is
+ * roughly 860px of bar, so the breakpoint is where the widest page runs out of
+ * room rather than a device size.
  */
 export function SiteNav({
   current,
@@ -109,6 +117,8 @@ export function SiteNav({
           </Link>
         ) : null}
       </div>
+
+      <NavMenu links={PUBLIC_NAV} signIn={signIn} cta={cta} variant={variant} />
     </nav>
   )
 }

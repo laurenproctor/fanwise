@@ -16,7 +16,7 @@ import {
   DirectoryResults,
   DirectorySkeleton,
 } from "@/components/public/directory/directory-sections"
-import { appOrigin } from "@/lib/channels/oauth"
+import { appUrl } from "@/lib/env"
 import { directoryHref, isFiltered, parseDirectoryState } from "@/lib/public/directory"
 import { loadDirectoryFacets } from "@/lib/public/directory-queries"
 import { marketingRoutes, publicUrl } from "@/lib/routes"
@@ -60,7 +60,7 @@ interface Props {
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const state = parseDirectoryState(await searchParams)
-  const canonical = publicUrl(appOrigin(), marketingRoutes.creators)
+  const canonical = publicUrl(appUrl().replace(/\/$/, ""), marketingRoutes.creators)
   // The directory itself is indexed. A search, a filter, another order or a
   // later page is the same content rearranged, so it is followed but not
   // indexed, and every variant names the plain directory as canonical.
