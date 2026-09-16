@@ -186,6 +186,17 @@
   margin: 0 auto;
 }
 
+/*
+ * 24px of gutter each side is 15% of a 320px screen. Narrowing it to 18px below
+ * 480px buys back a word a line without touching the rhythm on any other size.
+ */
+@media (max-width: 479px) {
+  .fw-wrap,
+  .fw-wrap--wide {
+    width: calc(100% - 36px);
+  }
+}
+
 /* ------------------------------------------------------------------ type -- */
 
 .fw-eyebrow {
@@ -437,6 +448,132 @@
   padding: 10px 12px;
 }
 
+/*
+ * The nav below 900px: brand on the left, theme toggle and a disclosure button
+ * on the right, everything else in a panel under the bar. 900px is where the
+ * widest link set stops fitting, not a device width — see site-nav.tsx.
+ *
+ * Both rows are in the markup and this query picks one, so the right nav is
+ * painted on the first frame. The panel is positioned against .fw-nav, which
+ * is why the bar is a containing block.
+ */
+.fw-nav {
+  position: relative;
+}
+
+.fw-nav__mobile {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 899px) {
+  .fw-nav__links,
+  .fw-nav__end {
+    display: none;
+  }
+
+  .fw-nav__mobile {
+    display: flex;
+  }
+}
+
+.fw-nav__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--fw-rule);
+  background: transparent;
+  color: var(--fw-ink);
+  cursor: pointer;
+}
+
+.fw-nav__toggle:hover {
+  border-color: var(--fw-rule-hover);
+}
+
+.fw-nav__toggle--dark {
+  border-color: var(--fw-rule-dark);
+  color: var(--fw-on-dark);
+}
+
+.fw-nav__toggle--dark:hover {
+  border-color: var(--fw-rule-dark-strong);
+  background: var(--fw-lift);
+}
+
+.fw-nav__panel {
+  position: absolute;
+  top: calc(100% - 8px);
+  right: 0;
+  left: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--fw-rule);
+  background: var(--fw-paper);
+  box-shadow: 0 18px 44px rgba(10, 12, 20, 0.14);
+}
+
+/*
+ * The panel sets display:flex, which outranks the user-agent rule behind the
+ * hidden attribute. Without this it would never close.
+ */
+.fw-nav__panel[hidden] {
+  display: none;
+}
+
+.fw-nav__panel--dark {
+  border-color: var(--fw-rule-dark);
+  background: var(--fw-panel);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+}
+
+.fw-nav__panel-link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 9px;
+  font-size: 15px;
+  color: var(--fw-ink-2);
+}
+
+.fw-nav__panel-link:hover {
+  background: var(--fw-paper-2);
+  color: var(--fw-ink);
+}
+
+.fw-nav__panel--dark .fw-nav__panel-link {
+  color: var(--fw-on-dark-2);
+}
+
+.fw-nav__panel--dark .fw-nav__panel-link:hover {
+  background: var(--fw-lift);
+  color: var(--fw-on-dark);
+}
+
+.fw-nav__panel-sep {
+  height: 1px;
+  margin: 8px 4px;
+  background: var(--fw-rule);
+}
+
+.fw-nav__panel--dark .fw-nav__panel-sep {
+  background: var(--fw-rule-dark);
+}
+
+.fw-nav__panel .fw-btn {
+  width: 100%;
+  margin-top: 6px;
+}
+
 /* ---------------------------------------------------------------- footer -- */
 
 .fw-footer {
@@ -657,12 +794,12 @@
  */
 .fw-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 36px;
 }
 
 .fw-cards--roadmap {
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
   gap: 32px;
   margin-top: 44px;
 }
@@ -788,7 +925,7 @@
 
 .fw-step {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: 44px;
   padding: 44px 0;
   border-top: 1px solid var(--fw-rule);
@@ -881,7 +1018,7 @@
 .fw-shop-grid {
   padding: 72px 0 40px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: 22px;
 }
 
@@ -1377,7 +1514,7 @@
 /* The worked examples, one tile per marketplace count. */
 .fw-examples {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
   border: 1px solid var(--fw-rule);
   border-radius: 14px;
   overflow: hidden;
@@ -1459,7 +1596,7 @@
 /* Owned versus rented. */
 .fw-channels {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: 56px;
   align-items: start;
 }
@@ -1486,7 +1623,7 @@
 
 .fw-channels__lists {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
   gap: 24px;
 }
 
@@ -1863,7 +2000,7 @@
 .fw-statement {
   padding: 88px 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: 40px;
 }
 
@@ -1896,7 +2033,7 @@
 /* Section heads on the slab: title left, standfirst right, bottom-aligned. */
 .fw-slab-head {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: 40px;
   align-items: end;
   margin-bottom: 50px;
@@ -2218,6 +2355,53 @@
   align-self: end;
 }
 
+/*
+ * The mock below 700px, which is where .fw-mock__body's two panes wrap.
+ *
+ * The derived list is a four-column table on a laptop and cannot stay one: at
+ * 342px the spec column wrapped to four words a line and "Updated" fell off the
+ * right edge. Each row becomes a small stack instead — name and time on one
+ * line, then the spec, then the status — and the column header goes, because a
+ * header for columns that no longer exist is noise.
+ */
+@media (max-width: 699px) {
+  .fw-mock__master {
+    max-width: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--fw-rule-dark);
+  }
+
+  .fw-derived-row--head {
+    display: none;
+  }
+
+  .fw-derived-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px 12px;
+    padding: 14px 18px;
+  }
+
+  .fw-derived-row__name {
+    grid-area: 1 / 1;
+  }
+
+  .fw-derived-row__when {
+    grid-area: 1 / 2;
+  }
+
+  .fw-derived-row__spec {
+    grid-area: 2 / 1 / auto / -1;
+  }
+
+  .fw-derived-row__status {
+    grid-area: 3 / 1 / auto / -1;
+  }
+
+  .fw-rejection {
+    padding: 0 18px 16px;
+  }
+}
+
 /* -------------------------------------------------------------- shop rail -- */
 
 .fw-rail {
@@ -2228,7 +2412,7 @@
 
 .fw-rail__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
 }
 
 .fw-rail__cell {
@@ -2238,6 +2422,23 @@
 
 .fw-rail__cell:last-child {
   border-right: 0;
+}
+
+/*
+ * Two columns instead of seven, so the column dividers become row dividers.
+ * Kept as border-right, the rule on each right-hand cell had nothing beyond it
+ * and hung off the end of the rail.
+ */
+@media (max-width: 699px) {
+  .fw-rail__cell {
+    padding: 18px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--fw-slab-rule);
+  }
+
+  .fw-rail__cell:last-child {
+    border-bottom: 0;
+  }
 }
 
 .fw-rail__cell strong {
@@ -2292,7 +2493,7 @@
 
 .fw-arith {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: 56px;
   align-items: start;
 }
@@ -2373,7 +2574,7 @@
 /* The landing's own three-step grid and spec table run on the slab palette. */
 .fw-slab-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 32px;
 }
 
@@ -2486,7 +2687,7 @@
 
 .fw-band-head {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: 40px;
   align-items: end;
   margin-bottom: 50px;
@@ -2659,7 +2860,7 @@
 
 .fw-band--start .fw-band__inner {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: 56px;
   align-items: center;
 }
