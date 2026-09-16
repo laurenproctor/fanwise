@@ -5,7 +5,12 @@ import { detectConflicts, readFacts, type LabelledEvidence } from "@/lib/imports
 import { emptyDraftDetails, type DraftOutput } from "@/lib/imports/draft-output"
 import { hashEvidence, type ProductSourceEvidence } from "@/lib/imports/evidence"
 import { sniff, sniffAudio } from "@/lib/imports/file-signature"
-import { combinedEvidenceHash, planSession, type SourceRow } from "@/lib/imports/runner"
+import {
+  combinedEvidenceHash,
+  draftExists,
+  planSession,
+  type SourceRow,
+} from "@/lib/imports/runner"
 import { audioRecordingImporter } from "@/lib/imports/sources/content"
 import { transcribeAudio } from "@/lib/imports/transcribe"
 import {
@@ -523,5 +528,17 @@ describe("the review screen's view of sources", () => {
     expect(conflicts.map((conflict) => conflict.values.map((entry) => entry.value))).toEqual([
       ["USD 12.00", "USD 15.00"],
     ])
+  })
+})
+
+describe("whether a session holds a draft", () => {
+  it("does not count a settle without a model as a draft", () => {
+    // The marker a missing or refused model leaves. Counting it kept every
+    // such session from composing once the model worked: the hash matched and
+    // the column was not empty.
+    expect(draftExists({ draft: { missingInformation: [] }, unavailable: true })).toBe(false)
+    expect(draftExists({ draft: { title: { value: "A" } }, withheld: [], trimmed: [] })).toBe(true)
+    expect(draftExists(null)).toBe(false)
+    expect(draftExists({})).toBe(false)
   })
 })

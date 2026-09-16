@@ -42,6 +42,8 @@ export interface ImportRecord {
   trimmed: DraftField[]
   /** True when the page was read but no model was configured to draft from it. */
   aiUnavailable: boolean
+  /** Why, when it was: a provider code such as credentials_invalid, or not_configured. */
+  aiUnavailableReason: string | null
   missingInformation: string[]
   errorCode: ImportErrorCode | null
   errorMessage: string | null
@@ -61,6 +63,7 @@ function parseSuggestions(value: unknown): {
   withheld: DraftField[]
   trimmed: DraftField[]
   aiUnavailable: boolean
+  aiUnavailableReason: string | null
   missingInformation: string[]
 } {
   const empty = {
@@ -68,12 +71,18 @@ function parseSuggestions(value: unknown): {
     withheld: [],
     trimmed: [],
     aiUnavailable: false,
+    aiUnavailableReason: null,
     missingInformation: [],
   }
   if (typeof value !== "object" || value === null) return empty
 
   const record = value as Record<string, unknown>
   const aiUnavailable = record.unavailable === true
+  const aiUnavailableReason = aiUnavailable
+    ? typeof record.reason === "string"
+      ? record.reason
+      : "not_configured"
+    : null
   const rawDraft = record.draft
 
   // A row written before `trimmed` existed has none, which reads as none.
@@ -88,7 +97,7 @@ function parseSuggestions(value: unknown): {
   const trimmed = fields(record.trimmed)
 
   if (typeof rawDraft !== "object" || rawDraft === null) {
-    return { ...empty, withheld, trimmed, aiUnavailable }
+    return { ...empty, withheld, trimmed, aiUnavailable, aiUnavailableReason }
   }
 
   const draftRecord = rawDraft as Record<string, unknown>
@@ -110,6 +119,7 @@ function parseSuggestions(value: unknown): {
     withheld,
     trimmed,
     aiUnavailable,
+    aiUnavailableReason,
     missingInformation,
   }
 }

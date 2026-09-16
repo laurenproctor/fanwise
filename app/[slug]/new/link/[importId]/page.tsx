@@ -70,6 +70,7 @@ export default async function ImportDetailPage({
       trimmed={record.trimmed}
       htmlWithoutPictures={htmlSourcesWithoutPictures(record)}
       aiUnavailable={record.aiUnavailable}
+      aiUnavailableReason={record.aiUnavailableReason}
       changes={evidenceChanges(record)}
       sourceMode={sourceModeFor(record)}
       canReplaceLink={record.row.source_url !== null}

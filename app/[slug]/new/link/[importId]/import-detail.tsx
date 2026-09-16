@@ -13,6 +13,7 @@ import { ReadinessRegion } from "@/components/imports/readiness-region"
 import { SourceField } from "@/components/imports/source-field"
 import { SourcePanel } from "@/components/imports/source-panel"
 import {
+  composeAgainAction,
   confirmOwnershipAction,
   discardImportAction,
   removeDeliverableAction,
@@ -84,6 +85,8 @@ export interface ImportDetailProps {
   htmlWithoutPictures: readonly string[]
   /** True when the page was read and no model was configured to draft from it. */
   aiUnavailable: boolean
+  /** Why, when it was: a provider code, or not_configured. */
+  aiUnavailableReason?: string | null
   /** The product id, for minting an upload the pipeline already understands. */
   productId: string
   /** What a re-read turned up that the previous reading did not. */
@@ -314,7 +317,17 @@ export function ImportDetail(props: ImportDetailProps) {
           ) : null}
           <ConflictsSection conflicts={props.conflicts} />
           {props.changes.length > 0 ? <SourceChanges changes={props.changes} /> : null}
-          {props.aiUnavailable ? <NoModelNotice mode={props.sourceMode} /> : null}
+          {props.aiUnavailable && !busy ? (
+            <NoModelNotice
+              mode={props.sourceMode}
+              reason={props.aiUnavailableReason ?? "not_configured"}
+              onComposeAgain={async () => {
+                const result = await composeAgainAction(props.workspaceSlug, props.importId)
+                if (result.error === null) startTransition(() => router.refresh())
+                return result.error
+              }}
+            />
+          ) : null}
           {!busy ? (
             <MissingDetails
               gaps={gaps}
@@ -417,15 +430,60 @@ export function ImportDetail(props: ImportDetailProps) {
   )
 }
 
-function NoModelNotice({ mode }: { mode: "link" | "content" }) {
+/** What stopped the model, in a sentence a creator can act on. */
+const UNAVAILABLE_REASONS: Record<string, string> = {
+  not_configured: "this deployment has no model configured, so nothing was proposed.",
+  credentials_invalid: "the model refused this deployment's credentials, so nothing was proposed.",
+  rate_limited: "the model was busy, so nothing was proposed.",
+  network: "the model could not be reached, so nothing was proposed.",
+  provider_unavailable: "the model was unavailable, so nothing was proposed.",
+  invalid_output: "the model's answer could not be used, so nothing was proposed.",
+}
+
+function NoModelNotice({
+  mode,
+  reason,
+  onComposeAgain,
+}: {
+  mode: "link" | "content"
+  reason: string
+  onComposeAgain: () => Promise<string | null>
+}) {
+  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+  const why =
+    UNAVAILABLE_REASONS[reason] ??
+    "composing did not finish, so nothing was proposed. The error has been recorded."
+  const sources = mode === "link" ? "page" : "sources"
+
   return (
-    <section className="flex flex-col gap-2 rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-card)] px-5 py-4">
+    <section className="flex flex-col gap-3 rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-card)] px-5 py-4">
       <h2 className="label-mono">No draft was composed</h2>
       <p className="text-[14px] leading-[1.55] text-[var(--color-ink-2)]">
-        Fanwise read the {mode === "link" ? "page" : "sources"} and saved what it found, but this
-        deployment has no model configured, so nothing was proposed. The details are yours to write,
-        and everything on the left is what the {mode === "link" ? "page" : "sources"} actually said.
+        Fanwise read the {sources} and saved what it found, but {why} The details are yours to
+        write, and everything on the left is what the {sources} actually said. Once composing is
+        working, the same reading can be composed from again without re-uploading anything.
       </p>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => {
+          setPending(true)
+          setError(null)
+          void onComposeAgain().then((message) => {
+            setPending(false)
+            setError(message)
+          })
+        }}
+        className="inline-flex min-h-11 items-center self-start rounded-[var(--radius-pill)] border border-[var(--color-ink)] px-4 text-[14px] font-medium text-[var(--color-ink)] transition-colors hover:bg-[var(--color-paper-2)] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-accent)] disabled:opacity-60"
+      >
+        {pending ? "Composing…" : "Compose again"}
+      </button>
+      {error ? (
+        <p role="alert" className="text-[13px] text-[var(--color-danger)]">
+          {error}
+        </p>
+      ) : null}
     </section>
   )
 }

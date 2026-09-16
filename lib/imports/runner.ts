@@ -279,6 +279,21 @@ export function combinedEvidenceHash(
   return createHash("sha256").update(material).digest("hex")
 }
 
+/**
+ * Whether the suggestions column holds a draft worth keeping.
+ *
+ * A session that settled without a model writes a marker there, not a draft,
+ * and that marker must not count: it kept every such session from ever
+ * composing, because the evidence hash matched and "a draft exists" was read
+ * off the column's shape rather than its meaning.
+ */
+export function draftExists(suggestions: unknown): boolean {
+  if (typeof suggestions !== "object" || suggestions === null) return false
+  const record = suggestions as Record<string, unknown>
+  if (record.unavailable === true) return false
+  return Object.keys(record).length > 0
+}
+
 export interface SessionPlan {
   action: "wait" | "fail" | "reuse" | "compose"
   readable: { row: SourceRow; evidence: ProductSourceEvidence }[]
@@ -333,11 +348,10 @@ export async function composeSession(
   if (!session || session.status === "discarded") return
 
   const sources = await loadSources(admin, workspaceId, importId)
-  const hasSuggestions =
-    typeof session.suggestions === "object" &&
-    session.suggestions !== null &&
-    Object.keys(session.suggestions as Record<string, unknown>).length > 0
-  const plan = planSession(sources, { content_hash: session.content_hash, hasSuggestions })
+  const plan = planSession(sources, {
+    content_hash: session.content_hash,
+    hasSuggestions: draftExists(session.suggestions),
+  })
 
   if (plan.action === "wait") return
 
@@ -431,6 +445,9 @@ export async function composeSession(
           withheld: [],
           trimmed: [],
           unavailable: true,
+          // Why, in the provider's normalized vocabulary, so the screen can
+          // tell "no model configured" from "the model refused the key".
+          reason: unavailableReason(normalized),
         }),
       })
       return
@@ -446,6 +463,17 @@ export async function composeSession(
       .eq("workspace_id", workspaceId)
       .eq("status", "analyzing")
   }
+}
+
+/** The normalized code behind an ai_unavailable, or not_configured when there was none. */
+function unavailableReason(error: { cause?: unknown }): string {
+  const cause = error.cause
+  if (typeof cause === "object" && cause !== null) {
+    const record = cause as Record<string, unknown>
+    if (typeof record.code === "string") return record.code
+    if (typeof record.reason === "string") return record.reason
+  }
+  return "not_configured"
 }
 
 async function settleReady(

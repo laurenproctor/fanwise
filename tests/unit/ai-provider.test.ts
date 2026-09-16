@@ -49,6 +49,29 @@ const request = {
   maxOutputTokens: 1024,
 }
 
+describe("the workspace header", () => {
+  it("names the workspace when one is configured, and nothing otherwise", async () => {
+    const withId = fakeFetch(200, message())
+    await createAnthropicProvider({
+      apiKey: "sk-test",
+      workspaceId: "wrkspc_1",
+      fetch: withId.fetchImpl,
+    }).generate(request)
+    const sent = (withId.fetchImpl as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]!
+    const headers = new Headers((sent[1] as RequestInit).headers)
+    expect(headers.get("anthropic-workspace-id")).toBe("wrkspc_1")
+
+    const without = fakeFetch(200, message())
+    await createAnthropicProvider({
+      apiKey: "sk-test",
+      workspaceId: null,
+      fetch: without.fetchImpl,
+    }).generate(request)
+    const plain = (without.fetchImpl as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]!
+    expect(new Headers((plain[1] as RequestInit).headers).get("anthropic-workspace-id")).toBeNull()
+  })
+})
+
 describe("the request", () => {
   it("carries the schema, low effort, and a cache marker on the boundary block", async () => {
     const { fetchImpl, calls } = fakeFetch(200, message())

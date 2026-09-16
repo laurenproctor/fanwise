@@ -158,7 +158,7 @@ the listing, and restoring it would be the one door the validator does not guard
 | Prompt | `lib/ai/prompt.ts` | System blocks for the rules, the product type's guidance when there is one, and the channel profile, then the FactSheet alone in the user turn. The profile block carries the cache boundary, so the prefix is the same bytes for every product of one type on a channel |
 | Zod validation | `lib/ai/output.ts` | Six text fields. Price, currency and category are not the model's to decide and are not in the schema |
 | Factuality validator | `lib/ai/factuality.ts` | Numerals, number words, vague quantities, format tokens, software and platform names, and licensing, support and standing claims. Each is allowed only if the FactSheet states it, as a value or in the creator's own words. Biased to refuse |
-| Provider | `lib/ai/providers/` | One vendor, chosen by which key is present. Its name appears in that folder and nowhere else; a unit test reads the tree |
+| Provider | `lib/ai/providers/` | One vendor, chosen by which key is present. Its name appears in that folder and nowhere else; a unit test reads the tree. An organization-level key also needs `ANTHROPIC_WORKSPACE_ID`, sent as a header; the vendor refuses such a key without one (found 16 September 2026, on the worker) |
 | Runner | `lib/ai/runner.ts` | Claims the row, records the hashes before the call, and either applies the copy with a `generate` snapshot or records `rejected` with the violations and leaves the listing untouched |
 | Log | `ai_generations` | Provider, model, prompt version, input hash, FactSheet hash, tokens including cached, estimated cost, and the structured output on every succeeded or rejected row |
 
