@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { FanMark } from "./logo"
 import { ThemeToggle } from "./theme-toggle"
+import { NavMenu } from "./nav-menu"
 import { marketingRoutes } from "@/lib/routes"
 
 export type NavLink = { label: string; href: string }
@@ -15,6 +16,11 @@ export type NavLink = { label: string; href: string }
  * The link set differs per page in the handoff — each page drops its own entry
  * and some add an in-page anchor — so it is passed in rather than derived. That
  * is the design, not an oversight to normalize away.
+ *
+ * Below 900px the links, Sign in and the CTA move into NavMenu's disclosure;
+ * marketing.css swaps the two rows. Five links, a toggle, Sign in and a pill is
+ * roughly 860px of bar, so the breakpoint is where the widest page runs out of
+ * room rather than a device size.
  */
 export function SiteNav({
   links,
@@ -86,6 +92,8 @@ export function SiteNav({
           </Link>
         ) : null}
       </div>
+
+      <NavMenu links={links} signIn={signIn} cta={cta} variant={variant} />
     </nav>
   )
 }

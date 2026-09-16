@@ -83,6 +83,7 @@ export default async function ProductPage({
           skips={data.plan.skips.map((skip) => ({
             channelName: skip.channelName,
             reason: skip.reason,
+            needs: skip.needs,
           }))}
           hasLicenseFile={data.hasLicenseFile}
           attemptableChannels={data.plan.starts.length}
@@ -279,6 +280,7 @@ export default async function ProductPage({
             skips={publishRun.skips.map((skip) => ({
               channelName: skip.channelName,
               reason: skip.reason,
+              needs: skip.needs,
             }))}
           />
         ) : null}

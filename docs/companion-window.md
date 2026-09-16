@@ -8,8 +8,10 @@ constraints there are the law of this document and are not restated to be soften
 file is the part 0010 deliberately left out: what gets built, in what order, and what would
 have to be true for it to be worth building at all.
 
-**Status: planned 12 September 2026 at the founder's request. Not opened. Conditional on
-evidence that does not exist yet, see section 2.**
+**Status: planned 12 September 2026 at the founder's request. Opened 13 September 2026, also
+at the founder's request, ahead of the evidence section 2 waits for. Code complete; the exit
+test in section 8 is unrun. What was built, and where it departs from this plan, is
+section 12.**
 
 ---
 
@@ -59,6 +61,11 @@ without saying so. Note it in the session record; it is not on its own enough to
 
 **If the finding never arrives, close this file rather than leaving it open.** A plan that
 waits forever for evidence becomes a plan somebody eventually builds because it is there.
+
+**Opened ahead of the finding, 13 September 2026.** The founder asked for B11 to be opened
+once the plan was merged, having been told the three conditions above were unmet. That was
+their call and the step was opened on it. The finding still matters: it is now what decides
+whether the companion stays, per section 8's revert clause, rather than whether it is built.
 
 ---
 
@@ -201,16 +208,22 @@ already exists.
 
 ## 7. Testing
 
-**Unit and component.** The handoff renders identically into a detached document and into
-the page, given the same props. Copy writes both `text/plain` and `text/html` for the
-description. The pop-out button is absent when the API is absent. The CSP origin set is
-unchanged.
+**Unit and component.** `tests/unit/handoff.test.ts`: the step order and values, missing
+fields said to be missing, images not yet downloadable left out, no "publish" and no link
+off Fanwise's own routes in the rendered panel, and no pop-out button in a render that has
+not seen a browser. `tests/unit/companion.test.ts`: the API detection, the window dressed
+with the page's sheets, theme and fonts, and ADR 0010 constraint checks over the repository
+(section 5). The CSP origin set was already pinned by `tests/unit/security-headers.test.ts`
+and B11 does not touch it. A `text/html` clipboard write is not tested because nothing
+writes one yet; see section 12.
 
-**E2E.** Playwright drives Chromium with `--auto-open-devtools-for-tabs` off and the
-Document PiP API available; the spec opens the pop-out, asserts the handoff's steps are
-present in the second window's document, copies one field, and closes it. If driving a
-Document PiP window proves unreliable under Playwright, assert up to the API call and cover
-the rest in the manual run rather than writing a test that passes for the wrong reason.
+**E2E.** `tests/e2e/companion-window.spec.ts`. Playwright's Chromium, headless included,
+has the API and opens the window, so the spec does the whole thing rather than stopping at
+the API call: it builds an assisted listing, copies a field from the page and reads the
+clipboard back, opens the pop-out, asserts the handoff left the page and arrived in the
+window's document with stylesheets, clicks a copy button inside the window and sees it take,
+and brings the handoff back. It asserts the API is present rather than branching on it, so
+a browser without it fails instead of silently skipping the half that matters.
 
 **Journey.** This is **not a new numbered journey.** It is journey 7 run in the companion
 window, and `docs/testing.md` gets a line saying so. A new journey number would imply a new
@@ -245,16 +258,28 @@ same handoff, and the second one has to be maintained forever.
 ## 9. Open questions, to answer at build
 
 1. Do clipboard writes succeed from a Document PiP window when the creator's focus has been
-   in another window? Section 4.2.
+   in another window? Section 4.2. **Half answered, 13 September 2026.** A copy clicked
+   inside the window succeeds in headless Chromium 151 with clipboard permission granted, and
+   the button writes through the window's own `navigator`, not the page's. Whether it holds
+   with real focus moving between a marketplace tab and the window is the manual run. The
+   fallback, selectable text and a line saying to copy by hand, is built and renders.
 2. Does a formatted-text `ClipboardItem` survive into Creative Market's description editor
-   from the pop-out, as it does from the page?
+   from the pop-out, as it does from the page? **Open, and A8's.** Nothing writes formatted
+   text yet; the only assisted channel is the mock, whose description is plain text.
 3. Can a file be dragged from the pop-out into a marketplace upload control, in Chrome, at
-   all? Timeboxed; download is the answer if not.
+   all? Timeboxed; download is the answer if not. **Not attempted.** Download links are what
+   shipped. The drag needs a real marketplace upload control to try against.
 4. Does 0010's Firefox 151 support claim hold? It was written from a support table, not from
-   a browser.
+   a browser. **Open.** Only Chromium was run.
 5. Does the pop-out survive the opener navigating within the app, or does the creator lose it
    by clicking something in the background tab? If it dies, the button must restore cleanly.
+   **Answered by design.** Leaving the listing page unmounts the handoff, and unmounting
+   closes the window, so a companion never outlives the page that explains it. Returning to
+   the page shows the handoff inline with the button ready.
 6. Under Playwright, can a Document PiP window be addressed as a page or a frame? Section 7.
+   **Answered: neither, and it does not need to be.** Chromium 151 opens it headless, and the
+   spec reaches its document through `documentPictureInPicture.window` on the page that owns
+   it.
 
 ---
 
@@ -288,3 +313,49 @@ Nothing here changes what is charged. It is one more piece of evidence for decis
 assisted versus automatic pricing: an assisted channel that is one uninterrupted flow is
 easier to charge the same $6 for than one that is two windows and a clipboard. Record which
 way the exit run points, in `docs/decisions/0002` under 16, rather than deciding it here.
+
+---
+
+## 12. What was built, 13 September 2026
+
+Opened ahead of section 2's evidence at the founder's request, on the branch
+`b11-companion-window`.
+
+**The plan assumed A8's handoff existed. It did not.** Section 3 describes B11 as a layout
+over a handoff screen A8 builds, and on `main` there was none: an assisted listing showed the
+same card and editor as any other channel, with no step list, no mark-submitted control and
+no URL capture. B11 could not pop out a screen that was not there, so it built the smallest
+one that gives the window something true to show, and stopped there.
+
+- `lib/channels/handoff.ts`: the steps, derived from the saved listing and nothing else.
+  Title, description, tags, price, images, then a line saying the creator submits it
+  themselves. The order is generic; a channel whose editor runs differently gets its own
+  order when its handoff is specified, and Creative Market's is A8's, per its spec §10.
+- `components/channels/handoff-panel.tsx`: the panel, which assumes no width. Copy buttons
+  that hold a copied state until the next copy, download links at the step that needs them,
+  the readiness count, a missing line where a field is not written yet.
+- `components/channels/companion-window.tsx` and `lib/ui/companion.ts`: the pop-out. Feature
+  detection after hydration, the window requested from the click, the page's sheets, theme
+  and fonts carried across and the theme followed while open, the children portalled in,
+  closed with the page.
+- On the listing page, for assisted channels only. API channels are unchanged.
+
+**What B11 deliberately did not build, because it is A8's:** mark submitted, the listing URL
+capture, any row written from the handoff, formatted-text copying, and channel-specific
+ordering. B11 still adds no migration, no table, no server action and no capability.
+
+**Where it departs from sections 4 and 5:**
+
+- Popping out and bringing back remounts the handoff, so the copied marker starts fresh on
+  each move. Section 4.1's closing rule, that nothing lives only in the window's state, holds;
+  the marker is simply not carried. Keeping it would mean moving DOM nodes between documents
+  by hand.
+- Constraint 3, the URL capture shared with the web handoff, has nothing to hold yet: there is
+  no capture on either surface. It becomes testable when A8 adds one.
+- Constraint 1's check is a repository scan for extension manifests and extension or
+  script-injection APIs, not a change to the CSP test, which already pins every origin.
+
+**When A8 opens,** it extends this handoff rather than writing a second one: its order, its
+package download, formatted text for the description, and the mark-submitted and URL
+controls, all inside `HandoffPanel` so the companion shows them with no further work. The
+test that there is one handoff component on the listing page will fail if a second appears.
