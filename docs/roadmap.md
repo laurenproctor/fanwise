@@ -10,8 +10,9 @@ it, with the stamp-and-search create guard deferred.
 
 **A6 is done.** Its exit ran on 11 September 2026 against the live shop `Fanwise`: connect,
 publish, and an active listing in one job, with four of the five §13 questions in
-`docs/channels/etsy.md` settled; see "The A6 exit run" below. B1, B2 and B8 are also on
-`main`, each code complete with its exit unrun; see their sections under Gate B. A5 is done; all three exit clauses ran against a live Shopify
+`docs/channels/etsy.md` settled; see "The A6 exit run" below. B1, B2, B8 and B10 are also on
+`main`, each code complete; B8's exit passed on 16 September 2026 and the others are unrun;
+see their sections under Gate B. A5 is done; all three exit clauses ran against a live Shopify
 store. What remains of Gate A: A7 has its two live channels, Shopify and Etsy, and is blocked
 on nothing; A8 waits on a Creative Market seller login; and the gate's own exit — an outside
 creator, unassisted — waits on a real portfolio to hand them.
@@ -413,7 +414,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B7 | CSV import foundation |
 | B8 | WooCommerce: store authorization, adapter, draft, images, activate with the file verified, idempotency. See `docs/channels/woocommerce.md`. Added 8 September 2026 at the founder's request; **code complete the same day**, exit unrun, see below |
 | B9 | Behance: creative-field and category mapping, the project-and-asset package, two new image derivative specs, guided handoff in new-project and existing-project modes, mark submitted, project URL capture. See `docs/channels/behance.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on A8, see below |
-| B10 | Gumroad: OAuth with PKCE, adapter, presigned multipart file upload, draft then enable, covers and thumbnail, the compensating delete, a platform-wide create pace, idempotency. See `docs/channels/gumroad.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on nothing in code, see below |
+| B10 | Gumroad: OAuth with PKCE, adapter, presigned multipart file upload, draft then enable, covers and thumbnail, the compensating delete, a platform-wide create pace, idempotency. See `docs/channels/gumroad.md`. Planned 11 September 2026 at the founder's request; **opened 16 September 2026 at the founder's request, ahead of A7's exit; code complete, exit unrun**, see below |
 | B11 | The companion window: the assisted handoff shown beside the marketplace's own editor, in a pop-out that touches nothing on the marketplace's page. See `docs/companion-window.md` and `docs/decisions/0010`. Planned 12 September 2026. **Opened 13 September 2026 at the founder's request, ahead of its evidence; code complete, exit unrun**, see below |
 | B12 | Import a live listing: an inward read per `api` adapter, listing-URL resolution inside the adapter, a reviewed mapping to a canonical product, fetched images, the `import` snapshot, and the claim that makes a second import a navigation. See `docs/listing-import.md`. **Planned 12 September 2026 at the founder's request, not opened**; opens after Gate A passes, see below |
 
@@ -579,10 +580,39 @@ What B9 changes elsewhere in this file:
   read next to that.
 - **Gate A does not widen.** Behance is in Gate B and is not in the gate's exit test.
 
-### B10, what is planned and what it waits on
+### B10, what was built and what is still owed
 
-Planned on 11 September 2026 at the founder's request and not built. The assessment is in
-`docs/channel-feasibility.md` under Tier 1; the spec is `docs/channels/gumroad.md`.
+Planned on 11 September 2026 at the founder's request. **Opened and built on 16 September
+2026**, ahead of A7's exit, on the B8 precedent: the founder said to start, the OAuth
+applications were registered the same day, and the step waited on nothing in code. The
+assessment is in `docs/channel-feasibility.md` under Tier 1; the spec is
+`docs/channels/gumroad.md`.
+
+What landed, against the scope list below: `lib/channels/adapters/gumroad` in full, the
+square thumbnail as a derivative the runner renders on request (`PublishContext.derivativeUrl`,
+new and optional), the platform-wide pace as a declared `ChannelAdapter.pace` that the runner
+and the durable queue honour (a `paced_creates` queue with a concurrency of one in
+`trigger/jobs.ts`, and each publish holding its turn for ten seconds), disconnect revoking
+the token through a new optional `ChannelOAuth.revoke`, the catalog migration
+`20260916120000_gumroad_channel`, and the two unit test files. Two pieces of shared
+machinery were added for it and are provider-neutral: `PublishResult.listingMetadata`, which
+the runner merges into the listing so an adapter can keep what a provider hands out only
+once, and `EnqueueOptions.queue`.
+
+Three departures from the spec, each the simplest correct version:
+
+- **Covers are the source images**, not a 2000-pixel derivative. Etsy sends its sources too;
+  the spec's claim that a derivative exists was wrong, and Gumroad takes up to 50 MB by URL.
+- **The canonical file URL is persisted on the listing after the publish**, in
+  `metadata.files`, not on the job row before the create. A publish that fails after the
+  upload deletes the draft and re-uploads next time, so nothing is lost by waiting.
+- **A refused thumbnail never fails a publish.** It is cosmetic; the product goes live and
+  the job row says the thumbnail was skipped and why.
+
+Still owed: the exit, journey 13, against the seller account in decision 27; the §13
+questions, the first of which decides whether `rich_content` is needed for the buyer to see
+the file; the two category paths marked unverified in `categories.ts`; the hosted migration;
+and the worker redeploy that carries the new queue, which is deployed by hand.
 
 What Gumroad is to the plan, in one sentence: the second billable automatic channel, the
 relief for the Etsy concentration that decision 2 was written about, and the first provider
@@ -601,12 +631,10 @@ Scope, when it opens:
 - A catalog migration: one `channels` row, `integration_type = api`, `billable = true`.
 - `tests/unit/gumroad-oauth.test.ts` and `tests/unit/gumroad-adapter.test.ts`; journey 13.
 
-**B10 waits on nothing in code.** It depends on A3's contract, A5's publishing machinery, and
-A6's OAuth with PKCE and file upload, all done. It is not opened because A7 is the current
-step and is itself unblocked, and `CLAUDE.md` says one step at a time. If the founder wants
-it sooner, B8 is the precedent for opening a channel ahead of its gate. What it does wait on
-is decision 27: an OAuth application to build against, and a seller account with a payout
-method for the exit.
+**B10 waited on nothing in code.** It depends on A3's contract, A5's publishing machinery,
+and A6's OAuth with PKCE and file upload, all done. It was opened ahead of A7's exit on the
+B8 precedent. What its exit still waits on is the rest of decision 27: a seller account with
+a confirmed email and a payout method, and Gumroad's answer on the per-IP create limit.
 
 **B10's exit test** is journey 13: connect through OAuth, publish a real product with its
 covers and its file, confirm it is purchasable, and settle the spec's §13 questions, the

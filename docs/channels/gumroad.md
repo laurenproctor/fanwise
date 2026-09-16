@@ -5,9 +5,16 @@ The second billable automatic channel, and the first whose file goes up in parts
 at commit `409faee82934265236351992ac89bc8a31140cc1`: the API v2 controllers, the OAuth and
 rate-limit initializers, the in-repo API documentation and help center, and the terms. Every
 route named below was confirmed to exist in production by an unauthenticated request that
-answered 401, against a made-up path that answered 404. Planned as B10 and not built; the
-roadmap's B10 section says what it waits on. Items marked **[verify]** could not be settled
-from source and need a live seller account, which is decision 27 in `docs/decisions/0002`.
+answered 401, against a made-up path that answered 404. Planned as B10 and **built on
+16 September 2026**, in `lib/channels/adapters/gumroad`; the roadmap's B10 section says what
+was built, where the build departs from this spec, and what the exit still waits on. Items
+marked **[verify]** could not be settled from source and need a live seller account, which is
+decision 27 in `docs/decisions/0002`. Read against the code, three things differ: covers go
+as source images rather than a derivative (§6), the canonical file URL is kept on the listing
+after the publish rather than on the job row before the create (§5, §12), and a refused
+thumbnail is recorded rather than fatal (§5 stage 3). The controllers were re-read from
+`main` on the build day; the routes and parameter names below held, and the `files[]` entry
+that keeps an existing file must carry both its id and its canonical url (§6).
 
 `docs/channel-feasibility.md` carried Gumroad as "the near miss" until this was written. The
 product endpoints it described as unimplemented shipped in spring 2026: file upload on

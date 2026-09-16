@@ -25,8 +25,10 @@ of any gate: first-run onboarding on 11 September 2026 as PR #61, and the public
 pages (`/@handle`) on 12 September 2026 as PR #72, migration applied and live. B11, the
 companion window (`docs/companion-window.md`), was opened on 13 September 2026 at the
 founder's request ahead of the evidence its plan waits for; code complete, no migration, exit
-unrun. B1, B2 and B8
-are on `main`; B8's exit needs a live WooCommerce store, which needs no approval. Gate A is
+unrun. B10, Gumroad (`docs/channels/gumroad.md`), was opened on 16 September 2026 at the
+founder's request ahead of A7's exit, on the B8 precedent; code complete with one catalog
+migration, exit unrun, waiting on the seller account in decision 27. B1, B2 and B8
+are on `main`; B8's exit passed on 16 September 2026. Gate A is
 not passed; A8 waits on a Creative Market seller login and the questions in that spec's
 §13.** See `docs/roadmap.md`. Implement the current step only. Do not build ahead.
 

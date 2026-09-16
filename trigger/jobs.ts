@@ -1,6 +1,16 @@
-import { task } from "@trigger.dev/sdk"
+import { queue, task } from "@trigger.dev/sdk"
 import { handlers } from "@/lib/jobs/handlers"
 import type { JobPayloads } from "@/lib/jobs/types"
+
+/**
+ * One lane, one at a time, for a channel whose create limit every workspace
+ * shares. A publish to such a channel is triggered onto this queue by name
+ * (`EnqueueOptions.queue`) and holds its turn for the adapter's interval, so
+ * the platform never sends creates faster than the provider allows, however
+ * many creators click at once. Declared here because a queue named at trigger
+ * time has to exist somewhere, and this is where tasks live.
+ */
+export const pacedCreates = queue({ name: "paced_creates", concurrencyLimit: 1 })
 
 /**
  * One Trigger.dev task per job name.

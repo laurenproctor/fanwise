@@ -54,6 +54,24 @@ describe("TriggerQueue", () => {
     await queue.enqueue("noop", { message: "m" }, { delayMs: 1500 })
     expect(trigger).toHaveBeenCalledWith("noop", { message: "m" }, { delay: "2s" })
   })
+
+  it("names the queue when the caller asks for one, and not otherwise", async () => {
+    // A channel whose create limit every workspace shares runs its publishes
+    // on one lane; everything else runs on the task's own queue and never
+    // sends the key at all, so the vendor is not handed an undefined.
+    const trigger = vi.fn(async () => ({ id: "run_3" }))
+    const queue = new TriggerQueue({ trigger })
+    await queue.enqueue(
+      "publish_listing",
+      { workspaceId: "w", publicationJobId: "p" },
+      { idempotencyKey: "p:0", queue: "paced_creates" },
+    )
+    expect(trigger).toHaveBeenCalledWith(
+      "publish_listing",
+      { workspaceId: "w", publicationJobId: "p" },
+      { idempotencyKey: "p:0", idempotencyKeyTTL: "1h", queue: "paced_creates" },
+    )
+  })
 })
 
 describe("trigger/jobs.ts", () => {

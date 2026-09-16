@@ -150,6 +150,11 @@ a paid tool built on the public API.
 now. The email is the only part of this that waits on someone else, and the per-IP answer
 changes how B10 queues its creates.
 
+**Progress, 16 September 2026.** Two applications registered, one per environment, and their
+credentials placed on every deployment. B10 was built the same day against them, with the
+create pace from the spec's §10 (one at a time, six a minute) as the default until Gumroad
+says otherwise. Still open: the seller account's payout method, and the email.
+
 ---
 
 ## Shopify, before any public launch

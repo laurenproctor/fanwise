@@ -31,7 +31,7 @@ Current reality, from `docs/channel-feasibility.md`:
 | Behance | assisted | no | no | no | no | no |
 | Adobe Stock | assisted | no | no | no | no | no |
 | MyFonts | assisted | no | no | no | no | no |
-| Gumroad | api | yes | yes | yes | **yes**, 20 GB by presigned multipart upload, planned at B10 | yes |
+| Gumroad | api | yes | yes | yes | **yes**, 20 GB by presigned multipart upload, built at B10 | yes |
 | Envato | assisted | no | no | yes | no | no |
 
 **Behance note.** Every `no` on that row is the permanent kind: the provider cannot. Its API

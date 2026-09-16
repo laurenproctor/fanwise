@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createIngestUrl } from "@/lib/products/storage"
+import { buildDerivative } from "@/lib/products/assets"
 import { deliveryUrlFor } from "@/lib/delivery/links"
 import { evaluate, listingToDraft, resolveListing, snapshotPayload } from "@/lib/channels/listings"
 import { findAdapter } from "@/lib/channels/registry"
@@ -13,7 +14,7 @@ import type {
   PublishResult,
 } from "@/lib/channels/types"
 import type { Product, ProductAsset } from "@/lib/products/types"
-import { jobs } from "@/lib/jobs"
+import { jobs, jobsAreDurable } from "@/lib/jobs"
 import { sentFingerprint } from "./idempotency"
 import { planReattempt } from "./retry"
 import { recordEvent } from "./events"
@@ -324,12 +325,44 @@ async function execute(
     // URL keeps one address per file for the life of the listing.
     deliveryUrl: (asset) =>
       deliveryUrlFor({ workspaceId, listingId: listing.id, assetId: asset.id }),
+    // Rendered once per (source, spec) and cached as a derivative asset, then
+    // signed like any other image. The adapter names the shape it wants and
+    // never sees storage.
+    derivativeUrl: async (asset, spec) => {
+      const { assetId } = await buildDerivative({ workspaceId, sourceAssetId: asset.id, spec })
+      const { data: derived, error: derivedError } = await admin
+        .from("product_assets")
+        .select("storage_path")
+        .eq("id", assetId)
+        .eq("workspace_id", workspaceId)
+        .single()
+      if (derivedError || !derived) throw new Error("the derivative could not be read back")
+      return createIngestUrl(derived.storage_path)
+    },
+  }
+
+  /*
+   * A channel whose create limit is shared by every workspace holds its turn.
+   *
+   * The queue in trigger/jobs.ts lets one such publish run at a time; this is
+   * the other half, the floor on how often. The turn is held whether the call
+   * succeeded or not, because the provider counted the request either way,
+   * and only on a worker: in a request the queue does not exist and the wait
+   * would keep a page open for nothing.
+   */
+  const pace = adapter.pace && job.kind === "publish" && jobsAreDurable() ? adapter.pace : null
+  const startedAt = Date.now()
+  const holdTurn = async () => {
+    if (!pace) return
+    const remaining = pace.minIntervalMs - (Date.now() - startedAt)
+    if (remaining > 0) await new Promise<void>((resolve) => setTimeout(resolve, remaining))
   }
 
   let result: PublishResult
   try {
     result = await method(context)
   } catch (error) {
+    await holdTurn()
     const normalized = normalizeUnknown(error, adapter.name)
 
     /*
@@ -388,7 +421,11 @@ async function execute(
       await jobs.enqueue(
         "publish_listing",
         { workspaceId, publicationJobId: job.id },
-        { idempotencyKey: `${job.id}:${attempts}`, delayMs: reattempt.delayMs },
+        {
+          idempotencyKey: `${job.id}:${attempts}`,
+          delayMs: reattempt.delayMs,
+          ...(adapter.pace ? { queue: adapter.pace.queue } : {}),
+        },
       )
       return
     }
@@ -414,6 +451,7 @@ async function execute(
     return
   }
 
+  await holdTurn()
   await recordSuccess({ admin, workspaceId, listing, channel, adapter, job, result, subject })
 
   await finish({
@@ -514,6 +552,9 @@ async function recordSuccess(params: {
 
   const metadata = {
     ...((listing.metadata as Record<string, unknown>) ?? {}),
+    // What the adapter needs back on its next write, before the keys
+    // publication owns so those always win.
+    ...(result.listingMetadata ?? {}),
     // Read back by the adapter's update() so an edit does not silently take a
     // live product off sale, or put a draft one on it.
     externalState: result.externalState,

@@ -195,6 +195,7 @@ export async function publishListingAction(
     kind: "publish",
     draft,
     generation: listing.publish_generation,
+    ...(adapter.pace ? { queue: adapter.pace.queue } : {}),
   })
 
   if (outcome.kind === "error") return { error: outcome.message, notice: null }
@@ -308,6 +309,7 @@ export async function publishChangesAction(
     draft,
     images: imagesFingerprint(subject),
     generation: listing.publish_generation,
+    ...(adapter.pace ? { queue: adapter.pace.queue } : {}),
   })
 
   if (outcome.kind === "error") return { error: outcome.message, notice: null }
@@ -387,6 +389,7 @@ export async function replaceDeliveryLinksAction(
     draft: resolvedDraft(listing, product, adapter),
     images: `${imagesFingerprint(subject)}#delivery-links-replaced:${revokedAt}`,
     generation: listing.publish_generation,
+    ...(adapter.pace ? { queue: adapter.pace.queue } : {}),
   })
 
   revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
@@ -474,6 +477,7 @@ export async function completeManualStepAction(
     kind: "activate",
     draft: resolvedDraft(listing, product, adapter),
     generation: listing.publish_generation,
+    ...(adapter.pace ? { queue: adapter.pace.queue } : {}),
   })
 
   if (outcome.kind === "error") {
@@ -614,6 +618,7 @@ export async function publishEverywhereAction(
             images: imagesFingerprint(subject),
             generation: listing.publish_generation,
             runId,
+            ...(adapter.pace ? { queue: adapter.pace.queue } : {}),
           }
         : {
             supabase,
@@ -623,6 +628,7 @@ export async function publishEverywhereAction(
             draft,
             generation: listing.publish_generation,
             runId,
+            ...(adapter.pace ? { queue: adapter.pace.queue } : {}),
           },
     )
 
