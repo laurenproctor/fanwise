@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Fanwise favicon</title>
+  <desc id="desc">Five bright beams fan outward from one point on a deep navy field.</desc>
+  <defs>
+    <radialGradient id="field" cx="50%" cy="78%" r="88%">
+      <stop offset="0" stop-color="#16295B"/>
+      <stop offset="0.48" stop-color="#0A1534"/>
+      <stop offset="1" stop-color="#030711"/>
+    </radialGradient>
+    <radialGradient id="origin" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.55" stop-color="#DCE8FF"/>
+      <stop offset="1" stop-color="#94B9FF"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#field)"/>
+  <g fill="none" stroke="#F7F9FF" stroke-width="34" stroke-linecap="round">
+    <path d="M256 394 100 138"/>
+    <path d="M256 394 176 94"/>
+    <path d="M256 394V76"/>
+    <path d="M256 394 336 94"/>
+    <path d="M256 394 412 138"/>
+  </g>
+  <circle cx="256" cy="394" r="31" fill="url(#origin)"/>
+</svg>

@@ -140,6 +140,27 @@ Wide reference tables are the exception: they keep their width inside a
 `.fw-table-scroll` region that scrolls on its own and is focusable, because six spec columns
 do not mean anything collapsed onto a phone.
 
+## Favicon
+
+The mark in the browser tab is the fan: five beams from one luminous source point on a
+deep navy field, `public/fanwise-favicon/favicon.svg`, with PNG, ICO, Apple touch and
+Safari pinned-tab fallbacks beside it in `public/` and a web manifest that names the
+192 and 512 icons. The root layout declares them through the metadata `icons` field. They
+are static files rather than the `app/icon.*` convention because the favicon animates by
+swapping between frame files, and the resting icon has to be one of them.
+
+It moves at three moments and no others. Once about 450 ms after Fanwise first loads in a
+tab. Once when a product's first listing is confirmed on a channel, which the listing panel
+decides from the server's refreshed cards (`lib/publishing/first-publication.ts`), never
+from a click. And every 8 minutes 32 seconds while the tab is hidden, counted from the
+moment it was hidden: the mark contracts into the source point and fans out again, about a
+second, and a tab that comes to the front cancels the countdown. Reduced motion means the
+static mark, always. The schedule is `lib/favicon/animation.ts`; the component that runs
+it in a browser is `components/ui/animated-favicon.tsx`.
+
+The colours in the mark and the manifest are the mark's own, not palette tokens: they are
+pixels in files, and the app's light and dark palettes do not change them.
+
 ## In the app
 
 `app/globals.css` defines these as Tailwind v4 `@theme` tokens. Style through tokens, never

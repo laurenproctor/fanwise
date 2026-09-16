@@ -11,6 +11,7 @@ import {
   replaceDeliveryLinksAction,
 } from "@/lib/publishing/actions"
 import { useBackgroundRefresh } from "@/lib/use-background-refresh"
+import { useFirstPublicationSignal } from "@/lib/publishing/use-first-publication-signal"
 import { resolveSend } from "@/lib/publishing/send-outcome"
 import { ReadinessBar } from "./readiness-bar"
 import { RequirementList } from "./requirement-list"
@@ -134,6 +135,14 @@ export function ListingPanel({
    * progress, which is where it belongs.
    */
   useBackgroundRefresh(publishing || sending !== null || activating !== null)
+
+  /*
+   * The favicon's one domain cue. Decided from the cards the server just
+   * rendered, never from the click that queued the job, so a refusal, a
+   * failure, an edit to a listing already on a channel and a second channel
+   * for a product already on one all pass through in silence.
+   */
+  useFirstPublicationSignal(productId, cards)
 
   const activatingCard =
     activating === null ? undefined : cards.find((card) => card.listingId === activating)

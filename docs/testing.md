@@ -4,7 +4,7 @@
 
 **Unit** — product schemas, readiness, channel requirements, listing transformations, AI
 structured output, the factuality validator, entitlements, error normalization, idempotency
-keys, revenue aggregation.
+keys, revenue aggregation, the favicon's schedule and when a first publication has landed.
 
 **Database** — RLS, tenancy, membership, cascades, external ID uniqueness, transaction
 deduplication, snapshot immutability. `pnpm test:db`, against a live local Supabase
