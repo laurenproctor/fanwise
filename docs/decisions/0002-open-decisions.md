@@ -109,6 +109,10 @@ stated: a public HTTPS origin, because the keys arrive by a server-to-server POS
 `localhost` can receive. §9 of the spec and `.env.example` now say so. The run moves to the
 hosted deployment, on a domain being bought for it. What is still owed is the run itself.
 
+**Passed on 16 September 2026.** The exit ran on the hosted deployment and passed; B8 is done
+and this item is closed. The answers the run produced for §13 of the spec are still owed to
+the spec.
+
 ---
 
 ### 26. Get a Behance profile with Stripe connected

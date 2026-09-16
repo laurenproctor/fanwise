@@ -151,7 +151,7 @@ the product heading, usually.
     provider account in test mode)*
 11. Connect WooCommerce, publish, buy as a test buyer and download through the Fanwise link,
     then replace the link and see the old one stop. *(rewritten for ADR 0012 on 13 September
-    2026; unverified: needs a live store. Covered without one by
+    2026; **passed against the live store on 16 September 2026**. Covered without it by
     `tests/unit/woocommerce-oauth.test.ts`, `tests/unit/woocommerce-adapter.test.ts`,
     `tests/unit/delivery-route.test.ts` and `tests/db/delivery-links.test.ts`)*
 12. Generate a Behance project and asset package, hand off, capture the project URL.

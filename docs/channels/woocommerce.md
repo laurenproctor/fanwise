@@ -223,6 +223,10 @@ permalinks and WooCommerce activity can be checked from a browser before Connect
 Item 3 asks about the root index's `name`, which that read did not cover. The first Connect,
 from a local dev server, never reached the approve screen; §9 records why.
 
+**The exit passed on 16 September 2026** (journey 11 in `docs/testing.md`), which means the
+grant, the publish, a test buyer's download and the link replacement all worked against the
+live store. What that run showed for items 1, 2 and 4 has not been recorded here yet.
+
 ## 14. The outbound boundary
 
 The store address is the one thing in this adapter a creator typed, and Fanwise then sends

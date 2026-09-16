@@ -25,8 +25,8 @@ of any gate: first-run onboarding on 11 September 2026 as PR #61, and the public
 pages (`/@handle`) on 12 September 2026 as PR #72, migration applied and live. B11, the
 companion window (`docs/companion-window.md`), was opened on 13 September 2026 at the
 founder's request ahead of the evidence its plan waits for; code complete, no migration, exit
-unrun. B1, B2 and B8
-are on `main`; B8's exit needs a live WooCommerce store, which needs no approval. Gate A is
+unrun. B1 and B2 are on `main` with exits unrun. B8 is done: its exit, journey 11, passed on
+16 September 2026 against the live store. Gate A is
 not passed; A8 waits on a Creative Market seller login and the questions in that spec's
 §13.** See `docs/roadmap.md`. Implement the current step only. Do not build ahead.
 
