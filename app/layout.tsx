@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { Archivo, Instrument_Sans, JetBrains_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { StrayFileDropGuard } from "@/components/ui/stray-file-drop-guard"
+import { AnimatedFavicon } from "@/components/ui/animated-favicon"
 import "./globals.css"
 
 // Self-hosted at build time by next/font, so there is no render-blocking request
@@ -31,6 +32,21 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Fanwise",
   description: "One catalog. Every channel.",
+  // The mark, as static files in public/ rather than the app/icon.* file
+  // convention: the animated favicon swaps between frame files at the same
+  // path, and a build-generated route would put the resting icon somewhere the
+  // frames are not. The colour is the mark's own field, not a palette token,
+  // because a mask-icon colour and a manifest theme are pixels, not CSS.
+  icons: {
+    icon: [
+      { url: "/fanwise-favicon/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+    other: [{ rel: "mask-icon", url: "/safari-pinned-tab.svg", color: "#050B1B" }],
+  },
+  manifest: "/site.webmanifest",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -64,6 +80,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           drop onto, where a stray file is pure loss.
         */}
         <StrayFileDropGuard />
+        {/*
+          Renders null and owns one <link rel="icon"> it appends itself. Here
+          rather than on a page because the opening fan is once per load of
+          the application, and the root layout is the one thing a client-side
+          route change never remounts.
+        */}
+        <AnimatedFavicon />
         {children}
         {/*
           Renders null and appends a same-origin script, /_vercel/insights/script.js,
