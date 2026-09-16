@@ -119,7 +119,12 @@ upload that sniffs as a font (OTF, TTF, WOFF, WOFF2) and writes what the file
 says onto that asset's `metadata.font` (family, style, PostScript name, weight,
 width, italic, version, glyph count, variation axes, scripts, languages, Unicode
 blocks, OpenType features, embedding permission), or `metadata.fontProblem`
-when it cannot be read (`lib/fonts/detected.ts`). Decodable images get
+when it cannot be read (`lib/fonts/detected.ts`). The reading lands in the same update
+that makes the row ready, so a ready font with neither was settled by a worker built
+before fonts were read (worker deploys are by hand and lag `main`). The font workspace
+asks for each such row to be read (`readFontFileAction`, which queues `finalize_asset`
+again); on a ready row the job writes `metadata` only, which the immutability trigger
+permits, and a re-upload is never needed. Decodable images get
 `metadata.width` and `height`; the font workspace adds `metadata.altText`. None
 of this is on the product. The product's own `metadata` (the `font` member of
 the union) holds what the creator stands behind: classification, scripts,

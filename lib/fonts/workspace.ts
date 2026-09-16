@@ -125,19 +125,33 @@ export function fontFileViews(assets: readonly ProductAsset[]): FontFileView[] {
       format: reading.kind === "font" ? reading.font.format : nameFormat,
       kind,
       reading:
-        // A ready file named like a font whose bytes are not one never reached
-        // the parser: the job only reads what sniffs as a font. Say so, rather
-        // than showing it as a font with nothing detected.
+        // A ready file whose bytes are not a font's never reached the parser:
+        // the job only reads what sniffs as a font. Say so, rather than showing
+        // it as a font with nothing detected. What is left with no reading is a
+        // font the job never read (`unreadFontFiles`).
         kind === "font" &&
         asset.asset_state === "ready" &&
         reading.kind === "none" &&
-        nameFormat !== null &&
         !(asset.mime_type ?? "").startsWith("font/")
           ? { kind: "problem", problem: "unrecognised" }
           : reading,
       duplicateOf,
     }
   })
+}
+
+/**
+ * Ready font files with no reading.
+ *
+ * The reading lands in the same update that makes a row ready, so these were
+ * settled by a worker built before fonts were read. The files section asks
+ * for each one to be read (`readFontFileAction`) rather than showing "Not read
+ * yet" for good.
+ */
+export function unreadFontFiles(files: readonly FontFileView[]): FontFileView[] {
+  return files.filter(
+    (file) => file.kind === "font" && file.state === "ready" && file.reading.kind === "none",
+  )
 }
 
 /* ------------------------------------------------------------------- family */

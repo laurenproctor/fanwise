@@ -6,6 +6,8 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { routes } from "@/lib/routes"
 import { toJson } from "@/lib/imports/json"
+import { jobs } from "@/lib/jobs"
+import { isUnreadFont } from "./read-upload"
 import type { Product } from "@/lib/products/types"
 import { mergeFontMetadata, patchColumns, productPatchSchema, type PatchField } from "./save"
 
@@ -192,5 +194,41 @@ export async function setImageAltTextAction(
     console.error("[fonts] could not save alt text", { assetId, code: error.code })
     return { error: "That alt text could not be saved. Try again." }
   }
+  return { error: null }
+}
+
+/**
+ * Asks for a ready font file's reading, when the job that settled it left
+ * none.
+ *
+ * The files section calls this for every "Not read yet" row it shows, so a row
+ * settled by a worker built before fonts were read is read on the next visit
+ * rather than re-uploaded. The job is the same one an upload runs
+ * (`finalize_asset`): on a ready row it completes the reading and nothing else.
+ * A file that is already read, or is not a font, enqueues nothing.
+ */
+export async function readFontFileAction(
+  workspaceSlug: string,
+  assetId: string,
+): Promise<{ error: string | null }> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data: asset, error } = await supabase
+    .from("product_assets")
+    .select("id, asset_state, mime_type, metadata")
+    .eq("id", assetId)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+
+  if (error) {
+    console.error("[fonts] could not read the file to request its reading", { assetId, error })
+    return { error: "That file could not be read. Try again." }
+  }
+  if (!asset) return { error: "That file could not be found." }
+  if (asset.asset_state !== "ready" || !isUnreadFont(asset.mime_type, asset.metadata)) {
+    return { error: null }
+  }
+
+  await jobs.enqueue("finalize_asset", { workspaceId: workspace.id, assetId: asset.id })
   return { error: null }
 }

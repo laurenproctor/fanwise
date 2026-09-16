@@ -2,7 +2,8 @@ import { createHash } from "node:crypto"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { renderDerivative, specHash, derivativeFilename, type ImageSpec } from "./derivatives"
 import { isDerivableImage, sniffMimeType } from "./sniff"
-import { describeUpload } from "@/lib/fonts/read-upload"
+import { describeUpload, isUnreadFont } from "@/lib/fonts/read-upload"
+import type { ProductAsset } from "./types"
 import { toJson } from "@/lib/imports/json"
 import {
   buildStoragePath,
@@ -42,6 +43,10 @@ export function sha256(data: Buffer): string {
  * Everything recorded here is measured from the stored bytes. Nothing the client
  * claimed about size or type is trusted, because the client uploaded straight to
  * storage and could have sent anything.
+ *
+ * Run again for a row that is already ready, it completes the one measurement
+ * that can be missing, a font's reading (`completeReading`), and otherwise does
+ * nothing. A failed row is never revisited: the creator replaces it.
  */
 export async function finalizeAsset(payload: FinalizeAssetPayload): Promise<void> {
   const admin = createAdminClient()
@@ -55,7 +60,11 @@ export async function finalizeAsset(payload: FinalizeAssetPayload): Promise<void
 
   if (error) throw error
   if (!asset) throw new Error("asset not found")
-  if (asset.asset_state !== "pending") return // already settled; jobs may retry
+  if (asset.asset_state === "ready") {
+    await completeReading(admin, asset, payload.workspaceId)
+    return
+  }
+  if (asset.asset_state !== "pending") return // failed; jobs may retry, creators replace
 
   try {
     const data = await downloadObject(asset.storage_path)
@@ -96,6 +105,47 @@ export async function finalizeAsset(payload: FinalizeAssetPayload): Promise<void
       .eq("id", asset.id)
       .eq("workspace_id", payload.workspaceId)
   }
+}
+
+type AdminClient = ReturnType<typeof createAdminClient>
+
+/**
+ * Reads a ready font whose reading never landed.
+ *
+ * The reading is written by the same update that makes a row ready, so a
+ * ready font with none was settled by a worker built before fonts were read.
+ * Worker deploys are by hand and lag behind `main`; the font workspace asks
+ * for this on every such row it shows, and a re-upload is never needed.
+ *
+ * The row's bytes, type and checksum are correct and immutable, and stay so:
+ * only `metadata` is written, which the immutability trigger permits, and only
+ * when the reading is absent, so a second request is a no-op, not a rewrite.
+ * A failure here throws rather than marking the row failed. The file is fine,
+ * and a download that did not complete is worth the queue's retry.
+ */
+async function completeReading(
+  admin: AdminClient,
+  asset: ProductAsset,
+  workspaceId: string,
+): Promise<void> {
+  if (!isUnreadFont(asset.mime_type, asset.metadata)) return
+
+  const data = await downloadObject(asset.storage_path)
+  const described = await describeUpload(data, asset.mime_type!)
+  if (!described) return
+
+  const { error } = await admin
+    .from("product_assets")
+    .update({
+      metadata: toJson({
+        ...((asset.metadata as Record<string, unknown>) ?? {}),
+        ...described,
+      }),
+    })
+    .eq("id", asset.id)
+    .eq("workspace_id", workspaceId)
+
+  if (error) throw error
 }
 
 export interface BuildDerivativeResult {
