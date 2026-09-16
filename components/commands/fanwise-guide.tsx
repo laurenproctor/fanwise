@@ -10,7 +10,10 @@ import { Kbd } from "./kbd"
  * One live region, always in the DOM, so a screen reader is told once when
  * it fills and hears nothing while it is empty. The guide's own text is the
  * announcement — "Fanwise: P Products, C Channels…" — rather than a second
- * hidden sentence saying the same thing.
+ * hidden sentence saying the same thing. It is `aria-live` without the
+ * status role on purpose: every save indicator in the app is the page's one
+ * `role="status"`, and a second one under it would make "the status" mean
+ * two things to a screen reader and to a test.
  *
  * No animation: it is up for a second and a half, and a fade would spend a
  * third of that arriving. Reduced motion therefore has nothing to reduce.
@@ -19,8 +22,9 @@ export function FanwiseGuide({ open, message }: { open: boolean; message: string
   const visible = open || message !== null
   return (
     <div
-      role="status"
+      data-command-status=""
       aria-live="polite"
+      aria-atomic="true"
       className={
         visible
           ? "pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4"

@@ -1,7 +1,7 @@
 "use client"
 
 import { ariaKeyShortcuts } from "@/lib/commands/shortcuts"
-import { useCommandCenter, useShortcut } from "./command-provider"
+import { useCommandCenter, useShortcut, useSingleKeysEnabled } from "./command-provider"
 import { ShortcutKeys } from "./kbd"
 
 /**
@@ -22,9 +22,10 @@ export function ShortcutHint({
 }) {
   const center = useCommandCenter()
   const shortcut = useShortcut(commandId)
+  const singleKeysEnabled = useSingleKeysEnabled()
   if (!center || !shortcut) return null
   const single = !shortcut.shortcut.mod && !shortcut.shortcut.alt
-  if (single && !center.singleKeysEnabled) return null
+  if (single && !singleKeysEnabled) return null
   return (
     <ShortcutKeys shortcut={shortcut.shortcut} platform={shortcut.platform} className={className} />
   )

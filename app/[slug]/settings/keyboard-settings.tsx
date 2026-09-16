@@ -1,7 +1,7 @@
 "use client"
 
 import { useId, useSyncExternalStore } from "react"
-import { useCommandCenter } from "@/components/commands/command-provider"
+import { useCommandCenter, usePlatform } from "@/components/commands/command-provider"
 import { Kbd } from "@/components/commands/kbd"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,7 +26,7 @@ export function KeyboardSettings() {
   const enabled = useSyncExternalStore(subscribePreferences, readSingleKeyPreference, () => true)
   const id = useId()
   const hintId = `${id}-hint`
-  const platform = center?.platform ?? null
+  const platform = usePlatform()
 
   return (
     <div className="flex flex-col gap-6">
@@ -55,7 +55,7 @@ export function KeyboardSettings() {
           </span>
         </label>
       </div>
-      <p role="status" aria-live="polite" className="sr-only">
+      <p aria-live="polite" aria-atomic="true" className="sr-only">
         {enabled ? "Single-key shortcuts are on." : "Single-key shortcuts are off."}
       </p>
       {center ? (

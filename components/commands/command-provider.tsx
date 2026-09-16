@@ -36,8 +36,8 @@ import {
   matchesShortcut,
   type Platform,
 } from "@/lib/commands/shortcuts"
-import { PALETTE_SHORTCUT } from "@/lib/commands/workspace"
 import type { FanwiseCommand, InvocationMethod } from "@/lib/commands/types"
+import { PALETTE_SHORTCUT } from "@/lib/commands/workspace"
 import { CommandPalette } from "./command-palette"
 import { FanwiseGuide } from "./fanwise-guide"
 import { ShortcutReference } from "./shortcut-reference"
@@ -51,29 +51,36 @@ import { ShortcutReference } from "./shortcut-reference"
  * unregister on unmount; the listener reads the registry at the moment of
  * the keystroke, never a copy.
  *
- * Order of decision for one key, all of it in `onKeyDown` below:
+ * ## The context value never changes
  *
- *   1. Something already claimed it (`defaultPrevented`), or the palette or
- *      reference is open and handling its own keys: nothing.
- *   2. Text composition, or a dialog that is not ours: nothing.
- *   3. The F guide is open: the key is the second half of a sequence.
- *   4. A command modifier is held: match a modifier shortcut, in a field or
+ * This provider sits above every page's Suspense boundary. A context value
+ * that changed as the page streamed in — the platform becoming known, a
+ * preference read from storage — would reach the consumers inside that
+ * boundary, and React answers an update inside a boundary it has not
+ * hydrated yet by client-rendering it instead. With the server's segment
+ * still queued for reveal, the page then exists twice for a moment. So the
+ * context carries only what is stable for the provider's life: the registry
+ * and the callbacks. Anything that varies is read through its own hook,
+ * from a store, by the component that needs it.
+ *
+ * ## Order of decision for one key
+ *
+ *   1. Something already claimed it (`defaultPrevented`), or a held key.
+ *   2. The palette is open: ⌘K closes it, everything else is its own.
+ *   3. Text composition, or a dialog that is not ours: nothing.
+ *   4. The F guide is open: the key is the second half of a sequence.
+ *   5. A command modifier is held: match a modifier shortcut, in a field or
  *      not, and prevent the browser's default only if one matched.
- *   5. Otherwise a single key: refused on a virtual keyboard, on a held key,
- *      and inside anything editable; `F` opens the guide; anything else is
- *      looked up. A match that is disabled says why in the status bar rather
- *      than doing nothing.
+ *   6. Otherwise a single key: refused on a virtual keyboard and inside
+ *      anything editable; `F` opens the guide; anything else is looked up. A
+ *      match that is disabled says why in the status bar rather than doing
+ *      nothing.
  */
 
 export interface CommandCenter {
   registry: CommandRegistry
-  /** Null until hydrated: the server does not know whose keyboard this is. */
-  platform: Platform | null
-  singleKeysEnabled: boolean
-  paletteOpen: boolean
   openPalette: () => void
   closePalette: () => void
-  referenceOpen: boolean
   openReference: () => void
   closeReference: () => void
   /** Runs a command the way a button would, with the same refusal for a disabled one. */
@@ -89,6 +96,9 @@ export interface CommandCenter {
 }
 
 const CommandContext = createContext<CommandCenter | null>(null)
+
+/** Whether the palette is open. Its own context, for the header control alone. */
+const PaletteOpenContext = createContext(false)
 
 const NO_SUBSCRIBE = () => () => {}
 
@@ -112,6 +122,27 @@ function scopesOf(target: Element | null): Set<string> {
 /** The dialogs this provider owns, so a key inside them is never a global command. */
 const OWN_DIALOG = "[data-command-dialog]"
 
+/**
+ * Which command modifier this keyboard uses. Null until hydrated: the server
+ * does not know, and a keycap that guessed would flash wrong on every Mac.
+ */
+export function usePlatform(): Platform | null {
+  return useSyncExternalStore<Platform | null>(
+    NO_SUBSCRIBE,
+    () => detectPlatform(navigator),
+    () => null,
+  )
+}
+
+/** The creator's preference for plain single keys. On until read otherwise. */
+export function useSingleKeysEnabled(): boolean {
+  return useSyncExternalStore(subscribePreferences, readSingleKeyPreference, () => true)
+}
+
+export function usePaletteOpen(): boolean {
+  return useContext(PaletteOpenContext)
+}
+
 export function CommandProvider({
   workspaceSlug,
   children,
@@ -125,16 +156,8 @@ export function CommandProvider({
   )
   const pathname = usePathname()
 
-  const platform = useSyncExternalStore<Platform | null>(
-    NO_SUBSCRIBE,
-    () => detectPlatform(navigator),
-    () => null,
-  )
-  const singleKeysEnabled = useSyncExternalStore(
-    subscribePreferences,
-    readSingleKeyPreference,
-    () => true,
-  )
+  const platform = usePlatform()
+  const singleKeysEnabled = useSingleKeysEnabled()
   const commands = useSyncExternalStore(registry.subscribe, registry.list, registry.list)
   const guideOpen = useSyncExternalStore(sequence.subscribe, sequence.isOpen, () => false)
 
@@ -145,9 +168,12 @@ export function CommandProvider({
   const pendingFocus = useRef<string | null>(null)
 
   /*
-   * A completed navigation closes everything. Adjusted during the render
+   * A completed navigation closes the dialogs. Adjusted during the render
    * that sees the new path, as components/ui/use-disclosure.ts does, so
-   * nothing is painted open on the new page and then closed.
+   * nothing is painted open on the new page and then closed. The guide is
+   * not closed here: it closes itself on the key that navigates, and a
+   * close-on-path effect ran late enough on a slow machine to swallow an F
+   * pressed the instant the new page appeared.
    */
   const [renderedPath, setRenderedPath] = useState(pathname)
   if (pathname !== renderedPath) {
@@ -155,9 +181,6 @@ export function CommandProvider({
     setPaletteOpen(false)
     setReferenceOpen(false)
   }
-  useEffect(() => {
-    sequence.close()
-  }, [pathname, sequence])
 
   const announce = useCallback((text: string) => {
     if (messageTimer.current) clearTimeout(messageTimer.current)
@@ -367,15 +390,13 @@ export function CommandProvider({
     [],
   )
 
+  // Every dependency here is stable for the provider's life; see the file
+  // comment for why that is a requirement and not a nicety.
   const center = useMemo<CommandCenter>(
     () => ({
       registry,
-      platform,
-      singleKeysEnabled,
-      paletteOpen,
       openPalette,
       closePalette,
-      referenceOpen,
       openReference,
       closeReference,
       run,
@@ -384,12 +405,8 @@ export function CommandProvider({
     }),
     [
       registry,
-      platform,
-      singleKeysEnabled,
-      paletteOpen,
       openPalette,
       closePalette,
-      referenceOpen,
       openReference,
       closeReference,
       run,
@@ -400,23 +417,25 @@ export function CommandProvider({
 
   return (
     <CommandContext.Provider value={center}>
-      {children}
-      <CommandPalette
-        open={paletteOpen}
-        onClose={closePalette}
-        commands={commands}
-        platform={platform ?? "other"}
-        run={run}
-        workspaceSlug={workspaceSlug}
-      />
-      <ShortcutReference
-        open={referenceOpen}
-        onClose={closeReference}
-        commands={commands}
-        platform={platform ?? "other"}
-        singleKeysEnabled={singleKeysEnabled}
-      />
-      <FanwiseGuide open={guideOpen} message={message} />
+      <PaletteOpenContext.Provider value={paletteOpen}>
+        {children}
+        <CommandPalette
+          open={paletteOpen}
+          onClose={closePalette}
+          commands={commands}
+          platform={platform ?? "other"}
+          run={run}
+          workspaceSlug={workspaceSlug}
+        />
+        <ShortcutReference
+          open={referenceOpen}
+          onClose={closeReference}
+          commands={commands}
+          platform={platform ?? "other"}
+          singleKeysEnabled={singleKeysEnabled}
+        />
+        <FanwiseGuide open={guideOpen} message={message} />
+      </PaletteOpenContext.Provider>
     </CommandContext.Provider>
   )
 }
@@ -491,13 +510,14 @@ export function useShortcut(commandId: string): {
   shortcut: NonNullable<FanwiseCommand["shortcuts"]>[number]
 } | null {
   const center = useCommandCenter()
+  const platform = usePlatform()
   const commands = useSyncExternalStore(
     center?.registry.subscribe ?? NO_SUBSCRIBE,
     center?.registry.list ?? (() => []),
     center?.registry.list ?? (() => []),
   )
-  if (!center || !center.platform) return null
+  if (!center || !platform) return null
   const shortcut = commands.find((c) => c.id === commandId)?.shortcuts?.[0]
   if (!shortcut) return null
-  return { label: formatShortcut(shortcut, center.platform), platform: center.platform, shortcut }
+  return { label: formatShortcut(shortcut, platform), platform, shortcut }
 }

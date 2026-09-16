@@ -45,7 +45,16 @@ async function paletteChord(page: Page): Promise<string> {
 }
 
 function guide(page: Page) {
-  return page.getByRole("status").filter({ hasText: "Fanwise:" })
+  return page.locator("[data-command-status]").filter({ hasText: "Fanwise:" })
+}
+
+function said(page: Page, text: string) {
+  return page.locator("[data-command-status]").filter({ hasText: text })
+}
+
+/** A navigation has landed when its heading has, not merely its URL. */
+async function landed(page: Page, heading: string | RegExp) {
+  await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible()
 }
 
 test("⌘K opens the palette, a command runs, and Escape gives focus back", async ({ page }) => {
@@ -56,6 +65,7 @@ test("⌘K opens the palette, a command runs, and Escape gives focus back", asyn
   const button = page.getByRole("button", { name: /Commands/ })
   await expect(button).toBeVisible()
   await expect(page.getByRole("note")).toContainText("Try")
+  await expect(page.getByRole("button", { name: "Dismiss this hint" })).toHaveCount(0)
 
   await page.keyboard.press(await paletteChord(page))
   await expect(palette(page)).toBeVisible()
@@ -99,26 +109,26 @@ test("F draws the guide; a letter navigates; it times out and Escape closes it",
   await expect(guide(page)).toContainText("P Products")
   await page.keyboard.press("p")
   await page.waitForURL(routes.workspace(slug))
+  await landed(page, "Your first product starts here.")
   await expect(guide(page)).toHaveCount(0)
 
   // Every destination that navigates.
-  for (const [key, path] of [
-    ["c", routes.channels(slug)],
-    ["r", routes.profile(slug)],
-    ["s", routes.settings(slug)],
+  for (const [key, path, heading] of [
+    ["c", routes.channels(slug), "Channels"],
+    ["r", routes.profile(slug), "Public profile"],
+    ["s", routes.settings(slug), "Studio settings"],
   ] as const) {
     await page.keyboard.press("f")
     await expect(guide(page)).toBeVisible()
     await page.keyboard.press(key)
     await page.waitForURL(path)
+    await landed(page, heading)
   }
 
   // Preview, with no profile: refused, with the reason where the guide was.
   await page.keyboard.press("F")
   await page.keyboard.press("v")
-  await expect(
-    page.getByRole("status").filter({ hasText: "Create a public profile first." }),
-  ).toBeVisible()
+  await expect(said(page, "Create a public profile first.")).toBeVisible()
 
   // Timeout.
   await page.keyboard.press("f")
@@ -194,9 +204,7 @@ test("the product list's keys move focus between rows and only there", async ({ 
   // P on the product page, with no public page: refused with the reason.
   await page.locator("body").click({ position: { x: 4, y: 4 } })
   await page.keyboard.press("p")
-  await expect(
-    page.getByRole("status").filter({ hasText: "Set up a public profile first." }),
-  ).toBeVisible()
+  await expect(said(page, "Set up a public profile first.")).toBeVisible()
 
   // "/" reaches the catalog's search box from another page.
   await page.keyboard.press("/")

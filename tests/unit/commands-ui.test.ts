@@ -74,8 +74,9 @@ const COMMANDS: FanwiseCommand[] = [
 describe("FanwiseGuide", () => {
   it("keeps one polite live region in the DOM, empty until F", () => {
     const closed = render(createElement(FanwiseGuide, { open: false, message: null }))
-    expect(closed).toContain('role="status"')
+    expect(closed).not.toContain('role="status"')
     expect(closed).toContain('aria-live="polite"')
+    expect(closed).toContain("data-command-status")
     expect(closed).toContain("sr-only")
     expect(textOf(closed)).toBe("")
   })
