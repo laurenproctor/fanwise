@@ -12,6 +12,7 @@ import {
   unlistedStyles,
   type ChannelDraftView,
   type FontProductValues,
+  unreadFontFiles,
 } from "@/lib/fonts/workspace"
 import { evaluateFontReadiness, type FontReadinessInput } from "@/lib/fonts/readiness"
 import {
@@ -279,6 +280,19 @@ describe("the family, as the files describe it", () => {
       asset({ filename: "fake.otf", mime_type: "application/octet-stream" }),
     ])
     expect(files[0]!.reading).toEqual({ kind: "problem", problem: "unrecognised" })
+  })
+
+  it("lists the ready fonts the job never read, and nothing else", () => {
+    const unread = asset({ filename: "BlimpDisplay-Solid.otf", metadata: {} })
+    const files = fontFileViews([
+      unread,
+      fontAsset(blimp("Regular")),
+      asset({ filename: "fake.otf", mime_type: "application/octet-stream" }),
+      asset({ filename: "later.otf", asset_state: "pending", mime_type: null, metadata: {} }),
+      asset({ filename: "package.zip", asset_type: "archive", mime_type: "application/zip" }),
+    ])
+    expect(files[0]!.reading).toEqual({ kind: "none" })
+    expect(unreadFontFiles(files).map((file) => file.id)).toEqual([unread.id])
   })
 })
 

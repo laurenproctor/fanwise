@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useRef, useState, type DragEvent } from "react"
+import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
 import { deleteAssetAction } from "@/lib/products/actions"
 import { uploadProductFile } from "@/lib/products/upload-client"
 import { useBackgroundRefresh } from "@/lib/use-background-refresh"
+import { readFontFileAction } from "@/lib/fonts/actions"
 import {
   FONT_PROBLEM_TEXT,
   WIDTH_NAMES,
@@ -11,7 +12,7 @@ import {
   weightLabel,
 } from "@/lib/fonts/detected"
 import { FIELD_IDS } from "@/lib/fonts/readiness"
-import type { FontFileView } from "@/lib/fonts/workspace"
+import { unreadFontFiles, type FontFileView } from "@/lib/fonts/workspace"
 import type { AssetType } from "@/lib/products/types"
 import type { SectionContext } from "../context"
 import {
@@ -42,6 +43,15 @@ import type { SectionStatus } from "@/lib/fonts/readiness"
  */
 
 const ACCEPT = ".otf,.ttf,.woff,.woff2,.zip,.pdf"
+
+/**
+ * How long a requested reading is waited for before the row offers to ask
+ * again. Just past the background refresh's own window, so the wait ends
+ * after the last poll rather than while one could still land.
+ */
+const READ_WAIT_MS = 45_000
+
+type ReadRequest = "reading" | "stalled"
 
 type Accepted = { assetType: AssetType } | { rejected: string }
 
@@ -94,7 +104,47 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
   const serverById = new Map(files.map((file) => [file.id, file]))
   const processing =
     uploads.some((u) => u.state === "processing") || files.some((f) => f.state === "pending")
-  useBackgroundRefresh(processing)
+
+  /*
+   * A ready font with no reading was settled by a worker that did not read
+   * fonts. Ask for its reading once per visit and poll while the job runs;
+   * if nothing lands inside the poll window, the row offers to ask again.
+   */
+  const [readRequests, setReadRequests] = useState<Record<string, ReadRequest>>({})
+  const readRequested = useRef(new Set<string>())
+  const readTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+  const requestReading = useCallback(
+    (assetId: string) => {
+      readRequested.current.add(assetId)
+      setReadRequests((current) => ({ ...current, [assetId]: "reading" }))
+      const stall = () =>
+        setReadRequests((current) =>
+          current[assetId] === "reading" ? { ...current, [assetId]: "stalled" } : current,
+        )
+      clearTimeout(readTimers.current.get(assetId))
+      readTimers.current.set(assetId, setTimeout(stall, READ_WAIT_MS))
+      void readFontFileAction(ctx.workspaceSlug, assetId)
+        .then((result) => {
+          if (result.error) stall()
+        })
+        .catch(stall)
+    },
+    [ctx.workspaceSlug],
+  )
+  const unread = unreadFontFiles(files)
+  const unreadIds = unread.map((file) => file.id).join(" ")
+  useEffect(() => {
+    for (const assetId of unreadIds.split(" ")) {
+      if (assetId && !readRequested.current.has(assetId)) requestReading(assetId)
+    }
+  }, [unreadIds, requestReading])
+  useEffect(() => {
+    const timers = readTimers.current
+    return () => timers.forEach((timer) => clearTimeout(timer))
+  }, [])
+
+  const reading = unread.some((file) => readRequests[file.id] === "reading")
+  useBackgroundRefresh(processing || reading)
 
   // Queued means started and not yet settled: a batch still going through
   // `startAll` counts here before its later files have a row at all.
@@ -467,6 +517,8 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
                   key={file.id}
                   file={file}
                   replacing={uploads.some((u) => u.replaces === file.id)}
+                  readRequest={readRequests[file.id]}
+                  onReadAgain={() => requestReading(file.id)}
                   onReplace={() => {
                     replaceTarget.current = file
                     replaceRef.current?.click()
@@ -525,7 +577,10 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
   )
 }
 
-function rowStatus(file: FontFileView): { status: SectionStatus; text: string } {
+function rowStatus(
+  file: FontFileView,
+  readRequest: ReadRequest | undefined,
+): { status: SectionStatus; text: string } {
   if (file.state === "pending") return { status: "incomplete", text: "Processing…" }
   if (file.state === "failed") {
     return { status: "error", text: file.failureReason ?? "The upload could not be verified." }
@@ -542,21 +597,28 @@ function rowStatus(file: FontFileView): { status: SectionStatus; text: string } 
     }
   }
   if (file.reading.kind === "font") return { status: "complete", text: "Valid font" }
-  return { status: "incomplete", text: "Not read yet" }
+  if (readRequest === "stalled") {
+    return { status: "attention", text: "Fanwise could not read this file yet." }
+  }
+  return { status: "incomplete", text: readRequest === "reading" ? "Reading…" : "Not read yet" }
 }
 
 function FileRow({
   file,
   replacing,
+  readRequest,
   onReplace,
   onRemove,
+  onReadAgain,
 }: {
   file: FontFileView
   replacing: boolean
+  readRequest: ReadRequest | undefined
   onReplace: () => void
   onRemove: () => void
+  onReadAgain: () => void
 }) {
-  const { status, text } = rowStatus(file)
+  const { status, text } = rowStatus(file, readRequest)
   const font = file.reading.kind === "font" ? file.reading.font : null
   const style = font ? [font.familyName, font.styleName].filter(Boolean).join(" · ") : null
 
@@ -597,7 +659,17 @@ function FileRow({
       </div>
       <p className="flex items-start gap-1.5 text-[13px] text-[var(--color-ink-2)]">
         <StatusIcon status={status} size={16} />
-        <span>{replacing ? "Replacement uploading…" : text}</span>
+        <span>
+          {replacing ? "Replacement uploading…" : text}
+          {!replacing && readRequest === "stalled" ? (
+            <>
+              {" "}
+              <button type="button" className={LINK_BUTTON_CLASS} onClick={onReadAgain}>
+                Read again<span className="sr-only"> {file.filename}</span>
+              </button>
+            </>
+          ) : null}
+        </span>
       </p>
 
       {font ? (

@@ -1,6 +1,7 @@
 import { brotliDecompressSync, inflateSync } from "node:zlib"
 import sharp from "sharp"
 import { isDerivableImage } from "@/lib/products/sniff"
+import { readFontAsset } from "./detected"
 import { inspectFont } from "./inspect"
 import type { Decompressors } from "./sfnt"
 
@@ -50,4 +51,15 @@ export async function describeUpload(
   }
 
   return null
+}
+
+/**
+ * A ready font row the job never read.
+ *
+ * The reading lands in the same update that makes a row ready, so a ready
+ * font with none was settled by a worker built before fonts were read. Worker
+ * deploys are by hand and lag behind `main`; this is how the gap shows up.
+ */
+export function isUnreadFont(mimeType: string | null | undefined, metadata: unknown): boolean {
+  return isFontMimeType(mimeType) && readFontAsset(metadata).kind === "none"
 }
