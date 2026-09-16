@@ -9,13 +9,6 @@ export const metadata: Metadata = {
     "From your canonical product, through a channel adapter, to a listing. One master listing in, six correct listings out.",
 }
 
-const NAV = [
-  { label: "Product", href: marketingRoutes.landing },
-  { label: "Marketplaces", href: marketingRoutes.marketplaces },
-  { label: "Pricing", href: marketingRoutes.pricing },
-  { label: "About", href: marketingRoutes.about },
-]
-
 const FOOTER = [
   { label: "Product", href: marketingRoutes.landing },
   { label: "Marketplaces", href: marketingRoutes.marketplaces },
@@ -113,7 +106,7 @@ const AFTER = [
 
 export default function HowItWorksPage() {
   return (
-    <MarketingPage nav={{ links: NAV }} footer={FOOTER}>
+    <MarketingPage nav={{ current: "how-it-works" }} footer={FOOTER}>
       <header className="fw-page__header fw-page__header--tight">
         <span className="fw-eyebrow">How it works</span>
         <h1 className="fw-h1">One master listing in. Six correct listings out.</h1>

@@ -9,13 +9,6 @@ export const metadata: Metadata = {
     "Fanwise collects what it needs to run your workspace and publish your listings, and nothing it doesn't.",
 }
 
-const NAV = [
-  { label: "Product", href: marketingRoutes.landing },
-  { label: "Marketplaces", href: marketingRoutes.marketplaces },
-  { label: "Pricing", href: marketingRoutes.pricing },
-  { label: "About", href: marketingRoutes.about },
-]
-
 const FOOTER = [
   { label: "Product", href: marketingRoutes.landing },
   { label: "Pricing", href: marketingRoutes.pricing },
@@ -25,7 +18,7 @@ const FOOTER = [
 
 export default function PrivacyPage() {
   return (
-    <MarketingPage nav={{ links: NAV, signIn: false }} footer={FOOTER} reveal={false} legal>
+    <MarketingPage nav={{ signIn: false }} footer={FOOTER} reveal={false} legal>
       <header className="fw-legal__header">
         <span className="fw-eyebrow">Legal</span>
         <h1 className="fw-legal__h1">Privacy Policy</h1>

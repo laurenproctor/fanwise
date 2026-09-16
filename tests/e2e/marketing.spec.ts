@@ -129,7 +129,15 @@ test("on a phone the nav links live in a menu", async ({ page }) => {
 
   const panel = page.locator(".fw-nav__panel")
   await expect(panel).toBeVisible()
-  for (const label of ["Product", "Marketplaces", "How it works", "FAQ", "About", "Sign in"]) {
+  for (const label of [
+    "Product",
+    "Creators",
+    "Marketplaces",
+    "How it works",
+    "Pricing",
+    "About",
+    "Sign in",
+  ]) {
     await expect(panel.getByRole("link", { name: label, exact: true }), label).toBeVisible()
   }
   await expect(panel.getByRole("link", { name: "Start free", exact: true })).toHaveAttribute(
@@ -143,8 +151,8 @@ test("on a phone the nav links live in a menu", async ({ page }) => {
   await expect(panel).toBeHidden()
   await expect(menu).toBeFocused()
 
-  // A link closes it on the way out: the anchor links change no route, so the
-  // panel cannot rely on the navigation alone.
+  // A link closes it on the way out: a link to the page already shown would
+  // change no route, so the panel cannot rely on the navigation alone.
   await menu.click()
   await panel.getByRole("link", { name: "About", exact: true }).click()
   await expect(page).toHaveURL(/\/about$/)

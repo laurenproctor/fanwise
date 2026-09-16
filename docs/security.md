@@ -425,3 +425,14 @@ with a rewrite in play, which of `/@handle` and `/profile/handle` the route cach
 on is not something to bet a privacy guarantee on, and `revalidatePath()` can only
 name one of them. The cache returns when its invalidation is proven rather than
 assumed.
+
+**The creator directory reads views, never a function.** `/creators` needs counts,
+search and pagination across profiles, which is the shape a security definer RPC usually
+takes, and that would break the rule that `anon` executes nothing. Instead its three
+views are `security_invoker`: they run as `anon`, so column grants and RLS apply
+underneath unchanged, and `authenticated` is granted none of them. Search words are
+reduced to letters, digits, hyphens and apostrophes before they reach a PostgREST filter,
+so a query cannot inject filter syntax. `public_featured_profiles` is writable by the
+service role only; the label "Selected by Fanwise" is true because no creator can write
+that table. Analytics events from the directory carry the section and never a query,
+handle or product.

@@ -11,14 +11,6 @@ export const metadata: Metadata = {
     "Seven shops, seven rulebooks. Connect the marketplaces you sell on for $6 each a month; one owned storefront, Shopify or WooCommerce, is included.",
 }
 
-const NAV = [
-  { label: "Product", href: marketingRoutes.landing },
-  { label: "How it works", href: marketingRoutes.howItWorks },
-  { label: "Spec sheet", href: "#specs" },
-  { label: "Pricing", href: marketingRoutes.pricing },
-  { label: "About", href: marketingRoutes.about },
-]
-
 const FOOTER = [
   { label: "Product", href: marketingRoutes.landing },
   { label: "How it works", href: marketingRoutes.howItWorks },
@@ -39,7 +31,7 @@ const SPEC_COLUMNS = [
 
 export default function MarketplacesPage() {
   return (
-    <MarketingPage nav={{ links: NAV }} footer={FOOTER}>
+    <MarketingPage nav={{ current: "marketplaces" }} footer={FOOTER}>
       <header className="fw-page__header fw-page__header--tight">
         <span className="fw-eyebrow">Marketplaces</span>
         <h1 className="fw-h1">Seven shops. Seven rulebooks. One of yours.</h1>

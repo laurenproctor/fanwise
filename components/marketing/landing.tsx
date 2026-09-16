@@ -10,14 +10,6 @@ import { RAIL } from "./channels"
 import { ShopMark } from "./shop-mark"
 import { marketingRoutes } from "@/lib/routes"
 
-const NAV = [
-  { label: "Product", href: "#product" },
-  { label: "Marketplaces", href: marketingRoutes.marketplaces },
-  { label: "How it works", href: marketingRoutes.howItWorks },
-  { label: "Pricing", href: marketingRoutes.pricing },
-  { label: "About", href: marketingRoutes.about },
-]
-
 const FOOTER = [
   { label: "Product", href: "#product" },
   { label: "Marketplaces", href: marketingRoutes.marketplaces },
@@ -211,7 +203,7 @@ export function Landing() {
           <HeroCanvas />
           <div className="fw-hero__scrim" />
           <div className="fw-wrap--wide fw-hero__inner">
-            <SiteNav links={NAV} variant="hero" />
+            <SiteNav current="product" variant="hero" />
 
             <div style={{ paddingTop: 56 }}>
               <span className="fw-chip">

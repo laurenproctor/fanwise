@@ -795,6 +795,32 @@ read — and the policies then restrict those columns to genuinely published row
 halves are load-bearing. `storage_path`, `channel_connection_id`, `status` and
 `archived_at` are among the columns deliberately absent.
 
+### The creator directory (20260914100000)
+
+`/creators` lists public creators. It adds no copy of any profile or product: it reads
+three **`security_invoker` views**, so `anon` sees through them exactly what `anon` sees
+in the tables beneath, and nothing more. None is readable by `authenticated`, whose
+member policies would let a creator's own drafts through.
+
+**public_creator_directory**: one row per published profile with at least one published,
+unarchived product. Carries product_count, latest_published_at, product_types (for
+filtering), up to four representative products (featured page, has an image, the
+creator's order, most recent, slug), `featured_rank`, and `search_text`: lowercase public
+text only (name, introduction, About, place, published titles and types).
+**public_creator_product_types**: published counts per creator and type, for each card's
+primary types. **public_creator_locations**: distinct country and city pairs for the
+filters.
+
+**public_featured_profiles**: public_profile_id (pk), rank (unique, 1–1000),
+created_at. Fanwise's editorial selection for "Featured creators · Selected by Fanwise".
+`anon` may read a row only while its profile is published; `authenticated` has no grant,
+so a creator cannot feature themselves. Written by the service role, by hand, with no
+admin UI. Featuring grants no visibility.
+
+The same migration adds `archived_at is null` to the `anon` policy on `products`, so an
+archived product leaves every public surface (the directory, the profile catalog, the
+product page), and reserves `creators` as a workspace slug.
+
 Those policies are `to anon` and not `to anon, authenticated`, because `authenticated`
 already holds all-column SELECT on those tables: adding that role to a permissive
 policy would hand a signed-in member every column of another workspace's product the

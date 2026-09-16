@@ -28,6 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const marketing: MetadataRoute.Sitemap = [
     { url: publicUrl(origin, marketingRoutes.landing), priority: 1 },
+    { url: publicUrl(origin, marketingRoutes.creators), priority: 0.8 },
     { url: publicUrl(origin, marketingRoutes.howItWorks), priority: 0.8 },
     { url: publicUrl(origin, marketingRoutes.pricing), priority: 0.8 },
     { url: publicUrl(origin, marketingRoutes.marketplaces), priority: 0.7 },

@@ -27,6 +27,13 @@
  */
 export const marketingRoutes = {
   landing: "/",
+  /**
+   * The public creator directory. Lives with the marketing site because it is
+   * public and unauthenticated, but it is not prerendered: its content is the
+   * directory, read per request as `anon`. Profiles and products it links to
+   * stay at their canonical `publicRoutes` addresses.
+   */
+  creators: "/creators",
   marketplaces: "/marketplaces",
   howItWorks: "/how-it-works",
   pricing: "/pricing",

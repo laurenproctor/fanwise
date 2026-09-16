@@ -35,13 +35,6 @@ export const metadata: Metadata = {
   title: "Page not found · Fanwise",
 }
 
-const NAV = [
-  { label: "Product", href: marketingRoutes.landing },
-  { label: "Marketplaces", href: marketingRoutes.marketplaces },
-  { label: "How it works", href: marketingRoutes.howItWorks },
-  { label: "Pricing", href: marketingRoutes.pricing },
-]
-
 const FOOTER = [
   { label: "Product", href: marketingRoutes.landing },
   { label: "Pricing", href: marketingRoutes.pricing },
@@ -52,7 +45,7 @@ const FOOTER = [
 
 export default function NotFound() {
   return (
-    <MarketingPage nav={{ links: NAV }} footer={FOOTER} reveal={false}>
+    <MarketingPage nav={{}} footer={FOOTER} reveal={false}>
       <main className="fw-nf">
         <div>
           <span className="fw-eyebrow">Not found</span>

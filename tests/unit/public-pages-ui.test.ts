@@ -294,6 +294,7 @@ describe("the public shell", () => {
     const hrefs = [...markup.matchAll(/href="(\/[^"]*)"/g)].map((m) => m[1]!)
     const known = new Set([
       "/",
+      "/creators",
       "/how-it-works",
       "/pricing",
       "/marketplaces",

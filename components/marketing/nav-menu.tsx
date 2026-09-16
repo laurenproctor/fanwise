@@ -26,7 +26,7 @@ export function NavMenu({
   cta,
   variant,
 }: {
-  links: NavLink[]
+  links: readonly NavLink[]
   signIn: boolean
   cta: { label: string; href: string } | null
   variant: "light" | "dark" | "hero"

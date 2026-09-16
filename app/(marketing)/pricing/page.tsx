@@ -14,14 +14,6 @@ export const metadata: Metadata = {
     "$9 a month, then $6 for each marketplace you connect. One owned storefront included, unlimited catalog, no percentage of sales.",
 }
 
-const NAV = [
-  { label: "Product", href: marketingRoutes.landing },
-  { label: "Marketplaces", href: marketingRoutes.marketplaces },
-  { label: "How it works", href: marketingRoutes.howItWorks },
-  { label: "FAQ", href: "#faq" },
-  { label: "About", href: marketingRoutes.about },
-]
-
 const FOOTER = [
   { label: "Pricing", href: "#plan" },
   { label: "Channels", href: "#channels" },
@@ -94,7 +86,7 @@ export default function PricingPage() {
       <ScrollReveal />
 
       <div className="fw-wrap">
-        <SiteNav links={NAV} cta={{ label: "Start free", href: marketingRoutes.signUp }} />
+        <SiteNav current="pricing" cta={{ label: "Start free", href: marketingRoutes.signUp }} />
         <header id="top" style={{ padding: "68px 0 12px", maxWidth: 780 }}>
           <h1 className="fw-price-h1">Simple pricing for wherever you sell.</h1>
         </header>

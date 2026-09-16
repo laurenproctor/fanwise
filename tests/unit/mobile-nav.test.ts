@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/pricing",
 }))
 
-import { SiteNav } from "@/components/marketing/site-nav"
+import { PUBLIC_NAV, SiteNav } from "@/components/marketing/site-nav"
 import { PublicNavMenu } from "@/components/public/public-nav-menu"
 
 /**
@@ -27,11 +27,7 @@ import { PublicNavMenu } from "@/components/public/public-nav-menu"
  * a phone, which is the bug this file exists to catch.
  */
 
-const LINKS = [
-  { label: "Product", href: "/" },
-  { label: "Marketplaces", href: "/marketplaces" },
-  { label: "FAQ", href: "#faq" },
-]
+const LINKS = PUBLIC_NAV
 
 function render(element: Parameters<typeof renderToStaticMarkup>[0]): string {
   return renderToStaticMarkup(element)
@@ -48,7 +44,7 @@ function panelOf(markup: string): string {
 
 describe("the marketing nav", () => {
   it("carries every link in the panel as well as the row", () => {
-    const panel = panelOf(render(createElement(SiteNav, { links: LINKS })))
+    const panel = panelOf(render(createElement(SiteNav, {})))
 
     for (const link of LINKS) {
       expect(panel, `${link.label} in the panel`).toContain(`href="${link.href}"`)
@@ -61,7 +57,7 @@ describe("the marketing nav", () => {
   })
 
   it("ships the panel closed, and says so", () => {
-    const markup = render(createElement(SiteNav, { links: LINKS }))
+    const markup = render(createElement(SiteNav, {}))
 
     // hidden, not absent: aria-controls has to point at something real, and a
     // panel that only exists once opened cannot be styled closed.
@@ -72,9 +68,7 @@ describe("the marketing nav", () => {
   })
 
   it("drops Sign in and the call to action from the panel when the page has none", () => {
-    const panel = panelOf(
-      render(createElement(SiteNav, { links: LINKS, signIn: false, cta: null })),
-    )
+    const panel = panelOf(render(createElement(SiteNav, { signIn: false, cta: null })))
 
     expect(panel).not.toContain("Sign in")
     // The separator divides links from those two; with neither, it is nothing.
@@ -82,18 +76,24 @@ describe("the marketing nav", () => {
   })
 
   it("names the toggle for a screen reader, with no text in the icon", () => {
-    const markup = render(createElement(SiteNav, { links: LINKS }))
+    const markup = render(createElement(SiteNav, {}))
 
     expect(markup).toMatch(/<span class="sr-only">Open menu<\/span>/)
     expect(markup).toContain('aria-hidden="true"')
   })
 })
 
+const PROFILE_LINKS = [
+  { label: "Creators", href: "/creators" },
+  { label: "How it works", href: "/how-it-works" },
+  { label: "Pricing", href: "/pricing" },
+]
+
 describe("the public profile nav", () => {
   it("carries its links, Sign in and the call to action", () => {
-    const markup = render(createElement(PublicNavMenu, { links: LINKS }))
+    const markup = render(createElement(PublicNavMenu, { links: PROFILE_LINKS }))
 
-    for (const link of LINKS) {
+    for (const link of PROFILE_LINKS) {
       expect(markup, `${link.label}`).toContain(`href="${link.href}"`)
     }
     expect(markup).toContain("Sign in")

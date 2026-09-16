@@ -45,6 +45,8 @@ import type { Database } from "@/lib/supabase/database.types"
 export const PUBLIC_PATHS = [
   "/",
   "/about",
+  // The creator directory. Reads as `anon` like the profile pages it links to.
+  "/creators",
   "/how-it-works",
   "/marketplaces",
   "/pricing",
