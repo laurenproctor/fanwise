@@ -10,8 +10,9 @@ it, with the stamp-and-search create guard deferred.
 
 **A6 is done.** Its exit ran on 11 September 2026 against the live shop `Fanwise`: connect,
 publish, and an active listing in one job, with four of the five §13 questions in
-`docs/channels/etsy.md` settled; see "The A6 exit run" below. B1, B2 and B8 are also on
-`main`, each code complete with its exit unrun; see their sections under Gate B. A5 is done; all three exit clauses ran against a live Shopify
+`docs/channels/etsy.md` settled; see "The A6 exit run" below. B1 and B2 are also on
+`main`, each code complete with its exit unrun, and B8 is done, its exit passed on 16 September
+2026; see their sections under Gate B. A5 is done; all three exit clauses ran against a live Shopify
 store. What remains of Gate A: A7 has its two live channels, Shopify and Etsy, and is blocked
 on nothing; A8 waits on a Creative Market seller login; and the gate's own exit — an outside
 creator, unassisted — waits on a real portfolio to hand them.
@@ -39,7 +40,7 @@ step completes, and do not work on more than one step at a time.
 | Etsy developer app | A6 | date unrecorded | by 8 Sep 2026 |
 | Etsy commercial access | A6 | date unrecorded | by 8 Sep 2026 |
 | Shopify Partner account | A5 | yes, date unrecorded | by 5 Sep 2026 |
-| WooCommerce test store | B8 exit, and A7 if it runs before Etsy's | nothing to file | exists, 9 Sep 2026: `houseofproctor.com`, permalinks on. Fanwise needs a public HTTPS origin to meet it |
+| WooCommerce test store | B8 exit, and A7 if it runs before Etsy's | nothing to file | exists, 9 Sep 2026: `houseofproctor.com`, permalinks on. B8's exit passed against the live store on 16 Sep 2026 |
 | Behance profile with Stripe connected | B9, and its §13 questions before B9 opens | nothing to file | not yet. A profile and a Stripe account; decision 26 |
 | Gumroad OAuth application and seller account | B10 build and exit | nothing to file: self-serve in account settings | not yet. Decision 27, which also carries an email to Gumroad |
 
@@ -305,7 +306,8 @@ on 8 September 2026, and it changes A7's blocker rather than its exit. The exit 
 two live URLs. What has changed is that the second live channel no longer has to be Etsy: a
 WooCommerce store needs no approval, so A7 could have been proven on Shopify and WooCommerce
 while A6's exit waited on its shop. Etsy landed on 11 September 2026, so A7 now has its two
-live channels without B8's exit, and WooCommerce joins as a third when that runs. One thing A7 must
+live channels without B8's exit, and WooCommerce joined as a third when B8's exit passed on 16
+September 2026. One thing A7 must
 decide with WooCommerce connected: `activate` refusing a product with no file attached is the
 creator's step still owed, not a provider failure, and the progress surface has to say which.
 
@@ -411,7 +413,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B5 | `sales_events`, transaction ingestion for Shopify, Etsy and WooCommerce, dedupe constraints |
 | B6 | Analytics overview: revenue, units, by channel, by product |
 | B7 | CSV import foundation |
-| B8 | WooCommerce: store authorization, adapter, draft, images, activate with the file verified, idempotency. See `docs/channels/woocommerce.md`. Added 8 September 2026 at the founder's request; **code complete the same day**, exit unrun, see below |
+| B8 | WooCommerce: store authorization, adapter, draft, images, activate with the file verified, idempotency. See `docs/channels/woocommerce.md`. Added 8 September 2026 at the founder's request; **code complete the same day**; **exit passed 16 September 2026**, journey 11, see below |
 | B9 | Behance: creative-field and category mapping, the project-and-asset package, two new image derivative specs, guided handoff in new-project and existing-project modes, mark submitted, project URL capture. See `docs/channels/behance.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on A8, see below |
 | B10 | Gumroad: OAuth with PKCE, adapter, presigned multipart file upload, draft then enable, covers and thumbnail, the compensating delete, a platform-wide create pace, idempotency. See `docs/channels/gumroad.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on nothing in code, see below |
 | B11 | The companion window: the assisted handoff shown beside the marketplace's own editor, in a pop-out that touches nothing on the marketplace's page. See `docs/companion-window.md` and `docs/decisions/0010`. Planned 12 September 2026. **Opened 13 September 2026 at the founder's request, ahead of its evidence; code complete, exit unrun**, see below |
@@ -510,7 +512,8 @@ What it deliberately does not do: upload the file (`digitalFileUpload: false` by
 read orders (`transactions: false` until B5), or bill (nothing bills before C1, and the row
 reads included either way).
 
-**B8's exit test has not run.** It needs a WooCommerce store on HTTPS with pretty
+**B8's exit passed on 16 September 2026**, run by the founder on the hosted deployment. What the
+run answered in §13 of the spec is not yet written down there and is owed. It needed a WooCommerce store on HTTPS with pretty
 permalinks, which is any WordPress host and no approval, and a Fanwise at a public HTTPS
 address, because the store posts the keys server to server and a local dev server cannot
 receive them (spec §9, learned 9 September 2026). The store exists as of that day; the run
