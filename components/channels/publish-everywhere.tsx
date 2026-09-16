@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { publishEverywhereAction } from "@/lib/publishing/actions"
 import { SKIP_REASON_TEXT, type SkipReason } from "@/lib/publishing/run"
+import { useRegisterCommands } from "@/components/commands/command-provider"
+import { ShortcutHint, useAriaKeyShortcuts } from "@/components/commands/shortcut-hint"
+import { EDITOR_COMMAND_IDS, PUBLISH_SHORTCUT } from "@/lib/commands/workspace"
 
 /**
  * The central action: one product, every channel that can take it.
@@ -61,6 +64,38 @@ export function PublishEverywhere({
     })
   }
 
+  /*
+   * The shortcut is the button: same `run`, same server action, same
+   * refusal. When the button is disabled the palette says why, in the words
+   * the skip list already uses — the first thing a channel still needs, or
+   * the blocker that stops every channel at once.
+   */
+  const firstNeed = skips.flatMap((skip) => skip.needs)[0] ?? null
+  const disabledReason = pending
+    ? "Publishing is starting."
+    : (blocker ??
+      (attemptable === 0
+        ? (firstNeed ?? "No channel is ready to receive this product yet.")
+        : null))
+  useRegisterCommands([
+    {
+      id: EDITOR_COMMAND_IDS.publish,
+      label: "Publish everywhere",
+      description:
+        attemptable === 1
+          ? "Send this product to the one channel that is ready."
+          : `Send this product to the ${attemptable} channels that are ready.`,
+      group: "page",
+      scope: "page",
+      keywords: ["publish", "send", "channels", "listing"],
+      shortcuts: [PUBLISH_SHORTCUT],
+      enabled: disabledReason === null,
+      disabledReason: disabledReason ?? undefined,
+      execute: run,
+    },
+  ])
+  const publishKeys = useAriaKeyShortcuts(EDITOR_COMMAND_IDS.publish)
+
   return (
     <section
       aria-labelledby="publish-everywhere-heading"
@@ -88,13 +123,17 @@ export function PublishEverywhere({
           channels below explain why, and a button that vanishes teaches
           nothing. It is the page's one primary action either way.
         */}
-        <Button
-          type="button"
-          onClick={run}
-          disabled={pending || attemptable === 0 || blocker !== null}
-        >
-          {pending ? "Starting…" : "Publish everywhere"}
-        </Button>
+        <span className="inline-flex items-center gap-3">
+          <ShortcutHint commandId={EDITOR_COMMAND_IDS.publish} />
+          <Button
+            type="button"
+            onClick={run}
+            disabled={pending || attemptable === 0 || blocker !== null}
+            aria-keyshortcuts={publishKeys}
+          >
+            {pending ? "Starting…" : "Publish everywhere"}
+          </Button>
+        </span>
       </div>
 
       {blocker ? <p className="text-[14px] text-[var(--color-ink-2)]">{blocker}</p> : null}

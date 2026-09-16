@@ -2,6 +2,9 @@
 
 import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
+import { useRegisterCommands } from "@/components/commands/command-provider"
+import { ShortcutHint, useAriaKeyShortcuts } from "@/components/commands/shortcut-hint"
+import { COMPOSE_SHORTCUT, EDITOR_COMMAND_IDS } from "@/lib/commands/workspace"
 import { FormError } from "@/components/ui/form-error"
 import { composeListingAction, restoreGenerationAction } from "@/lib/ai/actions"
 import { LISTING_FIELD_LABELS, listingFieldSchema } from "@/lib/ai/output"
@@ -86,6 +89,28 @@ export function ComposePanel({
 
   const hasCopy = generation?.status === "succeeded"
 
+  // The shortcut is the button, refusals included.
+  const composeReason = !configured
+    ? "Composing with AI is not configured on this deployment."
+    : pending || inFlight
+      ? "A draft is already being composed."
+      : null
+  useRegisterCommands([
+    {
+      id: EDITOR_COMMAND_IDS.compose,
+      label: hasCopy ? "Compose again with AI" : "Compose with AI",
+      description: `Write this listing for ${channelName} from the product's facts.`,
+      group: "page",
+      scope: "page",
+      keywords: ["ai", "write", "generate", "draft", "listing"],
+      shortcuts: [COMPOSE_SHORTCUT],
+      enabled: composeReason === null,
+      disabledReason: composeReason ?? undefined,
+      execute: compose,
+    },
+  ])
+  const composeKeys = useAriaKeyShortcuts(EDITOR_COMMAND_IDS.compose)
+
   return (
     <section
       aria-labelledby="compose-heading"
@@ -103,14 +128,18 @@ export function ComposePanel({
         </div>
 
         {configured ? (
-          <Button
-            type="button"
-            variant={hasCopy ? "secondary" : "primary"}
-            onClick={compose}
-            disabled={pending || inFlight}
-          >
-            {pending || inFlight ? "Composing…" : hasCopy ? "Compose again" : "Compose with AI"}
-          </Button>
+          <span className="inline-flex items-center gap-3">
+            <ShortcutHint commandId={EDITOR_COMMAND_IDS.compose} />
+            <Button
+              type="button"
+              variant={hasCopy ? "secondary" : "primary"}
+              onClick={compose}
+              disabled={pending || inFlight}
+              aria-keyshortcuts={composeKeys}
+            >
+              {pending || inFlight ? "Composing…" : hasCopy ? "Compose again" : "Compose with AI"}
+            </Button>
+          </span>
         ) : (
           <span className="label-mono text-[var(--color-ink-3)]">Not configured here</span>
         )}

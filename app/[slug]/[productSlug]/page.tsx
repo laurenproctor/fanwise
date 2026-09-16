@@ -30,6 +30,7 @@ import { DeleteProductDraft } from "./delete-product-draft"
 import { offeredDraftDeletion } from "@/lib/products/draft-deletion"
 import { loadFontWorkspace } from "@/lib/fonts/queries"
 import { FontWorkspace } from "@/components/fonts/font-workspace"
+import { ProductPageCommands } from "./product-page-commands"
 
 export const metadata = { title: "Product · Fanwise" }
 
@@ -69,6 +70,7 @@ export default async function ProductPage({
 
     return (
       <div data-workspace-canvas="full" className="flex flex-col gap-14 pb-16">
+        {/* The workspace registers its own Save, Publish and Preview commands. */}
         <FontWorkspace
           workspaceSlug={slug}
           productId={product.id}
@@ -208,6 +210,13 @@ export default async function ProductPage({
 
   return (
     <div className="flex flex-col gap-12">
+      {/* P, and the palette's Preview: the public page in a new tab, when it is public. */}
+      <ProductPageCommands
+        handle={publicPage.handle}
+        pageSlug={publicPage.page?.slug ?? null}
+        pageStatus={publicPage.page?.status ?? null}
+        profileStatus={publicPage.profileStatus}
+      />
       <div className="flex flex-col gap-2">
         <Link href={routes.workspace(slug)} className="label-mono hover:text-[var(--color-ink-2)]">
           ← Products

@@ -9,6 +9,9 @@ import { MarkdownEditor } from "@/components/ui/markdown-editor"
 import { updateProductAction, type SaveState } from "@/lib/products/actions"
 import { PRODUCT_TYPES, PRODUCT_TYPE_LABELS, type Product } from "@/lib/products/types"
 import { SaveStatusIndicator, type SaveStatus } from "@/components/ui/save-status"
+import { useRegisterCommands } from "@/components/commands/command-provider"
+import { ShortcutHint, useAriaKeyShortcuts } from "@/components/commands/shortcut-hint"
+import { EDITOR_COMMAND_IDS, SAVE_SHORTCUT } from "@/lib/commands/workspace"
 
 /**
  * How long typing has to stop before the form saves itself.
@@ -135,6 +138,30 @@ export function ProductForm({
     window.addEventListener("beforeunload", warn)
     return () => window.removeEventListener("beforeunload", warn)
   }, [dirty, state.error])
+
+  /*
+   * ⌘S, and the palette's "Save draft", are this button. Same `save`, same
+   * refusal while a save is in flight, and disabled for the same reason the
+   * button is: nothing outstanding to write.
+   */
+  const canSave = !isPending && (dirty || state.error !== null)
+  useRegisterCommands([
+    {
+      id: EDITOR_COMMAND_IDS.save,
+      label: "Save draft",
+      description: "Save the canonical record now, without waiting for autosave.",
+      group: "page",
+      scope: "page",
+      keywords: ["save", "draft", "product"],
+      shortcuts: [SAVE_SHORTCUT],
+      enabled: canSave,
+      disabledReason: isPending
+        ? "A save is already in progress."
+        : "Nothing to save. Changes save themselves.",
+      execute: save,
+    },
+  ])
+  const saveKeys = useAriaKeyShortcuts(EDITOR_COMMAND_IDS.save)
 
   const status: SaveStatus = state.error
     ? "error"
@@ -273,9 +300,14 @@ export function ProductForm({
           never invites a pointless write.
         */}
         <div className="flex items-center gap-4">
-          <Button type="submit" disabled={isPending || (!dirty && !state.error)}>
+          <Button
+            type="submit"
+            disabled={isPending || (!dirty && !state.error)}
+            aria-keyshortcuts={saveKeys}
+          >
             {isPending ? "Saving…" : state.error ? "Try again" : "Save changes"}
           </Button>
+          <ShortcutHint commandId={EDITOR_COMMAND_IDS.save} />
         </div>
       </form>
     </div>

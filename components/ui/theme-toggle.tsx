@@ -60,26 +60,32 @@ function subscribe(onChange: () => void) {
   }
 }
 
+/**
+ * Flips the theme. The button below and the command palette's "Switch light
+ * or dark mode" both call this, so there is one toggle rather than two that
+ * agree today.
+ */
+export function toggleTheme(): void {
+  const next = currentTheme() === DARK ? LIGHT : DARK
+  try {
+    localStorage.setItem(THEME_KEY, next)
+  } catch {
+    // The preference still applies for this page when storage is unavailable.
+  }
+
+  apply(next)
+  window.dispatchEvent(new Event(CHANGED))
+}
+
 export function ThemeToggle({ variant = "light" }: { variant?: "light" | "dark" }) {
   const theme = useSyncExternalStore(subscribe, currentTheme, () => LIGHT)
   const dark = theme === DARK
   const next = dark ? LIGHT : DARK
 
-  function toggle() {
-    try {
-      localStorage.setItem(THEME_KEY, next)
-    } catch {
-      // The preference still applies for this page when storage is unavailable.
-    }
-
-    apply(next)
-    window.dispatchEvent(new Event(CHANGED))
-  }
-
   return (
     <button
       type="button"
-      onClick={toggle}
+      onClick={toggleTheme}
       title={`Switch to ${next} mode`}
       aria-label={`Switch to ${next} mode`}
       aria-pressed={dark}

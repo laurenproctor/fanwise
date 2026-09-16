@@ -9,13 +9,15 @@ import { BillingPanel } from "@/components/billing/billing-panel"
 import { BillingLedger } from "@/components/billing/billing-ledger"
 import { FanLines } from "@/components/ui/fan-lines"
 import { AccountForm } from "./account-form"
+import { KeyboardSettings } from "./keyboard-settings"
 import { SettingsSection } from "./settings-section"
 import { StudioDetailsForm } from "./studio-details-form"
 
 export const metadata = { title: "Settings · Fanwise" }
 
 /**
- * Three sections: the studio, what it costs, and the person signed in.
+ * Four sections: the studio, what it costs, the person signed in, and the
+ * keyboard — the last one a browser preference rather than a row anywhere.
  *
  * The public profile is not one of them. It has its own section of the
  * workspace header (`/<workspace>/profile`), because it describes a page
@@ -103,6 +105,18 @@ export default async function SettingsPage({
         description="Personal details and sign-in security."
       >
         <AccountForm workspaceSlug={workspace.slug} profile={profile} />
+      </SettingsSection>
+
+      {/*
+        Stored in this browser rather than on the account: it is a fact about
+        this keyboard. The one preference here that is not a row anywhere.
+      */}
+      <SettingsSection
+        id="keyboard"
+        heading="Keyboard"
+        description="Shortcuts and the command palette."
+      >
+        <KeyboardSettings />
       </SettingsSection>
     </div>
   )
