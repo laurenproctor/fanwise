@@ -65,6 +65,23 @@ function suggestionsFor() {
       audience: suggestion("Designers"),
       tags: suggestion(["font", "grotesque"]),
       technicalRequirements: suggestion([]),
+      details: suggestion({
+        styleCount: 6,
+        styleNames: [],
+        isVariable: true,
+        fontFormats: [],
+        glyphCount: null,
+        classification: null,
+        scripts: [],
+        languages: [],
+        features: [],
+        software: [],
+        pageCount: null,
+        dimensions: null,
+        fileFormats: [],
+        dpi: null,
+        itemCount: null,
+      }),
       priceGuidance: suggestion({
         amount: null,
         currency: "USD",
@@ -173,7 +190,7 @@ export async function fillListing(
 ) {
   await page.getByRole("textbox", { name: "Product name" }).fill(values.name)
   await page.getByRole("textbox", { name: /^Price/ }).fill(values.price)
-  await page.getByRole("textbox", { name: "Description" }).fill(values.description)
+  await page.getByRole("textbox", { name: "Description", exact: true }).fill(values.description)
   await page.getByRole("combobox", { name: "Product type" }).selectOption(values.type ?? "font")
 }
 

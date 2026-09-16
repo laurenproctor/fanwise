@@ -79,7 +79,9 @@ export function DestinationList({
       <ul ref={listRef} aria-labelledby="where-to-buy" className="flex flex-col">
         {destinations.map((destination, index) => (
           <li
-            key={destination.channelId}
+            // Two shops on one marketplace share a channel id; the address is
+            // the one thing two rows never share.
+            key={destination.url}
             className={
               index === 0
                 ? "flex items-center gap-3 py-3"

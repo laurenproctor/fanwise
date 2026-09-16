@@ -1,4 +1,5 @@
 import { createPublicClient } from "@/lib/supabase/public"
+import { orderGallery } from "./gallery"
 import { PRODUCT_TYPE_LABELS, type ProductType } from "@/lib/products/types"
 import { parseMetadata } from "@/lib/products/metadata"
 import { findAdapter } from "@/lib/channels/registry"
@@ -254,9 +255,13 @@ export async function resolveProductPage(
       .maybeSingle(),
     supabase
       .from("product_assets")
+      // Only the columns `anon` is granted (20260912010000). The order is
+      // settled in `orderGallery`, with the id as the last tie-break, so two
+      // requests never disagree about which image is second.
       .select("id, product_id, asset_type, sort_order, mime_type")
       .eq("product_id", page.product_id)
-      .order("sort_order", { ascending: true }),
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: true }),
     supabase
       .from("channel_listings")
       .select("id, product_id, channel_id, public_url, price, currency")
@@ -265,8 +270,11 @@ export async function resolveProductPage(
 
   if (!product) return { kind: "missing" }
 
-  const gallery = (assets ?? []).filter(
-    (a) => GALLERY_TYPES.has(a.asset_type) && a.mime_type?.startsWith("image/"),
+  const gallery = orderGallery(
+    (assets ?? []).filter(
+      (a) => GALLERY_TYPES.has(a.asset_type) && a.mime_type?.startsWith("image/"),
+    ),
+    page.cover_asset_id,
   )
 
   const destinations = await loadDestinations(listings ?? [], product)
@@ -291,7 +299,9 @@ export async function resolveProductPage(
       brandName: product.brand_name,
       updatedAt: page.published_at ?? product.updated_at,
       galleryAssetIds: gallery.map((a) => a.id),
-      coverAssetId: page.cover_asset_id ?? gallery[0]?.id ?? null,
+      // The first of the ordered gallery, which is the page's own choice when
+      // it made one and the product's cover otherwise.
+      coverAssetId: gallery[0]?.id ?? null,
       startingPrice: startingPrice(product, listings ?? []),
       destinations,
       seoTitle: page.seo_title,
@@ -387,10 +397,12 @@ const GALLERY_TYPES = new Set([
 ])
 
 function pickCover(assets: Array<{ id: string; asset_type: string; sort_order: number | null }>) {
-  const gallery = assets
-    .filter((a) => GALLERY_TYPES.has(a.asset_type))
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-  return gallery[0]?.id ?? null
+  return (
+    orderGallery(
+      assets.filter((a) => GALLERY_TYPES.has(a.asset_type)),
+      null,
+    )[0]?.id ?? null
+  )
 }
 
 /**

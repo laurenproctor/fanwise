@@ -30,10 +30,22 @@ export const FONT_CLASSIFICATIONS = [
   "decorative",
 ] as const
 
+/** The font file formats the model knows. A channel maps from these in its adapter. */
+export const FONT_FORMATS = ["otf", "ttf", "woff", "woff2", "eot"] as const
+export type FontFormat = (typeof FONT_FORMATS)[number]
+
 export const FONT_LICENSE_KINDS = ["desktop", "web", "app", "epub"] as const
 export type FontLicenseKind = (typeof FONT_LICENSE_KINDS)[number]
 
 const shortText = z.string().trim().min(1).max(64)
+
+/**
+ * Search keywords for the product, entered once, on every kind of product.
+ *
+ * Not a channel field: each channel's listing keeps its own tags, and those
+ * remain what it is sent. A listing with none of its own is offered these.
+ */
+const productTags = z.array(z.string().trim().min(1).max(40)).max(50).optional()
 
 /**
  * One style of the family, as the creator stands behind it.
@@ -80,7 +92,7 @@ const fontMetadata = z.object({
   kind: z.literal("font"),
   styleCount: z.number().int().min(1).max(500).optional(),
   isVariable: z.boolean().optional(),
-  formats: z.array(z.enum(["otf", "ttf", "woff", "woff2", "eot"])).optional(),
+  formats: z.array(z.enum(FONT_FORMATS)).optional(),
   languageSupport: z.array(z.string().min(2).max(64)).max(200).optional(),
   glyphCount: z.number().int().min(1).max(100_000).optional(),
   classification: z.enum(FONT_CLASSIFICATIONS).optional(),
@@ -88,11 +100,7 @@ const fontMetadata = z.object({
   features: z.array(z.string().trim().min(1).max(4)).max(512).optional(),
   axes: z.array(fontAxis).max(64).optional(),
   styles: z.array(fontStyle).max(500).optional(),
-  /**
-   * Search keywords for the product, entered once. Not a channel field: each
-   * channel's listing keeps its own tags, and those remain what it is sent.
-   */
-  tags: z.array(z.string().trim().min(1).max(40)).max(50).optional(),
+  tags: productTags,
   licenses: z.array(fontLicense).max(FONT_LICENSE_KINDS.length).optional(),
   eulaUrl: z.url().max(2000).optional(),
 })
@@ -108,6 +116,7 @@ const templateMetadata = z.object({
   software: z.array(z.string().min(1).max(64)).max(20).optional(),
   pageCount: z.number().int().min(1).max(10_000).optional(),
   dimensions: z.string().min(1).max(64).optional(),
+  tags: productTags,
 })
 
 const rasterMetadata = z.object({
@@ -115,11 +124,13 @@ const rasterMetadata = z.object({
   fileFormats: z.array(z.string().min(1).max(16)).max(20).optional(),
   dpi: z.number().int().min(1).max(2400).optional(),
   itemCount: z.number().int().min(1).max(100_000).optional(),
+  tags: productTags,
 })
 
 const genericMetadata = z.object({
   kind: z.literal("generic"),
   notes: z.string().max(2000).optional(),
+  tags: productTags,
 })
 
 export const productMetadataSchema = z.discriminatedUnion("kind", [

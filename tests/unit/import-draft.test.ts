@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from "vitest"
-import { buildDraftPrompt, composeDraft, renderEvidence } from "@/lib/imports/compose"
+import {
+  buildDraftPrompt,
+  composeDraft,
+  DRAFT_PROMPT_VERSION_WRITTEN,
+  renderEvidence,
+} from "@/lib/imports/compose"
 import { checkDraftClaims, evidenceCorpus, withoutWithheldFields } from "@/lib/imports/claims"
-import { DRAFT_FIELDS, draftOutputSchema, type DraftOutput } from "@/lib/imports/draft-output"
+import {
+  DRAFT_FIELDS,
+  draftOutputSchema,
+  emptyDraftDetails,
+  type DraftOutput,
+} from "@/lib/imports/draft-output"
 import {
   hashEvidence,
   productSourceEvidenceSchema,
@@ -67,6 +77,7 @@ function draft(overrides: Partial<DraftOutput> = {}): DraftOutput {
     audience: suggestion("Designers"),
     tags: suggestion(["font", "grotesque"]),
     technicalRequirements: suggestion([]),
+    details: suggestion(emptyDraftDetails()),
     priceGuidance: suggestion({
       amount: null,
       currency: "USD",
@@ -406,6 +417,20 @@ describe("the prompt", () => {
     expect(user).toContain("Pictures the page offers: 1")
   })
 
+  it("asks for a structured description, the most specific type, tags and details", () => {
+    const { system } = buildDraftPrompt(evidence())
+    const rules = system[0]!.text
+    expect(rules).toContain('sections under "## " headings')
+    expect(rules).toContain('Never a "# " heading')
+    expect(rules).toContain("Choose the most specific member")
+    expect(rules).toContain("tags is never empty")
+    expect(rules).toContain("details holds the specifications the evidence states")
+    // The typeface standard rides along, for the case the model decides it is a font.
+    expect(rules).toContain("PRODUCT TYPE GUIDANCE: TYPEFACES")
+    // And the version written to the row says so.
+    expect(composeVersionMentionsGuidance()).toBe(true)
+  })
+
   it("hashes its whole input, so an identical request is recognisable", () => {
     const a = buildDraftPrompt(evidence())
     const b = buildDraftPrompt(evidence())
@@ -413,6 +438,10 @@ describe("the prompt", () => {
     expect(a.inputHash).toMatch(/^[0-9a-f]{64}$/)
   })
 })
+
+function composeVersionMentionsGuidance(): boolean {
+  return /\+font\.\d{4}-\d{2}-\d{2}\./.test(DRAFT_PROMPT_VERSION_WRITTEN)
+}
 
 /* ----------------------------------------------------------------- compose */
 
@@ -476,6 +505,37 @@ describe("composing a draft", () => {
         resolution: "removed",
       },
     ])
+  })
+
+  it("drops a detail the page does not state, and keeps the ones it does", async () => {
+    const stated = draft({
+      details: suggestion({
+        ...emptyDraftDetails(),
+        // "six-weight" is on the page; 524 glyphs and Cyrillic are not.
+        styleCount: 6,
+        glyphCount: 524,
+        isVariable: true,
+        scripts: ["Latin", "Cyrillic"],
+        fontFormats: ["otf"],
+      }),
+    })
+    const composed = await composeDraft(evidence(), { provider: stubProvider(stated) })
+
+    expect(composed.withheld).toEqual([])
+    expect(composed.trimmed).toEqual(["details"])
+    expect(composed.draft.details?.value).toMatchObject({
+      styleCount: 6,
+      glyphCount: null,
+      isVariable: true,
+      scripts: ["Latin"],
+      fontFormats: [],
+    })
+    expect(composed.violations.map((violation) => violation.phrase)).toEqual([
+      "Font formats: otf",
+      "Glyph count: 524",
+      "Writing systems: Cyrillic",
+    ])
+    expect(composed.violations.every((violation) => violation.kind === "unstated")).toBe(true)
   })
 
   it("refuses an answer that does not match the schema", async () => {

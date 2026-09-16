@@ -45,9 +45,11 @@ Log the FactSheet hash on every `ai_generations` row so a bad listing traces to 
 
 ## Formatting
 
-Descriptions are Markdown (ADR 0011). A generated description may use paragraphs and bullet
-lists, and bold sparingly where the channel profile allows; never headings, links, images or
-emoji. The factuality validator reads the description as the words a buyer sees
+Descriptions are Markdown (ADR 0011). A generated channel description may use paragraphs and
+bullet lists, and bold sparingly where the channel profile allows; never headings, links,
+images or emoji. The canonical description an import composes is the exception: it is
+structured with `##` and `###` headings and paragraphs, because it is the product page a
+buyer scans rather than one channel's copy (`docs/product-link-import.md` §16). The factuality validator reads the description as the words a buyer sees
 (`markdownToClaimText`): markup is removed, list markers are dropped because they are
 structure rather than counts, and everything else, a link's address included, is checked as
 before. The FactSheet's description is read the same way.
@@ -100,6 +102,11 @@ the validator's corpus, follows once it is on `main`.
 The guidance is part of the cached prefix, so the prefix is now the same bytes per channel
 and product type rather than per channel. Its version is appended to `prompt_version` as
 `font.<version>` when present, so a row still says exactly what was asked.
+
+The import prompt carries the same guidance since 16 September 2026, for the case the model
+decides a source is a typeface: the product type is its choice in the same answer, so the
+guidance rides in the rules block with a line saying when it applies, and
+`product_imports.prompt_version` records `<rules>+font.<version>`.
 
 ## Review
 

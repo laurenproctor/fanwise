@@ -1,5 +1,8 @@
+import { parseMetadata } from "@/lib/products/metadata"
 import type { ProductAsset, ProductType } from "@/lib/products/types"
 import { PRODUCT_TYPES } from "@/lib/products/types"
+import { emptyDraftDetails, hasAnyDetail } from "./draft-output"
+import { detailsFromMetadata } from "./facts"
 import { IMPORT_ERROR_RECOVERIES } from "./errors"
 import { IMPORT_LIMITS } from "./limits"
 import { licenseEntry } from "./licenses"
@@ -416,6 +419,17 @@ export function draftFor(record: ImportRecord): ListingDraft {
 
   const typeValue: ProductType | null = productTypeOf(product.product_type, draft)
 
+  const shortDescriptionValue =
+    nonEmpty(product.short_description) ?? draft?.shortDescription?.value ?? ""
+
+  // Facts the product already holds are the creator's, whoever wrote them: a
+  // font file's reading or a typed value. A model's details fill in only while
+  // the product has none.
+  const stored = detailsFromMetadata(parseMetadata(product.metadata))
+  const hasStored = hasAnyDetail(stored)
+  const detailsValue = hasStored ? stored : (draft?.details?.value ?? emptyDraftDetails())
+  const storedTags: readonly string[] = parseMetadata(product.metadata).tags ?? []
+
   return {
     title: {
       value: titleValue,
@@ -448,6 +462,16 @@ export function draftFor(record: ImportRecord): ListingDraft {
       ),
     },
     currency: { value: product.currency, origin: { kind: "creator" } },
+    shortDescription: {
+      value: shortDescriptionValue,
+      origin: originFor(
+        "shortDescription",
+        nonEmpty(product.short_description) !== null,
+        null,
+        Boolean(draft?.shortDescription),
+        accepted,
+      ),
+    },
     description: {
       value: descriptionValue,
       origin: originFor(
@@ -463,9 +487,19 @@ export function draftFor(record: ImportRecord): ListingDraft {
         accepted,
       ),
     },
+    details: {
+      value: detailsValue,
+      origin: originFor(
+        "details",
+        hasStored,
+        null,
+        Boolean(draft?.details) && hasAnyDetail(draft!.details!.value),
+        accepted,
+      ),
+    },
     tags: {
-      value: draft?.tags?.value ?? [],
-      origin: originFor("tags", false, null, Boolean(draft?.tags), accepted),
+      value: storedTags.length > 0 ? storedTags : (draft?.tags?.value ?? []),
+      origin: originFor("tags", storedTags.length > 0, null, Boolean(draft?.tags), accepted),
     },
   }
 }

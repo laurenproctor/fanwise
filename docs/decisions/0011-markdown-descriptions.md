@@ -39,8 +39,11 @@ are paragraphs, and single newlines are line breaks (`breaks: true`). No data mi
 **Each consumer asks for the shape it can take** (`lib/text/`):
 
 - `markdownToHtml` renders with `marked` and then sanitizes with `sanitize-html` to an allowlist
-  of `p br strong em del s a ul ol li h2 h3 h4 blockquote code pre hr`, links limited to `http`,
-  `https` and `mailto`, no attributes beyond `href` and `ol[start]`. `h1` becomes `h2`. Script,
+  of `p br strong em del s a ul ol li h2 h3 h4 h5 h6 blockquote code pre hr`, links limited to
+  `http`, `https` and `mailto`, no attributes beyond `href` and `ol[start]`. `h1` becomes `h2`,
+  because the page a description sits in already has one; every level below it is kept as
+  written (widened from `h2`–`h4` on 16 September 2026, when the import began composing
+  structured descriptions). Script,
   style, iframe, object and template elements lose their contents too. Shopify's
   `descriptionHtml`, WooCommerce's `description`, and the public product page (which adds
   `rel="nofollow noopener noreferrer"`) use it.
@@ -62,6 +65,13 @@ schema, so an element outside it has nowhere to go and is dropped before it beco
 **AI writes Markdown too**, within the channel profile: paragraphs and bullet lists, bold
 sparingly on the storefronts, and no headings, links, images or emoji. `RULES_VERSION` moves to
 `2026-09-13.1`.
+
+**The import composes a structured description** (16 September 2026): an opening paragraph
+or two, then sections under `##` headings taken from what the source covers, `###` where it
+has subsections, paragraphs and bullet lists inside them, never a `#`. It is the canonical
+description, which a person reviews before it is saved, and it renders as `<h2>`–`<h6>` and
+`<p>` on the public page and in every storefront that takes HTML. Channel generations are
+unchanged: they are shaped by the channel profile and still carry no headings.
 
 ## Consequences
 

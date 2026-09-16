@@ -109,7 +109,7 @@ export function MarkdownEditor({
       StarterKit.configure({
         // One is accepted so a pasted or typed top-level heading survives as a
         // heading; the sanitizer renders it a level down on every page.
-        heading: { levels: [1, 2, 3, 4] },
+        heading: { levels: [1, 2, 3, 4, 5, 6] },
         // Underline has no Markdown and no place on a storefront.
         underline: false,
         link: {

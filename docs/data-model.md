@@ -67,6 +67,9 @@ deliberately **coarse** enum:
 This is a revision, not an omission being filled in, and the reasoning matters
 because it will be under pressure at A3:
 
+- **`metadata.tags`** is the product's own search keywords, on every metadata kind since
+  16 September 2026 (it was a font-only field before). Not a channel field: a listing keeps
+  its own `tags` column and is offered these when it has none.
 - **Per-type granularity now lives in `metadata`**, validated in the application
   by a discriminated union keyed on `product_type`
   (`lib/products/metadata.ts`). Serif versus sans, print versus web, variable
@@ -810,7 +813,11 @@ Not B12: nothing here reads a connected channel.
 `product_imports` is the **import session**: one per draft product, holding the combined
 evidence, the suggestions, what the creator accepted, and the legacy URL columns that carry the
 one-live-import-per-link index. `submission_id` (unique per workspace) is the composer's
-idempotency key.
+idempotency key. `suggestions.draft` follows `draftOutputSchema` (`lib/imports/draft-output.ts`);
+since schema version `2026-09-16.1` it carries `details`, the specifications a source stated in
+one flat shape for every product type, each value kept only when the sources contain it
+(`docs/product-link-import.md` §16). On save the surviving details and the tags land on
+`products.metadata` in the chosen type's shape; the session row is never the source of truth.
 
 `product_import_sources` is one row per source, `import_id` nullable only while a file or
 recording is staged in the composer:

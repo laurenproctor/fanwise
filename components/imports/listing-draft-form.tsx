@@ -4,6 +4,7 @@ import { FIELD_INPUT_CLASS } from "@/components/ui/field"
 import { TagInput } from "@/components/channels/tag-input"
 import { PRODUCT_TYPES, PRODUCT_TYPE_LABELS, type ProductType } from "@/lib/products/types"
 import { fieldsAwaitingReview, listingIssues, LISTING_FIELD_LABELS } from "@/lib/imports/draft"
+import { describeDetails } from "@/lib/imports/facts"
 import { IMPORT_LIMITS } from "@/lib/imports/limits"
 import { joinWords } from "@/lib/imports/prose"
 import type { ListingDraft, ListingFieldKey } from "@/lib/imports/types"
@@ -32,6 +33,7 @@ import { OriginBadge } from "./origin-badge"
  */
 
 const DESCRIPTION_LIMIT = IMPORT_LIMITS.maxListingDescription
+const SHORT_DESCRIPTION_LIMIT = IMPORT_LIMITS.maxShortDescription
 
 export function ListingDraftForm({
   draft,
@@ -52,6 +54,7 @@ export function ListingDraftForm({
   const priceIssue = issueFor("price")
   const descriptionIssue = issueFor("description")
   const described = draft.description.value.length
+  const details = describeDetails(draft.details.value, draft.productType.value)
 
   return (
     <section aria-labelledby="import-draft-heading" className="flex flex-col gap-5">
@@ -155,10 +158,34 @@ export function ListingDraftForm({
       </div>
 
       <DraftField
+        label={LISTING_FIELD_LABELS.shortDescription}
+        htmlFor="import-short-description"
+        hint="One or two sentences, for the listing card and the public page's summary."
+        annotation={
+          <OriginBadge
+            origin={draft.shortDescription.origin}
+            field={LISTING_FIELD_LABELS.shortDescription}
+          />
+        }
+      >
+        <textarea
+          id="import-short-description"
+          name="shortDescription"
+          rows={2}
+          maxLength={SHORT_DESCRIPTION_LIMIT}
+          value={draft.shortDescription.value}
+          aria-describedby={describedByFor("import-short-description", { hint: true })}
+          onChange={(event) => onFieldChange("shortDescription", event.target.value)}
+          className={`${FIELD_INPUT_CLASS} resize-y leading-[1.6]`}
+        />
+      </DraftField>
+
+      <DraftField
         label={LISTING_FIELD_LABELS.description}
         htmlFor="import-description"
         required
         issue={descriptionIssue}
+        hint="Markdown. Headings with ## and ###, paragraphs separated by a blank line, lists with -."
         annotation={
           <OriginBadge origin={draft.description.origin} field={LISTING_FIELD_LABELS.description} />
         }
@@ -167,10 +194,11 @@ export function ListingDraftForm({
           id="import-description"
           name="description"
           required
-          rows={5}
+          rows={12}
           maxLength={DESCRIPTION_LIMIT}
           value={draft.description.value}
           aria-describedby={describedByFor("import-description", {
+            hint: true,
             issue: descriptionIssue !== null,
           })}
           aria-invalid={descriptionIssue !== null}
@@ -181,6 +209,45 @@ export function ListingDraftForm({
           {described} / {DESCRIPTION_LIMIT}
         </span>
       </DraftField>
+
+      {/*
+        The specifications, read rather than typed. A count or a format is
+        checked against the sources before it gets here and is corrected on the
+        product page, where each kind of product has its own fields; a second
+        set of them on this screen would be a second set of rules about a fact.
+      */}
+      <section
+        aria-labelledby="import-details-heading"
+        className="flex flex-col gap-2 rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)] px-4 py-3"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 id="import-details-heading" className="label-mono">
+            {LISTING_FIELD_LABELS.details}
+          </h3>
+          <OriginBadge origin={draft.details.origin} field={LISTING_FIELD_LABELS.details} />
+        </div>
+        {details.length > 0 ? (
+          <dl className="grid gap-x-6 gap-y-1.5 sm:grid-cols-[auto_minmax(0,1fr)]">
+            {details.map((item) => (
+              <div key={item.field} className="contents">
+                <dt className="text-[13px] text-[var(--color-ink-2)]">{item.label}</dt>
+                <dd className="text-[14px] text-[var(--color-ink)]">{item.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="text-[13px] leading-[1.5] text-[var(--color-ink-2)]">
+            {draft.productType.value === null
+              ? "Choose a product type and the details it can hold appear here."
+              : "Nothing stated yet. Upload the files, or add details on the product page after saving."}
+          </p>
+        )}
+        {details.length > 0 ? (
+          <p className="text-[13px] leading-[1.5] text-[var(--color-ink-2)]">
+            These go into the product with the draft. Correct any of them on the product page.
+          </p>
+        ) : null}
+      </section>
 
       {/*
         The channel listing editor's tag field, reused rather than rewritten. It

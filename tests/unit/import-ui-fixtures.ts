@@ -1,3 +1,4 @@
+import { emptyDraftDetails } from "@/lib/imports/draft-output"
 import type {
   ListingDraft,
   RecoveryOption,
@@ -63,6 +64,11 @@ function draft(overrides: Partial<ListingDraft> = {}): ListingDraft {
     productType: { value: "template", origin: { kind: "suggested", reviewed: false } },
     price: { value: "24", origin: { kind: "suggested", reviewed: false } },
     currency: { value: "USD", origin: { kind: "creator" } },
+    shortDescription: {
+      value: "A tool for generating modular type scales.",
+      origin: { kind: "suggested", reviewed: false },
+    },
+    details: { value: emptyDraftDetails(), origin: { kind: "creator" } },
     description: {
       value:
         "A modern, easy-to-use tool for generating beautiful, modular type scales. Adjust your base size and scale ratio, preview in real time, and export ready-to-use styles for Figma, CSS, and more.",

@@ -24,6 +24,44 @@ const SOURCE = [
   "See the [specimen](https://example.com/blimp).",
 ].join("\n")
 
+describe("headings", () => {
+  const STRUCTURED = [
+    "# Blimp Display",
+    "",
+    "Opening.",
+    "",
+    "## What's included",
+    "",
+    "Six fonts.",
+    "",
+    "### Layers",
+    "",
+    "#### Solid",
+    "",
+    "##### Outline",
+    "",
+    "###### Color",
+  ].join("\n")
+
+  it("renders every level from two to six and demotes a top-level heading", () => {
+    const html = markdownToHtml(STRUCTURED)
+    expect(html).toContain("<h2>Blimp Display</h2>")
+    expect(html).toContain("<h2>What's included</h2>")
+    expect(html).toContain("<h3>Layers</h3>")
+    expect(html).toContain("<h4>Solid</h4>")
+    expect(html).toContain("<h5>Outline</h5>")
+    expect(html).toContain("<h6>Color</h6>")
+    expect(html).not.toContain("<h1")
+    expect(html).toContain("<p>Six fonts.</p>")
+  })
+
+  it("reads a heading as its words in plain text", () => {
+    expect(markdownToPlainText("## What's included\n\nSix fonts.")).toBe(
+      "What's included\n\nSix fonts.",
+    )
+  })
+})
+
 describe("plain text", () => {
   it("keeps paragraphs, line breaks and lists, and drops the markup", () => {
     expect(markdownToPlainText(SOURCE)).toBe(

@@ -119,6 +119,34 @@ describe("unsent changes", () => {
     ).toBe(false)
   })
 
+  it("offers a resend for a live listing with no buyer address", () => {
+    // Published before public_url existed and never sent since: live on the
+    // channel, absent from the public page. Sending it again fills the column.
+    const recorded = sentFingerprint(draft, "asset-1")
+    const unlinked = {
+      ...listing(recorded),
+      status: "published" as const,
+      public_url: null,
+      metadata: { externalState: "live", purchasable: true },
+    }
+    expect(hasUnsentChanges(unlinked, draft, subject(), { manualSteps: [] })).toBe(true)
+    // With the address recorded there is nothing to send.
+    expect(
+      hasUnsentChanges(
+        { ...unlinked, public_url: "https://shop.example/products/aster" },
+        draft,
+        subject(),
+        { manualSteps: [] },
+      ),
+    ).toBe(false)
+    // A draft on the channel has no buyer address to be missing.
+    expect(
+      hasUnsentChanges({ ...unlinked, metadata: { externalState: "draft" } }, draft, subject(), {
+        manualSteps: [],
+      }),
+    ).toBe(false)
+  })
+
   it("offers the action when nothing was ever recorded", () => {
     // Every listing published before the column existed, including the two
     // that were stranded. Null is "cannot prove there is nothing to send", and
