@@ -22,6 +22,8 @@ import { SKIP_REASON_TEXT, type SkipReason } from "@/lib/publishing/run"
 export interface RunChannelSummary {
   channelName: string
   reason: SkipReason
+  /** What a not-ready channel still needs, one sentence each. */
+  needs: string[]
 }
 
 export function PublishEverywhere({
@@ -119,6 +121,13 @@ export function PublishEverywhere({
               >
                 <span className="text-[var(--color-ink)]">{skip.channelName}</span>
                 <span className="text-[var(--color-ink-2)]">{SKIP_REASON_TEXT[skip.reason]}</span>
+                {skip.needs.length > 0 ? (
+                  <ul className="mt-1 flex w-full list-disc flex-col gap-0.5 pl-5 text-[13px] text-[var(--color-ink-2)]">
+                    {skip.needs.map((need) => (
+                      <li key={need}>{need}</li>
+                    ))}
+                  </ul>
+                ) : null}
               </li>
             ))}
           </ul>

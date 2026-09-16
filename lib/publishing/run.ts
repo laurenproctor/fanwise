@@ -30,9 +30,17 @@ export type SkipReason = "assisted" | "not_connected" | "not_ready" | "already_p
 export const SKIP_REASON_TEXT: Record<SkipReason, string> = {
   assisted: "Fanwise cannot publish here. You submit this listing yourself.",
   not_connected: "Not connected to this workspace.",
-  not_ready: "Not ready yet: fix what this channel would reject.",
+  not_ready: "Not ready yet. Still needed:",
   already_published: "Already published. Nothing new to send.",
 }
+
+/**
+ * What a not-ready channel needs when there is no listing to judge yet.
+ *
+ * Said as the next move rather than as a rule, because no rule has run: the
+ * channel's requirements are evaluated against a listing, and there is none.
+ */
+export const NO_LISTING_TEXT = "Build the listing from this channel's card below."
 
 /** What a run knows about one channel before it decides anything. */
 export interface RunChannelInput {
@@ -47,6 +55,11 @@ export interface RunChannelInput {
   /** Null when nothing has been built for this channel yet. */
   listingId: string | null
   ready: boolean
+  /**
+   * What this channel would reject, one sentence each, in the adapter's
+   * declaration order. Empty when ready or when there is no listing to judge.
+   */
+  blocking: string[]
   hasExternalId: boolean
   unsentChanges: boolean
 }
@@ -62,6 +75,11 @@ export type RunSkip = {
   connectionId: string | null
   channelName: string
   reason: SkipReason
+  /**
+   * For a not-ready channel, what is still missing, so the creator can act on
+   * the skip without opening each card to find out. Empty for other reasons.
+   */
+  needs: string[]
 }
 
 export interface RunPlan {
@@ -79,9 +97,9 @@ export interface RunPlan {
 function decide(channel: RunChannelInput): RunStart | RunSkip {
   const { connectionId, channelName } = channel
 
-  if (!channel.canPublish) return { connectionId, channelName, reason: "assisted" }
+  if (!channel.canPublish) return { connectionId, channelName, reason: "assisted", needs: [] }
   if (!channel.connected || connectionId === null) {
-    return { connectionId, channelName, reason: "not_connected" }
+    return { connectionId, channelName, reason: "not_connected", needs: [] }
   }
 
   /*
@@ -90,7 +108,9 @@ function decide(channel: RunChannelInput): RunStart | RunSkip {
    * same word rather than a fifth one, because the creator's next move is
    * identical — open the channel's card and deal with what it says.
    */
-  if (channel.listingId === null) return { connectionId, channelName, reason: "not_ready" }
+  if (channel.listingId === null) {
+    return { connectionId, channelName, reason: "not_ready", needs: [NO_LISTING_TEXT] }
+  }
 
   if (channel.hasExternalId) {
     /*
@@ -105,10 +125,12 @@ function decide(channel: RunChannelInput): RunStart | RunSkip {
     if (channel.unsentChanges && channel.canUpdate) {
       return { kind: "update", connectionId, listingId: channel.listingId, channelName }
     }
-    return { connectionId, channelName, reason: "already_published" }
+    return { connectionId, channelName, reason: "already_published", needs: [] }
   }
 
-  if (!channel.ready) return { connectionId, channelName, reason: "not_ready" }
+  if (!channel.ready) {
+    return { connectionId, channelName, reason: "not_ready", needs: channel.blocking }
+  }
 
   return { kind: "publish", connectionId, listingId: channel.listingId, channelName }
 }
@@ -163,6 +185,7 @@ export function runInputs(params: {
           connected: false,
           listingId: null,
           ready: false,
+          blocking: [],
           hasExternalId: false,
           unsentChanges: false,
         },
@@ -196,6 +219,9 @@ export function runInputs(params: {
         connected: connected.connection.status === "active",
         listingId: view?.listing.id ?? null,
         ready: view?.evaluation?.readiness.ready ?? false,
+        // The rule's own message where it wrote one, which names the field and
+        // the fix ("Price is below the minimum of 0.2."); its label otherwise.
+        blocking: (view?.evaluation?.readiness.blocking ?? []).map((r) => r.message ?? r.label),
         hasExternalId: Boolean(view?.listing.external_listing_id),
         unsentChanges: view?.unsentChanges ?? false,
       }
