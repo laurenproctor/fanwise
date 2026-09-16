@@ -100,6 +100,41 @@ export async function retryImportAction(
 }
 
 /**
+ * Compose the draft again from the sources as they were read.
+ *
+ * For a session that settled with no draft because the model was missing or
+ * refused: nothing is re-read, the evidence stands, and the content hash is
+ * cleared so the runner composes rather than reusing what it has. Only a
+ * settled session qualifies; one still reading has a composition coming.
+ */
+export async function composeAgainAction(
+  workspaceSlug: string,
+  importId: string,
+): Promise<ImportActionState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data, error } = await supabase
+    .from("product_imports")
+    .update({ status: "pending", content_hash: null, error_code: null, error_message: null })
+    .eq("id", importId)
+    .eq("workspace_id", workspace.id)
+    .eq("status", "ready")
+    .select("id")
+    .maybeSingle()
+
+  if (error) {
+    console.error("[imports] could not queue a recomposition", { importId, code: error.code })
+    return { error: "That could not be composed again. Try again." }
+  }
+  if (!data) return { error: null }
+
+  await jobs.enqueue("import_source", { workspaceId: workspace.id, importId })
+
+  revalidatePath(routes.productImport(workspaceSlug, importId))
+  return { error: null }
+}
+
+/**
  * Try one source again, from the sources list.
  *
  * The session goes back to `pending` too, so the draft is recomposed once the

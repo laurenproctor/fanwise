@@ -313,11 +313,25 @@ describe("the import detail screen", () => {
     )
   })
 
-  it("says plainly when there was no model to draft with", () => {
+  it("says plainly when there was no model to draft with, and offers to compose again", () => {
     const noModel = render(createElement(ImportDetail, { ...detailProps(), aiUnavailable: true }))
     const text = textOf(noModel)
     expect(text).toContain("No draft was composed")
     expect(text).toContain("this deployment has no model configured")
+    expect(text).toContain("Compose again")
+
+    // A model that refused the key is a different sentence, not the same one.
+    const refused = textOf(
+      render(
+        createElement(ImportDetail, {
+          ...detailProps(),
+          aiUnavailable: true,
+          aiUnavailableReason: "credentials_invalid",
+        }),
+      ),
+    )
+    expect(refused).toContain("refused this deployment")
+    expect(refused).not.toContain("no model configured")
   })
 })
 

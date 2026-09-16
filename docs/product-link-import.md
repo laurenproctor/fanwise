@@ -1125,3 +1125,18 @@ are not requirements; the five readiness steps are unchanged.
 `tests/unit/import-facts.test.ts` covers which details the sources support, the mapping into
 metadata, and the gaps. `import-draft.test.ts` pins the prompt's new asks and a composed draft
 losing an unstated glyph count. `markdown.test.ts` pins `h2`–`h6` and the demoted `h1`.
+
+### Composing again (16 September 2026)
+
+Found on the first production import that reached the model: a session whose composition
+failed settled `ready` with an `unavailable` marker in `suggestions`, and could never be
+composed again. "Try again" only takes a failed or unavailable session, and the planner read
+"a draft exists" off the column's shape, so the evidence hash matched and the empty draft was
+reused forever. Now `draftExists` ignores the marker, the marker records the provider's
+normalized `reason`, the notice says which it was (no model configured, credentials
+refused, busy, unreachable), and **Compose again** (`composeAgainAction`) clears the hash and
+queues the runner without re-reading anything.
+
+The failure itself was the vendor refusing an organization-level key that names no
+workspace, in about 200 ms, on every request. `ANTHROPIC_WORKSPACE_ID` is now read beside the
+key and sent as the `anthropic-workspace-id` header; a workspace-scoped key needs neither.

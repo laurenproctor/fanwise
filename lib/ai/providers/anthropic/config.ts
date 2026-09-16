@@ -28,3 +28,18 @@ export function readApiKey(env: Record<string, string | undefined> = process.env
   const key = env.ANTHROPIC_API_KEY?.trim()
   return key && key.length > 0 ? key : null
 }
+
+/**
+ * The workspace an organization-level key acts as.
+ *
+ * The vendor requires a key that is not scoped to a workspace to name one on
+ * every request, and refuses the request in a few hundred milliseconds
+ * otherwise. A workspace-scoped key needs nothing here; this is for the other
+ * kind, and is optional for the same reason the key is.
+ */
+export function readWorkspaceId(
+  env: Record<string, string | undefined> = process.env,
+): string | null {
+  const id = env.ANTHROPIC_WORKSPACE_ID?.trim()
+  return id && id.length > 0 ? id : null
+}

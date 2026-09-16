@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk"
 import type { AiProvider, GenerationRequest, GenerationResponse, TokenUsage } from "@/lib/ai/types"
 import { AiError } from "@/lib/ai/types"
-import { EFFORT, MODEL, PROVIDER_NAME, RATES, readApiKey } from "./config"
+import { EFFORT, MODEL, PROVIDER_NAME, RATES, readApiKey, readWorkspaceId } from "./config"
 
 /**
  * The first provider.
@@ -18,6 +18,8 @@ import { EFFORT, MODEL, PROVIDER_NAME, RATES, readApiKey } from "./config"
 
 export interface AnthropicProviderOptions {
   apiKey?: string
+  /** The workspace an organization-level key acts as. See readWorkspaceId. */
+  workspaceId?: string | null
   /** Test seam: a fetch that answers without a network. */
   fetch?: typeof fetch
 }
@@ -87,9 +89,12 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
     throw new AiError("not_configured", "Composing is not configured on this deployment.")
   }
 
+  const workspaceId = options.workspaceId === undefined ? readWorkspaceId() : options.workspaceId
   const client = new Anthropic({
     apiKey,
     maxRetries: 2,
+    // The vendor refuses an organization-level key that names no workspace.
+    ...(workspaceId ? { defaultHeaders: { "anthropic-workspace-id": workspaceId } } : {}),
     ...(options.fetch ? { fetch: options.fetch } : {}),
   })
 
