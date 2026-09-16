@@ -178,6 +178,11 @@ confirm.
 ADR 0013, 15 September 2026. Shopify has no downloadable-file field, so the file never goes to
 Shopify.
 
+The snippet goes inside the email body, on the line after `<p>{{ email_body }}</p>`. Everything
+above `<!DOCTYPE html>` in Shopify's template is Liquid setup that runs before the layout, so a
+snippet pasted there prints its button above the shop header. Found on the first live paste,
+16 September 2026; the setup step on the Channels page now names the anchor line.
+
 ```
 once per shop        Channels page: copy ORDER_EMAIL_SNIPPET into Settings → Notifications →
                      Order confirmation → Edit code, then "I've added it"
