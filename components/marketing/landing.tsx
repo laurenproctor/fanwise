@@ -322,7 +322,7 @@ export function Landing() {
                     >
                       <div className="fw-derived-row__name">{row.name}</div>
                       <div className="fw-derived-row__spec">{row.spec}</div>
-                      <div>
+                      <div className="fw-derived-row__status">
                         <span className={STATUS_CLASS[row.status]}>
                           <i
                             className={
@@ -351,7 +351,7 @@ export function Landing() {
                   <div className="fw-derived-row fw-derived-row--last">
                     <div className="fw-derived-row__name">MyFonts</div>
                     <div className="fw-derived-row__spec">OTF and TTF · 8 specimens at 2:1</div>
-                    <div>
+                    <div className="fw-derived-row__status">
                       <span className="fw-status fw-status--pending">
                         <i className="fw-status__dot" /> Foundry review
                       </span>
@@ -499,7 +499,12 @@ export function Landing() {
                 so you never have to.
               </p>
             </div>
-            <div className="fw-table-scroll fw-table--slab">
+            <div
+              className="fw-table-scroll fw-table--slab"
+              role="region"
+              aria-label="What each shop asks for"
+              tabIndex={0}
+            >
               <table className="fw-table fw-table--slab">
                 <thead>
                   <tr>

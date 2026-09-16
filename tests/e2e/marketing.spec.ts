@@ -113,3 +113,45 @@ test("the light and dark view survives a navigation", async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark")
   expect(await page.evaluate(() => document.documentElement.style.filter)).toBe("")
 })
+
+test("on a phone the nav links live in a menu", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto("/pricing")
+
+  // The row is gone at this width, so everything it held has to be somewhere
+  // else. Before this menu existed it was nowhere.
+  const nav = page.locator("nav").first()
+  await expect(nav.locator(".fw-nav__links")).toBeHidden()
+
+  const menu = page.getByRole("button", { name: "Open menu" })
+  await expect(menu).toBeVisible()
+  await menu.click()
+
+  const panel = page.locator(".fw-nav__panel")
+  await expect(panel).toBeVisible()
+  for (const label of ["Product", "Marketplaces", "How it works", "FAQ", "About", "Sign in"]) {
+    await expect(panel.getByRole("link", { name: label, exact: true }), label).toBeVisible()
+  }
+  await expect(panel.getByRole("link", { name: "Start free", exact: true })).toHaveAttribute(
+    "href",
+    "/sign-up",
+  )
+
+  // Escape closes it and hands the focus back, rather than dropping it on the
+  // document where the next Tab starts from the top of the page.
+  await page.keyboard.press("Escape")
+  await expect(panel).toBeHidden()
+  await expect(menu).toBeFocused()
+
+  // A link closes it on the way out: the anchor links change no route, so the
+  // panel cannot rely on the navigation alone.
+  await menu.click()
+  await panel.getByRole("link", { name: "About", exact: true }).click()
+  await expect(page).toHaveURL(/\/about$/)
+  await expect(page.locator(".fw-nav__panel")).toBeHidden()
+
+  // Past the breakpoint the row is back and the menu is not offered twice.
+  await page.setViewportSize({ width: 1200, height: 900 })
+  await expect(page.getByRole("button", { name: "Open menu" })).toBeHidden()
+  await expect(nav.locator(".fw-nav__links")).toBeVisible()
+})
