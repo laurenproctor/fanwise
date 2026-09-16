@@ -30,7 +30,12 @@ export interface TriggerLike {
   trigger(
     id: string,
     payload: unknown,
-    options?: { idempotencyKey?: string; idempotencyKeyTTL?: string; delay?: string },
+    options?: {
+      idempotencyKey?: string
+      idempotencyKeyTTL?: string
+      delay?: string
+      queue?: string
+    },
   ): Promise<{ id: string }>
 }
 
@@ -42,11 +47,12 @@ export class TriggerQueue implements JobQueue {
     payload: JobPayloads[K],
     options: EnqueueOptions = {},
   ): Promise<EnqueuedJob<K>> {
-    const { idempotencyKey, delayMs } = options
+    const { idempotencyKey, delayMs, queue } = options
 
     const handle = await this.client.trigger(name, payload, {
       ...(idempotencyKey ? { idempotencyKey, idempotencyKeyTTL: IDEMPOTENCY_KEY_TTL } : {}),
       ...(delayMs && delayMs > 0 ? { delay: `${Math.ceil(delayMs / 1000)}s` } : {}),
+      ...(queue ? { queue } : {}),
     })
 
     return {

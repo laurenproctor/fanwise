@@ -98,6 +98,13 @@ export interface EnqueueOptions {
   /** Delay before first attempt, milliseconds. */
   delayMs?: number
   maxAttempts?: number
+  /**
+   * A named queue to run on instead of the task's own, for work that has to
+   * be serialized platform-wide (a provider limit shared by every workspace).
+   * Declared in trigger/jobs.ts; the in-process queue has no queues and
+   * ignores it, which is fine because nothing shares a process with anyone.
+   */
+  queue?: string
 }
 
 export interface EnqueuedJob<K extends JobName = JobName> {

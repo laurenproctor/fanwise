@@ -158,8 +158,9 @@ the product heading, usually.
     *(planned at B9, not built; waits on A8's handoff machinery and on a profile with Stripe
     connected, decision 26)*
 13. Connect Gumroad, publish a product with its covers and its file, confirm it is
-    purchasable. *(planned at B10, not built; needs a registered Gumroad OAuth application and
-    a seller account, decision 27)*
+    purchasable. *(built at B10 on 16 September 2026, exit unrun; the adapter is covered by
+    `tests/unit/gumroad-oauth.test.ts` and `tests/unit/gumroad-adapter.test.ts`, and the run
+    needs the seller account in decision 27)*
 14. **A creator builds and publishes a public profile, and a stranger reads it.** *(built and
     running in `tests/e2e/journey-14-public-pages.spec.ts`, through the three-step profile
     builder; the permission half is `tests/db/public-pages-tenancy.test.ts`,

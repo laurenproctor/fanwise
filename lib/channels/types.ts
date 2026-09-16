@@ -1,6 +1,7 @@
 import { z } from "zod"
 import type { Database } from "@/lib/supabase/database.types"
 import type { Product, ProductAsset } from "@/lib/products/types"
+import type { ImageSpec } from "@/lib/products/derivatives"
 
 export type Channel = Database["public"]["Tables"]["channels"]["Row"]
 export type ChannelConnection = Database["public"]["Tables"]["channel_connections"]["Row"]
@@ -21,7 +22,14 @@ export type SnapshotType = Database["public"]["Enums"]["snapshot_type"]
  * component that wants to special-case a marketplace has to name a key, and a
  * unit test fails the moment a key appears outside lib/channels/adapters.
  */
-export const CHANNEL_KEYS = ["mock_api", "mock_assisted", "shopify", "woocommerce", "etsy"] as const
+export const CHANNEL_KEYS = [
+  "mock_api",
+  "mock_assisted",
+  "shopify",
+  "woocommerce",
+  "etsy",
+  "gumroad",
+] as const
 export type ChannelKey = (typeof CHANNEL_KEYS)[number]
 export const channelKeySchema = z.enum(CHANNEL_KEYS)
 
@@ -211,6 +219,17 @@ export interface PublishResult {
    */
   publicUrl?: string | null
   /**
+   * Facts about the provider's object that only the adapter needs back on its
+   * next write, merged into `channel_listings.metadata` by the runner.
+   *
+   * Exists because one provider hands out an address exactly once: Gumroad
+   * returns a file's canonical URL at upload and never again, and an update
+   * that cannot resend it deletes the buyer's download. Never a credential,
+   * never rendered, and never allowed to override the keys publication owns
+   * (`externalState`, `purchasable`), which the runner writes after it.
+   */
+  listingMetadata?: Record<string, unknown>
+  /**
    * The provider's own response, persisted to publication_jobs. Never rendered,
    * and never a credential: adapters return what came back from a write.
    */
@@ -239,6 +258,15 @@ export interface PublishContext {
    * reaches into delivery or storage itself.
    */
   deliveryUrl(asset: ProductAsset): Promise<string>
+  /**
+   * A time-limited signed link to a rendition of an image, built to the spec
+   * the adapter names, for a channel whose image slot has a shape of its own
+   * (a square thumbnail, say). Rendered once and cached by the derivative
+   * engine; the adapter names a spec and never touches storage or sharp.
+   * Optional because only the runner provides it, and a channel that needs
+   * none should not have to be handed one.
+   */
+  derivativeUrl?(asset: ProductAsset, spec: ImageSpec): Promise<string>
 }
 
 /**
@@ -399,6 +427,14 @@ export interface ChannelOAuth {
     /** The PKCE verifier minted when the flow started, for a `pkce` adapter. */
     codeVerifier?: string
   }): Promise<OAuthGrant>
+  /**
+   * Tells the provider the credential is finished with, before the connection
+   * row is deleted. For a provider whose tokens never expire, this is the only
+   * thing that ever ends the authorization. Best effort: a revoke that fails
+   * does not stop a disconnect, and the adapter reads the credential itself so
+   * the token never passes through the action.
+   */
+  revoke?(params: { workspaceId: string; connectionId: string }): Promise<void>
 }
 
 /**
@@ -473,11 +509,31 @@ export interface DeliverySetupSpec {
   snippet: string
 }
 
+/**
+ * A provider limit that is not per connection.
+ *
+ * Every earlier channel throttles per shop or per app token, so one
+ * workspace's traffic cannot starve another's. A provider that throttles by
+ * source address changes that: every workspace's creates leave from the same
+ * workers and draw on one allowance. An adapter that declares this has its
+ * publishes queued one at a time, on the named queue, and each holds its turn
+ * for at least the interval, platform-wide. The runner reads it; nothing else
+ * names a provider.
+ */
+export interface PublishPace {
+  /** The durable queue creates run on, declared in trigger/jobs.ts with a concurrency of one. */
+  queue: string
+  /** How long a publish holds its turn, from when it started. */
+  minIntervalMs: number
+}
+
 export interface ChannelAdapter {
   key: ChannelKey
   name: string
   integrationType: IntegrationType
   capabilities: ChannelCapabilities
+  /** Present on a channel whose create limit is shared across every workspace. */
+  pace?: PublishPace
   /**
    * The listing fields this channel has. The editor shows these and no others,
    * and a listing resolves a field the channel lacks to empty, so a product

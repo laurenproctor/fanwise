@@ -26,6 +26,18 @@ export function selectQueue(env: Record<string, string | undefined> = process.en
 
 export const jobs: JobQueue = selectQueue()
 
+/**
+ * Whether a job runs somewhere other than the request that queued it.
+ *
+ * Read by the one piece of work that behaves differently on a worker: a
+ * publish that holds its turn on a paced queue. Holding a turn is right on a
+ * worker, where the queue serializes the channel's creates, and wrong in a
+ * request, where it would keep a page waiting for a limit nobody shares.
+ */
+export function jobsAreDurable(): boolean {
+  return jobs instanceof TriggerQueue
+}
+
 export * from "./types"
 export { InMemoryQueue }
 export { TriggerQueue }

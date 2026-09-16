@@ -3,6 +3,7 @@ import { mockAssistedAdapter } from "./adapters/mock-assisted"
 import { shopifyAdapter } from "./adapters/shopify"
 import { woocommerceAdapter } from "./adapters/woocommerce"
 import { etsyAdapter } from "./adapters/etsy"
+import { gumroadAdapter } from "./adapters/gumroad"
 import type { ChannelAdapter, ChannelKey } from "./types"
 
 /**
@@ -23,6 +24,7 @@ const adapters: Record<ChannelKey, ChannelAdapter> = {
   shopify: shopifyAdapter,
   woocommerce: woocommerceAdapter,
   etsy: etsyAdapter,
+  gumroad: gumroadAdapter,
 }
 
 export function listAdapters(): ChannelAdapter[] {

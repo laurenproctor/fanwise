@@ -286,6 +286,24 @@ export async function disconnectChannelAction(
     }
   }
 
+  /*
+   * Tell the provider first, for a channel whose tokens never expire: after
+   * the row goes nothing else could. Best effort, and read through RLS so the
+   * key belongs to this workspace before anything is revoked with it.
+   */
+  const { data: connection } = await supabase
+    .from("channel_connections")
+    .select("channel:channels(key)")
+    .eq("id", connectionId)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+  const revoke = findAdapter(connection?.channel?.key ?? "")?.oauth?.revoke
+  if (revoke) {
+    await revoke({ workspaceId: workspace.id, connectionId }).catch((revokeError: unknown) => {
+      console.error("[channels] revoke failed, disconnecting anyway", revokeError)
+    })
+  }
+
   const { error } = await supabase
     .from("channel_connections")
     .delete()

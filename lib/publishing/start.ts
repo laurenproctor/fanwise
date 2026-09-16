@@ -56,6 +56,12 @@ export type StartParams = {
    * generation on it could not answer that.
    */
   generation: number
+  /**
+   * The queue the job runs on, when the channel declares a pace
+   * (`ChannelAdapter.pace`). Absent for every other channel, which run on the
+   * task's own queue.
+   */
+  queue?: string
 } & (
   | { kind: "publish" | "activate"; draft: ChannelListingDraft }
   | { kind: "update"; draft: ChannelListingDraft; images: string }
@@ -89,7 +95,7 @@ export async function startPublication(params: StartParams): Promise<StartOutcom
     .single()
 
   if (!error && inserted) {
-    await enqueue(workspaceId, inserted.id, 0)
+    await enqueue(workspaceId, inserted.id, 0, params.queue)
     return { kind: "started", jobId: inserted.id }
   }
 
@@ -123,7 +129,7 @@ export async function startPublication(params: StartParams): Promise<StartOutcom
   // Failed. A retry is the same operation tried again, so it reuses the row and
   // its key rather than creating a second one. The runner's compare-and-swap is
   // what actually re-claims it.
-  await enqueue(workspaceId, existing.id, existing.attempt_count)
+  await enqueue(workspaceId, existing.id, existing.attempt_count, params.queue)
   return { kind: "retried", jobId: existing.id }
 }
 
@@ -147,10 +153,11 @@ async function enqueue(
   workspaceId: string,
   publicationJobId: string,
   attempt: number,
+  queue: string | undefined,
 ): Promise<void> {
   await jobs.enqueue(
     "publish_listing",
     { workspaceId, publicationJobId },
-    { idempotencyKey: `${publicationJobId}:${attempt}` },
+    { idempotencyKey: `${publicationJobId}:${attempt}`, ...(queue ? { queue } : {}) },
   )
 }
