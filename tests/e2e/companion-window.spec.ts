@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
+import { openFontSection } from "./publish-support"
 import { listingUrl, newCreator, productUrl } from "./support"
 
 /**
@@ -34,15 +35,24 @@ async function assistedListing(page: Page) {
   await page.waitForURL((url) => productUrl(slug).test(url.pathname))
   await expect(page.getByRole("heading", { name: "Aster Grotesk" })).toBeVisible()
 
+  // A font opens on its family section. The channel drafts, and the button
+  // that builds one, are in the drafts section.
+  await openFontSection(page, "Marketplace drafts")
   await page.getByRole("button", { name: "Build listing" }).click()
   await page.getByRole("link", { name: "Edit listing" }).click()
   await page.waitForURL(listingUrl(slug))
 
+  // Each field is the product's until customized for this channel, as
+  // tests/e2e/publish-support.ts writes a font listing. Tags are the channel's
+  // own and need no customizing.
+  await page.getByRole("button", { name: "Customize title for this channel" }).click()
   await page.getByLabel("Title", { exact: true }).fill("Aster Grotesk Display")
   await page.getByLabel("Tags", { exact: true }).fill("grotesque, sans serif, editorial")
+  await page.getByRole("button", { name: "Customize description for this channel" }).click()
   await page
     .getByLabel("Description", { exact: true })
     .fill("A grotesque for editorial work. ".repeat(6))
+  await page.getByRole("button", { name: "Customize price for this channel" }).click()
   await page.getByLabel("Price", { exact: true }).fill("15")
   await page.getByRole("button", { name: "Save listing" }).click()
   await expect(page.getByRole("status")).toHaveText("Saved")
