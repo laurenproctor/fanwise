@@ -773,6 +773,15 @@ The tenant boundary is a foreign key, as it is on `product_assets`. The profile,
 product and the cover asset are each referenced as an `(id, workspace_id)` pair, so a
 member cannot point their own workspace's public page at another workspace's product.
 
+Since 17 September 2026 a product's public page carries one checkbox, "Show this product
+on my public profile" (`setProductOnProfileAction`, `lib/public/profile-choice.ts`). It
+writes the profile builder's draft arrangement rather than a second flag: on appends the
+product (or switches its existing entry back on, in place) and, when the profile is live and
+the product is eligible, publishes that one page through `publish_all_profile_products()`
+at the end of the order; off switches the draft entry off in place and returns the page to
+draft. The builder remains where the order is decided, and `status` remains the one fact
+the public reads.
+
 **public_product_slug_history** — the same redirect model one level down, scoped to
 the profile rather than globally.
 
