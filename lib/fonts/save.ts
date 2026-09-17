@@ -52,6 +52,7 @@ export const productPatchSchema = z
       .regex(/^[A-Z]{3}$/, "Use a three-letter currency code.")
       .optional(),
     licenseSummary: nullableText(2000),
+    madeWithGenerativeAi: z.boolean().nullable().optional(),
     font: z
       .record(z.string(), z.unknown())
       .refine((value) => Object.keys(value).every((key) => FONT_KEYS.includes(key)), {
@@ -118,6 +119,9 @@ export function patchColumns(patch: ParsedProductPatch) {
   if (patch.basePrice !== undefined) columns.base_price = patch.basePrice
   if (patch.currency !== undefined) columns.currency = patch.currency
   if (patch.licenseSummary !== undefined) columns.license_summary = patch.licenseSummary
+  if (patch.madeWithGenerativeAi !== undefined) {
+    columns.made_with_generative_ai = patch.madeWithGenerativeAi
+  }
   return columns
 }
 

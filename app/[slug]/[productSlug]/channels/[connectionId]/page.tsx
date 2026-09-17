@@ -18,6 +18,7 @@ import { isAiConfigured } from "@/lib/ai/providers"
 import { awaitingReview } from "@/lib/ai/review"
 import { handoffSteps } from "@/lib/channels/handoff"
 import { findHandoffRenditions } from "@/lib/channels/handoff-renditions"
+import { findHandoffPackage } from "@/lib/channels/handoff-package"
 import { choicesKey } from "@/lib/channels/choices"
 import { HandoffPanel } from "@/components/channels/handoff-panel"
 import { CompanionWindow } from "@/components/channels/companion-window"
@@ -234,6 +235,7 @@ export default async function ListingPage({
                   ready: image.state === "ready",
                 })),
                 renditions: findHandoffRenditions(view.adapter, subject, assets),
+                package: findHandoffPackage(view.adapter, subject, assets),
               })}
             />
           </CompanionWindow>

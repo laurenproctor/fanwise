@@ -140,6 +140,7 @@ export async function updateProductAction(
     supportUrl: formData.get("supportUrl"),
     documentationUrl: formData.get("documentationUrl"),
     licenseSummary: formData.get("licenseSummary"),
+    madeWithGenerativeAi: formData.get("madeWithGenerativeAi") ?? undefined,
   })
   if (!parsed.success) {
     return {
@@ -164,6 +165,7 @@ export async function updateProductAction(
       support_url: parsed.data.supportUrl ?? null,
       documentation_url: parsed.data.documentationUrl ?? null,
       license_summary: parsed.data.licenseSummary ?? null,
+      made_with_generative_ai: parsed.data.madeWithGenerativeAi,
     })
     .eq("id", productId)
     .eq("workspace_id", workspace.id)

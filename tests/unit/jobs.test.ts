@@ -12,6 +12,7 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 const stubs = {
   finalize_asset: async () => {},
   build_derivative: async () => {},
+  build_package: async () => {},
   publish_listing: async () => {},
   generate_listing: async () => {},
   sync_billing: async () => {},

@@ -28,6 +28,8 @@ export interface ZipEntry {
   method: number
   encrypted: boolean
   localHeaderOffset: number
+  /** The stored CRC-32 of the uncompressed bytes, as the archive claims it. */
+  crc32: number
 }
 
 export type ZipProblem = "malformed" | "unsupported"
@@ -70,6 +72,7 @@ export function listZipEntries(data: Buffer, options: { maxEntries?: number } = 
 
       const flags = data.readUInt16LE(cursor + 8)
       const method = data.readUInt16LE(cursor + 10)
+      const crc32 = data.readUInt32LE(cursor + 16)
       const compressedSize = data.readUInt32LE(cursor + 20)
       const uncompressedSize = data.readUInt32LE(cursor + 24)
       const nameLength = data.readUInt16LE(cursor + 28)
@@ -97,6 +100,7 @@ export function listZipEntries(data: Buffer, options: { maxEntries?: number } = 
           method,
           encrypted: (flags & 0x0001) !== 0,
           localHeaderOffset,
+          crc32,
         })
       }
 
@@ -146,6 +150,33 @@ export class ZipReadError extends Error {
  * One entry's bytes. `inflate` is injected like the font readers' decompressors
  * so the byte ceiling is the caller's, and a test can hand in a plain one.
  */
+/**
+ * One entry's bytes exactly as stored, still compressed, with what a writer
+ * needs to carry them into another archive unchanged. No decompression, so no
+ * byte ceiling: the entry is copied, never opened. Used by the package build
+ * to re-wrap a creator's own zip without inflating and deflating every file.
+ */
+export function readZipEntryRaw(
+  data: Buffer,
+  entry: ZipEntry,
+): { compressed: Buffer; method: number; crc32: number; uncompressedSize: number } {
+  const header = entry.localHeaderOffset
+  if (header + 30 > data.length || data.readUInt32LE(header) !== LOCAL_SIGNATURE) {
+    throw new ZipReadError("malformed")
+  }
+  const nameLength = data.readUInt16LE(header + 26)
+  const extraLength = data.readUInt16LE(header + 28)
+  const start = header + 30 + nameLength + extraLength
+  const end = start + entry.compressedSize
+  if (end > data.length) throw new ZipReadError("malformed")
+  return {
+    compressed: data.subarray(start, end),
+    method: entry.method,
+    crc32: entry.crc32,
+    uncompressedSize: entry.uncompressedSize,
+  }
+}
+
 export function readZipEntry(
   data: Buffer,
   entry: ZipEntry,

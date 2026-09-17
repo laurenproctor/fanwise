@@ -31,6 +31,50 @@ const optionalUrl = z
   .transform((v) => (v === "" ? undefined : v))
   .refine((v) => v === undefined || z.url().safeParse(v).success, "Enter a valid URL.")
 
+/**
+ * The generative AI disclosure, decision 24, as a form answers it.
+ *
+ * Three states and the third is the honest default: a product nobody has
+ * answered for is unanswered, never "no". Marketplaces that require the
+ * answer ask for it through their own readiness check; the product schema
+ * never does.
+ */
+export const GENERATIVE_AI_PROMPT =
+  "Was this product, or one of its key features, primarily made with generative AI tools? Marketplaces that ask are given this answer."
+
+export const GENERATIVE_AI_ANSWERS = ["", "yes", "no"] as const
+export type GenerativeAiAnswer = (typeof GENERATIVE_AI_ANSWERS)[number]
+
+export const generativeAiAnswerSchema = z
+  .enum(GENERATIVE_AI_ANSWERS)
+  .optional()
+  .transform((v): boolean | null => (v === "yes" ? true : v === "no" ? false : null))
+
+/** The stored value back into the form's three states. */
+export function generativeAiAnswer(value: boolean | null | undefined): GenerativeAiAnswer {
+  return value === true ? "yes" : value === false ? "no" : ""
+}
+
+/**
+ * What the browser may say about a file it is about to upload. All of it is a
+ * hint: the finalize job measures the stored bytes and overwrites size and type
+ * with what it actually found.
+ */
+export const uploadIntentSchema = z.object({
+  productId: z.uuid(),
+  assetType: assetTypeSchema,
+  filename: z.string().trim().min(1).max(255),
+  byteSize: z
+    .number()
+    .int()
+    .min(1, "The file is empty.")
+    .max(4 * 1024 * 1024 * 1024, "Files are limited to 4 GB."),
+})
+
+export type CreateProductInput = z.infer<typeof createProductSchema>
+export type UpdateProductInput = z.infer<typeof updateProductSchema>
+export type UploadIntentInput = z.infer<typeof uploadIntentSchema>
+
 export const createProductSchema = z.object({
   name: productNameSchema,
   productType: productTypeSchema,
@@ -62,24 +106,5 @@ export const updateProductSchema = z.object({
   supportUrl: optionalUrl,
   documentationUrl: optionalUrl,
   licenseSummary: optionalText(2000),
+  madeWithGenerativeAi: generativeAiAnswerSchema,
 })
-
-/**
- * What the browser may say about a file it is about to upload. All of it is a
- * hint: the finalize job measures the stored bytes and overwrites size and type
- * with what it actually found.
- */
-export const uploadIntentSchema = z.object({
-  productId: z.uuid(),
-  assetType: assetTypeSchema,
-  filename: z.string().trim().min(1).max(255),
-  byteSize: z
-    .number()
-    .int()
-    .min(1, "The file is empty.")
-    .max(4 * 1024 * 1024 * 1024, "Files are limited to 4 GB."),
-})
-
-export type CreateProductInput = z.infer<typeof createProductSchema>
-export type UpdateProductInput = z.infer<typeof updateProductSchema>
-export type UploadIntentInput = z.infer<typeof uploadIntentSchema>

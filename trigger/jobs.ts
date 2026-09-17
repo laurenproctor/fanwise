@@ -41,6 +41,11 @@ export const buildDerivative = task({
   run: async (payload: JobPayloads["build_derivative"]) => handlers.build_derivative(payload),
 })
 
+export const buildPackage = task({
+  id: "build_package",
+  run: async (payload: JobPayloads["build_package"]) => handlers.build_package(payload),
+})
+
 export const describeImage = task({
   id: "describe_image",
   // A refused or failed description is recorded in the log and the field

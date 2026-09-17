@@ -208,6 +208,47 @@ function withoutImportSourceNames(rel: string, contents: string): string {
   return IMPORT_SOURCE_NAMES.reduce((text, name) => text.split(name).join(""), contents)
 }
 
+/**
+ * Adapters are bundled to the browser by the listing editor, which computes
+ * readiness while the creator types. A value import of anything that reaches
+ * storage, the admin client, the job queue or sharp breaks the production
+ * build, and the build is the first place it shows: the package build was
+ * the first to do it, on 17 September 2026. A type-only import is erased and
+ * is fine, and so are the credential and markdown modules the api adapters
+ * already load.
+ */
+const SERVER_ONLY_FOR_ADAPTERS = [
+  "@/lib/products/assets",
+  "@/lib/products/storage",
+  "@/lib/products/package",
+  "@/lib/products/derivatives",
+  "@/lib/fonts/read-upload",
+  "@/lib/supabase/admin",
+  "@/lib/supabase/server",
+  "@/lib/jobs",
+]
+
+function isServerOnlyForAdapters(specifier: string): boolean {
+  return SERVER_ONLY_FOR_ADAPTERS.some((m) => specifier === m || specifier.startsWith(`${m}/`))
+}
+
+describe("adapters import nothing the browser cannot load", () => {
+  it("makes no value import of a server-only module", () => {
+    const offenders: string[] = []
+    for (const file of sourceFiles(join(ROOT, "lib", "channels", "adapters"))) {
+      const contents = readFileSync(file, "utf8")
+      for (const match of contents.matchAll(
+        /^import\s+(?!type\s)[^;]*?from\s+["']([^"']+)["']/gms,
+      )) {
+        if (isServerOnlyForAdapters(match[1]!)) {
+          offenders.push(`${relative(ROOT, file)} imports ${match[1]}`)
+        }
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+})
+
 describe("the transcription vendor stays inside its provider folder", () => {
   it("is named nowhere else in the tree", () => {
     const offenders: string[] = []

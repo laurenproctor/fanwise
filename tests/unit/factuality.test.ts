@@ -23,6 +23,7 @@ const sheet: FactSheet = {
   price: { amount: 48, currency: "USD" },
   version: null,
   licenseSummary: "Desktop and web license for one user. Commercial use permitted.",
+  madeWithGenerativeAi: null,
   supportUrl: null,
   documentationUrl: null,
   details: { kind: "font", styleCount: 9, formats: ["otf", "woff2"], glyphCount: 612 },

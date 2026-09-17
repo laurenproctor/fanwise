@@ -123,3 +123,18 @@ describe("downloadName", () => {
     expect(downloadName("aster.zip", "../../etc/passwd")).toBe("passwd.zip")
   })
 })
+
+describe("choiceVisible with several values", () => {
+  it("shows a choice while the other holds any of the named values", () => {
+    const spec = {
+      kind: "text",
+      key: "note",
+      label: "Note",
+      showWhen: { key: "mode", value: ["a", "b"] },
+    } as const
+    expect(choiceVisible(spec, { mode: "a" })).toBe(true)
+    expect(choiceVisible(spec, { mode: "b" })).toBe(true)
+    expect(choiceVisible(spec, { mode: "c" })).toBe(false)
+    expect(choiceVisible(spec, {})).toBe(false)
+  })
+})

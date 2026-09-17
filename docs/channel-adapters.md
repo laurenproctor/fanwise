@@ -34,6 +34,10 @@ Current reality, from `docs/channel-feasibility.md`:
 | Gumroad | api | yes | yes | yes | **yes**, 20 GB by presigned multipart upload, built at B10 | yes |
 | Envato | assisted | no | no | yes | no | no |
 
+**Creative Market note.** Every `no` on that row is the permanent kind: no seller API, and
+the Terms of Use close browser automation in writing. Built at A8 on 17 September 2026; the
+spec is `docs/channels/creative-market.md`. It is the first channel with a package build.
+
 **Behance note.** Every `no` on that row is the permanent kind: the provider cannot. Its API
 is read-only and closed, and Adobe's terms forbid the alternative. Built at B9 on 17 September
 2026; the spec is `docs/channels/behance.md`.
@@ -337,6 +341,16 @@ components that know no channel:
 - `submission`: mark submitted with the URL parsed inside the adapter. Writes `published` with
   `status_source = "self_reported"`, the parsed id as `external_listing_id`, and a `publish`
   snapshot. A unit test refuses `submission` on an `api` adapter.
+- `handoffPackage` (since A8): the package the handoff hands over, as a `PackageSpec`
+  naming the buyer files and attachments in order, the archive's filename and a README
+  written from the canonical record. Built by `lib/products/package.ts` in the
+  `build_package` job when the listing is built, cached on the first file and the spec hash
+  exactly as a derivative is, and stored as a derived row of type `other` so no channel that
+  uploads deliverables ever sends it. A creator's own zip is re-wrapped, never nested.
+
+A copy step on the handoff may carry `html` beside its value: the panel puts both on the
+clipboard, formatted text for a rich-text editor and the words for a plain field. Creative
+Market's description is the first, because its editor renders pasted markdown as asterisks.
 
 The handoff for an assisted channel may also be shown in a companion window beside the
 marketplace's editor, as proposed in `docs/decisions/0010`. It is a layout, not a capability.

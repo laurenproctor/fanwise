@@ -1,4 +1,5 @@
 import type { ImageSpec } from "@/lib/products/derivatives"
+import type { PackageSpec } from "@/lib/products/package-spec"
 
 /**
  * Job contract.
@@ -16,6 +17,7 @@ export type JobName =
   | "noop"
   | "finalize_asset"
   | "build_derivative"
+  | "build_package"
   | "publish_listing"
   | "generate_listing"
   | "sync_billing"
@@ -33,6 +35,12 @@ export interface JobPayloads {
     sourceAssetId: string
     spec: ImageSpec
   }
+  /**
+   * Build one package, the buyer's files with a README and the license
+   * documents in one zip, for an assisted channel's handoff. Step A8. Cached
+   * on the first file and the spec hash, the way a derivative is.
+   */
+  build_package: { workspaceId: string; productId: string; spec: PackageSpec }
   /**
    * Perform one external write against a channel. Step A5.
    *
@@ -94,6 +102,7 @@ export const JOB_NAMES = [
   "noop",
   "finalize_asset",
   "build_derivative",
+  "build_package",
   "publish_listing",
   "generate_listing",
   "sync_billing",

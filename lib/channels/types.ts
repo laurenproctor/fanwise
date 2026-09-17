@@ -2,6 +2,7 @@ import { z } from "zod"
 import type { Database } from "@/lib/supabase/database.types"
 import type { Product, ProductAsset } from "@/lib/products/types"
 import type { ImageSpec } from "@/lib/products/derivatives"
+import type { PackageSpec } from "@/lib/products/package-spec"
 import type { HandoffImage, HandoffStep } from "./handoff"
 
 export type Channel = Database["public"]["Tables"]["channels"]["Row"]
@@ -31,6 +32,7 @@ export const CHANNEL_KEYS = [
   "etsy",
   "gumroad",
   "behance",
+  "creative_market",
 ] as const
 export type ChannelKey = (typeof CHANNEL_KEYS)[number]
 export const channelKeySchema = z.enum(CHANNEL_KEYS)
@@ -569,8 +571,8 @@ interface ListingChoiceBase {
   key: string
   label: string
   description?: string
-  /** Rendered only while another choice holds the named value. */
-  showWhen?: { key: string; value: string }
+  /** Rendered only while another choice holds the named value, or one of them. */
+  showWhen?: { key: string; value: string | readonly string[] }
 }
 
 export type ListingChoiceSpec =
@@ -607,6 +609,13 @@ export interface HandoffRendition {
   asset: ProductAsset | null
 }
 
+/** The package a handoff hands over: named by the adapter, built or not yet. */
+export interface HandoffPackage {
+  spec: PackageSpec
+  /** The package row, once the build has produced it. */
+  asset: ProductAsset | null
+}
+
 /** Everything an adapter's handoff is built from. */
 export interface HandoffInput {
   draft: ChannelListingDraft
@@ -614,6 +623,8 @@ export interface HandoffInput {
   /** The channel's images in channel order, as the generic handoff lists them. */
   images: readonly HandoffImage[]
   renditions: readonly HandoffRendition[]
+  /** Present for a channel that declares `handoffPackage`. */
+  package?: HandoffPackage | null
 }
 
 /**
@@ -687,6 +698,13 @@ export interface ChannelAdapter {
    * lib/channels/handoff.ts is used.
    */
   buildHandoff?(input: HandoffInput): HandoffStep[]
+  /**
+   * The package an assisted channel's handoff hands over: the buyer's files,
+   * a README and the license documents in one zip, named as a spec and built
+   * by the package build when the listing is built. Null when the product
+   * has nothing to package yet.
+   */
+  handoffPackage?(subject: AdapterSubject): PackageSpec | null
   /** Mark submitted with URL capture. Assisted channels only. */
   submission?: SubmissionSpec
   publish?(context: PublishContext): Promise<PublishResult>

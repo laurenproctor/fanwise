@@ -98,6 +98,9 @@ function toPatch<K extends keyof FontProductValues>(
   if (key === "basePrice" || key === "name" || key === "slug" || key === "currency") {
     return { [key]: value } as ProductPatch
   }
+  if (key === "madeWithGenerativeAi") {
+    return { madeWithGenerativeAi: value === "yes" ? true : value === "no" ? false : null }
+  }
   const text = (value as string).trim()
   return { [key]: text === "" ? null : text } as ProductPatch
 }

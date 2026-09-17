@@ -1006,6 +1006,7 @@ export type Database = {
           license_id: string | null
           license_summary: string | null
           license_version: string | null
+          made_with_generative_ai: boolean | null
           metadata: Json
           name: string
           product_type: Database["public"]["Enums"]["product_type"]
@@ -1036,6 +1037,7 @@ export type Database = {
           license_id?: string | null
           license_summary?: string | null
           license_version?: string | null
+          made_with_generative_ai?: boolean | null
           metadata?: Json
           name: string
           product_type: Database["public"]["Enums"]["product_type"]
@@ -1066,6 +1068,7 @@ export type Database = {
           license_id?: string | null
           license_summary?: string | null
           license_version?: string | null
+          made_with_generative_ai?: boolean | null
           metadata?: Json
           name?: string
           product_type?: Database["public"]["Enums"]["product_type"]

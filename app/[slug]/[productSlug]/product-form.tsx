@@ -8,6 +8,7 @@ import { FormError } from "@/components/ui/form-error"
 import { MarkdownEditor } from "@/components/ui/markdown-editor"
 import { updateProductAction, type SaveState } from "@/lib/products/actions"
 import { PRODUCT_TYPES, PRODUCT_TYPE_LABELS, type Product } from "@/lib/products/types"
+import { GENERATIVE_AI_PROMPT, generativeAiAnswer } from "@/lib/products/schemas"
 import { SaveStatusIndicator, type SaveStatus } from "@/components/ui/save-status"
 
 /**
@@ -264,6 +265,26 @@ export function ProductForm({
           rows={3}
           maxLength={2000}
         />
+
+        {/*
+          Decision 24. A fact about the product, stated by the creator and never
+          composed: marketplaces that ask the question read this answer, and a
+          channel that requires it says so in its own readiness list. Three
+          states, because unanswered is not no.
+        */}
+        <label className="flex flex-col gap-2">
+          <span className="label-mono">Generative AI</span>
+          <select
+            name="madeWithGenerativeAi"
+            defaultValue={generativeAiAnswer(product.made_with_generative_ai)}
+            className="w-full rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-card)] px-3 py-2.5 text-[15px] text-[var(--color-ink)] outline-none focus:border-[var(--color-accent)]"
+          >
+            <option value="">Not answered</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+          <span className="text-[13px] text-[var(--color-ink-3)]">{GENERATIVE_AI_PROMPT}</span>
+        </label>
 
         {/*
           Kept, though autosave means it is rarely the thing that saves. It is

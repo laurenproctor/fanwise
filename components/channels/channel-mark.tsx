@@ -74,6 +74,17 @@ export const CHANNEL_MARKS: Partial<Record<ChannelKey, ChannelBrandMark>> = {
   },
 }
 
+/**
+ * Channels whose card shows the fallback tile on purpose.
+ *
+ * A mark table that is merely missing an entry is a card nobody decided
+ * about, and the unit test refuses it. An entry here is a decision: the
+ * provider publishes no mark under a licence Fanwise may redraw from, and
+ * the initial in a quiet tile is the honest card until it does. The marketing
+ * site's own table says the same of the same shop.
+ */
+export const NO_PUBLISHED_MARK: readonly ChannelKey[] = ["creative_market"]
+
 export function findChannelMark(key: string): ChannelBrandMark | null {
   return CHANNEL_MARKS[key as ChannelKey] ?? null
 }

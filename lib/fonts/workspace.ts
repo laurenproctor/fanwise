@@ -1,4 +1,5 @@
 import { readAltTextSource, type AltTextSource } from "@/lib/products/image-metadata"
+import type { GenerativeAiAnswer } from "@/lib/products/schemas"
 import { KNOWN_SCRIPTS } from "./coverage"
 import {
   FONT_FORMATS,
@@ -72,6 +73,8 @@ export interface FontProductValues {
   basePrice: number | null
   currency: string
   licenseSummary: string
+  /** The generative AI disclosure (decision 24), in the form's three states. */
+  madeWithGenerativeAi: GenerativeAiAnswer
 }
 
 /* -------------------------------------------------------------------- files */
@@ -335,6 +338,7 @@ export interface ProductPatch {
   basePrice?: number | null
   currency?: string
   licenseSummary?: string | null
+  madeWithGenerativeAi?: boolean | null
   font?: FontPatch
 }
 

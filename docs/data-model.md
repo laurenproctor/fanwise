@@ -85,8 +85,14 @@ because it will be under pressure at A3:
 
 **products** — id, workspace_id, name, slug, product_type, status, canonical_title,
 canonical_description, short_description, brand_name, base_price, currency, version,
-support_url, documentation_url, license_summary, metadata (jsonb), created_at, updated_at,
-archived_at
+support_url, documentation_url, license_summary, made_with_generative_ai, metadata (jsonb),
+created_at, updated_at, archived_at
+
+`made_with_generative_ai` (migration `20260917210000_creative_market_channel`, decision 24)
+is the creator's answer to whether the product or one of its key features was primarily made
+with generative AI tools. Nullable, and null is unanswered, never no. A fact about the
+product, so it lives here and in the FactSheet rather than on a listing, and no model ever
+writes it; a channel that requires it asks through its own readiness rule.
 
 Status: draft, incomplete, ready, publishing, published, archived.
 
@@ -113,6 +119,12 @@ stored bytes. Nothing the client claims about size or type is trusted.
 ready asset; replacing a file creates a new row. `sort_order` and `metadata` stay
 editable because they are presentation, not content. This is what makes the
 derivative cache key sound, see below.
+
+**A package is a derivative too** (A8, `lib/products/package.ts`): the zip an assisted
+channel's handoff hands over is a row of type `other` derived from the first buyer file in
+it, with the package spec's hash as `spec_hash`, so the same cache index and the same
+cascade apply. Every reader that lists sources skips it, and no reader that selects buyer
+files by type sees it; it is a rendering for one handoff, not a file of the product.
 
 **Font products: detected versus canonical.** The finalize job reads every
 upload that sniffs as a font (OTF, TTF, WOFF, WOFF2) and writes what the file

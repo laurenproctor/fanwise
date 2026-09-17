@@ -18,7 +18,9 @@ export type ParsedChoices =
 /** True while the choice's `showWhen` condition holds, or when it has none. */
 export function choiceVisible(spec: ListingChoiceSpec, values: Record<string, unknown>): boolean {
   if (!spec.showWhen) return true
-  return values[spec.showWhen.key] === spec.showWhen.value
+  const current = values[spec.showWhen.key]
+  const wanted = spec.showWhen.value
+  return typeof wanted === "string" ? current === wanted : wanted.includes(current as string)
 }
 
 export function parseChoices(

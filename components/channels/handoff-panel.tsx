@@ -67,14 +67,33 @@ export function HandoffPanel({
     () => "",
   )
 
-  async function copy(event: MouseEvent<HTMLButtonElement>, key: string, value: string) {
+  async function copy(
+    event: MouseEvent<HTMLButtonElement>,
+    key: string,
+    value: string,
+    html?: string,
+  ) {
     // The clipboard of the window the button is in. In the companion that is
     // the companion's own, and the page's would refuse: a clipboard write needs
     // its document to have focus, and the click just gave focus to the other.
     const clipboard = event.currentTarget.ownerDocument.defaultView?.navigator.clipboard
     try {
       if (!clipboard) throw new Error("no clipboard")
-      await clipboard.writeText(value)
+      // Formatted text where the step carries it, with the plain value as
+      // the fallback for a field that takes only text. A browser without
+      // ClipboardItem gets the plain value, which is still the right words.
+      const view = event.currentTarget.ownerDocument.defaultView
+      const Item = view && "ClipboardItem" in view ? view.ClipboardItem : undefined
+      if (html && view && Item && typeof clipboard.write === "function") {
+        await clipboard.write([
+          new Item({
+            "text/html": new view.Blob([html], { type: "text/html" }),
+            "text/plain": new view.Blob([value], { type: "text/plain" }),
+          }),
+        ])
+      } else {
+        await clipboard.writeText(value)
+      }
       setCopied(key)
       setFailed(null)
     } catch {
@@ -112,7 +131,7 @@ export function HandoffPanel({
               <button
                 type="button"
                 aria-label={`${copied === step.key ? "Copied" : "Copy"} ${step.label.charAt(0).toLowerCase()}${step.label.slice(1)}`}
-                onClick={(event) => copy(event, step.key, step.value)}
+                onClick={(event) => copy(event, step.key, step.value, step.html)}
                 className={
                   "label-mono rounded-[var(--radius-pill)] border px-2.5 py-1 transition-colors " +
                   (copied === step.key

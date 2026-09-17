@@ -374,6 +374,9 @@ function factCorpus(sheet: FactSheet): string {
     sheet.brand ?? "",
     sheet.version ?? "",
     sheet.licenseSummary ?? "",
+    // A stated disclosure may be repeated in either direction; an unanswered
+    // one gives the model nothing to say about it.
+    sheet.madeWithGenerativeAi === null ? "" : "generative ai",
     ...sheet.files.formats,
   ]
   const d = sheet.details

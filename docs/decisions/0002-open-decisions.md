@@ -52,6 +52,7 @@ Keep these here only as pointers. Do not relitigate them from this file.
 | `listing_manual_steps` | Landed at A5 with Shopify, migration `20260904190000_shopify_publishing`, and described in the data model | `docs/data-model.md` |
 | `next dev` writes into `CLAUDE.md` | Committed, 5 September 2026. The block is part of the file, so a dev run no longer dirties the tree | `CLAUDE.md`, the `nextjs-agent-rules` block |
 | Who sends Fanwise's email | Resend, over SMTP from a verified subdomain. Wired in `supabase/config.toml` and applied by `pnpm auth:push` from a temporary deployment worktree at an approved commit, which refuses to run until the four `SMTP_*` values are set. Decided 9 September 2026 | `docs/decisions/0008` |
+| Where the generative AI disclosure lives | A nullable boolean on `products`, `made_with_generative_ai`, in neutral Fanwise wording, set in the product form and the font workspace, stated in the FactSheet, required by Creative Market's `ai_disclosure_set` rule and by no product schema. Null is unanswered, never no. Landed with A8, 17 September 2026 | `docs/data-model.md`, products; migration `20260917210000_creative_market_channel` |
 | Email Gumroad about their product API | Overtaken on 11 September 2026: the API had shipped. File upload 30 March 2026, product creation 6 April, publish by default 6 September. Planned as B10; the email survives as item 27 with a different ask | `docs/channel-feasibility.md`, `docs/channels/gumroad.md` |
 
 ---
@@ -224,35 +225,6 @@ product.
 
 **Recommendation:** start the conversation during A5. A creator who has agreed in principle
 two steps early is a very different prospect from one approached the week the gate is ready.
-
-### 24. Where the generative AI disclosure lives
-
-Discovered on 7 September 2026 from Creative Market's upload form. Every product must answer,
-yes or no, whether it or one of its key features was primarily created with generative AI
-tools. The answer is required and the spec at `docs/channels/creative-market.md` did not
-know the field existed.
-
-This is a factual claim about the product, not a channel preference, and other marketplaces
-are adding the same question. That rules out two easy homes. It cannot live on
-`channel_listings`, because the same product would be asked the same question once per
-channel and could answer differently. It cannot be composed by AI, because invariant 5 says AI
-never introduces a fact absent from the FactSheet, and this is exactly such a fact.
-
-**Recommendation:** a nullable boolean on `products`, set by the creator in the product
-editor, surfaced in the FactSheet as a stated fact, and required by the Creative Market
-readiness check (`ai_disclosure_set`) rather than by the product schema, so products headed
-only to channels that do not ask are not blocked. Null means unanswered, never no. The
-migration lands with A8, since that is the first channel that needs it. Whether the wording
-should be Creative Market's or a neutral Fanwise one that adapters map onto each channel's
-question is the part still owed, and the neutral wording is the one consistent with adapters
-being adapters.
-
-Behance, planned 11 September 2026, asks a softer form of the same question: it encourages
-every project to name the tools used, generative ones included, and supports Content
-Credentials, but documents no required field. That is the neutral-wording argument made by a
-second channel. The Behance adapter maps a yes onto Tools Used and the description
-(`docs/channels/behance.md` §5, §9); whether the form has grown a required field since the
-2023 FAQ is item 10 of that spec's §13.
 
 ### 28. Whether the assisted handoff gets a companion window
 

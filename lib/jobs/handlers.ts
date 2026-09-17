@@ -1,4 +1,5 @@
 import { buildDerivative, finalizeAsset } from "@/lib/products/assets"
+import { buildPackage } from "@/lib/products/package"
 import { runPublication } from "@/lib/publishing/runner"
 import { runGeneration } from "@/lib/ai/runner"
 import { syncBilling } from "@/lib/billing/sync"
@@ -44,6 +45,9 @@ export const handlers: JobHandlers = {
   },
   build_derivative: async (payload) => {
     await buildDerivative(payload)
+  },
+  build_package: async (payload) => {
+    await buildPackage(payload)
   },
   publish_listing: async (payload) => {
     await runPublication(payload)

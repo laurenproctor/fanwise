@@ -10,6 +10,7 @@ import { listingImages } from "./images"
 import { findAdapter } from "./registry"
 import { updateListingSchema } from "./schemas"
 import { prepareHandoffImages } from "./handoff-renditions"
+import { prepareHandoffPackage } from "./handoff-package"
 import { parseChoices } from "./choices"
 import { recordEvent } from "@/lib/publishing/events"
 import { callbackUrl, createAuthorizationState, grantUrl } from "./oauth"
@@ -497,6 +498,9 @@ export async function buildListingAction(
   // creator reaches the handoff; cached by the engine, so a rebuild re-asks
   // for nothing that already exists.
   await prepareHandoffImages(adapter, workspace.id, subject)
+  // And the package, for a channel whose handoff hands one over. Same
+  // bargain: asked for at build, cached on its inputs.
+  await prepareHandoffPackage(adapter, workspace.id, subject)
 
   revalidatePath(routes.product(workspaceSlug, product.slug))
   return { error: null }
@@ -699,6 +703,7 @@ export async function updateListingChoicesAction(
 
     // A choice can change which renditions the handoff wants.
     await prepareHandoffImages(adapter, workspace.id, subject)
+    await prepareHandoffPackage(adapter, workspace.id, subject)
     revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
   }
 

@@ -400,6 +400,7 @@ const EMPTY_VALUES: FontProductValues = {
   basePrice: null,
   currency: "USD",
   licenseSummary: "",
+  madeWithGenerativeAi: "",
 }
 
 describe("what the product adopts from its files", () => {
