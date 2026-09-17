@@ -167,6 +167,27 @@ is the email to Gumroad, and the §13 answers the run produced are owed to the s
 
 ---
 
+### 31. Get a Fontspring foundry account
+
+`docs/channels/fontspring.md` was written on 17 September 2026 from the public pages, and
+the public pages stop at the door: the vendor tools, the upload form and the *Font Foundry
+Terms* are all behind a foundry account. Fourteen questions in that spec's §13 can only be
+settled there, and four decide code before the channel could open: the upload form's fields
+and order, how licence prices are entered, whether a submission is reviewed, and the poster
+spec, which decides whether the 2:1 rendition is shared with MyFonts or not.
+
+The application is "Contact the Fontspring team for more info", with no form, no published
+criteria beyond being the designer or having the owner's permission, and no published wait.
+That makes it the same shape as 3 and 26, an external wait nobody controls, and cheaper than
+either to start: one message. The MyFonts foundry application in `docs/channels/myfonts.md`
+§1 is the same kind of wait and is owed its own entry when PR #118 merges; if fonts are the
+wedge, both are started together.
+
+**Recommendation:** do not start it until decision 14 has the alpha evidence it waits on.
+Fontspring's terms are Creative Market's, so nothing learned there changes A8, and a foundry
+account with no fonts to sell is a relationship opened for no reason. The day a creator with
+a real family is in the alpha, send the message the same day, because the wait is unknown.
+
 ## Shopify, before any public launch
 
 ### 4. Shopify app type: public or custom
@@ -352,6 +373,17 @@ own, after A8, because what it tests is different: B4's two candidates carry hea
 metadata, which is where assisted preparation earns its price, and Behance's metadata is
 light. What Behance tests is a project-shaped handoff, and what it is worth is reach. See
 `docs/channels/behance.md` §1.
+
+**Fontspring is not a third candidate either**, as of 17 September 2026. It is the other
+half of the MyFonts answer. Both are font marketplaces, both take the same bare OTF and TTF
+files and, pending one `[verify]`, the same 2:1 posters, so if fonts are the wedge the
+second assisted channel is the pair sharing one package, and the question under this
+decision becomes "Adobe Stock, or fonts". Fontspring is the cheaper half to prove first: it
+sells the creator's own licence at the creator's prices, which the font workspace already
+models and MyFonts cannot take, and its Worry-Free badge is a published quality mark Fanwise
+can predict. It publishes far less than MyFonts about what a submission must contain, so the
+exact-rules argument that carries MyFonts is thinner there. See
+`docs/channels/fontspring.md` §1 and `docs/channel-feasibility.md`.
 
 ### 15. How to show analytics holes honestly
 
