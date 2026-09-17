@@ -365,7 +365,7 @@ function ProductTile({
   ].filter(Boolean)
   const body = (
     <>
-      <div className="aspect-[4/3] w-full overflow-hidden rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)]">
+      <div className="aspect-video w-full overflow-hidden rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)]">
         {product.imageUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element -- see PublicImage. */
           <img
