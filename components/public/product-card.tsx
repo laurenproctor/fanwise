@@ -34,7 +34,7 @@ export function ProductCard({
             assetId={product.coverAssetId}
             alt={product.coverAlt}
             priority={priority}
-            ratio="4 / 3"
+            ratio="16 / 9"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
         ) : (
@@ -43,7 +43,7 @@ export function ProductCard({
           // would, so a grid of mixed cards does not stagger.
           <span
             aria-hidden
-            style={{ aspectRatio: "4 / 3" }}
+            style={{ aspectRatio: "16 / 9" }}
             className="flex w-full items-center justify-center border-b border-[var(--color-rule)] bg-[var(--color-paper-2)]"
           >
             <span className="label-mono">{product.typeLabel}</span>

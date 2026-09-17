@@ -32,6 +32,7 @@ const { ProductCard, formatPrice } = await import("@/components/public/product-c
 const { DestinationList, ChooseWhereToBuy } = await import("@/components/public/destination-list")
 const { PublicImage, PublicAvatar } = await import("@/components/public/public-image")
 const { PublicShell } = await import("@/components/public/public-shell")
+const { ProductGallery } = await import("@/components/public/product-gallery")
 const { PublishControls } = await import("@/app/[slug]/profile/publish-controls")
 
 function render(element: Parameters<typeof renderToStaticMarkup>[0]): string {
@@ -120,14 +121,14 @@ describe("a product card", () => {
 
   it("holds the image's box before it loads, so the grid does not jump", () => {
     const markup = render(createElement(ProductCard, { handle: HANDLE, product: card() }))
-    expect(markup).toMatch(/aspect-ratio:\s*4\s*\/\s*3/)
+    expect(markup).toMatch(/aspect-ratio:\s*16\s*\/\s*9/)
   })
 
   it("keeps the same box when there is no cover", () => {
     const markup = render(
       createElement(ProductCard, { handle: HANDLE, product: card({ coverAssetId: null }) }),
     )
-    expect(markup).toMatch(/aspect-ratio:\s*4\s*\/\s*3/)
+    expect(markup).toMatch(/aspect-ratio:\s*16\s*\/\s*9/)
     // And says what the product is, rather than showing an empty grey box.
     expect(textOf(markup)).toContain("Font")
   })
@@ -244,6 +245,19 @@ describe("public images", () => {
     expect(markup).not.toContain("storage/v1")
   })
 
+  it("crop to a 16:9 box by default, and letterbox inside it when asked not to crop", () => {
+    // A marketplace cover is 16:9. A 4:3 box, which these pages once used,
+    // took a quarter off the width of every promo a creator had already made.
+    const cropped = render(createElement(PublicImage, { assetId: "abc", alt: "x" }))
+    expect(cropped).toMatch(/aspect-ratio:\s*16\s*\/\s*9/)
+    expect(cropped).toContain("object-cover")
+    expect(cropped).not.toContain("object-contain")
+
+    const whole = render(createElement(PublicImage, { assetId: "abc", alt: "x", fit: "contain" }))
+    expect(whole).toContain("object-contain")
+    expect(whole).not.toContain("object-cover")
+  })
+
   it("reserve their box and load lazily unless they are the priority image", () => {
     const lazy = render(createElement(PublicImage, { assetId: "abc", alt: "x" }))
     expect(lazy).toContain('loading="lazy"')
@@ -279,6 +293,32 @@ describe("public images", () => {
     )
     expect(markup).toContain('src="/api/public/avatar/p1"')
     expect(markup).toContain('alt="Northline Studio"')
+  })
+})
+
+describe("the product gallery", () => {
+  it("shows the large image whole in a 16:9 frame, and crops only the thumbnails", () => {
+    // A creator's promo is made for a marketplace cover, which is 16:9. The
+    // one picture a visitor came to see is never cut, whatever its shape; the
+    // thumbnails are a picker, so those crop to squares.
+    const single = render(createElement(ProductGallery, { assetIds: ["a"], title: "Aster" }))
+    expect(single).toMatch(/aspect-ratio:\s*16\s*\/\s*9/)
+    expect(single).toContain("object-contain")
+    expect(single).not.toContain("object-cover")
+
+    const several = render(createElement(ProductGallery, { assetIds: ["a", "b"], title: "Aster" }))
+    const panels = several.split('role="tablist"')[0]!
+    expect(panels).not.toContain("object-cover")
+    expect(panels.match(/object-contain/g)).toHaveLength(2)
+    const tabs = several.split('role="tablist"')[1]!
+    expect(tabs).toMatch(/aspect-ratio:\s*1\s*\/\s*1/)
+    expect(tabs).not.toContain("object-contain")
+  })
+
+  it("holds a 16:9 frame when there are no images yet", () => {
+    const markup = render(createElement(ProductGallery, { assetIds: [], title: "Aster" }))
+    expect(markup).toMatch(/aspect-ratio:\s*16\s*\/\s*9/)
+    expect(markup).toContain("No images yet")
   })
 })
 
