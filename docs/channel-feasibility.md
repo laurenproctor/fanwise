@@ -15,7 +15,9 @@ first two were built or filed for. Gumroad moved up from near miss on 11 Septemb
 when its product API turned out to have shipped in April; see its section under Tier 1.
 Behance was added the same day under Tier 3, and it is assisted for good. A wider survey
 that day found publishing APIs outside this set, at Polar, Fourthwall, Wix, Ecwid, CGTrader
-and Cults3D, none of them assessed here. Everything else is a preparation problem, not an
+and Cults3D, none of them assessed here. Dribbble was assessed on 17 September 2026 and is
+cut under Tier 4: it stopped being a goods marketplace in July 2023 and its guidelines
+reject shots that sell a product. Everything else is a preparation problem, not an
 integration problem.
 
 Three findings change the plan:
@@ -403,6 +405,63 @@ marketplace-publish action.
 the canonical-product thesis does not apply to them. If you want the Framer creator as a
 customer, the way in is their fonts and graphics, not their Framer templates.
 
+### Dribbble — a portfolio, not a store
+
+Assessed 17 September 2026 against the Shot Guidelines (8 April 2025), the Community
+Guidelines (9 September 2026), the Terms of Service (17 March 2025), the Pricing and Payment
+Terms (3 February 2026), the v2 API documentation and terms, and the Wayback Machine's index
+of `dribbble.com/marketplace`. Not a design tool, but it belongs in this tier for the same
+reason the four above do: there is no product object to syndicate.
+
+**The goods marketplace is gone.** The "Dribbble Marketplace" launched on 15 November 2021
+was a Creative Market product feed: a shop owner connected a Creative Market shop, products
+appeared on a Goods tab on a 12-hour sync, and "all transactions occur on Dribbble, powered by
+Creative Market". `dribbble.com/marketplace` answered 200 through June 2023 and has redirected
+to the homepage since at least 29 July 2023; `/goods` and the profile-level Goods tab redirect
+too; Creative Market's help article for the integration was last archived in February 2023
+and now answers 403; and no Dribbble help article, Pro page or product update since mentions
+goods, shops or Creative Market. Creative Market is still "a Dribbble company" per its 2026
+footer, so the Dribbble-family route to selling a product is Creative Market itself, which is
+A8.
+
+**What Dribbble monetizes now is design work.** Since September 2024 it has been a
+transactional services marketplace (Projects and Services), and in March 2025 it made
+on-platform transacting mandatory under a disintermediation policy. The fee page sets a
+graduated designer fee of 10% on the first $500, 7% on the next $500 and 4% above $1,000 on
+projects, a flat 3.5% on services, both waived on annual Pro Standard or Plus, plus client
+fees and 2.9% + $0.30 processing. A Service is a package of work delivered to one client.
+There is no price, file or checkout object for a downloadable product anywhere.
+
+**Posting the product as a shot breaks three rules.** The Shot Guidelines list, under content
+Dribbble reserves the right to reject, "No digital downloads and design assets: This includes
+product mockups, icon packs, and web templates that are for sale or given away for free." The
+Community Guidelines say "Do not use Dribbble Shots to advertise your product or service" and
+"Do not include email addresses or websites/URLs in your Shot description or within the Shots
+themselves." Dribbble's May 2025 product post states the policy behind them: "uploading
+content to Dribbble to generate referral traffic to products or services sold elsewhere is,
+functionally, advertising ... and we offer robust advertising solutions." The sanctioned
+version is a paid Boosted Shot through BuySellAds, contact for pricing.
+
+**The API cannot help, even where the rules allow it.** v2 is real and self-serve: OAuth
+with two scopes, `public` and `upload`, and `POST /shots` creates a shot from a 400×300 or
+800×600 GIF, JPG or PNG up to 8 MB (the documentation is stale against the site's 1600×1200
+and 10 MB), at 60 requests a minute and 1,440 a day per user. That is the whole write
+surface. The API terms forbid automating actions on behalf of users unless they request
+them, forbid scraping, and let Dribbble refuse access at any time. It publishes portfolio
+images and nothing else.
+
+**What is legitimately allowed:** the profile's "Social Profiles + Portfolio URL" are
+publicly visible, so a creator may put their `/@handle` page there. Fanwise already models
+Dribbble exactly this way, as a social link on the public profile (`docs/data-model.md`).
+That is the correct and complete treatment.
+
+**Verdict: cut.** Not assisted either, because there is nothing to hand off: no listing form,
+no file, no price. It differs from Behance, which sells assets. Two residues: Creative Market
+is the Dribbble-family goods channel, already A8; and Dribbble also owns Fontspring (acquired
+February 2022), a real font marketplace paying a 50% royalty plus a 35% bonus on releases in
+their first 30 days, with a foundry application. If fonts turn out to be the wedge, Fontspring
+belongs in the decision 14 conversation next to MyFonts. Not assessed here.
+
 ---
 
 ## Revised channel roadmap
@@ -423,6 +482,7 @@ customer, the way in is their fonts and graphics, not their Framer templates.
 | Payhip | Blocked | API covers coupons and license keys only | Webhooks | Skip |
 | Lemon Squeezy | Blocked | Products and files read-only, mid-migration to Stripe | API | Skip |
 | Framer, Webflow, Canva, Figma | Blocked | No API, product lives in the tool | None | Cut |
+| Dribbble | Blocked | No goods marketplace since July 2023; shots that sell a product are rejected | None | Cut, assessed 17 Sep 2026 |
 | Design Cuts | Defunct | Platform closed January 2025 | n/a | Remove |
 
 ---
