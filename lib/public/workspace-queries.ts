@@ -1,3 +1,4 @@
+import { draftProductsSchema } from "./profile-draft"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
@@ -70,6 +71,11 @@ export interface ProductPageForEditor {
   /** Null when the workspace has no public profile yet, which the UI must say. */
   handle: string | null
   profileStatus: PublicPageStatus | null
+  /**
+   * True when the profile builder's draft has this product switched on, which
+   * is "chosen" even before the profile or the page is published.
+   */
+  chosenInDraft: boolean
   /** The product's own gallery images, for the cover picker. */
   images: Array<{ id: string; filename: string; assetType: string }>
 }
@@ -109,10 +115,24 @@ export async function getProductPageForEditor(
       .order("sort_order", { ascending: true }),
   ])
 
+  let chosenInDraft = false
+  if (profile) {
+    const { data: draft } = await supabase
+      .from("public_profile_drafts")
+      .select("products")
+      .eq("public_profile_id", profile.id)
+      .maybeSingle()
+    const products = draftProductsSchema.safeParse(draft?.products)
+    chosenInDraft =
+      products.success &&
+      products.data.some((entry) => entry.productId === productId && entry.visible)
+  }
+
   return {
     page: page ?? null,
     handle: profile?.handle ?? null,
     profileStatus: profile?.status ?? null,
+    chosenInDraft,
     images: (assets ?? [])
       .filter((a) => GALLERY_TYPES.has(a.asset_type) && a.mime_type?.startsWith("image/"))
       .map((a) => ({ id: a.id, filename: a.filename, assetType: a.asset_type })),

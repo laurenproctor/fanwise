@@ -1,10 +1,13 @@
 "use client"
 
-import { useActionState, useEffect, useId, useRef, useState } from "react"
+import { useActionState, useEffect, useId, useRef, useState, useTransition } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { savePublicProductPageAction } from "@/lib/public/actions"
+import { setProductOnProfileAction } from "@/lib/public/publish-actions"
+import { PROFILE_CHOICE_TEXT, type ProfileChoiceOutcome } from "@/lib/public/profile-choice"
 import { EMPTY_PAGE_STATE, type PublicProductPageState } from "@/lib/public/form-state"
 import { PUBLIC_SLUG_LIMITS, canonicalHandle, checkPublicSlug } from "@/lib/public/handles"
 import { publicRoutes, routes } from "@/lib/routes"
@@ -23,9 +26,10 @@ import type { PublicPageStatus } from "@/lib/public/types"
  * because a product renamed in Fanwise should be renamed on its public page
  * without them having to remember a second place.
  *
- * Whether the page is public is not decided here. The profile builder chooses
- * which products a profile shows and publishes them together; this section
- * edits what the page says, and reports where it stands.
+ * Whether the page is on the profile is one checkbox here, and the checkbox
+ * writes the profile builder's own arrangement (lib/public/profile-choice.ts),
+ * so the builder still owns the order and its preview still tells the truth.
+ * Everything else here edits what the page says.
  */
 
 /** The product's own wording, which the public page uses wherever it says nothing. */
@@ -54,6 +58,7 @@ export function PublicPageForm({
   appOrigin,
   status,
   profileStatus,
+  onProfile: initialOnProfile,
   page,
   images,
   product,
@@ -64,6 +69,8 @@ export function PublicPageForm({
   appOrigin: string
   status: PublicPageStatus
   profileStatus: PublicPageStatus
+  /** Published on the profile, or switched on in the builder's draft. */
+  onProfile: boolean
   page: PublicPageFields
   images: Array<{ id: string; filename: string; assetType: string }>
   product: ProductWording
@@ -75,6 +82,35 @@ export function PublicPageForm({
   )
 
   const savedSlug = state.saved?.slug ?? page.slug
+
+  const router = useRouter()
+  const choiceId = useId()
+  const [onProfile, setOnProfile] = useState(initialOnProfile)
+  const [choiceMessage, setChoiceMessage] = useState<string | null>(null)
+  const [choiceError, setChoiceError] = useState<string | null>(null)
+  const [choosing, startChoosing] = useTransition()
+
+  function choose(next: boolean) {
+    const previous = onProfile
+    setOnProfile(next)
+    setChoiceError(null)
+    setChoiceMessage(null)
+    startChoosing(async () => {
+      let result: Awaited<ReturnType<typeof setProductOnProfileAction>>
+      try {
+        result = await setProductOnProfileAction(workspaceSlug, productSlug, { onProfile: next })
+      } catch {
+        result = { ok: false, message: "That could not be saved. Reload the page and try again." }
+      }
+      if (!result.ok) {
+        setOnProfile(previous)
+        setChoiceError(result.message)
+        return
+      }
+      setChoiceMessage(result.message)
+      router.refresh()
+    })
+  }
 
   const [fields, setFields] = useState<PublicPageFields>({ ...page, slug: savedSlug })
   const statusRef = useRef<HTMLParagraphElement>(null)
@@ -131,6 +167,14 @@ export function PublicPageForm({
   }
 
   const published = status === "published"
+  // What the row says before anyone has clicked, from the server's own view.
+  const standingOutcome: ProfileChoiceOutcome = !onProfile
+    ? "hidden"
+    : published && profileStatus === "published"
+      ? "shown"
+      : profileStatus !== "published"
+        ? "chosen_until_published"
+        : "kept_until_live"
   const url = `${appOrigin}${publicRoutes.product(handle, savedSlug)}`
 
   const slugChanged = canonicalHandle(fields.slug) !== savedSlug.toLowerCase()
@@ -152,22 +196,34 @@ export function PublicPageForm({
       <div className="flex flex-col gap-4 rounded-[14px] border border-[var(--color-rule)] p-5">
         <div className="flex flex-wrap items-center gap-3">
           <StatusPill published={published && profileStatus === "published"} />
-          <p className="text-[14px] text-[var(--color-ink-2)]">
-            {published
-              ? profileStatus === "published"
-                ? "Shown on your public profile."
-                : "Chosen for your profile, which isn't published."
-              : "Not on your public profile."}
-          </p>
+          <label htmlFor={choiceId} className="flex items-center gap-2 text-[14px]">
+            <input
+              id={choiceId}
+              type="checkbox"
+              checked={onProfile}
+              disabled={choosing}
+              onChange={(event) => choose(event.target.checked)}
+              aria-describedby={`${choiceId}-status`}
+              className="h-4 w-4 accent-[var(--color-accent)]"
+            />
+            Show this product on my public profile
+          </label>
         </div>
 
         {/*
-          Whether a product appears on the profile, and where, is decided in
-          one place: the profile builder. A second switch here would let the
-          live profile show something its final preview did not.
+          The checkbox writes the profile builder's arrangement, so the builder
+          stays the one place order is decided and its preview stays truthful.
+          A product goes to the end of the order; the builder moves it.
         */}
-        <p className="text-[14px] text-[var(--color-ink-2)]">
-          Choose which products appear on your profile, and their order, in{" "}
+        <p
+          id={`${choiceId}-status`}
+          aria-live="polite"
+          className={`text-[14px] ${choiceError ? "text-[var(--color-bad)]" : "text-[var(--color-ink-2)]"}`}
+        >
+          {choosing
+            ? "Saving…"
+            : (choiceError ?? choiceMessage ?? PROFILE_CHOICE_TEXT[standingOutcome])}{" "}
+          Change the order, or several products at once, in{" "}
           <Link
             href={routes.publicProfileBuilderProducts(workspaceSlug)}
             className="underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"

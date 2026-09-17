@@ -425,6 +425,7 @@ function PublicPageSection({
       appOrigin={appOrigin()}
       status={publicPage.page.status}
       profileStatus={publicPage.profileStatus ?? "draft"}
+      onProfile={publicPage.page.status === "published" || publicPage.chosenInDraft}
       page={{
         slug: publicPage.page.slug,
         titleOverride: publicPage.page.title_override ?? "",
