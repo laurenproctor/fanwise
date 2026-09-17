@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import { adminClient, createActor, destroyActor, type Actor } from "./harness"
+import { adminClient, createActor, destroyActor, settle, type Actor } from "./harness"
 import { startPublication } from "@/lib/publishing/start"
 import { sentFingerprint, updateKey } from "@/lib/publishing/idempotency"
 import type { ChannelListingDraft } from "@/lib/channels/types"
@@ -37,10 +37,6 @@ const draft: ChannelListingDraft = {
 }
 
 const edited: ChannelListingDraft = { ...draft, title: "Aster Grotesk Variable" }
-
-async function settle(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 250))
-}
 
 async function listingRow(id: string) {
   const { data } = await adminClient().from("channel_listings").select("*").eq("id", id).single()
@@ -133,7 +129,7 @@ beforeAll(async () => {
     draft,
     generation: 0,
   })
-  await settle()
+  await settle(listingId)
 })
 
 afterAll(async () => {
@@ -165,7 +161,7 @@ describe("updating a published listing", () => {
       generation: 0,
     })
     expect(outcome.kind).toBe("started")
-    await settle()
+    await settle(listingId)
 
     const listing = await listingRow(listingId)
     // Still published, and still verified: an update does not unpublish.
@@ -202,7 +198,7 @@ describe("updating a published listing", () => {
       generation: 0,
     })
     expect(outcome.kind).toBe("already_done")
-    await settle()
+    await settle(listingId)
 
     expect(await jobsFor(listingId)).toHaveLength(before.length)
   })
@@ -248,7 +244,7 @@ describe("updating a published listing", () => {
       generation: 0,
     })
     expect(outcome.kind).toBe("started")
-    await settle()
+    await settle(listingId)
 
     const listing = await listingRow(listingId)
     expect(listing.last_sent_fingerprint).toBe(sentFingerprint(edited, asset!.id))
