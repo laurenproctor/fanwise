@@ -14,6 +14,8 @@ import {
 import { routes } from "@/lib/routes"
 import { jobs } from "@/lib/jobs"
 import { deleteAssetCascade } from "./assets"
+import { altTextSchema, readAltText } from "./image-metadata"
+import { toJson } from "@/lib/imports/json"
 import { createUploadUrl, buildStoragePath, removeObjects } from "./storage"
 import { sanitizeFilename } from "./storage"
 import { createProductSchema, updateProductSchema, uploadIntentSchema } from "./schemas"
@@ -461,5 +463,93 @@ export async function deleteAssetAction(
   }
 
   revalidatePath(routes.workspace(workspaceSlug))
+  return { error: null }
+}
+
+/**
+ * Alt text for a product image, kept on the asset beside its dimensions.
+ *
+ * `metadata` is outside the columns the immutability trigger protects, so a
+ * ready image can be described without being replaced. Only cover and preview
+ * images are accepted: the deliverable is not a picture and has nothing to
+ * describe. Whatever the creator types is theirs, and is labelled so; a
+ * suggestion the model wrote earlier is overwritten, not kept beside it.
+ */
+export async function setImageAltTextAction(
+  workspaceSlug: string,
+  assetId: string,
+  altText: string,
+): Promise<{ error: string | null }> {
+  const parsed = altTextSchema.safeParse(altText)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the alt text." }
+
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data: asset } = await supabase
+    .from("product_assets")
+    .select("id, asset_type, metadata")
+    .eq("id", assetId)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+
+  if (!asset || (asset.asset_type !== "cover_image" && asset.asset_type !== "preview_image")) {
+    return { error: "That image could not be found." }
+  }
+
+  const rest = { ...((asset.metadata as Record<string, unknown>) ?? {}) }
+  delete rest.altTextSource
+  const { error } = await supabase
+    .from("product_assets")
+    .update({
+      metadata: toJson(
+        parsed.data.length > 0
+          ? { ...rest, altText: parsed.data, altTextSource: "creator" }
+          : { ...rest, altText: "" },
+      ),
+    })
+    .eq("id", assetId)
+    .eq("workspace_id", workspace.id)
+
+  if (error) {
+    console.error("[products] could not save alt text", { assetId, code: error.code })
+    return { error: "That alt text could not be saved. Try again." }
+  }
+  return { error: null }
+}
+
+/**
+ * Asks for alt text to be written from the image (ADR 0014).
+ *
+ * Queues the job and returns; the description lands on the asset a few
+ * seconds later and the editor refreshes into it. Refused when the image
+ * already has alt text, because the job would decline anyway and the creator
+ * should clear the field first if they want another.
+ */
+export async function suggestImageAltTextAction(
+  workspaceSlug: string,
+  assetId: string,
+): Promise<{ error: string | null }> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data: asset } = await supabase
+    .from("product_assets")
+    .select("id, asset_type, asset_state, derived_from, metadata")
+    .eq("id", assetId)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+
+  if (
+    !asset ||
+    asset.derived_from !== null ||
+    (asset.asset_type !== "cover_image" && asset.asset_type !== "preview_image")
+  ) {
+    return { error: "That image could not be found." }
+  }
+  if (asset.asset_state !== "ready") return { error: "Wait for the upload to finish first." }
+  if (readAltText(asset.metadata).trim().length > 0) {
+    return { error: "Clear the alt text first to ask for another." }
+  }
+
+  await jobs.enqueue("describe_image", { workspaceId: workspace.id, assetId })
   return { error: null }
 }

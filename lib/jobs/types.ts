@@ -21,6 +21,7 @@ export type JobName =
   | "sync_billing"
   | "import_source"
   | "transcribe_import_source"
+  | "describe_image"
 
 export interface JobPayloads {
   noop: { message: string }
@@ -73,6 +74,14 @@ export interface JobPayloads {
    * the row is claimed by compare-and-swap on `transcribing`.
    */
   transcribe_import_source: { workspaceId: string; sourceId: string }
+  /**
+   * Write alt text for one product image from the image itself (ADR 0014).
+   *
+   * Ids only. The asset and its product are read when the job runs, the
+   * FactSheet is derived then, and an image that has alt text by the time the
+   * job looks is left alone, so a redelivery does nothing.
+   */
+  describe_image: { workspaceId: string; assetId: string }
 }
 
 /**
@@ -90,6 +99,7 @@ export const JOB_NAMES = [
   "sync_billing",
   "import_source",
   "transcribe_import_source",
+  "describe_image",
 ] as const satisfies readonly JobName[]
 
 export interface EnqueueOptions {

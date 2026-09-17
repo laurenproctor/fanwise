@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { buildSfnt } from "./font-fixtures"
 
@@ -75,6 +76,44 @@ beforeEach(() => {
   state.updates = []
   state.downloads = 0
   state.bytes = inline
+})
+
+describe("finalize_asset on a pending picture", () => {
+  it("measures it, makes it ready, and asks for alt text when it has none", async () => {
+    state.asset = row({
+      asset_type: "cover_image",
+      asset_state: "pending",
+      filename: "cover.png",
+      mime_type: null,
+      checksum: null,
+      metadata: {},
+    })
+    state.bytes = new Uint8Array(await readFile("tests/fixtures/small-800x600.png"))
+
+    const outcome = await finalizeAsset(payload)
+
+    expect(outcome).toEqual({ describe: true })
+    expect(state.updates[0]).toMatchObject({
+      asset_state: "ready",
+      mime_type: "image/png",
+      metadata: { width: 800, height: 600 },
+    })
+  })
+
+  it("does not ask for alt text the creator already wrote, or for a buyer's file", async () => {
+    state.asset = row({
+      asset_type: "cover_image",
+      asset_state: "pending",
+      mime_type: null,
+      metadata: { altText: "Mine." },
+    })
+    state.bytes = new Uint8Array(await readFile("tests/fixtures/small-800x600.png"))
+    expect(await finalizeAsset(payload)).toEqual({ describe: false })
+
+    state.asset = row({ asset_state: "pending", mime_type: null })
+    state.bytes = inline
+    expect(await finalizeAsset(payload)).toEqual({ describe: false })
+  })
 })
 
 describe("finalize_asset on a row that is already ready", () => {

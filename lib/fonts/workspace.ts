@@ -1,3 +1,4 @@
+import { readAltTextSource, type AltTextSource } from "@/lib/products/image-metadata"
 import { KNOWN_SCRIPTS } from "./coverage"
 import {
   FONT_FORMATS,
@@ -392,6 +393,7 @@ export interface SpecimenImageView {
   width: number | null
   height: number | null
   altText: string
+  altTextSource: AltTextSource | null
 }
 
 export function specimenImageViews(assets: readonly ProductAsset[]): SpecimenImageView[] {
@@ -409,6 +411,7 @@ export function specimenImageViews(assets: readonly ProductAsset[]): SpecimenIma
         width: dimensions?.width ?? null,
         height: dimensions?.height ?? null,
         altText: readAltText(asset.metadata),
+        altTextSource: readAltTextSource(asset.metadata),
       },
     ]
   })

@@ -1,10 +1,10 @@
 "use client"
 
 import { useMemo, useRef, useState } from "react"
+import { AltTextField } from "@/components/channels/alt-text-field"
 import { ListingImages, type ListingImage } from "@/components/channels/listing-images"
 import { deleteAssetAction, reorderProductImagesAction } from "@/lib/products/actions"
 import { uploadProductFile } from "@/lib/products/upload-client"
-import { setImageAltTextAction } from "@/lib/fonts/actions"
 import { FIELD_IDS } from "@/lib/fonts/readiness"
 import {
   GRID_SHAPES,
@@ -14,7 +14,7 @@ import {
 } from "@/lib/fonts/workspace"
 import { routes } from "@/lib/routes"
 import type { SectionContext } from "../context"
-import { INPUT_CLASS, QUIET_BUTTON_CLASS, SectionHeading, StatusIcon } from "../controls"
+import { QUIET_BUTTON_CLASS, SectionHeading, StatusIcon } from "../controls"
 
 /**
  * Pictures of the type, which are not the type tester.
@@ -36,6 +36,8 @@ export function SpecimenImagesSection({ ctx }: { ctx: SectionContext }) {
         assetType: image.assetType,
         state: image.state,
         checksum: image.checksum,
+        altText: image.altText,
+        altTextSource: image.altTextSource,
       })),
     [ctx.images],
   )
@@ -56,6 +58,7 @@ export function SpecimenImagesSection({ ctx }: { ctx: SectionContext }) {
           productId={ctx.productId}
           channelName={null}
           images={listingImages}
+          altTextEditor={false}
         />
       </div>
 
@@ -98,37 +101,10 @@ function ImageDetail({
   position: number
   order: string[]
 }) {
-  const [alt, setAlt] = useState(image.altText)
-  const [altState, setAltState] = useState<"idle" | "saving" | "saved" | "error">("idle")
-  const [altError, setAltError] = useState<string | null>(null)
   const [replacing, setReplacing] = useState(false)
   const [replaceError, setReplaceError] = useState<string | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const saved = useRef(image.altText)
   const fileRef = useRef<HTMLInputElement>(null)
   const src = routes.assetPreview(ctx.workspaceSlug, image.id)
-  const altId = `image-alt-${image.id}`
-
-  function saveAlt(value: string) {
-    if (value === saved.current) return
-    setAltState("saving")
-    void setImageAltTextAction(ctx.workspaceSlug, image.id, value).then(
-      (result) => {
-        if (result.error) {
-          setAltState("error")
-          setAltError(result.error)
-          return
-        }
-        saved.current = value
-        setAltError(null)
-        setAltState("saved")
-      },
-      () => {
-        setAltState("error")
-        setAltError("Couldn't save. Check your connection and try again.")
-      },
-    )
-  }
 
   async function replace(file: File) {
     setReplacing(true)
@@ -210,39 +186,16 @@ function ImageDetail({
       </div>
 
       <div className="flex flex-col gap-2">
-        <label htmlFor={altId} className="text-[14px]">
-          Alt text
-        </label>
-        <textarea
-          id={altId}
-          rows={2}
-          maxLength={250}
-          value={alt}
-          aria-describedby={`${altId}-status`}
-          aria-invalid={altState === "error" || undefined}
-          placeholder="Blimp Display set large in black on white, spelling “Blimp”."
-          onChange={(event) => {
-            const value = event.target.value
-            setAlt(value)
-            setAltState("idle")
-            if (timer.current) clearTimeout(timer.current)
-            timer.current = setTimeout(() => saveAlt(value), 900)
-          }}
-          onBlur={() => {
-            if (timer.current) clearTimeout(timer.current)
-            saveAlt(alt)
-          }}
-          className={INPUT_CLASS}
+        <AltTextField
+          workspaceSlug={ctx.workspaceSlug}
+          assetId={image.id}
+          filename={image.filename}
+          altText={image.altText}
+          altTextSource={image.altTextSource}
+          ready={image.state === "ready"}
+          variant="full"
+          refresh={ctx.refresh}
         />
-        <p id={`${altId}-status`} role="status" className="text-[12.5px] text-[var(--color-ink-3)]">
-          {altState === "saving"
-            ? "Saving…"
-            : altState === "saved"
-              ? "Saved"
-              : altState === "error"
-                ? altError
-                : "Describe what the image shows, including any words set in it."}
-        </p>
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -253,11 +206,6 @@ function ImageDetail({
             {replacing ? "Replacing…" : "Replace image"}
             <span className="sr-only"> {image.filename}</span>
           </button>
-          {altState === "error" ? (
-            <button type="button" className={QUIET_BUTTON_CLASS} onClick={() => saveAlt(alt)}>
-              Try again
-            </button>
-          ) : null}
           <input
             ref={fileRef}
             type="file"

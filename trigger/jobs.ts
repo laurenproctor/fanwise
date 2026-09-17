@@ -41,6 +41,14 @@ export const buildDerivative = task({
   run: async (payload: JobPayloads["build_derivative"]) => handlers.build_derivative(payload),
 })
 
+export const describeImage = task({
+  id: "describe_image",
+  // A refused or failed description is recorded in the log and the field
+  // stays empty for the creator; a retry would spend the same call again.
+  retry: { maxAttempts: 1 },
+  run: async (payload: JobPayloads["describe_image"]) => handlers.describe_image(payload),
+})
+
 export const publishListing = task({
   id: "publish_listing",
   // The runner claims the row by compare-and-swap, so a retried delivery of a

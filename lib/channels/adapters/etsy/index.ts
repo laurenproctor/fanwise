@@ -1,6 +1,8 @@
 import { z } from "zod"
 import { ChannelError, normalized } from "@/lib/channels/errors"
 import { listingImages } from "@/lib/channels/images"
+import { channelImage, type ImagePolicy } from "@/lib/channels/image-policy"
+import { altTextFor } from "@/lib/products/image-metadata"
 import { readConnectionCredentials, storeConnectionCredentials } from "@/lib/credentials"
 import type {
   AdapterSubject,
@@ -239,6 +241,20 @@ async function readListing(client: EtsyClient, id: string): Promise<Listing> {
   }
 }
 
+/**
+ * What Etsy takes: JPEG, PNG and GIF, never WebP, and it recommends at least
+ * 2000 pixels on the shortest side. The ceiling here is a long edge of 3000,
+ * which keeps a 3:2 picture above that recommendation; the byte ceiling is
+ * Etsy's stated maximum for an image upload. Etsy's thumbnail crop is
+ * adjustable in the shop, so nothing is cropped here.
+ */
+export const IMAGE_POLICY: ImagePolicy = {
+  key: "fit-3000",
+  maxEdge: 3000,
+  accepts: ["image/jpeg", "image/png", "image/gif"],
+  maxByteSize: LIMITS.imageBytesMax,
+}
+
 async function bytesOf(url: string): Promise<Blob> {
   const response = await fetch(url)
   if (!response.ok) {
@@ -266,10 +282,14 @@ async function uploadImages(
   const ids: number[] = []
   let rank = startRank
   for (const asset of images) {
+    const image = await channelImage(context, IMAGE_POLICY, asset)
     const form = new FormData()
-    form.set("image", await bytesOf(await context.assetUrl(asset)), asset.filename)
+    form.set("image", await bytesOf(image.url), image.filename)
     form.set("rank", String(rank))
-    form.set("alt_text", (context.listing.title ?? context.subject.product.name).slice(0, 250))
+    form.set(
+      "alt_text",
+      altTextFor(asset.metadata, context.listing.title ?? context.subject.product.name),
+    )
     const uploaded = await client.request({
       method: "POST",
       path: `application/shops/${shopId}/listings/${listingId}/images`,
@@ -406,7 +426,7 @@ export const etsyAdapter: ChannelAdapter = {
    */
   async publish(context: PublishContext): Promise<PublishResult> {
     const { client, shopId } = await clientFor(context)
-    const images = listingImages(context.subject)
+    const images = listingImages(context.subject).slice(0, LIMITS.imageMax)
     const files = deliverables(context.subject.assets)
 
     const draft = await client.request({
@@ -481,7 +501,7 @@ export const etsyAdapter: ChannelAdapter = {
       schema: listingSchema,
     })
 
-    const images = listingImages(context.subject)
+    const images = listingImages(context.subject).slice(0, LIMITS.imageMax)
     const held = before.images?.length ?? 0
     let imageIds: number[] = []
     if (images.length > held) {

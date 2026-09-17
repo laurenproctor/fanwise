@@ -13,6 +13,8 @@ import { routes } from "@/lib/routes"
 import { useBackgroundRefresh } from "@/lib/use-background-refresh"
 import { planImageDrop } from "@/lib/products/image-drop"
 import { duplicateOrigins } from "@/lib/products/duplicate-images"
+import type { AltTextSource } from "@/lib/products/image-metadata"
+import { AltTextField } from "./alt-text-field"
 
 /**
  * The images this channel will receive, in the order it will receive them.
@@ -53,6 +55,9 @@ export interface ListingImage {
    * which is why a pending tile is never called a duplicate of anything.
    */
   checksum: string | null
+  /** What a screen reader says for this image, or empty when nobody has said. */
+  altText?: string
+  altTextSource?: AltTextSource | null
 }
 
 export function ListingImages({
@@ -61,6 +66,7 @@ export function ListingImages({
   channelName,
   images,
   published,
+  altTextEditor = true,
 }: {
   workspaceSlug: string
   productId: string
@@ -76,6 +82,12 @@ export function ListingImages({
   images: ListingImage[]
   /** True once the channel holds a product, which changes what a change means. */
   published?: boolean
+  /**
+   * Whether each tile carries its alt text field. On by default; the font
+   * workspace turns it off because it describes each image in a fuller row of
+   * its own below the grid, and two fields for one value would race.
+   */
+  altTextEditor?: boolean
 }) {
   const router = useRouter()
   /*
@@ -306,7 +318,12 @@ export function ListingImages({
         if (uploading || pending) return
         void upload(Array.from(event.dataTransfer.files))
       }}
-      className={`grid gap-5 rounded-[14px] border p-6 transition-colors ${
+      /*
+        content-start: a parent that stretches this panel (a grid row shared
+        with a taller neighbour, say) must not stretch the tiles with it. The
+        extra height stays below the grid, where it is merely empty.
+      */
+      className={`grid content-start gap-5 rounded-[14px] border p-6 transition-colors ${
         fileOver
           ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
           : "border-[var(--color-rule)] bg-[var(--color-card)]"
@@ -370,15 +387,28 @@ export function ListingImages({
                 setDragging(null)
                 if (from !== -1) move(from, index)
               }}
-              className={`group relative grid cursor-grab gap-2 rounded-[10px] border p-2 transition-opacity ${
+              /*
+                grid-cols-1 is load-bearing. A grid with no column template
+                gets one implicit `auto` column, and an auto track is sized to
+                the widest thing in it, which here is a nowrap filename. The
+                tile then grew to the filename, the image stretched to the tile,
+                and both spilled over the neighbouring tile's border. minmax(0,
+                1fr) pins the column to the outer track, so the filename
+                truncates and the image stays inside its frame.
+
+                The cover spans two rows, so it has slack; grid-rows puts all of
+                it into the picture instead of into gaps between the caption and
+                the buttons.
+              */
+              className={`group relative grid min-w-0 grid-cols-1 cursor-grab gap-2 rounded-[10px] border p-2 transition-opacity ${
                 isCover
-                  ? "col-span-2 row-span-2 border-[var(--color-accent)]"
+                  ? `col-span-2 row-span-2 ${altTextEditor ? "grid-rows-[minmax(0,1fr)_auto_auto_auto]" : "grid-rows-[minmax(0,1fr)_auto_auto]"} border-[var(--color-accent)]`
                   : "border-[var(--color-rule)]"
               } ${dragging === image.id ? "opacity-40" : ""}`}
             >
               <div
-                className={`relative overflow-hidden rounded-[6px] bg-[var(--color-paper-2)] ${
-                  isCover ? "aspect-[16/10]" : "aspect-[4/3]"
+                className={`relative min-h-0 w-full overflow-hidden rounded-[6px] bg-[var(--color-paper-2)] ${
+                  isCover ? "aspect-[16/10] self-stretch" : "aspect-[4/3]"
                 }`}
               >
                 {image.state === "ready" ? (
@@ -391,7 +421,7 @@ export function ListingImages({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={routes.assetPreview(workspaceSlug, image.id)}
-                    alt={image.filename}
+                    alt={image.altText || image.filename}
                     draggable={false}
                     className="h-full w-full object-cover"
                   />
@@ -408,23 +438,40 @@ export function ListingImages({
                 ) : null}
               </div>
 
-              <span className="truncate text-[12px] text-[var(--color-ink-2)]">
-                {image.filename}
-              </span>
-
-              {/*
-                Said on the copy, not on the original, and it names where the
-                original is so the choice of which to remove is the creator's.
-                A warning rather than a block: this is almost never deliberate,
-                and "almost never" is the reason to mention it rather than the
-                reason to refuse it.
-              */}
-              {origins[index] !== null && origins[index] !== undefined ? (
-                <span className="text-[12px] text-[var(--color-bad)]">
-                  {origins[index] === 0
-                    ? "Same image as the cover"
-                    : `Same image as #${origins[index]! + 1}`}
+              <div className="grid min-w-0 gap-0.5">
+                <span
+                  className="truncate text-[12px] text-[var(--color-ink-2)]"
+                  title={image.filename}
+                >
+                  {image.filename}
                 </span>
+
+                {/*
+                  Said on the copy, not on the original, and it names where the
+                  original is so the choice of which to remove is the creator's.
+                  A warning rather than a block: this is almost never
+                  deliberate, and "almost never" is the reason to mention it
+                  rather than the reason to refuse it.
+                */}
+                {origins[index] !== null && origins[index] !== undefined ? (
+                  <span className="text-[12px] text-[var(--color-bad)]">
+                    {origins[index] === 0
+                      ? "Same image as the cover"
+                      : `Same image as #${origins[index]! + 1}`}
+                  </span>
+                ) : null}
+              </div>
+
+              {altTextEditor ? (
+                <AltTextField
+                  workspaceSlug={workspaceSlug}
+                  assetId={image.id}
+                  filename={image.filename}
+                  altText={image.altText ?? ""}
+                  altTextSource={image.altTextSource ?? null}
+                  ready={image.state === "ready"}
+                  variant="compact"
+                />
               ) : null}
 
               {/*
@@ -476,18 +523,18 @@ export function ListingImages({
           The empty-state tile has been full width in intent and one column in
           fact since it was written.
         */}
-        <li className={`grid ${order.length === 0 ? "col-span-2" : ""}`}>
+        <li className={`grid min-w-0 grid-cols-1 ${order.length === 0 ? "col-span-2" : ""}`}>
           <label
             /*
-              w-full pins the width to the column. Without it the aspect ratio
-              was free to derive width from height, and height is whatever the
-              row happens to be — which, next to a cover spanning two rows, is
-              tall. The tile then computed itself wider than its column and hung
-              out past the panel. An aspect ratio needs one side nailed down or
-              it will pick the wrong one.
+              Two shapes. Alone on an empty product the tile is the cover's
+              shape, so the panel shows what it is waiting for. Among images it
+              stretches to the row it lands in instead: an aspect ratio next to
+              taller tiles derived its width from the row's height and hung out
+              past its column, and a shorter tile left a ragged row. The min
+              height is for a tile that has a row to itself.
             */
-            className={`grid w-full cursor-pointer place-items-center gap-1 rounded-[10px] border border-dashed border-[var(--color-rule)] p-4 text-center hover:border-[var(--color-accent)] ${
-              order.length === 0 ? "aspect-[16/10]" : "aspect-[4/3]"
+            className={`grid w-full min-w-0 cursor-pointer place-items-center gap-1 rounded-[10px] border border-dashed border-[var(--color-rule)] p-4 text-center hover:border-[var(--color-accent)] ${
+              order.length === 0 ? "aspect-[16/10]" : "min-h-[9rem] self-stretch"
             }`}
           >
             <span className="label-mono">

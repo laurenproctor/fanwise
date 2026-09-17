@@ -21,6 +21,13 @@ export type ImageFit =
   | "cover"
   /** Fit inside the frame and pad to size. */
   | "contain"
+  /**
+   * Scale down until the image fits inside the frame, keep its own ratio, and
+   * never enlarge. The frame is a ceiling, not a shape: a source already
+   * inside it comes out at its own size, only re-encoded. This is what a
+   * channel's "no larger than" rule wants, and the one fit that never crops.
+   */
+  | "inside"
 
 /** Which region survives a cover crop. */
 export type CropFocus =
@@ -129,11 +136,15 @@ export async function renderDerivative(
   const dimensions = await readImageDimensions(source)
   if (!dimensions) throw new Error("source is not a readable image")
 
-  if (dimensions.width < spec.width || dimensions.height < spec.height) {
+  const fit = spec.fit ?? "cover"
+
+  // A frame that must be filled needs the pixels to fill it. A frame that is
+  // a ceiling does not: a small source stays small, and the refusal would be
+  // refusing to do nothing.
+  if (fit !== "inside" && (dimensions.width < spec.width || dimensions.height < spec.height)) {
     throw new UpscaleRefused(dimensions.width, dimensions.height, spec)
   }
 
-  const fit = spec.fit ?? "cover"
   const focus = spec.focus ?? "attention"
   let quality = spec.quality ?? DEFAULT_QUALITY
 

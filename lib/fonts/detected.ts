@@ -95,22 +95,15 @@ export const FONT_PROBLEM_TEXT: Record<FontProblem, string> = {
     "This file is missing tables every font needs. Export it again from your font editor.",
 }
 
-/** Image dimensions, written by the finalize job for pictures it can decode. */
-export const imageDimensionsSchema = z.object({
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-})
-
-export function readImageDimensions(metadata: unknown): { width: number; height: number } | null {
-  const parsed = imageDimensionsSchema.safeParse(metadata)
-  return parsed.success ? parsed.data : null
-}
-
-/** Alt text a creator wrote for an image. Stored beside the dimensions. */
-export function readAltText(metadata: unknown): string {
-  const alt = (metadata as { altText?: unknown } | null)?.altText
-  return typeof alt === "string" ? alt : ""
-}
+/*
+  Image metadata moved to lib/products/image-metadata.ts once alt text stopped
+  being a font-only concern. Re-exported so nothing that reads it here breaks.
+*/
+export {
+  imageDimensionsSchema,
+  readImageDimensions,
+  readAltText,
+} from "@/lib/products/image-metadata"
 
 /** Which extension a browser-picked file claims. A hint only; the job sniffs. */
 export function formatFromFilename(filename: string): FontFormat | null {

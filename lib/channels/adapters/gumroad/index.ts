@@ -11,6 +11,7 @@ import type {
   RequirementSpec,
 } from "@/lib/channels/types"
 import type { ImageSpec } from "@/lib/products/derivatives"
+import { channelImage, type ImagePolicy } from "@/lib/channels/image-policy"
 import type { ProductAsset } from "@/lib/products/types"
 import { CATEGORY_LABELS, categoryPath, defaultCategoryLabel } from "./categories"
 import { GumroadRefusal, createGumroadClient, type GumroadClient } from "./client"
@@ -66,6 +67,19 @@ function deliverables(assets: readonly ProductAsset[]): ProductAsset[] {
  * least 600 on a side; 1200 is enough for a retina grid without being a
  * second copy of the cover.
  */
+/**
+ * What Gumroad takes as a cover: JPEG, PNG or GIF, never WebP, up to 50 MB.
+ * Covers show in a carousel no wider than a retina 1280, so 2560 on the long
+ * edge is the most a buyer will ever see. Nothing is cropped; the square
+ * thumbnail below is the one shape this channel needs cut.
+ */
+export const IMAGE_POLICY: ImagePolicy = {
+  key: "fit-2560",
+  maxEdge: 2560,
+  accepts: ["image/jpeg", "image/png", "image/gif"],
+  maxByteSize: LIMITS.coverBytesMax,
+}
+
 export const THUMBNAIL_SPEC: ImageSpec = {
   key: "square-1200",
   width: LIMITS.thumbnailEdge,
@@ -366,7 +380,10 @@ async function sendCovers(
     const answer = await client.request({
       method: "POST",
       path: `products/${encodeURIComponent(productId)}/covers`,
-      body: { kind: "json", value: { url: await context.assetUrl(asset) } },
+      body: {
+        kind: "json",
+        value: { url: (await channelImage(context, IMAGE_POLICY, asset)).url },
+      },
       schema: coversSchema,
     })
     ids = answer.covers.map((c) => c.id)
