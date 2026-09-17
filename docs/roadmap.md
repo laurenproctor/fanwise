@@ -413,7 +413,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B6 | Analytics overview: revenue, units, by channel, by product |
 | B7 | CSV import foundation |
 | B8 | WooCommerce: store authorization, adapter, draft, images, activate with the file verified, idempotency. See `docs/channels/woocommerce.md`. Added 8 September 2026 at the founder's request; **code complete the same day**, exit unrun, see below |
-| B9 | Behance: creative-field and category mapping, the project-and-asset package, two new image derivative specs, guided handoff in new-project and existing-project modes, mark submitted, project URL capture. See `docs/channels/behance.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on A8, see below |
+| B9 | Behance: creative-field and category mapping, the project-and-asset package, two new image derivative specs, guided handoff in new-project and existing-project modes, mark submitted, project URL capture. See `docs/channels/behance.md`. Planned 11 September 2026 at the founder's request; **opened 17 September 2026 at the founder's request, ahead of A8; code complete, exit unrun**, see below |
 | B10 | Gumroad: OAuth with PKCE, adapter, presigned multipart file upload, draft then enable, covers and thumbnail, the compensating delete, a platform-wide create pace, idempotency. See `docs/channels/gumroad.md`. Planned 11 September 2026 at the founder's request; **opened 16 September 2026 at the founder's request, ahead of A7's exit; code complete, exit unrun**, see below |
 | B11 | The companion window: the assisted handoff shown beside the marketplace's own editor, in a pop-out that touches nothing on the marketplace's page. See `docs/companion-window.md` and `docs/decisions/0010`. Planned 12 September 2026. **Opened 13 September 2026 at the founder's request, ahead of its evidence; code complete, exit unrun**, see below |
 | B12 | Import a live listing: an inward read per `api` adapter, listing-URL resolution inside the adapter, a reviewed mapping to a canonical product, fetched images, the `import` snapshot, and the claim that makes a second import a navigation. See `docs/listing-import.md`. **Planned 12 September 2026 at the founder's request, not opened**; opens after Gate A passes, see below |
@@ -533,10 +533,58 @@ What B8 changes elsewhere in this file:
 - **Gate A does not widen.** WooCommerce is not in the gate's exit test and does not need to
   be: the gate proves the loop closes, and it closes on Shopify, Etsy and Creative Market.
 
-### B9, what is planned and what it waits on
+### B9, what was built and what is still owed
 
-Planned on 11 September 2026 at the founder's request and not built. The assessment is in
-`docs/channel-feasibility.md` under Tier 3; the spec is `docs/channels/behance.md`.
+Planned on 11 September 2026 at the founder's request; **opened and built on 17 September
+2026 at the founder's request, ahead of A8**, on the B10 and B11 precedent. The assessment
+is in `docs/channel-feasibility.md` under Tier 3; the spec is `docs/channels/behance.md`.
+
+**What was built, 17 September 2026.** Everything in the scope list below, and the assisted
+machinery the plan said A8 would build first, done as channel-neutral pieces of the adapter
+contract so A8 fills them in rather than building them again:
+
+- `lib/channels/adapters/behance`: capabilities (every one false but `drafts`, all for the
+  permanent reason), the requirements of §9 in both handoff modes, the two mapping tables
+  and the license recommendation (`fields.ts`), the fee arithmetic (`fees.ts`), the profile
+  and project-URL parsers (`account.ts`), a portfolio-audience merchandising profile, and
+  the handoff ordered to the project editor (`handoff.ts`).
+- Four contract members, on `ChannelAdapter` and declared as data: `accountHint`, for a
+  channel connected by naming an account rather than authorizing one; `choices`, per-listing
+  settings the channel's form asks for beyond the listing fields, stored in
+  `channel_listings.metadata` under keys the adapter names and validated against the
+  declaration on save; `handoffImages` and `buildHandoff`, the renditions a handoff hands
+  over and the handoff in the channel's own order; and `submission`, mark submitted with the
+  URL parsed inside the adapter. A unit test holds that `submission` exists only on an
+  assisted adapter.
+- Two rendition shapes, keyed as shapes: a 1616 × 1264 cover cropped to Behance's 1.278:1
+  (808 × 632 when the source cannot fill the larger frame, since the engine never enlarges),
+  and a 2800-wide fit that never crops, JPEG or PNG by source, under 10 MB. Asked for when
+  the listing is built or its choices change, cached by the engine, and matched to their
+  rows when the handoff is shown. The download route takes `?name=` so a rendition arrives
+  as `01-…` and the package as `{slug}-behance.zip`, with the row's own extension kept.
+- The handoff panel groups steps by section and numbers the sections, renders a note step
+  and a note under a copied value (the fee line), and is otherwise the B11 component.
+- Mark submitted: `markSubmittedAction` writes `published`, `self_reported`, the project URL
+  as both `external_url` and `public_url`, the numeric project id as `external_listing_id`,
+  `published_at`, a `publish` snapshot carrying the submission, and a
+  `listing_marked_submitted` event. It may be run again with a corrected address.
+- One catalog migration, `20260917120000_behance_channel.sql`, `billable = true`.
+- Journey 12 in `tests/e2e/journey-12-behance-handoff.spec.ts` against the channel itself,
+  since it needs no credential; unit coverage in `tests/unit/behance-adapter.test.ts`,
+  `tests/unit/handoff.test.ts` and `tests/unit/listing-choices.test.ts`.
+
+**What is still owed.**
+
+- **The exit run**, journey 12 against a live profile with Stripe connected (decision 26),
+  and the twelve §13 answers it settles. Two of them decide the mapping tables, which are
+  guessed from the marketplace's navigation and marked so in `fields.ts`.
+- **The package build.** A8's package (zip, README, license inside) is still A8's. Behance
+  hands over the product's one deliverable or archive under the buyer-facing name, and its
+  `package_single_file` rule refuses a product with more than one file until then.
+- **A generative-AI disclosure** in Tools Used waits on the product field decision 24 owes.
+- **Withdrawing a submission.** A self-reported listing has no unpublish; disconnecting the
+  channel is refused while it holds a project id, as for every channel. Correcting the
+  address is possible; clearing it is not.
 
 What Behance is to the plan, in one sentence: the second assisted channel, the first whose
 unit is a portfolio project rather than a product, the cheapest marketplace after Creative
@@ -556,13 +604,14 @@ Scope, when it opens:
   since it is a marketplace and decision 16 governs what that costs.
 - Unit tests for the requirements, the mappings and the capability honesty; journey 12.
 
-**B9 waits on A8**, and the dependency is real rather than ceremonial. A8 builds the
-package build, the handoff screen, mark submitted and URL capture, and Behance reuses every
-piece. Opening B9 first would mean building the assisted machinery on a channel that is not
-in Gate A's exit and then fitting Creative Market to it, which is backwards. B9 also waits
-on decision 26, a profile with Stripe connected, because twelve questions in the spec's §13
-can only be answered from inside one, and two of them (the five category names, the
-Creative Fields list) decide the mapping tables.
+**B9 was planned to wait on A8**, and the dependency was real rather than ceremonial: A8
+would build the handoff screen, mark submitted and URL capture, and Behance would reuse
+every piece. The founder opened B9 first on 17 September 2026, so the order inverted: B9
+built those pieces as contract members no channel owns, and A8 now fills them in for
+Creative Market rather than building them. The package build stayed with A8. B9 still waits
+on decision 26 for its exit, a profile with Stripe connected, because twelve questions in
+the spec's §13 can only be answered from inside one, and two of them (the five category
+names, the Creative Fields list) decide the mapping tables.
 
 **B9's exit test** is journey 12: a creator carries one real product through the handoff to
 a live project with the asset For Sale, composes nothing outside Fanwise, the project URL is

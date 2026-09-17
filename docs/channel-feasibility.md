@@ -417,7 +417,7 @@ customer, the way in is their fonts and graphics, not their Framer templates.
 | MyFonts | Assisted | Portal only, exact specs | CSV download | **V2, if fonts are the wedge** |
 | Gumroad | Automatic | Full API since April 2026, file by multipart upload, create limit shared per IP | API + webhooks | **V2, B10**, planned 11 Sep 2026 |
 | Envato | Assisted | No item creation, FTP for audio/video only | **API** | **V2 for analytics only** |
-| Behance | Assisted | Manual, a project plus an asset, no review queue documented | None; the seller's own Stripe | **V2, B9**, planned 11 Sep 2026, after A8 |
+| Behance | Assisted | Manual, a project plus an asset, no review queue documented | None; the seller's own Stripe | **V2, B9**, built 17 Sep 2026 ahead of A8, exit needs a profile with Stripe |
 | Creative Fabrica | Assisted | Manual, 1 to 2 day review | None | **V3** |
 | Design Bundles | Assisted | Manual, one design at a time by ToS | None | **V3, low priority** |
 | Payhip | Blocked | API covers coupons and license keys only | Webhooks | Skip |

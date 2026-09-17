@@ -35,8 +35,8 @@ Current reality, from `docs/channel-feasibility.md`:
 | Envato | assisted | no | no | yes | no | no |
 
 **Behance note.** Every `no` on that row is the permanent kind: the provider cannot. Its API
-is read-only and closed, and Adobe's terms forbid the alternative. Planned at B9; the spec is
-`docs/channels/behance.md`.
+is read-only and closed, and Adobe's terms forbid the alternative. Built at B9 on 17 September
+2026; the spec is `docs/channels/behance.md`.
 
 **Gumroad note.** Its row changed on 11 September 2026 from assisted to api: the product
 endpoints this matrix recorded as missing shipped in April 2026. Planned at B10; the spec is
@@ -320,6 +320,23 @@ the second.
 No `publish`. Status moves draft, ready, then published by human action with
 `status_source = "self_reported"`. Nothing that implies verification may treat those rows as
 equal to verified ones.
+
+Since B9 the human action has a shape, declared on the adapter as data and rendered by
+components that know no channel:
+
+- `accountHint`: Connect asks for the account the creator will submit to, the adapter parses
+  it, and the parsed value becomes `external_account_id`. Never alongside `oauth`.
+- `choices`: the settings the channel's own form asks for beyond the listing fields, each
+  `single`, `multiple` or `text`, stored in `channel_listings.metadata` under the key the
+  adapter names and validated against the declaration on save. Requirements and the handoff
+  read them back from `draft.metadata`.
+- `handoffImages` and `buildHandoff`: the renditions the handoff hands over, named as shapes
+  and built by the derivative engine when the listing is built, and the handoff in the
+  channel's editor order, with steps grouped by section. Absent, the generic handoff order
+  applies.
+- `submission`: mark submitted with the URL parsed inside the adapter. Writes `published` with
+  `status_source = "self_reported"`, the parsed id as `external_listing_id`, and a `publish`
+  snapshot. A unit test refuses `submission` on an `api` adapter.
 
 The handoff for an assisted channel may also be shown in a companion window beside the
 marketplace's editor, as proposed in `docs/decisions/0010`. It is a layout, not a capability.

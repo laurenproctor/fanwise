@@ -111,3 +111,50 @@ describe("the draft itself is regenerated", () => {
     expect(columns.generated_at).toBe(AT)
   })
 })
+
+describe("what the creator owns survives a rebuild", () => {
+  /*
+   * B9 gave a channel declared choices: settings for the channel's own form,
+   * seeded on the first build and edited by the creator after. A rebuild
+   * regenerates the adapter's suggestions and must not put them back over a
+   * choice already made; the caller names the keys, so this file does not
+   * have to know which channel declared which.
+   */
+  const draft = {
+    title: null,
+    description: null,
+    shortDescription: null,
+    seoTitle: null,
+    seoDescription: null,
+    price: null,
+    currency: "USD",
+    category: "Fonts",
+    tags: [],
+    metadata: { handoffMode: "new", creativeFields: ["Typography"], licenseType: "personal" },
+  }
+
+  it("keeps the named keys from the existing row over the fresh draft's suggestions", () => {
+    const columns = rebuildColumns(
+      draft,
+      {
+        handoffMode: "existing",
+        existingProjectUrl: "https://example.test/x",
+        externalState: "live",
+      },
+      "2026-09-17T00:00:00Z",
+      ["handoffMode", "existingProjectUrl", "creativeFields"],
+    )
+    expect(columns.metadata).toEqual({
+      handoffMode: "existing",
+      existingProjectUrl: "https://example.test/x",
+      creativeFields: ["Typography"],
+      licenseType: "personal",
+      externalState: "live",
+    })
+  })
+
+  it("seeds a key the row never held from the draft", () => {
+    const columns = rebuildColumns(draft, {}, "2026-09-17T00:00:00Z", ["handoffMode"])
+    expect(columns.metadata).toMatchObject({ handoffMode: "new" })
+  })
+})

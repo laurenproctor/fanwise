@@ -27,7 +27,12 @@ companion window (`docs/companion-window.md`), was opened on 13 September 2026 a
 founder's request ahead of the evidence its plan waits for; code complete, no migration, exit
 unrun. B10, Gumroad (`docs/channels/gumroad.md`), was opened on 16 September 2026 at the
 founder's request ahead of A7's exit, on the B8 precedent; code complete with one catalog
-migration, exit unrun, waiting on the seller account in decision 27. B1, B2 and B8
+migration, exit unrun, waiting on the seller account in decision 27. B9, Behance
+(`docs/channels/behance.md`), was opened on 17 September 2026 at the founder's request ahead
+of A8, which it was planned to wait on: it builds the assisted machinery A8 would have
+(listing choices, channel-ordered handoff, handoff renditions, mark submitted with URL
+capture) as shared, channel-neutral pieces; code complete with one catalog migration, exit
+unrun, waiting on the profile in decision 26. B1, B2 and B8
 are on `main`; B8's exit passed on 16 September 2026. Gate A is
 not passed; A8 waits on a Creative Market seller login and the questions in that spec's
 §13.** See `docs/roadmap.md`. Implement the current step only. Do not build ahead.
