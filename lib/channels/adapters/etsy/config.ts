@@ -37,6 +37,8 @@ export const LIMITS = {
   tagMax: 13,
   tagLength: 20,
   imageMax: 10,
+  /** Etsy's stated ceiling for one listing image upload. */
+  imageBytesMax: 20 * 1024 * 1024,
   fileMax: 5,
   fileBytesMax: 20 * 1024 * 1024,
 } as const

@@ -325,6 +325,60 @@ describe("publish", () => {
     })
   })
 
+  it("sends each image's alt text, and a JPEG rendition of a WebP that Etsy would refuse", async () => {
+    const calls: Call[] = []
+    vi.stubGlobal("fetch", etsy(calls))
+
+    await etsyAdapter.publish!(
+      context({
+        subject: subject({
+          assets: [
+            asset({
+              mime_type: "image/webp",
+              filename: "cover.webp",
+              metadata: { altText: "Aster set large in black on white." },
+            }),
+            asset({ id: "asset-2", asset_type: "deliverable", filename: "aster.zip" }),
+          ],
+        }),
+        derivativeUrl: async (a, spec) => `https://signed.example/${spec.key}/${a.filename}`,
+      }),
+    )
+
+    const upload = calls.find((c) => c.url.endsWith("/listings/900/images"))!
+    expect(upload.form?.get("alt_text")).toBe("Aster set large in black on white.")
+    expect((upload.form?.get("image") as File).name).toBe("cover.jpg")
+    expect(calls.some((c) => c.url === "https://signed.example/fit-3000-jpeg/cover.webp")).toBe(
+      true,
+    )
+  })
+
+  it("sends at most ten images, which is all Etsy will hold", async () => {
+    const calls: Call[] = []
+    vi.stubGlobal("fetch", etsy(calls))
+
+    const many = Array.from({ length: 12 }, (_, i) =>
+      asset({
+        id: `img-${i}`,
+        asset_type: i === 0 ? "cover_image" : "preview_image",
+        filename: `img-${i}.png`,
+        sort_order: i,
+      }),
+    )
+    await etsyAdapter.publish!(
+      context({
+        subject: subject({
+          assets: [
+            ...many,
+            asset({ id: "asset-2", asset_type: "deliverable", filename: "aster.zip" }),
+          ],
+        }),
+      }),
+    )
+
+    expect(calls.filter((c) => c.url.endsWith("/listings/900/images"))).toHaveLength(10)
+  })
+
   it("deletes the draft when a later step fails, so a retry starts clean", async () => {
     const calls: Call[] = []
     vi.stubGlobal("fetch", etsy(calls, { failAt: "files" }))

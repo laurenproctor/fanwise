@@ -83,6 +83,10 @@ function localSupabaseEnv(): Record<string, string> {
     // A recording reaches "Transcribed" through a fixed test transcript, never
     // a vendor. lib/ai/transcription refuses this unless the database is local.
     FANWISE_E2E_FAKE_TRANSCRIPTION: "1",
+    // An upload finalizing in this process would otherwise ask the model to
+    // describe the picture with the checkout's real key, once per image the
+    // suite uploads. The button still works; only the automatic ask is off.
+    FANWISE_AUTO_ALT_TEXT: "off",
   }
 }
 

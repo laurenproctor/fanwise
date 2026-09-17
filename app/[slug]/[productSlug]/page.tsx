@@ -1,3 +1,4 @@
+import { readAltText, readAltTextSource } from "@/lib/products/image-metadata"
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
@@ -142,6 +143,8 @@ export default async function ProductPage({
             assetType: asset.asset_type,
             state: asset.asset_state,
             checksum: asset.checksum,
+            altText: readAltText(asset.metadata),
+            altTextSource: readAltTextSource(asset.metadata),
           },
         ]
       : [],

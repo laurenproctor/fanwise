@@ -163,6 +163,30 @@ repeating something the creator vouched for.
 Only an accepted generation can be restored. The copy on a refused row was never allowed on
 the listing, and restoring it would be the one door the validator does not guard.
 
+## Image alt text
+
+Added 17 September 2026, ADR 0014, proposed. The one place the model is shown a picture.
+
+A product image's alt text is written by `lib/ai/alt-text.ts` from the image and the FactSheet,
+after the image finalizes and on request from the editor ("Suggest from the image"). The image
+is a fact source for that sentence and for nothing else: the job writes `metadata.altText` and
+`metadata.altTextSource: "generated"` on that one asset, and nothing it sees reaches the product,
+the FactSheet or a listing.
+
+The rule above applies to the sentence. The factuality validator runs on it as one field of an
+otherwise empty listing (`onlyField`), so a count of weights read off a specimen sheet, a script
+the model can see, or a format is refused unless the creator has stated it. One retry names the
+refused values. A second refusal leaves the field empty for the creator. The prompt forbids
+numbers, number words and vague quantities outright, and says the filename is a hint about
+intent and never a fact about the picture.
+
+Listing and field generations are unchanged: no image, and the rules block still says the
+model cannot see the product. `GenerationRequest.images` exists for alt text and is never
+filled by `buildPrompt`.
+
+The channels send the image's own alt text when there is one (`altTextFor`), the listing
+title otherwise. `FANWISE_AUTO_ALT_TEXT=off` stops the automatic ask; the button still works.
+
 ## What B1 built
 
 `lib/ai`, and one table. The pieces map onto the three layers above:

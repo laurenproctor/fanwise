@@ -103,6 +103,23 @@ describe("the request", () => {
     expect(response.provider).toBe("anthropic")
   })
 
+  it("shows an image before the text when the request carries one, and a plain string otherwise", async () => {
+    const { fetchImpl, calls } = fakeFetch(200, message())
+    const provider = createAnthropicProvider({ apiKey: "sk-test", fetch: fetchImpl })
+
+    await provider.generate({ ...request, images: [{ mediaType: "image/jpeg", data: "AAAA" }] })
+
+    expect(calls[0]!.body.messages).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "AAAA" } },
+          { type: "text", text: "facts" },
+        ],
+      },
+    ])
+  })
+
   it("never puts the key anywhere but the header", async () => {
     const { fetchImpl, calls } = fakeFetch(200, message())
     const provider = createAnthropicProvider({ apiKey: "sk-secret-value", fetch: fetchImpl })

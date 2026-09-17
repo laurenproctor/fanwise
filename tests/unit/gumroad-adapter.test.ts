@@ -454,6 +454,30 @@ describe("publish", () => {
     })
   })
 
+  it("sends a cover as a rendition when Gumroad would refuse the source's format", async () => {
+    const calls: Call[] = []
+    vi.stubGlobal("fetch", gumroad(calls))
+
+    await gumroadAdapter.publish!(
+      context({
+        subject: subject({
+          assets: [
+            asset({ mime_type: "image/webp", filename: "cover.webp" }),
+            asset({
+              id: "asset-2",
+              asset_type: "deliverable",
+              filename: "aster.zip",
+              byte_size: 5,
+            }),
+          ],
+        }),
+      }),
+    )
+
+    const cover = calls.find((c) => c.url.endsWith("/products/P1/covers"))!
+    expect(cover.json).toEqual({ url: "https://signed.example/fit-2560-jpeg/cover.webp" })
+  })
+
   it("goes live without a thumbnail when the runner cannot make one or Gumroad refuses it", async () => {
     const calls: Call[] = []
     vi.stubGlobal("fetch", gumroad(calls, { failAt: "thumbnail" }))

@@ -125,7 +125,10 @@ before fonts were read (worker deploys are by hand and lag `main`). The font wor
 asks for each such row to be read (`readFontFileAction`, which queues `finalize_asset`
 again); on a ready row the job writes `metadata` only, which the immutability trigger
 permits, and a re-upload is never needed. Decodable images get
-`metadata.width` and `height`; the font workspace adds `metadata.altText`. None
+`metadata.width` and `height`; product images add `metadata.altText` and
+`metadata.altTextSource` (`creator` or `generated`, ADR 0014), written by the creator from
+the product page or the font workspace, or suggested by the `describe_image` job after the
+image finalizes. The keys are named once in `lib/products/image-metadata.ts`. None
 of this is on the product. The product's own `metadata` (the `font` member of
 the union) holds what the creator stands behind: classification, scripts,
 languages, features, axes, the style list, search tags, the licence types sold

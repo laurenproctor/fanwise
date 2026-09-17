@@ -404,6 +404,7 @@ function readinessInput(overrides: Partial<FontReadinessInput> = {}): FontReadin
         width: 2400,
         height: 1800,
         altText: "Blimp",
+        altTextSource: null,
       },
     ],
     channels: [],

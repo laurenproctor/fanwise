@@ -9,6 +9,11 @@
  * The request is deliberately narrow. One system prompt in blocks, one user
  * message, one JSON schema the answer must satisfy. That is every listing
  * generation B1 makes, and a provider that offers more is not asked for it.
+ *
+ * One widening since, for alt text (ADR 0014): the user turn may carry an
+ * image the answer is about. A listing generation never sends one, and the
+ * rule that the model cannot see the product still holds there; the image is
+ * shown only where the words being written are a description of that image.
  */
 
 export interface PromptBlock {
@@ -22,9 +27,18 @@ export interface PromptBlock {
   cacheBoundary?: boolean
 }
 
+/** A picture shown alongside the user turn. Bytes, never a URL. */
+export interface ImageInput {
+  mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp"
+  /** Base64 of the encoded image. */
+  data: string
+}
+
 export interface GenerationRequest {
   system: readonly PromptBlock[]
   user: string
+  /** Shown before the user text, in order. Absent on a listing generation. */
+  images?: readonly ImageInput[]
   /** JSON Schema the provider must constrain the answer to. */
   outputSchema: Record<string, unknown>
   maxOutputTokens: number

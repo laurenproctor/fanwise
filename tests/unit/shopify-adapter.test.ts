@@ -734,6 +734,55 @@ describe("publish", () => {
     ])
   })
 
+  it("sends the image's own alt text when someone has written it", async () => {
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body)),
+    )
+    await shopifyAdapter.publish!(
+      context({
+        subject: subject({
+          assets: [asset({ metadata: { altText: "Aster set large in black on white." } })],
+        }),
+      }),
+    )
+
+    const input = productSetVariables(bodies).input as Record<string, unknown>
+    expect((input.files as { alt: string }[])[0]!.alt).toBe("Aster set large in black on white.")
+  })
+
+  it("sends a rendition when the source is larger than Shopify takes, and the source otherwise", async () => {
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body)),
+    )
+    await shopifyAdapter.publish!(
+      context({
+        subject: subject({
+          assets: [
+            asset({ mime_type: "image/png", metadata: { width: 6000, height: 6000 } }),
+            asset({
+              id: "asset-3",
+              asset_type: "preview_image",
+              filename: "small.png",
+              mime_type: "image/png",
+              metadata: { width: 1200, height: 800 },
+            }),
+          ],
+        }),
+        derivativeUrl: async (a, spec) => `https://signed.example/${spec.key}/${a.filename}`,
+      }),
+    )
+
+    const input = productSetVariables(bodies).input as Record<string, unknown>
+    expect((input.files as { originalSource: string }[]).map((f) => f.originalSource)).toEqual([
+      "https://signed.example/fit-4472-png/cover.png",
+      "https://signed.example/cover.png",
+    ])
+  })
+
   it("sends an identifier once the product exists, so a retry updates rather than duplicates", async () => {
     const bodies: unknown[] = []
     vi.stubGlobal(
