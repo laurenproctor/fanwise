@@ -44,8 +44,9 @@ import { uploadFile } from "./upload"
  * the draft exists deletes the draft before the error is reported, and the
  * retry starts from nothing. The product's permalink is the product's slug,
  * which Gumroad keeps unique per seller, so a create whose response was lost
- * cannot be repeated by accident: the second create is refused, and the
- * creator is told which product is in the way.
+ * cannot be repeated by accident: the second create is refused. Before that
+ * refusal, the guard in findDraft looks for the draft the lost create left,
+ * and adopts it when it is unmistakably Fanwise's own.
  */
 
 const DELIVERABLE_TYPES = ["deliverable", "archive"] as const
@@ -264,6 +265,23 @@ const coversSchema = z.object({
   covers: z.array(z.object({ id: z.string().min(1) })).default([]),
 })
 
+/** The seller's products, as far as the create guard reads them. */
+const productListSchema = z.object({
+  products: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().nullish(),
+        published: z.boolean().nullish(),
+        custom_permalink: z.string().nullish(),
+        files: z.array(fileSchema).optional(),
+        covers: z.array(z.object({ id: z.string().min(1) })).optional(),
+      }),
+    )
+    .default([]),
+})
+type ListedProduct = z.infer<typeof productListSchema>["products"][number]
+
 /** What the listing remembers about the files it sent, docs/channels/gumroad.md §12. */
 const storedFilesSchema = z.array(
   z.object({ assetId: z.string(), fileId: z.string().nullable(), fileUrl: z.string() }),
@@ -302,6 +320,36 @@ async function clientFor(context: PublishContext): Promise<GumroadClient> {
     )
   }
   return createGumroadClient({ accessToken: credentials.accessToken })
+}
+
+/**
+ * The create guard's search, ADR 0005. The stamp is the permalink, §7 of the
+ * spec, and it is also the product's slug, so a product a creator made by
+ * hand can carry it too. The spec's rule stands: their product is never
+ * adopted. What is adopted is only a product that looks exactly like the
+ * draft a lost create would have left, unpublished and under the name this
+ * publish sends, because a hand-made product the creator sells is published
+ * and a hand-made draft under the same slug and the same name is, for every
+ * purpose that matters here, the same draft. Anything else falls through to
+ * the create, and Gumroad's own refusal of a taken permalink says which
+ * product is in the way.
+ */
+async function findDraft(
+  client: GumroadClient,
+  permalink: string,
+  name: unknown,
+): Promise<ListedProduct | null> {
+  const listed = await client.request({
+    method: "GET",
+    path: "products",
+    schema: productListSchema,
+  })
+  const wanted = permalink.toLowerCase()
+  const match = listed.products.find(
+    (product) => (product.custom_permalink ?? "").toLowerCase() === wanted,
+  )
+  if (!match || match.published !== false || match.name !== name) return null
+  return match
 }
 
 /** Reads the product, and raises the one signal the runner acts on. */
@@ -523,6 +571,39 @@ export const gumroadAdapter: ChannelAdapter = {
     const images = listingImages(context.subject).slice(0, LIMITS.coverMax)
     const files = deliverables(context.subject.assets)
 
+    /*
+     * The guard, before the upload as well as before the create: a draft a
+     * lost create left already holds the files, and sending twenty gigabytes
+     * again to attach nothing would be the expensive way to find that out.
+     * An adopted draft gets the covers it is short of, a thumbnail, and the
+     * enable; its files are read back rather than re-sent. Nothing here is
+     * inside the cleanup below, because this draft was not this attempt's to
+     * delete.
+     */
+    const adopted = await findDraft(client, permalink, fields.name)
+    if (adopted) {
+      const held = adopted.covers?.length ?? 0
+      let coverIds = adopted.covers?.map((c) => c.id) ?? []
+      if (images.length > held) {
+        coverIds = await sendCovers(client, adopted.id, context, images.slice(held))
+      }
+      const thumbnail = await sendThumbnail(client, adopted.id, context, images[0])
+      await client.request({
+        method: "PUT",
+        path: `products/${encodeURIComponent(adopted.id)}/enable`,
+        schema: z.unknown(),
+      })
+      const live = await readProduct(client, adopted.id)
+      // What the draft holds is paired with the deliverables by name. A file
+      // without a canonical URL in the read is left unrecorded; a later update
+      // that needs it says so rather than guessing.
+      const records: StoredFile[] = (live.files ?? []).flatMap((file) => {
+        const asset = files.find((candidate) => candidate.filename === file.name)
+        return asset && file.url ? [{ assetId: asset.id, fileId: file.id, fileUrl: file.url }] : []
+      })
+      return result(live, records, coverIds, { adopted: adopted.id, coverIds, thumbnail, live })
+    }
+
     const uploaded = await uploadDeliverables(client, context, files)
 
     const created = await client.request({
@@ -539,6 +620,8 @@ export const gumroadAdapter: ChannelAdapter = {
         },
       },
       schema: productSchema,
+      // Sent once. A lost answer here is what findDraft exists to recover.
+      idempotent: false,
     })
     const productId = created.product.id
 

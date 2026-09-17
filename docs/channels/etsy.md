@@ -106,6 +106,24 @@ An update reads before it writes: the listing by id (raising `external_object_mi
 404 from that read only), its image count, and its file list, and uploads only what the
 listing is short of.
 
+**The create guard, ADR 0005, since 16 September 2026.** Step 1 is the one request whose
+answer can be lost after it landed, and the compensating delete cannot reach a draft whose id
+never arrived. So the create is sent once, with no in-call retry, and before every create the
+adapter looks for the draft an earlier one may have left. Etsy gives it nothing to stamp:
+`createDraftListing` takes no merchant reference, and a SKU lives on the inventory, a second
+call that never ran if the first one's answer was lost. The draft is recognised instead by
+what the create sent. `GET /shops/{shop_id}/listings?state=draft&limit=100&sort_on=created&sort_order=desc&includes=Images`
+is read once, and a draft is this listing's when it is still a draft, is a download, carries
+exactly the title and `taxonomy_id` this publish would send, and its `created_timestamp` is
+no earlier than the listing's own `created_at`, less a minute of skew. Exactly one match is
+adopted: its fields are patched, it receives only the images and files it is short of, and it
+is activated. None creates. Two or more refuse with a message naming the count, because
+taking over the wrong draft would put somebody else's work on sale. The job row names the
+adopted id under `adopted`. Two consequences worth knowing: a draft the creator made by hand
+with the same title and category, after the Fanwise listing existed, is adopted rather than
+duplicated; and a shop with more than a hundred drafts newer than the listing can hide the
+orphan beyond the page, in which case the next click creates and the orphan stays a draft.
+
 ## 8. Description transform
 
 None beyond normalizing line endings. Etsy strips formatting.
@@ -180,6 +198,13 @@ Listing `4573259073` in shop `67895664`, from one publish job; the record is in
    update runs more than an hour after the connect, or at B5 when scheduled ingestion
    refreshes routinely: the test is whether a second refresh with an already-used token is
    refused.
+6. **Open, added 16 September 2026 with the create guard, §7.** Whether a draft reads back
+   with `title` and `taxonomy_id` exactly as they were sent, and `listing_type: download`,
+   since the guard matches on those three. A title Etsy trims or re-cases on read would
+   never match, and the guard would create rather than adopt, which is the old behaviour and
+   not a duplicate. The check: create a draft by hand with a Fanwise listing's exact title
+   and category, then publish that listing; it should adopt the draft, and the job row should
+   carry `adopted`.
 
 ## 14. Categories
 

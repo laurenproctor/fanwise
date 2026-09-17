@@ -56,12 +56,21 @@ export interface ShopifyClientOptions {
   sleep?: (ms: number) => Promise<void>
 }
 
+export interface ShopifyRequest<T> {
+  query: string
+  variables: Record<string, unknown>
+  schema: z.ZodType<T>
+  /**
+   * False for the one request that creates an object: a transport failure on
+   * it is not retried inside the call, because the request may have landed
+   * and a repeat would create twice (ADR 0005). Every other request is
+   * repeatable and retried on the shared curve.
+   */
+  idempotent?: boolean
+}
+
 export interface ShopifyClient {
-  request<T>(params: {
-    query: string
-    variables: Record<string, unknown>
-    schema: z.ZodType<T>
-  }): Promise<T>
+  request<T>(params: ShopifyRequest<T>): Promise<T>
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -91,14 +100,12 @@ export function createShopifyClient(options: ShopifyClientOptions): ShopifyClien
       query,
       variables,
       schema,
-    }: {
-      query: string
-      variables: Record<string, unknown>
-      schema: z.ZodType<T>
-    }): Promise<T> {
+      idempotent = true,
+    }: ShopifyRequest<T>): Promise<T> {
       let lastError: ChannelError | null = null
+      const attempts = idempotent ? IN_CALL_MAX_ATTEMPTS : 1
 
-      for (let attempt = 1; attempt <= IN_CALL_MAX_ATTEMPTS; attempt += 1) {
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
         let response: Response
         try {
           response = await doFetch(endpoint, {
@@ -115,7 +122,7 @@ export function createShopifyClient(options: ShopifyClientOptions): ShopifyClien
           })
         } catch (error) {
           lastError = new ChannelError(transportError(error))
-          if (attempt === IN_CALL_MAX_ATTEMPTS) throw lastError
+          if (attempt === attempts) throw lastError
           await sleep(inCallBackoffMs(attempt))
           continue
         }
@@ -126,7 +133,7 @@ export function createShopifyClient(options: ShopifyClientOptions): ShopifyClien
         if (!response.ok) {
           const body = await response.text().catch(() => "")
           const error = new ChannelError(httpError(response.status, body.slice(0, 2000)))
-          if (!error.normalized.retryable || attempt === IN_CALL_MAX_ATTEMPTS) throw error
+          if (!error.normalized.retryable || attempt === attempts) throw error
           lastError = error
           await sleep(inCallBackoffMs(attempt))
           continue
@@ -140,7 +147,7 @@ export function createShopifyClient(options: ShopifyClientOptions): ShopifyClien
           const error = new ChannelError(
             graphqlError(envelope.data.errors as ShopifyGraphQLError[]),
           )
-          if (!error.normalized.retryable || attempt === IN_CALL_MAX_ATTEMPTS) throw error
+          if (!error.normalized.retryable || attempt === attempts) throw error
           lastError = error
           await sleep(
             inCallBackoffMs(

@@ -70,6 +70,13 @@ export interface WooRequest<T> {
   path: string
   body?: unknown
   schema: z.ZodType<T>
+  /**
+   * False for the one request that creates an object: a transport failure on
+   * it is not retried inside the call, because the request may have landed
+   * and a repeat would create twice (ADR 0005). Every other request is
+   * repeatable and retried on the shared curve.
+   */
+  idempotent?: boolean
 }
 
 export interface WooClient {
@@ -95,10 +102,11 @@ export function createWooClient(options: WooClientOptions): WooClient {
   const authorization = `Basic ${Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64")}`
 
   return {
-    async request<T>({ method, path, body, schema }: WooRequest<T>): Promise<T> {
+    async request<T>({ method, path, body, schema, idempotent = true }: WooRequest<T>): Promise<T> {
       let lastError: ChannelError | null = null
+      const attempts = idempotent ? IN_CALL_MAX_ATTEMPTS : 1
 
-      for (let attempt = 1; attempt <= IN_CALL_MAX_ATTEMPTS; attempt += 1) {
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
         let response: Response
         try {
           response = await outboundFetch(
@@ -121,7 +129,7 @@ export function createWooClient(options: WooClientOptions): WooClient {
             throw new ChannelError(refusedByBoundary(error))
           }
           lastError = new ChannelError(transportError(error))
-          if (attempt === IN_CALL_MAX_ATTEMPTS) throw lastError
+          if (attempt === attempts) throw lastError
           await sleep(inCallBackoffMs(attempt))
           continue
         }
@@ -139,7 +147,7 @@ export function createWooClient(options: WooClientOptions): WooClient {
             // Not JSON. The text stands.
           }
           const error = new ChannelError(httpError(response.status, parsedBody))
-          if (!error.normalized.retryable || attempt === IN_CALL_MAX_ATTEMPTS) throw error
+          if (!error.normalized.retryable || attempt === attempts) throw error
           lastError = error
           await sleep(inCallBackoffMs(attempt))
           continue

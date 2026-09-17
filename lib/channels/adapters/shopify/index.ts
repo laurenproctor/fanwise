@@ -4,6 +4,7 @@ import type { ProductAsset } from "@/lib/products/types"
 import { z } from "zod"
 import { ChannelError, normalized } from "@/lib/channels/errors"
 import { listingImages } from "@/lib/channels/images"
+import { carriesStamp, listingStamp } from "@/lib/channels/stamp"
 import { readConnectionCredentials } from "@/lib/credentials"
 import type {
   AdapterSubject,
@@ -421,6 +422,62 @@ function needsMedia(state: ProductState, intended: number): boolean {
 const OPTION_NAME = "Title"
 const OPTION_VALUE = "Default Title"
 
+/**
+ * The create guard's search. ADR 0005; lib/channels/stamp.ts says why.
+ *
+ * The stamp is the default variant's SKU, because it is the one merchant
+ * reference on a product that Shopify's product search can filter on:
+ * metafields cannot be searched, a handle cannot be given (§13 of the spec),
+ * and a tag would show on the storefront. The SKU is set on the create only
+ * and never sent again, so a creator who replaces it in the admin keeps their
+ * change; what they lose is only this recovery, which they would then have to
+ * do by hand.
+ *
+ * The search index is not the same store as the product itself and can lag a
+ * create by a moment, which is why the answer is checked against the variant
+ * it names rather than trusted: a hit whose SKU is not exactly this listing's
+ * stamp is not this listing's product.
+ */
+const PRODUCT_BY_STAMP = `
+  query FanwiseProductByStamp($query: String!) {
+    products(first: 5, query: $query) {
+      nodes {
+        id
+        variants(first: 1) {
+          nodes { sku }
+        }
+      }
+    }
+  }
+`
+
+const productByStampSchema = z.object({
+  products: z.object({
+    nodes: z.array(
+      z.object({
+        id: z.string(),
+        variants: z.object({ nodes: z.array(z.object({ sku: z.string().nullish() })) }),
+      }),
+    ),
+  }),
+})
+
+async function findStamped(
+  client: ReturnType<typeof createShopifyClient>,
+  listingId: string,
+): Promise<string | null> {
+  const stamp = listingStamp(listingId)
+  const found = await client.request({
+    query: PRODUCT_BY_STAMP,
+    variables: { query: `sku:"${stamp}"` },
+    schema: productByStampSchema,
+  })
+  const match = found.products.nodes.find((node) =>
+    node.variants.nodes.some((variant) => carriesStamp(variant.sku, listingId)),
+  )
+  return match?.id ?? null
+}
+
 async function clientFor(context: PublishContext) {
   /*
    * The connection is authorized, but is it authorized for what this build
@@ -507,12 +564,23 @@ const SHOPIFY_STATUSES = ["ACTIVE", "DRAFT", "ARCHIVED"] as const
  * can be answered from Fanwise's own tables with enough confidence to risk
  * being wrong, because productSet leaves an omitted field alone and overwrites
  * a supplied one.
+ *
+ * Before a create it looks for its own stamp (ADR 0005). A create whose
+ * answer was lost on the wire is the one request Fanwise cannot repeat
+ * safely, so the listing id goes out on the product as its SKU, and a later
+ * attempt that finds that SKU adopts the product and proceeds as an update.
+ * The create itself is sent once, with no in-call retry, for the same reason.
  */
 async function productSet(context: PublishContext, intent: PublishIntent): Promise<PublishResult> {
   const { listing, subject } = context
   const { shopDomain, client } = await clientFor(context)
 
-  const externalId = listing.external_listing_id
+  let externalId = listing.external_listing_id
+  let adopted: string | null = null
+  if (!externalId) {
+    adopted = await findStamped(client, listing.id)
+    externalId = adopted
+  }
   const price = toMoney(listing.price === null ? null : Number(listing.price))
 
   /*
@@ -713,6 +781,9 @@ async function productSet(context: PublishContext, intent: PublishIntent): Promi
       {
         optionValues: [{ optionName: OPTION_NAME, name: OPTION_VALUE }],
         ...(price === null ? {} : { price }),
+        // The stamp findStamped looks for. On the create only: an update
+        // leaves whatever the SKU has become alone.
+        ...(externalId ? {} : { sku: listingStamp(listing.id) }),
         taxable: true,
         // Not cosmetic. Left true, Shopify asks a buyer for a shipping address
         // and may quote a shipping rate on a font.
@@ -740,6 +811,9 @@ async function productSet(context: PublishContext, intent: PublishIntent): Promi
       input,
     },
     schema: productSetSchema,
+    // A create is sent once. With an identifier the same call is an update
+    // of that product, which converges however often it is repeated.
+    idempotent: externalId !== null,
   })
 
   if (result.productSet.userErrors.length > 0) {
@@ -774,7 +848,12 @@ async function productSet(context: PublishContext, intent: PublishIntent): Promi
       the moment we decided what to send — both which images, and whether the
       product was on sale.
     */
-    providerResponse: state === null ? result : { ...result, stateBefore: state },
+    providerResponse: {
+      ...(state === null ? result : { ...result, stateBefore: state }),
+      // Named on the job row when an earlier create was found and taken over,
+      // so a person reading the row can see the recovery rather than infer it.
+      ...(adopted === null ? {} : { adopted }),
+    },
   }
 }
 

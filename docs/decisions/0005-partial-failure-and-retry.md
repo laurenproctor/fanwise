@@ -392,3 +392,40 @@ The three choices most worth a second opinion:
 What A7 built on these: `workspace_events` as the activity log, `publication_jobs.run_id` to
 group one click's jobs, the runner's delayed re-attempt path, and the collapse of three
 copies of the in-call retry into `lib/channels/errors.ts`.
+
+## The create guard, built 16 September 2026
+
+Item 3 above is no longer deferred in code. What shipped, and where it departs from the
+design in "The create exception":
+
+- **The create is sent once.** Every client's request takes `idempotent`, and the one
+  request that creates the external object passes `false`: a transport failure on it throws
+  at once, with no in-call retry. Before this, every client retried every request three
+  times, creates included, which was the duplicate the exception was written to prevent and
+  which no client had honoured. Every other request keeps the shared curve.
+- **The stamp is the listing id**, `lib/channels/stamp.ts`, written on the create itself and
+  never on an update, and looked for before every create. The field differs per channel and
+  two channels have none:
+  - Shopify: the default variant's SKU, found with `products(query: "sku:...")` and checked
+    against the variant it names. Metafields cannot be searched and a handle cannot be given.
+  - WooCommerce: the product SKU, found with `GET /products?sku=`. The store keeps SKUs unique
+    besides, so a search that missed would meet a refusal, not a duplicate.
+  - Etsy: no merchant reference exists on the create, and a SKU is a second call that never
+    ran if the first one's answer was lost. The draft is recognised by what the create sent:
+    still a draft, a download, the same title and category, created no earlier than the
+    listing. One match is adopted, none creates, two or more refuse rather than guess.
+  - Gumroad: the permalink was already the stamp, and the spec's rule that a creator's own
+    product is never adopted stands. Only an unpublished product under the same permalink and
+    the same name is taken to be the lost draft.
+- **An adopted object proceeds as an update.** Shopify and WooCommerce send the identifier
+  and read first, as any update does. Etsy and Gumroad bring the fields up to date, send only
+  the images, files and covers the object is short of, and then activate or enable. The job
+  row names the adopted id under `adopted`.
+- **`planReattempt` is unchanged.** A `network` failure on a `publish` still waits for the
+  creator. The guard makes their Try again a recovery rather than a coin toss, which is what
+  the design asked of it; letting Fanwise re-attempt that case by itself is a separate
+  decision, not taken here.
+
+Still owed: one live verification per channel, which is a lost create nobody can stage on
+purpose. The nearest honest stand-in is a hand-made object carrying the stamp, and each spec's
+§13 says what to check. Unit tests cover every path above against scripted providers.

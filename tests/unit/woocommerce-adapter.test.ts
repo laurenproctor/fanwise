@@ -142,7 +142,13 @@ function productOk(overrides: Record<string, unknown> = {}) {
  */
 function store(
   calls: Call[],
-  options: { held?: Record<string, unknown>; missing?: boolean; existingTags?: string[] } = {},
+  options: {
+    held?: Record<string, unknown>
+    missing?: boolean
+    existingTags?: string[]
+    /** What the stamp search finds: product ids and the SKU each carries. */
+    stamped?: { id: number; sku: string | null }[]
+  } = {},
 ) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input)
@@ -150,6 +156,9 @@ function store(
     const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null
     calls.push({ method, url, body })
 
+    if (/\/products\?sku=/.test(url) && method === "GET") {
+      return json((options.stamped ?? []).map((hit) => productOk({ id: hit.id, sku: hit.sku })))
+    }
     if (url.endsWith("/products/tags") && method === "POST") {
       const name = String(body?.name)
       if (options.existingTags?.includes(name)) {
@@ -304,11 +313,17 @@ describe("publish", () => {
     expect(result.purchasable).toBe(false)
   })
 
-  it("does not read the store before a create", async () => {
+  it("reads nothing but its own stamp before a create", async () => {
+    // No product exists to ask about. The one read is the guard's search for
+    // a create whose answer was lost, and the create then carries the stamp
+    // that search looks for.
     const calls: Call[] = []
     scriptStore(store(calls))
     await woocommerceAdapter.publish!(context())
-    expect(calls.some((c) => c.method === "GET")).toBe(false)
+    expect(calls.filter((c) => c.method === "GET").map((c) => c.url)).toEqual([
+      "https://shop.example.com/wp-json/wc/v3/products?sku=fanwise-listing-1",
+    ])
+    expect(write(calls, "POST")!.body!.sku).toBe("fanwise-listing-1")
   })
 })
 
@@ -443,5 +458,48 @@ describe("transforms", () => {
     expect(adminProductUrl("https://shop.example.com", 12)).toBe(
       "https://shop.example.com/wp-admin/post.php?post=12&action=edit",
     )
+  })
+})
+
+describe("the create guard", () => {
+  // ADR 0005. A create whose answer was lost on the wire may have landed, so
+  // the product carries the listing id as its SKU and a later attempt looks
+  // for that SKU before creating again.
+
+  it("adopts the product an earlier create left behind, and updates it in place", async () => {
+    const calls: Call[] = []
+    scriptStore(store(calls, { stamped: [{ id: 900, sku: "fanwise-listing-1" }] }))
+
+    const result = await woocommerceAdapter.publish!(context())
+
+    expect(write(calls, "POST")).toBeUndefined()
+    const update = write(calls, "PUT")!
+    expect(update.url).toBe("https://shop.example.com/wp-json/wc/v3/products/900")
+    expect(update.body).not.toHaveProperty("sku")
+    // The adopted product is read before it is written, like any update.
+    expect(calls.map((c) => `${c.method} ${c.url.split("/wc/v3/")[1]}`)).toEqual(
+      expect.arrayContaining(["GET products?sku=fanwise-listing-1", "GET products/900"]),
+    )
+    expect(result).toMatchObject({
+      externalListingId: "900",
+      externalState: "live",
+      providerResponse: { adopted: "900" },
+    })
+  })
+
+  it("ignores a hit whose SKU is not exactly the stamp", async () => {
+    const calls: Call[] = []
+    scriptStore(store(calls, { stamped: [{ id: 900, sku: "fanwise-listing-12" }] }))
+    await woocommerceAdapter.publish!(context())
+    expect(write(calls, "POST")).toBeDefined()
+    expect(write(calls, "PUT")).toBeUndefined()
+  })
+
+  it("never sends the SKU on an update, so a creator's own SKU survives", async () => {
+    const calls: Call[] = []
+    scriptStore(store(calls, { held: { status: "publish", sku: "ASTER-01" } }))
+    await woocommerceAdapter.update!(context({ listing: listing({ external_listing_id: "900" }) }))
+    expect(write(calls, "PUT")!.body).not.toHaveProperty("sku")
+    expect(calls.some((c) => /products\?sku=/.test(c.url))).toBe(false)
   })
 })
