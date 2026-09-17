@@ -14,6 +14,12 @@ import { PublicImage } from "./public-image"
  *
  * A single image renders as a single image, with no tablist at all: a set of
  * one is not a choice.
+ *
+ * The large image is contained, never cropped. Its frame is 16:9, the shape of
+ * a marketplace cover, so a promo made for a channel fills it edge to edge; a
+ * squarer picture sits centred on the paper tint with room either side, which
+ * is a picture shown whole rather than a picture with its edges missing. The
+ * thumbnails crop to squares, because they are a picker and not the picture.
  */
 export function ProductGallery({ assetIds, title }: { assetIds: string[]; title: string }) {
   const [active, setActive] = useState(0)
@@ -21,7 +27,7 @@ export function ProductGallery({ assetIds, title }: { assetIds: string[]; title:
   if (assetIds.length === 0) {
     return (
       <div
-        style={{ aspectRatio: "4 / 3" }}
+        style={{ aspectRatio: "16 / 9" }}
         className="flex w-full items-center justify-center rounded-[16px] border border-[var(--color-rule)] bg-[var(--color-paper-2)]"
       >
         <span className="label-mono">No images yet</span>
@@ -36,7 +42,8 @@ export function ProductGallery({ assetIds, title }: { assetIds: string[]; title:
           assetId={assetIds[0]!}
           alt={title}
           priority
-          ratio="4 / 3"
+          ratio="16 / 9"
+          fit="contain"
           sizes="(max-width: 1024px) 100vw, 58vw"
         />
       </div>
@@ -66,7 +73,8 @@ export function ProductGallery({ assetIds, title }: { assetIds: string[]; title:
               assetId={assetId}
               alt={index === 0 ? title : `${title}, image ${index + 1} of ${assetIds.length}`}
               priority={index === 0}
-              ratio="4 / 3"
+              ratio="16 / 9"
+              fit="contain"
               sizes="(max-width: 1024px) 100vw, 58vw"
             />
           </div>

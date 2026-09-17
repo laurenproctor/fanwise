@@ -87,8 +87,10 @@ test("a creator hand-writes a listing and watches readiness resolve", async ({ p
 
   // A new listing says nothing of its own: the title is the product's, shown
   // rather than copied. Customizing starts from those words, and going back
-  // returns the field to the product.
-  await expect(page.getByText("The Canonical Title")).toBeVisible()
+  // returns the field to the product. The first match is the editor's: since
+  // B9 the handoff further down reads the listing as it resolves and shows the
+  // same inherited words, which is the point of it.
+  await expect(page.getByText("The Canonical Title").first()).toBeVisible()
   await expect(page.getByLabel("Title", { exact: true })).toHaveCount(0)
   await page.getByRole("button", { name: "Customize title for this channel" }).click()
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue("The Canonical Title")

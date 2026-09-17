@@ -124,7 +124,16 @@ that makes the row ready, so a ready font with neither was settled by a worker b
 before fonts were read (worker deploys are by hand and lag `main`). The font workspace
 asks for each such row to be read (`readFontFileAction`, which queues `finalize_asset`
 again); on a ready row the job writes `metadata` only, which the immutability trigger
-permits, and a re-upload is never needed. Decodable images get
+permits, and a re-upload is never needed. A ZIP package (`asset_type = 'archive'`, sniffed `application/zip`) gets `metadata.archive`
+since 17 September 2026: its table of contents, with every font inside read by the same
+inspector as a loose file (`lib/fonts/archive.ts`, bounded at 500 entries listed, 100 fonts
+read, 64 MB per font and 256 MB in all; `__MACOSX` and `.DS_Store` leftovers counted, not
+listed), or `metadata.archiveProblem` when the ZIP cannot be opened (malformed, or ZIP64 and
+split archives, which are refused). The package itself is delivered as uploaded; nothing is
+unpacked into storage. The font workspace detects a family from packaged fonts exactly as
+from loose ones, the readiness blocker `files.present` counts them, and the FactSheet's
+deliverable formats include what the package holds. A ready package with neither key was
+settled by an older worker and is read on request like an unread font. Decodable images get
 `metadata.width` and `height`; product images add `metadata.altText` and
 `metadata.altTextSource` (`creator` or `generated`, ADR 0014), written by the creator from
 the product page or the font workspace, or suggested by the `describe_image` job after the
@@ -588,7 +597,8 @@ provider body from a failure lands in `outcome`, persisted and never rendered (r
 
 ## B9: Behance
 
-Planned 11 September 2026, not built. The migration lands with B9.
+Planned 11 September 2026; built 17 September 2026. The migration is
+`20260917120000_behance_channel.sql`.
 
 One row in `channels`: key `behance`, `integration_type = assisted`, `billable = true`, since
 it is a marketplace and decision 16 governs what an assisted one costs. No new table, and
@@ -596,12 +606,24 @@ nothing in `channel_connection_secrets`: the adapter declares no `oauth`, so Con
 the connection row and nothing else, and no credential for this channel ever exists.
 
 What the existing columns hold: `external_account_id` is the profile username, parsed from
-`behance.net/{username}`; `external_account_name` is the display name the creator typed, if
-any. On the listing, `external_url` is the project URL captured at mark submitted,
-`external_listing_id` the numeric project id parsed from it, and `metadata` carries the
-chosen Creative Fields, the asset category, the license type and `handoffMode`, `new` or
-`existing`. `status_source` is `self_reported` on every row and the trigger that refuses
-`verified` on an assisted channel applies unchanged.
+`behance.net/{username}` by the adapter's `accountHint`; `external_account_name` is
+`behance.net/{username}`. On the listing, `external_url` and `public_url` are the project
+URL captured at mark submitted, canonicalized to `https://www.behance.net/gallery/{id}/{slug}`;
+`external_listing_id` is the numeric project id parsed from it; `category` is the asset
+category; and `metadata` carries `creativeFields` (an array of Creative Field names),
+`licenseType` (`personal` or `standard_commercial`), `handoffMode` (`new` or `existing`),
+`existingProjectUrl` in existing mode, and `submittedAt`. Those keys are the adapter's
+declared choices and are written only through `updateListingChoicesAction`, which validates
+each against the declaration; a rebuild keeps them, because they are the creator's and not
+the draft's, the way it keeps publication's `externalState` and `purchasable`. Only the first
+build seeds them from the product. `status_source` is `self_reported` on every row and the trigger
+that refuses `verified` on an assisted channel applies unchanged; `markSubmittedAction`
+also refuses to overwrite a row whose source is `verified`.
+
+Renditions for the handoff are ordinary derivative rows in `product_assets`, keyed on
+`(derived_from, spec_hash)` like every other; nothing new is stored for them. Mark submitted
+writes one `publish` snapshot and one `workspace_events` row of type
+`listing_marked_submitted`.
 
 One question this channel puts to the model and does not answer: a Behance project holds up
 to five assets, so one product could be several priced downloads on one project. Listing
@@ -790,6 +812,15 @@ compete with itself for a search result.
 The tenant boundary is a foreign key, as it is on `product_assets`. The profile, the
 product and the cover asset are each referenced as an `(id, workspace_id)` pair, so a
 member cannot point their own workspace's public page at another workspace's product.
+
+Since 17 September 2026 a product's public page carries one checkbox, "Show this product
+on my public profile" (`setProductOnProfileAction`, `lib/public/profile-choice.ts`). It
+writes the profile builder's draft arrangement rather than a second flag: on appends the
+product (or switches its existing entry back on, in place) and, when the profile is live and
+the product is eligible, publishes that one page through `publish_all_profile_products()`
+at the end of the order; off switches the draft entry off in place and returns the page to
+draft. The builder remains where the order is decided, and `status` remains the one fact
+the public reads.
 
 **public_product_slug_history** — the same redirect model one level down, scoped to
 the profile rather than globally.

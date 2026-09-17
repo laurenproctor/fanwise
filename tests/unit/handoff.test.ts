@@ -1,8 +1,14 @@
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
-import { buildHandoffSteps, formatHandoffPrice, type HandoffImage } from "@/lib/channels/handoff"
-import { HandoffPanel } from "@/components/channels/handoff-panel"
+import {
+  buildHandoffSteps,
+  formatHandoffPrice,
+  handoffSteps,
+  type HandoffImage,
+  type HandoffStep,
+} from "@/lib/channels/handoff"
+import { HandoffPanel, groupSteps } from "@/components/channels/handoff-panel"
 import { CompanionWindow } from "@/components/channels/companion-window"
 import type { ChannelListingDraft } from "@/lib/channels/types"
 
@@ -140,5 +146,89 @@ describe("CompanionWindow", () => {
     )
     expect(html.match(/the handoff/g)).toHaveLength(1)
     expect(html).not.toContain("Pop out")
+  })
+})
+
+/**
+ * A channel with an editor of its own shape declares its order on the
+ * adapter, and the panel groups what it declares. What is held here is the
+ * shared half: delegation, grouping, the note step, the renamed download, and
+ * that a sectioned handoff still says nothing a flat one would not.
+ */
+describe("a channel-ordered handoff", () => {
+  const sectioned: HandoffStep[] = [
+    {
+      kind: "files",
+      key: "canvas",
+      label: "Images",
+      section: "Canvas",
+      files: [{ assetId: "a1", filename: "01-specimen.jpg", downloadAs: "01-specimen.jpg" }],
+      note: "In order.",
+    },
+    {
+      kind: "copy",
+      key: "price",
+      label: "Price, USD",
+      section: "Attach",
+      value: "24.00",
+      multiline: false,
+      note: "You receive about $15.80.",
+    },
+    { kind: "note", key: "add", label: "Add it", section: "Attach", text: "Click Add, then Done." },
+    {
+      kind: "submit",
+      key: "submit",
+      label: "Make it public",
+      section: "Finish",
+      text: "Then paste the address below.",
+    },
+  ]
+
+  it("is used when the adapter declares one, and the generic order otherwise", () => {
+    const input = {
+      draft: draft(),
+      subject: { product: {} as never, assets: [] },
+      images: IMAGES,
+      renditions: [],
+    }
+    expect(handoffSteps({ name: "Mock Marketplace" }, input).map((s) => s.key)).toEqual([
+      "title",
+      "description",
+      "tags",
+      "price",
+      "images",
+      "submit",
+    ])
+    expect(handoffSteps({ name: "Own", buildHandoff: () => sectioned }, input)).toBe(sectioned)
+  })
+
+  it("groups consecutive steps by section and leaves unsectioned steps alone", () => {
+    expect(groupSteps(sectioned).map((g) => [g.section, g.steps.length])).toEqual([
+      ["Canvas", 1],
+      ["Attach", 2],
+      ["Finish", 1],
+    ])
+    expect(
+      groupSteps(buildHandoffSteps(draft(), IMAGES, "M")).every((g) => g.section === null),
+    ).toBe(true)
+  })
+
+  it("renders the sections numbered, the note under the price, and the renamed download", () => {
+    const html = renderToStaticMarkup(
+      createElement(HandoffPanel, {
+        workspaceSlug: "studio",
+        channelName: "Own",
+        productName: "Aster Grotesk",
+        readiness: null,
+        steps: sectioned,
+      }),
+    )
+    expect(html).toContain("Canvas")
+    expect(html).toContain("Attach")
+    expect(html).toContain("You receive about $15.80.")
+    expect(html).toContain("Click Add, then Done.")
+    expect(html).toContain('href="/studio/assets/a1/download?name=01-specimen.jpg"')
+    expect(html).toContain('aria-label="Copy price, USD"')
+    expect(html).not.toMatch(/fanwise (has )?published/i)
   })
 })

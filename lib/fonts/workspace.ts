@@ -4,8 +4,12 @@ import {
   FONT_FORMATS,
   formatFromFilename,
   readAltText,
+  readArchive,
   readFontAsset,
   readImageDimensions,
+  type ArchiveEntryProblem,
+  type ArchiveReading,
+  type DetectedFont,
   type FontAssetReading,
   type FontAxis,
   type FontFormat,
@@ -87,6 +91,8 @@ export interface FontFileView {
   format: FontFormat | null
   kind: "font" | "archive" | "document"
   reading: FontAssetReading
+  /** What a package holds, for an archive. `none` for every other kind. */
+  archive: ArchiveReading
   /** The filename of an earlier file with identical bytes, if any. */
   duplicateOf: string | null
 }
@@ -125,6 +131,7 @@ export function fontFileViews(assets: readonly ProductAsset[]): FontFileView[] {
       failureReason: asset.failure_reason,
       format: reading.kind === "font" ? reading.font.format : nameFormat,
       kind,
+      archive: kind === "archive" ? readArchive(asset.metadata) : { kind: "none" },
       reading:
         // A ready file whose bytes are not a font's never reached the parser:
         // the job only reads what sniffs as a font. Say so, rather than showing
@@ -151,7 +158,31 @@ export function fontFileViews(assets: readonly ProductAsset[]): FontFileView[] {
  */
 export function unreadFontFiles(files: readonly FontFileView[]): FontFileView[] {
   return files.filter(
-    (file) => file.kind === "font" && file.state === "ready" && file.reading.kind === "none",
+    (file) =>
+      file.state === "ready" &&
+      ((file.kind === "font" && file.reading.kind === "none") ||
+        (file.kind === "archive" && file.archive.kind === "none")),
+  )
+}
+
+/**
+ * The fonts read inside a ready package. Empty for anything that is not a
+ * package, is still processing, or could not be opened.
+ */
+export function archiveFonts(file: FontFileView): DetectedFont[] {
+  if (file.kind !== "archive" || file.state !== "ready" || file.archive.kind !== "archive")
+    return []
+  return file.archive.contents.entries.flatMap((entry) => (entry.font ? [entry.font] : []))
+}
+
+/** Font entries inside a package that could not be read, with why. */
+export function archiveFontProblems(
+  file: FontFileView,
+): Array<{ path: string; problem: ArchiveEntryProblem }> {
+  if (file.kind !== "archive" || file.state !== "ready" || file.archive.kind !== "archive")
+    return []
+  return file.archive.contents.entries.flatMap((entry) =>
+    entry.kind === "font" && entry.problem ? [{ path: entry.path, problem: entry.problem }] : [],
   )
 }
 
@@ -204,11 +235,13 @@ function intersect(lists: readonly string[][]): string[] {
  * hard way. Glyph count is the smallest style's for the same reason.
  */
 export function detectFamily(files: readonly FontFileView[]): DetectedFamily {
-  const readings = files.flatMap((file) =>
-    file.state === "ready" && file.reading.kind === "font" && file.duplicateOf === null
-      ? [{ file, font: file.reading.font }]
-      : [],
-  )
+  // Loose files and the fonts inside packages, on equal terms: a family
+  // uploaded as one ZIP is detected exactly as it would be from its files.
+  const readings = files.flatMap((file) => {
+    if (file.state !== "ready" || file.duplicateOf !== null) return []
+    if (file.reading.kind === "font") return [{ file, font: file.reading.font }]
+    return archiveFonts(file).map((font) => ({ file, font }))
+  })
 
   const byStyle = new Map<string, Array<(typeof readings)[number]>>()
   for (const reading of readings) {

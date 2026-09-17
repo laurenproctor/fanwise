@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest"
 import { CHANNEL_KEYS, CAPABILITY_KEYS } from "@/lib/channels/types"
 import { CAPABILITY_METHODS, listAdapters } from "@/lib/channels/registry"
 import { SOURCE_DESCRIPTORS } from "@/lib/imports/sources/registry"
+import { LINK_PLATFORMS } from "@/lib/public/profile-links"
 
 /**
  * The architectural invariants of A3, enforced rather than reviewed.
@@ -66,13 +67,38 @@ function isSanctioned(path: string): boolean {
   )
 }
 
+/**
+ * The places a creator may link to from their public profile.
+ *
+ * One of them shares its name with a channel, and the two are different
+ * things: the channel is a marketplace Fanwise composes a listing for, and the
+ * link is the address of the creator's own portfolio page, which the public
+ * profile shows as a glyph beside their other links. The link platforms are a
+ * registry in `lib/public/profile-links.ts`, and their names are removed
+ * before the sweep in the public-profile code and in the generated database
+ * types, where two retired profile columns still carry one. Derived from the
+ * registry so a platform added later is covered; scoped to those paths so the
+ * same word anywhere else still fails.
+ */
+const LINK_PLATFORM_NAMES: readonly string[] = Object.entries(LINK_PLATFORMS)
+  .flatMap(([key, platform]) => [key, platform.name])
+  .map((name) => name.toLowerCase())
+
+const PUBLIC_PROFILE_PATHS = ["lib/public/", "components/public/", "lib/supabase/database.types.ts"]
+
+function withoutLinkPlatformNames(rel: string, contents: string): string {
+  if (!PUBLIC_PROFILE_PATHS.some((path) => rel.startsWith(path))) return contents
+  return LINK_PLATFORM_NAMES.reduce((text, name) => text.split(name).join(""), contents)
+}
+
 describe("provider names stay inside the adapter layer", () => {
   it("no channel key appears in the product domain, shared utils or unrelated components", () => {
     const offenders: string[] = []
 
     for (const file of sourceFiles(ROOT)) {
       if (isSanctioned(file)) continue
-      const contents = readFileSync(file, "utf8").toLowerCase()
+      const rel = relative(ROOT, file).split(sep).join("/")
+      const contents = withoutLinkPlatformNames(rel, readFileSync(file, "utf8").toLowerCase())
       for (const key of CHANNEL_KEYS) {
         // Case-insensitive, and the key is also checked without its underscores.
         // A provider name does not stop being one because it was written
@@ -343,6 +369,36 @@ describe("the adapter contract stays honest", () => {
     for (const adapter of listAdapters()) {
       if (!adapter.oauth) continue
       expect(adapter.integrationType, `${adapter.key}`).toBe("api")
+    }
+  })
+
+  it("never both authorizes an account and merely names one", () => {
+    for (const adapter of listAdapters()) {
+      expect(adapter.oauth && adapter.accountHint, `${adapter.key}`).toBeFalsy()
+    }
+  })
+
+  it("only lets an assisted channel be marked submitted by hand", () => {
+    // Mark submitted writes `published` on a person's word. On a channel that
+    // can publish, the runner's confirmation is the only word that counts.
+    for (const adapter of listAdapters()) {
+      if (!adapter.submission) continue
+      expect(adapter.integrationType, `${adapter.key} takes a hand-marked submission`).toBe(
+        "assisted",
+      )
+    }
+  })
+
+  it("names its handoff renditions and choices as shapes and settings, never as a channel", () => {
+    for (const adapter of listAdapters()) {
+      for (const choice of adapter.choices ?? []) {
+        expect(choice.key, `${adapter.key} choice ${choice.key}`).toMatch(/^[a-z][A-Za-z0-9]*$/)
+        for (const key of CHANNEL_KEYS) {
+          expect(choice.key.toLowerCase(), `${adapter.key} choice ${choice.key}`).not.toContain(
+            key.replace(/_/g, ""),
+          )
+        }
+      }
     }
   })
 })

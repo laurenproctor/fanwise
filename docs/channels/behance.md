@@ -3,7 +3,10 @@
 The second assisted channel, and the first whose unit is not a product. Written on
 11 September 2026 against Behance's seller help center, the Behance Product Specific Terms
 (18 June 2024), the Adobe General Terms of Use (3 October 2025) and the Behance Community
-Guidelines. Planned as B9 and not built; the roadmap's B9 section says what it waits on.
+Guidelines. Planned as B9; **built on 17 September 2026** at the founder's request, ahead of
+A8 and of the profile in decision 26, so every **[verify]** below still stands and the two
+tables in §9 are guesses marked as such in the adapter. The roadmap's B9 section says what
+was built and what the exit run still owes.
 Items marked **[verify]** could not be confirmed from published documentation and need
 checking from inside a profile with a payment account connected, which is decision 26 in
 `docs/decisions/0002`.

@@ -1,5 +1,7 @@
 import { FONT_PROBLEM_TEXT } from "./detected"
 import {
+  archiveFontProblems,
+  archiveFonts,
   FONT_SECTIONS,
   GRID_SHAPES,
   MIN_HERO_WIDTH,
@@ -120,6 +122,11 @@ export function evaluateFontReadiness(input: FontReadinessInput): FontReadiness 
   const readable = fontFiles.filter(
     (file) => file.state === "ready" && file.reading.kind === "font",
   )
+  // Fonts read inside packages count as fonts buyers receive: one ZIP of a
+  // family is a complete upload.
+  const packagedFonts = files.flatMap((file) => archiveFonts(file))
+  const readableFontCount = readable.length + packagedFonts.length
+  const packagesWithProblems = files.filter((file) => archiveFontProblems(file).length > 0)
   const unreadable = fontFiles.filter(
     (file) => file.state === "ready" && file.reading.kind === "problem",
   )
@@ -139,8 +146,30 @@ export function evaluateFontReadiness(input: FontReadinessInput): FontReadiness 
     tone: "missing",
     scope: ALL,
     label: "Upload your font files",
-    message: "Buyers receive these. Add at least one OTF, TTF, WOFF or WOFF2 file.",
-    satisfied: readable.length > 0,
+    message:
+      "Buyers receive these. Add at least one OTF, TTF, WOFF or WOFF2 file, or a ZIP package of them.",
+    satisfied: readableFontCount > 0,
+  })
+
+  const firstPackage = packagesWithProblems[0]
+  const packagedProblemCount = packagesWithProblems.reduce(
+    (count, file) => count + archiveFontProblems(file).length,
+    0,
+  )
+  add({
+    key: "files.packagedFonts",
+    section: "files",
+    fieldId: FIELD_IDS.fileList,
+    severity: "attention",
+    tone: "problem",
+    scope: ALL,
+    label:
+      packagedProblemCount === 1
+        ? `Check the font file inside ${firstPackage?.filename ?? "the package"}`
+        : `Check ${packagedProblemCount} font files inside ${packagesWithProblems.length === 1 ? (firstPackage?.filename ?? "the package") : "your packages"}`,
+    message:
+      "Some fonts inside a package could not be read. Buyers would receive them as they are; open the contents to see which.",
+    satisfied: packagedProblemCount === 0,
   })
 
   const firstUnreadable = unreadable[0]
@@ -483,9 +512,10 @@ export function evaluateFontReadiness(input: FontReadinessInput): FontReadiness 
     satisfied: !web || web.monthlyPageviews !== undefined || (web.terms ?? "").trim().length > 0,
   })
 
-  const hasWebFormat = files.some(
-    (file) => file.state === "ready" && (file.format === "woff2" || file.format === "woff"),
-  )
+  const hasWebFormat =
+    files.some(
+      (file) => file.state === "ready" && (file.format === "woff2" || file.format === "woff"),
+    ) || packagedFonts.some((font) => font.format === "woff2" || font.format === "woff")
   add({
     key: "licensing.webFiles",
     section: "files",
@@ -495,7 +525,7 @@ export function evaluateFontReadiness(input: FontReadinessInput): FontReadiness 
     scope: ALL,
     label: "Add WOFF2 files for the web license",
     message: "Web licensees need webfont files. Upload WOFF2 alongside the desktop files.",
-    satisfied: !web || readable.length === 0 || hasWebFormat,
+    satisfied: !web || readableFontCount === 0 || hasWebFormat,
   })
 
   const embeds = licenses.some((license) => license.kind === "web" || license.kind === "app")

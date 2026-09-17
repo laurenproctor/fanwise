@@ -2,6 +2,7 @@ import { z } from "zod"
 import type { Database } from "@/lib/supabase/database.types"
 import type { Product, ProductAsset } from "@/lib/products/types"
 import type { ImageSpec } from "@/lib/products/derivatives"
+import type { HandoffImage, HandoffStep } from "./handoff"
 
 export type Channel = Database["public"]["Tables"]["channels"]["Row"]
 export type ChannelConnection = Database["public"]["Tables"]["channel_connections"]["Row"]
@@ -29,6 +30,7 @@ export const CHANNEL_KEYS = [
   "woocommerce",
   "etsy",
   "gumroad",
+  "behance",
 ] as const
 export type ChannelKey = (typeof CHANNEL_KEYS)[number]
 export const channelKeySchema = z.enum(CHANNEL_KEYS)
@@ -598,6 +600,110 @@ export interface PublishPace {
   minIntervalMs: number
 }
 
+/**
+ * How a channel with nothing to authorize against is connected.
+ *
+ * An assisted channel holds no credential, so Connect writes a row and starts
+ * no flow. What it still needs is which account the row is for: the profile a
+ * creator will submit to, so the connection can be named and so a second
+ * workspace cannot quietly claim the same one. The adapter parses what was
+ * typed for the same reason an OAuth adapter parses its account hint: the
+ * value becomes `external_account_id`, and a guess there is a wrong row.
+ */
+export interface AccountHintSpec {
+  label: string
+  placeholder: string
+  parse(raw: string): { ok: true; value: string; name: string } | { ok: false; message: string }
+}
+
+/**
+ * A per-listing setting the channel asks for that is not a listing field.
+ *
+ * A marketplace form has controls the canonical listing has no column for:
+ * which of its own creative fields a piece belongs to, which of two fixed
+ * licenses the seller grants, which of two ways the handoff should run. They
+ * are stored under `channel_listings.metadata[key]`, declared here as data so
+ * the editor renders them without knowing the channel, and read back by the
+ * adapter's requirements and handoff. The server validates a saved value
+ * against this declaration, so the browser cannot write a key the adapter did
+ * not ask for.
+ */
+export interface ListingChoiceOption {
+  value: string
+  label: string
+  /** One line under the label, when the option needs one. */
+  hint?: string
+}
+
+interface ListingChoiceBase {
+  /** The metadata key. camelCase, never a provider name. */
+  key: string
+  label: string
+  description?: string
+  /** Rendered only while another choice holds the named value. */
+  showWhen?: { key: string; value: string }
+}
+
+export type ListingChoiceSpec =
+  | (ListingChoiceBase & { kind: "single"; options: readonly ListingChoiceOption[] })
+  | (ListingChoiceBase & {
+      kind: "multiple"
+      options: readonly ListingChoiceOption[]
+      /** A ceiling the channel's own form enforces. */
+      max?: number
+    })
+  | (ListingChoiceBase & { kind: "text"; placeholder?: string; maxLength?: number })
+
+/**
+ * One rendition the handoff hands the creator, named by the adapter.
+ *
+ * Built by the derivative engine from the adapter's spec, cached on the
+ * source, and listed on the handoff as a download. `role` is what the file is
+ * for on the channel's form, in the adapter's words; `position` orders files
+ * that share a role.
+ */
+export interface HandoffRenditionSpec {
+  source: ProductAsset
+  spec: ImageSpec
+  role: string
+  position: number
+}
+
+/** A rendition as the handoff receives it: built, or not yet. */
+export interface HandoffRendition {
+  role: string
+  position: number
+  source: ProductAsset
+  /** The derivative row, once the engine has produced it. */
+  asset: ProductAsset | null
+}
+
+/** Everything an adapter's handoff is built from. */
+export interface HandoffInput {
+  draft: ChannelListingDraft
+  subject: AdapterSubject
+  /** The channel's images in channel order, as the generic handoff lists them. */
+  images: readonly HandoffImage[]
+  renditions: readonly HandoffRendition[]
+}
+
+/**
+ * How a creator tells Fanwise a listing they submitted by hand is up.
+ *
+ * Present only on an assisted channel, and the only way such a listing ever
+ * reaches `published`. The URL the creator pastes is the one handle Fanwise
+ * will hold on the listing; the adapter parses it, because the shape of a
+ * provider's address is the provider's business, and the id it yields is
+ * what keeps the same project from being claimed twice.
+ */
+export interface SubmissionSpec {
+  urlLabel: string
+  urlPlaceholder: string
+  parseUrl(
+    raw: string,
+  ): { ok: true; externalListingId: string; externalUrl: string } | { ok: false; message: string }
+}
+
 export interface ChannelAdapter {
   key: ChannelKey
   name: string
@@ -637,6 +743,25 @@ export interface ChannelAdapter {
   oauth?: ChannelOAuth
   /** Present on a channel that delivers events to Fanwise. ADR 0015. */
   webhooks?: ChannelWebhooks
+  /**
+   * Present on a channel connected by naming an account rather than
+   * authorizing one. Never alongside `oauth`.
+   */
+  accountHint?: AccountHintSpec
+  /** Settings the channel's form asks for beyond the listing fields. */
+  choices?: readonly ListingChoiceSpec[]
+  /**
+   * The renditions an assisted channel's handoff hands over. Built when the
+   * listing is built and matched to their rows when the handoff is shown.
+   */
+  handoffImages?(subject: AdapterSubject): HandoffRenditionSpec[]
+  /**
+   * The handoff in this channel's own order. Absent, the generic order in
+   * lib/channels/handoff.ts is used.
+   */
+  buildHandoff?(input: HandoffInput): HandoffStep[]
+  /** Mark submitted with URL capture. Assisted channels only. */
+  submission?: SubmissionSpec
   publish?(context: PublishContext): Promise<PublishResult>
   update?(context: PublishContext): Promise<PublishResult>
   /** Moves a provider draft to live. Required when a step gates activation. */
