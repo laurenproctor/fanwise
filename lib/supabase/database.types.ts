@@ -2089,6 +2089,7 @@ export type Database = {
         | "pdf"
         | "html"
         | "audio"
+        | "image"
       import_status:
         | "pending"
         | "retrieving"
@@ -2866,7 +2867,7 @@ export const Constants = {
         "unavailable",
         "removed",
       ],
-      import_source_type: ["public_url", "pasted_text", "pdf", "html", "audio"],
+      import_source_type: ["public_url", "pasted_text", "pdf", "html", "audio", "image"],
       import_status: [
         "pending",
         "retrieving",

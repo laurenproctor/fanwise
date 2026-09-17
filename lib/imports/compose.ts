@@ -171,6 +171,23 @@ export interface ComposedDraft {
   inputHash: string
 }
 
+/**
+ * Whether a source said anything a draft could be written from.
+ *
+ * A picture is evidence of a picture and nothing else. A session made only of
+ * pictures has nothing to hand a model, and asking one anyway would invite it
+ * to describe what it cannot see.
+ */
+export function hasWords(evidence: ProductSourceEvidence): boolean {
+  return Boolean(
+    evidence.title ||
+    evidence.summary ||
+    evidence.productType ||
+    evidence.bodyText ||
+    evidence.visibleFeatures.value.length > 0,
+  )
+}
+
 /** Strips the fence markers from page text so the fence cannot be closed early. */
 function defuse(text: string): string {
   return text.split(FENCE).join("").split(FENCE_END).join("")
@@ -184,6 +201,7 @@ const SOURCE_DESCRIPTIONS: Record<ProductSourceEvidence["provider"], string> = {
   pdf_document: "a PDF document the creator uploaded",
   html_document: "an HTML file the creator supplied",
   audio_recording: "a transcript of a recording the creator made",
+  image_file: "a picture the creator uploaded, which you cannot see",
 }
 
 export function renderEvidence(evidence: ProductSourceEvidence): string {
@@ -209,7 +227,11 @@ export function renderEvidence(evidence: ProductSourceEvidence): string {
 
   // The number of pictures, never their URLs. A URL in a prompt is a string a
   // stranger chose, and it buys nothing: the model cannot see them.
-  lines.push(`Pictures the page offers: ${evidence.previewAssets.length}`)
+  lines.push(
+    evidence.provider === "image_file"
+      ? `Pictures the creator uploaded: ${evidence.previewAssets.length}`
+      : `Pictures the page offers: ${evidence.previewAssets.length}`,
+  )
 
   return lines.join("\n")
 }

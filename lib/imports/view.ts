@@ -203,10 +203,13 @@ export const SOURCE_TYPE_LABELS: Record<ImportSourceType, string> = {
   pdf: "PDF",
   html: "HTML",
   audio: "Recording",
+  image: "Image",
 }
 
 function statusWordFor(type: ImportSourceType, status: string): string {
-  if (status === "ready") return type === "audio" ? "Transcribed" : "Read"
+  // A recording was transcribed and a picture was kept; only words are read.
+  if (status === "ready")
+    return type === "audio" ? "Transcribed" : type === "image" ? "Added" : "Read"
   if (status === "failed" || status === "unavailable") return "Needs attention"
   if (status === "transcribing") return "Transcribing"
   if (status === "reading") return "Reading"

@@ -62,6 +62,8 @@ export const IMPORT_ERROR_CODES = [
   "transcription_unavailable",
   /** A recording longer than the importer accepts. */
   "audio_too_long",
+  /** An uploaded picture Fanwise will not keep: not a raster image it decodes, too small, or too many pixels. */
+  "image_unusable",
 ] as const
 
 export type ImportErrorCode = (typeof IMPORT_ERROR_CODES)[number]
@@ -126,11 +128,13 @@ export const IMPORT_ERROR_MESSAGES: Record<ImportErrorCode, string> = {
     "None of your sources could be read. Each one below says why, and nothing was saved from them.",
   upload_incomplete: "That file did not finish uploading. Remove it and add it again.",
   unsupported_file:
-    "That file is not what its name says. Fanwise reads PDF, HTML and recorded audio, checked from the file itself.",
+    "That file is not what its name says. Fanwise reads PDF, HTML, images and recorded audio, checked from the file itself.",
   transcription_unavailable:
     "Transcription is not available on this Fanwise deployment, so the recording was not turned into text. Remove it, or type what you said instead.",
   audio_too_long:
     "That recording is longer than ten minutes, which is as much as Fanwise transcribes.",
+  image_unusable:
+    "That picture could not be used. Fanwise keeps PNG, JPEG, GIF and WebP images up to 8 MB, at least 32 pixels on each side and no more than 40 million pixels in all.",
 }
 
 /**
@@ -168,6 +172,7 @@ export const IMPORT_ERROR_RECOVERIES: Record<ImportErrorCode, readonly RecoveryA
   unsupported_file: ["paste_code", "continue_manually"],
   transcription_unavailable: ["paste_code", "continue_manually"],
   audio_too_long: ["paste_code", "continue_manually"],
+  image_unusable: ["upload_files", "continue_manually"],
 }
 
 /**

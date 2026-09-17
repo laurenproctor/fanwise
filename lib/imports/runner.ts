@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { buildStoragePath, uploadObject } from "@/lib/products/storage"
 import type { AiProvider } from "@/lib/ai/types"
 import { jobs, type JobQueue } from "@/lib/jobs"
-import { composeDraftFromSources, type ComposeDeps } from "./compose"
+import { composeDraftFromSources, hasWords, type ComposeDeps } from "./compose"
 import { detectConflicts, type LabelledEvidence } from "./conflicts"
 import {
   IMPORT_ERROR_MESSAGES,
@@ -15,7 +15,8 @@ import {
 import { toJson } from "./json"
 import { parseEvidence, type ProductSourceEvidence, type SourceAsset } from "./evidence"
 import { fetchPage, type FetchPageOptions } from "./retrieval/fetch-page"
-import { AssetSkipped, ASSET_LIMITS, fetchAsset } from "./retrieval/fetch-asset"
+import { AssetSkipped, ASSET_LIMITS, fetchAsset, type FetchedAsset } from "./retrieval/fetch-asset"
+import { asBuffer, inspectImage } from "./retrieval/image"
 import { importerFor } from "./sources/registry"
 import { CONTENT_IMPORTERS } from "./sources/content"
 import { isSourcePathFor, readStoredSource } from "./source-storage"
@@ -187,8 +188,14 @@ async function readOneSource(
     .eq("status", "pending")
 
   try {
-    const evidence = await readEvidence(workspaceId, source, deps)
-    const withAssets = await attachAssets(admin, workspaceId, importId, evidence)
+    const { evidence, bytes } = await readEvidence(workspaceId, source, deps)
+    const withAssets = await attachAssets(
+      admin,
+      workspaceId,
+      importId,
+      evidence,
+      source.source_type === "image" ? { bytes, filename: source.display_name } : undefined,
+    )
     await admin
       .from("product_import_sources")
       .update({
@@ -230,16 +237,20 @@ async function readOneSource(
  * this job runs for — the database checks the same thing when the row is
  * written, and this is the second lock on the one door that crosses a tenant
  * boundary.
+ *
+ * The stored bytes come back with the evidence, because for a picture they
+ * are the evidence: the runner copies them into the product's assets next.
  */
 async function readEvidence(
   workspaceId: string,
   source: SourceRow,
   deps: RunImportDeps,
-): Promise<ProductSourceEvidence> {
+): Promise<{ evidence: ProductSourceEvidence; bytes: Uint8Array }> {
   if (source.source_type === "public_url") {
     if (!source.source_url) throw new ImportError("internal", { reason: "source_url" })
     const page = await fetchPage(source.source_url, { outbound: deps.outbound })
-    return importerFor(new URL(source.source_url)).read(page, source.source_url)
+    const evidence = await importerFor(new URL(source.source_url)).read(page, source.source_url)
+    return { evidence, bytes: new Uint8Array() }
   }
 
   let bytes: Uint8Array = new Uint8Array()
@@ -257,11 +268,12 @@ async function readEvidence(
     }
   }
 
-  return CONTENT_IMPORTERS[CONTENT_KIND_FOR_TYPE[source.source_type]].read({
+  const evidence = await CONTENT_IMPORTERS[CONTENT_KIND_FOR_TYPE[source.source_type]].read({
     bytes,
     filename: source.source_type === "pasted_text" ? null : source.display_name,
     text: source.text_content,
   })
+  return { evidence, bytes }
 }
 
 /* -------------------------------------------------------------- composing */
@@ -414,6 +426,26 @@ export async function composeSession(
   const conflicts = detectConflicts(labelled)
   const unreadableNames = plan.unreadable.map((row) => row.display_name)
 
+  /*
+    Pictures alone. The sources were read and their pictures are on the
+    product, but there is not a word to draft from, and a model asked anyway
+    would describe what it cannot see. The session settles ready with the
+    reason recorded, the same way a missing model does, and the creator writes
+    the listing.
+  */
+  if (!labelled.some((source) => hasWords(source.evidence))) {
+    await settleReady(admin, workspaceId, importId, {
+      suggestions: toJson({
+        draft: { missingInformation: [] },
+        withheld: [],
+        trimmed: [],
+        unavailable: true,
+        reason: "no_words",
+      }),
+    })
+    return
+  }
+
   try {
     const composed = await composeDraftFromSources(labelled, conflicts, unreadableNames, {
       provider: deps.provider,
@@ -497,11 +529,14 @@ async function settleReady(
 /* ----------------------------------------------------------------- assets */
 
 /**
- * Fetches the pictures a source advertised into the product's own assets.
+ * Puts the pictures a source offered into the product's own assets.
  *
- * Each one is a URL a stranger chose, so each goes through the same outbound
- * boundary and the same signature and dimension checks; an asset that fails any
- * of them is recorded with the reason rather than dropped.
+ * A picture a page advertised is a URL a stranger chose, so it goes through the
+ * outbound boundary and then the same signature and dimension checks as any
+ * picture; an asset that fails any of them is recorded with the reason rather
+ * than dropped. A picture the creator uploaded is already in private storage:
+ * its bytes arrive with the evidence, are inspected the same way, and are
+ * copied into the product's assets from there.
  *
  * The product's first picture becomes the cover and the rest previews. With
  * several sources, "first" is decided by what the product already holds, so a
@@ -512,6 +547,7 @@ async function attachAssets(
   workspaceId: string,
   importId: string,
   evidence: ProductSourceEvidence,
+  uploaded?: { bytes: Uint8Array; filename: string },
 ): Promise<ProductSourceEvidence> {
   if (evidence.previewAssets.length === 0) return evidence
 
@@ -541,9 +577,11 @@ async function attachAssets(
     }
 
     try {
-      const fetched = await fetchAsset(asset.sourceUrl)
+      const fetched = asset.sourceUrl
+        ? await fetchAsset(asset.sourceUrl)
+        : await uploadedAsset(uploaded)
       const assetId = crypto.randomUUID()
-      const filename = filenameFor(asset.sourceUrl, fetched.mimeType)
+      const filename = filenameFor(asset.sourceUrl ?? uploaded?.filename ?? "", fetched.mimeType)
       const storagePath = buildStoragePath({ workspaceId, productId, assetId, filename })
 
       await uploadObject(storagePath, fetched.bytes, fetched.mimeType)
@@ -585,17 +623,36 @@ async function attachAssets(
   return { ...evidence, previewAssets: attached }
 }
 
-/** A storage filename from a URL, with the extension the bytes earned. */
-function filenameFor(sourceUrl: string, mimeType: string): string {
+/**
+ * A picture the creator uploaded, inspected as a fetched one would be.
+ *
+ * The bytes were inspected once when the pill was confirmed; inspecting them
+ * again here costs a header decode and means this function has the same
+ * contract as `fetchAsset`, whichever way the picture arrived.
+ */
+async function uploadedAsset(
+  uploaded: { bytes: Uint8Array; filename: string } | undefined,
+): Promise<FetchedAsset> {
+  if (!uploaded) throw new AssetSkipped("unreachable")
+  const bytes = asBuffer(uploaded.bytes)
+  const inspected = await inspectImage(bytes)
+  if (!inspected.ok) throw new AssetSkipped(inspected.problem)
+  return { ...inspected.image, bytes }
+}
+
+/** A storage filename from a URL or a file name, with the extension the bytes earned. */
+function filenameFor(source: string, mimeType: string): string {
   const extension = mimeType.split("/")[1]?.replace("jpeg", "jpg") ?? "bin"
   let stem = "preview"
+  let last: string
   try {
-    const last = new URL(sourceUrl).pathname.split("/").pop() ?? ""
-    const cleaned = last.replace(/\.[A-Za-z0-9]{1,8}$/, "").replace(/[^A-Za-z0-9_-]/g, "-")
-    if (cleaned.length > 0) stem = cleaned.slice(0, 60)
+    last = new URL(source).pathname.split("/").pop() ?? ""
   } catch {
-    // The default stands. The storage path is built from ids.
+    // Not an address: a file name the creator chose, minus any directory.
+    last = source.split(/[\\/]/).pop() ?? ""
   }
+  const cleaned = last.replace(/\.[A-Za-z0-9]{1,8}$/, "").replace(/[^A-Za-z0-9_-]/g, "-")
+  if (cleaned.length > 0) stem = cleaned.slice(0, 60)
   return `${stem}.${extension}`
 }
 

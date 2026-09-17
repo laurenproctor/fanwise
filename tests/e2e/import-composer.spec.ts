@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import sharp from "sharp"
 import { routes } from "@/lib/routes"
 import { newCreator } from "./support"
 
@@ -82,6 +83,46 @@ test("a link and an HTML file make one draft, and the failed link says so", asyn
   await expect(page.getByText("Canvas Tote").first()).toBeVisible()
 })
 
+test("a PNG and a GIF become product pictures, and a session of pictures says it had no words", async ({
+  page,
+}) => {
+  const { slug } = await newCreator(page, "cmp5", "Picture Studio")
+  await page.goto(routes.importProduct(slug))
+
+  const picture = (format: "png" | "gif") =>
+    sharp({ create: { width: 96, height: 64, channels: 3, background: "#3050c0" } })
+      .toFormat(format)
+      .toBuffer()
+  await page.locator('input[type="file"]').setInputFiles([
+    { name: "cover.png", mimeType: "image/png", buffer: await picture("png") },
+    { name: "loop.gif", mimeType: "image/gif", buffer: await picture("gif") },
+    // Named like a picture, but not one: refused from its bytes, with a reason.
+    { name: "fake.png", mimeType: "image/png", buffer: Buffer.from("not a picture at all") },
+  ])
+  const pills = page.getByRole("list", { name: "Added sources" })
+  await expect(pills.getByText("cover.png")).toBeVisible()
+  await expect(pills.getByText("Ready", { exact: true })).toHaveCount(2, { timeout: 20_000 })
+  await expect(pills.getByText("Needs attention", { exact: true })).toBeVisible()
+  await expect(pills.getByText(/not what its name says/)).toBeVisible()
+
+  // Create draft refuses to go around the refused one until it is removed.
+  await expect(page.getByRole("button", { name: "Create draft" })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  )
+  await page.getByRole("button", { name: "Remove fake.png" }).click()
+  await page.getByRole("button", { name: "Create draft" }).click()
+  await expect(page).toHaveURL(IMPORT_URL(slug), { timeout: 20_000 })
+
+  const sources = page.getByRole("region", { name: /Your sources/ })
+  await expect(sources.getByText("loop.gif")).toBeVisible({ timeout: 30_000 })
+  await expect(sources.getByText("Added", { exact: true })).toHaveCount(2, { timeout: 30_000 })
+  // No model is configured for the suite, and none would have been asked anyway.
+  await expect(page.getByText(/pictures with no words/)).toBeVisible({ timeout: 30_000 })
+  // The pictures are on the product, so the checklist no longer asks for them.
+  await expect(page.getByText("Preview images", { exact: true })).toHaveCount(0)
+})
+
 test("a refused microphone is said plainly, and the composer still works", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "mediaDevices", {
@@ -123,7 +164,7 @@ test("the composer can be used with the keyboard alone", async ({ page }) => {
 
   await page.keyboard.type("A canvas tote, printed by hand.")
   await page.keyboard.press("Tab")
-  await expect(page.getByRole("button", { name: "Add PDF or HTML" })).toBeFocused()
+  await expect(page.getByRole("button", { name: "Add files" })).toBeFocused()
   await page.keyboard.press("Tab")
   await expect(page.getByRole("button", { name: "Record" })).toBeFocused()
   await page.keyboard.press("Tab")

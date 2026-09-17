@@ -1,3 +1,4 @@
+import { isDerivableImage, sniffMimeType } from "@/lib/products/sniff"
 import type { ImportSourceType } from "./types"
 
 /**
@@ -16,8 +17,30 @@ export type SniffedType =
       mimeType: "audio/webm" | "audio/ogg" | "audio/mp4" | "audio/wav"
       extension: AudioExtension
     }
+  | { type: "image"; mimeType: ImageMimeType; extension: ImageExtension }
 
 export type AudioExtension = "webm" | "ogg" | "m4a" | "wav"
+export type ImageMimeType = "image/png" | "image/jpeg" | "image/gif" | "image/webp"
+export type ImageExtension = "png" | "jpg" | "gif" | "webp"
+
+export const IMAGE_EXTENSIONS: Record<ImageMimeType, ImageExtension> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/gif": "gif",
+  "image/webp": "webp",
+}
+
+/**
+ * A raster image Fanwise can decode, from its signature: the same table the
+ * asset pipeline trusts, so an uploaded picture and a fetched one are held to
+ * one rule. SVG is markup and is refused here as it is there.
+ */
+export function sniffImage(bytes: Uint8Array): SniffedType | null {
+  const mimeType = sniffMimeType(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength))
+  if (!isDerivableImage(mimeType)) return null
+  const known = mimeType as ImageMimeType
+  return { type: "image", mimeType: known, extension: IMAGE_EXTENSIONS[known] }
+}
 
 function startsWith(bytes: Uint8Array, signature: readonly number[], offset = 0): boolean {
   if (bytes.length < offset + signature.length) return false
@@ -64,6 +87,7 @@ export function sniff(
     return head.includes("%PDF-") ? { type: "pdf", mimeType: "application/pdf" } : null
   }
   if (declared === "audio") return sniffAudio(bytes)
+  if (declared === "image") return sniffImage(bytes)
 
   const head = bytes.subarray(0, 8192)
   if (head.includes(0)) return null

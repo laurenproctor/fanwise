@@ -438,6 +438,8 @@ const UNAVAILABLE_REASONS: Record<string, string> = {
   network: "the model could not be reached, so nothing was proposed.",
   provider_unavailable: "the model was unavailable, so nothing was proposed.",
   invalid_output: "the model's answer could not be used, so nothing was proposed.",
+  no_words:
+    "your sources were pictures with no words, so there was nothing to draft from. The pictures are on the product.",
 }
 
 function NoModelNotice({

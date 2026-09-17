@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useCallback, useEffect, useId, useReducer, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import {
+  FILE_INPUT_ACCEPT,
   checkFile,
   classifyInput,
   composerReducer,
@@ -35,7 +36,8 @@ import { useRecorder, type Recording } from "./use-recorder"
  * text, and becomes a "Pasted text" source when the draft is created — a
  * paragraph that mentions a URL is still a paragraph. Files and recordings are
  * uploaded the moment they are added, so a pill's status is what the server
- * found, not what the browser hoped.
+ * found, not what the browser hoped. A PDF or an HTML file is read for its
+ * words; a picture (PNG, JPEG, GIF, WebP) becomes a product image.
  *
  * The file bytes of each pill are kept in memory until the draft is created, so
  * a failed upload can be retried without choosing the file again.
@@ -347,7 +349,7 @@ export function UniversalComposer({ workspaceSlug }: { workspaceSlug: string }) 
           dragDepth.current += 1
           if (!dragging) {
             setDragging(true)
-            dispatch({ type: "announced", message: "Drop PDF or HTML files to add them." })
+            dispatch({ type: "announced", message: "Drop PDF, HTML or image files to add them." })
           }
         }}
         onDragOver={(event) => {
@@ -412,12 +414,14 @@ export function UniversalComposer({ workspaceSlug }: { workspaceSlug: string }) 
           className="max-h-[40vh] min-h-[2.25rem] w-full resize-none bg-transparent [field-sizing:content] font-display text-[clamp(1.125rem,2.2vw,1.375rem)] font-light leading-[1.4] tracking-[-0.01em] text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink-3)]"
         />
         <p id={helperId} className="mt-1 text-[14px] text-[var(--color-ink-2)]">
-          Or attach a PDF or HTML file, or describe the product aloud.
+          Or attach a PDF, an HTML file or a picture, or describe the product aloud.
         </p>
         <p id={limitsId} className="sr-only">
           Up to {IMPORT_LIMITS.maxSources} sources: one public link, PDFs up to{" "}
           {megabytes(IMPORT_LIMITS.maxPdfBytes)}, HTML files up to{" "}
-          {megabytes(IMPORT_LIMITS.maxHtmlBytes)}, and recordings up to ten minutes.
+          {megabytes(IMPORT_LIMITS.maxHtmlBytes)}, PNG, JPEG, GIF or WebP images up to{" "}
+          {megabytes(IMPORT_LIMITS.maxImageBytes)}, and recordings up to ten minutes. A picture
+          becomes a product image.
         </p>
 
         {state.sources.length > 0 ? (
@@ -457,7 +461,7 @@ export function UniversalComposer({ workspaceSlug }: { workspaceSlug: string }) 
               ref={fileInputRef}
               type="file"
               multiple
-              accept=".pdf,.html,.htm,application/pdf,text/html"
+              accept={FILE_INPUT_ACCEPT}
               className="sr-only"
               tabIndex={-1}
               aria-hidden
@@ -468,7 +472,7 @@ export function UniversalComposer({ workspaceSlug }: { workspaceSlug: string }) 
               }}
             />
             <ToolButton
-              label="Add PDF or HTML"
+              label="Add files"
               onClick={() => fileInputRef.current?.click()}
               disabled={submitting}
               icon={<PlusGlyph />}

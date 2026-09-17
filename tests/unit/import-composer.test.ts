@@ -65,11 +65,15 @@ describe("what was typed", () => {
 })
 
 describe("files", () => {
-  it("takes PDF and HTML by name, and refuses everything else", () => {
+  it("takes PDF, HTML and pictures by name, and refuses everything else", () => {
     expect(checkFile({ name: "brand-guidelines.pdf", size: 10 })).toEqual({ ok: true, type: "pdf" })
     expect(checkFile({ name: "Page.HTM", size: 10 })).toEqual({ ok: true, type: "html" })
-    expect(checkFile({ name: "photo.png", size: 10 })).toMatchObject({ ok: false })
+    for (const name of ["photo.png", "Photo.JPG", "photo.jpeg", "loop.gif", "cover.webp"]) {
+      expect(checkFile({ name, size: 10 }), name).toEqual({ ok: true, type: "image" })
+    }
     expect(checkFile({ name: "archive.pdf.zip", size: 10 })).toMatchObject({ ok: false })
+    expect(checkFile({ name: "logo.svg", size: 10 })).toMatchObject({ ok: false })
+    expect(checkFile({ name: "clip.mp4", size: 10 })).toMatchObject({ ok: false })
   })
 
   it("refuses an empty file and one over its limit", () => {
@@ -81,6 +85,13 @@ describe("files", () => {
       ok: false,
     })
     expect(checkFile({ name: "a.pdf", size: IMPORT_LIMITS.maxPdfBytes })).toMatchObject({
+      ok: true,
+    })
+    expect(checkFile({ name: "a.gif", size: IMPORT_LIMITS.maxImageBytes + 1 })).toMatchObject({
+      ok: false,
+      message: expect.stringContaining("an image"),
+    })
+    expect(checkFile({ name: "a.gif", size: IMPORT_LIMITS.maxImageBytes })).toMatchObject({
       ok: true,
     })
   })
