@@ -187,25 +187,58 @@ export const DRAFT_FIELDS = [
  * dialect the provider may not accept, and a unit test that parses a
  * schema-shaped answer with the Zod schema is what keeps the two agreeing.
  */
-function suggestedJson(value: Record<string, unknown>, description: string) {
+/**
+ * What the vendor's structured-output compiler takes, learned on 16 September
+ * 2026 when no production import had ever been composed (docs/product-link-import.md §17):
+ *
+ * - `minimum`, `maximum`, `maxItems`, `minLength` and `maxLength` are refused
+ *   outright. A cap travels in the description instead, and the Zod schema
+ *   still refuses an answer that ignores it.
+ * - A nullable enum is an `anyOf` of the enum and null, never a type list with
+ *   null inside the enum.
+ * - The compiled grammar has a size ceiling. Written out inline, with every
+ *   suggested field carrying its own confidence and evidence shape, the schema
+ *   is refused as "too large"; shared through `$defs` it compiles. The answer
+ *   has the same shape either way, so the Zod schema does not care.
+ *
+ * A unit test keeps the refused keywords out. The size ceiling can only be
+ * checked against the vendor, so a field added here is followed by one
+ * composition in a real environment.
+ */
+const CONFIDENCE_REF = { $ref: "#/$defs/confidence" }
+const EVIDENCE_REF = { $ref: "#/$defs/evidence" }
+
+function suggestedJson(value: Record<string, unknown>, description?: string) {
+  // A cap the vendor will not take as a keyword travels in the description
+  // instead; the Zod schema still refuses an answer that ignores it.
+  const own = typeof value.description === "string" ? value.description : undefined
+  const valueDescription = [description, own].filter(Boolean).join(" ")
   return {
     type: "object",
     additionalProperties: false,
     required: ["value", "confidence", "evidence"],
     properties: {
-      value: { ...value, description },
-      confidence: { type: "number", minimum: 0, maximum: 1 },
-      evidence: {
-        type: "array",
-        maxItems: 4,
-        items: { type: "string" },
-        description: "Short quotations from the page that support this value. Empty if none do.",
-      },
+      value: valueDescription ? { ...value, description: valueDescription } : value,
+      confidence: CONFIDENCE_REF,
+      evidence: EVIDENCE_REF,
     },
   }
 }
 
-const stringArray = (maxItems: number) => ({ type: "array", maxItems, items: { type: "string" } })
+/** A suggested field whose wrapper is one of the shared definitions. */
+function suggestedRef(definition: "suggestedString" | "suggestedStringList", description: string) {
+  return { $ref: `#/$defs/${definition}`, description }
+}
+
+function suggestedStrings(maxItems: number, description: string) {
+  return suggestedRef("suggestedStringList", `${description} At most ${maxItems} items.`)
+}
+
+const stringArray = (maxItems: number, description: string) => ({
+  type: "array",
+  items: { type: "string" },
+  description: `${description} At most ${maxItems} items.`,
+})
 const nullableInteger = { type: ["integer", "null"] }
 
 const DETAILS_JSON_SCHEMA = {
@@ -233,49 +266,41 @@ const DETAILS_JSON_SCHEMA = {
       ...nullableInteger,
       description: "Fonts: how many styles, weights or cuts the family includes.",
     },
-    styleNames: {
-      ...stringArray(100),
-      description: "Fonts: the names of the styles, as the source lists them.",
-    },
+    styleNames: stringArray(100, "Fonts: the names of the styles, as the source lists them."),
     isVariable: {
       type: ["boolean", "null"],
       description: "Fonts: whether the source says it is a variable font.",
     },
     fontFormats: {
       type: "array",
-      maxItems: FONT_FORMATS.length,
       items: { type: "string", enum: [...FONT_FORMATS] },
       description: "Fonts: file formats the source names.",
     },
     glyphCount: { ...nullableInteger, description: "Fonts: the glyph count the source states." },
     classification: {
-      type: ["string", "null"],
-      enum: [...FONT_CLASSIFICATIONS, null],
+      // A nullable enum is an anyOf for the vendor, never a type list with null in the enum.
+      anyOf: [{ type: "string", enum: [...FONT_CLASSIFICATIONS] }, { type: "null" }],
       description: "Fonts: the classification the source's own words support.",
     },
-    scripts: {
-      ...stringArray(64),
-      description: "Fonts: writing systems the source names, such as Latin, Cyrillic, Kana.",
-    },
-    languages: { ...stringArray(200), description: "Fonts: languages the source names." },
-    features: {
-      ...stringArray(64),
-      description:
-        "Fonts: OpenType feature tags the source names, four letters each (liga, dlig, salt, ss01, swsh, calt, smcp, frac, tnum, onum, kern).",
-    },
-    software: {
-      ...stringArray(20),
-      description: "Templates and themes: the software the source says it opens in.",
-    },
+    scripts: stringArray(
+      64,
+      "Fonts: writing systems the source names, such as Latin, Cyrillic, Kana.",
+    ),
+    languages: stringArray(200, "Fonts: languages the source names."),
+    features: stringArray(
+      64,
+      "Fonts: OpenType feature tags the source names, four letters each (liga, dlig, salt, ss01, swsh, calt, smcp, frac, tnum, onum, kern).",
+    ),
+    software: stringArray(20, "Templates and themes: the software the source says it opens in."),
     pageCount: { ...nullableInteger, description: "Templates: the page or slide count stated." },
     dimensions: {
       type: ["string", "null"],
       description: "Templates: the dimensions stated, as written.",
     },
-    fileFormats: {
-      ...stringArray(20),
-      description: "Graphics, photos, icons, mockups, brushes: file formats the source names.",
-    },
+    fileFormats: stringArray(
+      20,
+      "Graphics, photos, icons, mockups, brushes: file formats the source names.",
+    ),
     dpi: { ...nullableInteger, description: "Graphics: the resolution in DPI, when stated." },
     itemCount: {
       ...nullableInteger,
@@ -288,26 +313,37 @@ export const DRAFT_OUTPUT_JSON_SCHEMA: Record<string, unknown> = {
   type: "object",
   additionalProperties: false,
   required: [...DRAFT_FIELDS, "missingInformation"],
+  $defs: {
+    confidence: { type: "number", description: "Between 0 and 1." },
+    evidence: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "At most four short quotations from the page that support this value. Empty if none do.",
+    },
+    suggestedString: suggestedJson({ type: "string" }),
+    suggestedStringList: suggestedJson({ type: "array", items: { type: "string" } }),
+  },
   properties: {
-    title: suggestedJson({ type: "string" }, "A product name. Prefer the page's own wording."),
-    shortDescription: suggestedJson({ type: "string" }, "One or two sentences."),
-    longDescription: suggestedJson(
-      { type: "string" },
+    title: suggestedRef("suggestedString", "A product name. Prefer the page's own wording."),
+    shortDescription: suggestedRef("suggestedString", "One or two sentences."),
+    longDescription: suggestedRef(
+      "suggestedString",
       "Markdown: an opening paragraph or two, then sections under '## ' headings drawn from the source's own structure, '### ' for subsections, paragraphs separated by blank lines, bullet lists with '- ' where the evidence lists things. No '# ' heading, no links, no images, no emoji.",
     ),
     productType: suggestedJson(
       { type: "string", enum: [...PRODUCT_TYPES] },
       "The closest member of the list. Use other when nothing fits.",
     ),
-    features: suggestedJson(stringArray(12), "Things the page shows the product doing."),
-    useCases: suggestedJson(stringArray(8), "What somebody would use it for."),
-    audience: suggestedJson({ type: "string" }, "Who it appears to be for."),
-    tags: suggestedJson(
-      stringArray(15),
+    features: suggestedStrings(12, "Things the page shows the product doing."),
+    useCases: suggestedStrings(8, "What somebody would use it for."),
+    audience: suggestedRef("suggestedString", "Who it appears to be for."),
+    tags: suggestedStrings(
+      15,
       "Eight to fifteen lowercase search keywords a buyer would type: the kind of product, its style, and its uses, drawn from the evidence. Always filled.",
     ),
-    technicalRequirements: suggestedJson(
-      stringArray(8),
+    technicalRequirements: suggestedStrings(
+      8,
       "Only requirements the page itself states. Empty array if it states none.",
     ),
     details: suggestedJson(
@@ -327,9 +363,6 @@ export const DRAFT_OUTPUT_JSON_SCHEMA: Record<string, unknown> = {
       },
       "amount must be null unless the page states a price.",
     ),
-    missingInformation: {
-      ...stringArray(10),
-      description: "What a listing needs that the page did not say.",
-    },
+    missingInformation: stringArray(10, "What a listing needs that the page did not say."),
   },
 }
