@@ -1,6 +1,8 @@
 "use client"
 
 import { useId, useRef, useState, useTransition } from "react"
+import { useRegisterCommands } from "@/components/commands/command-provider"
+import { ADD_MEDIA_SHORTCUT, EDITOR_COMMAND_IDS } from "@/lib/commands/workspace"
 import { useRouter } from "next/navigation"
 import { FormError } from "@/components/ui/form-error"
 import {
@@ -127,6 +129,30 @@ export function ListingImages({
    * from it directly.
    */
   const dragDepth = useRef(0)
+
+  /*
+   * M, and the palette's "Add images", open the picker the tile opens. The
+   * input is the one below; clicking it is exactly what the tile's label does.
+   */
+  const picker = useRef<HTMLInputElement>(null)
+  useRegisterCommands([
+    {
+      id: EDITOR_COMMAND_IDS.addMedia,
+      label: "Add images",
+      description: channelName
+        ? `Choose image files for the ${channelName} listing.`
+        : "Choose image files for this product. The first becomes the cover.",
+      group: "page",
+      scope: "page",
+      keywords: ["media", "upload", "cover", "photo", "picture", "gallery"],
+      shortcuts: [ADD_MEDIA_SHORTCUT],
+      enabled: !uploading && !pending,
+      disabledReason: uploading
+        ? "An upload is still in progress."
+        : "The images are still being saved.",
+      execute: () => picker.current?.click(),
+    },
+  ])
 
   /*
    * Re-sync during render rather than in an effect. React's own guidance for
@@ -546,6 +572,7 @@ export function ListingImages({
                 : "Drop them here, or click"}
             </span>
             <input
+              ref={picker}
               type="file"
               accept="image/*"
               multiple

@@ -131,6 +131,7 @@ export function CatalogList({ rows }: { rows: readonly CatalogRow[] }) {
         {rows.map((row) => (
           <li
             key={row.id}
+            data-catalog-row=""
             className={`${COLUMNS} group flex flex-col gap-3 border-b border-[var(--color-rule-2)] px-2 py-4 transition-colors last:border-b-0 hover:bg-[var(--color-paper-2)]`}
           >
             {/*
@@ -144,6 +145,7 @@ export function CatalogList({ rows }: { rows: readonly CatalogRow[] }) {
               <span className="flex min-w-0 flex-col gap-1">
                 <Link
                   href={row.href}
+                  data-catalog-link=""
                   className="font-display text-[17px] font-normal tracking-[-0.01em] break-words transition-colors after:absolute after:inset-0 after:content-[''] group-hover:text-[var(--color-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
                 >
                   {row.name}

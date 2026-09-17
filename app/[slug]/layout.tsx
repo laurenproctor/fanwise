@@ -2,7 +2,12 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { signOutAction } from "@/lib/workspaces/actions"
 import { getCurrentUser, getWorkspaceBySlug } from "@/lib/workspaces/queries"
+import { listProducts } from "@/lib/products/queries"
+import { getProfileForSettings } from "@/lib/public/workspace-queries"
 import { routes } from "@/lib/routes"
+import { CommandProvider } from "@/components/commands/command-provider"
+import { CommandsButton } from "@/components/commands/commands-button"
+import { WorkspaceCommands } from "@/components/commands/workspace-commands"
 import { FanMark } from "@/components/marketing/logo"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { WorkspaceNav } from "./workspace-nav"
@@ -29,54 +34,84 @@ export default async function WorkspaceLayout({
   const workspace = await getWorkspaceBySlug(slug)
   if (!workspace) notFound()
 
+  /*
+   * What the command palette can name: the catalog's products, by name and
+   * slug, and the public profile's address. Both are reads the pages already
+   * make, through RLS, and a layout runs them once per full load rather than
+   * once per navigation. A product created in this session is reachable
+   * through the palette after the next full load; until then it is one
+   * click away in the catalog, which is not a wait worth a second query.
+   */
+  const [products, profile] = await Promise.all([
+    listProducts(workspace.id),
+    getProfileForSettings(workspace.id),
+  ])
+
   return (
-    <div className="min-h-dvh">
-      <header className="border-b border-[var(--color-rule)]">
-        {/*
+    <CommandProvider workspaceSlug={workspace.slug}>
+      <WorkspaceCommands
+        workspaceSlug={workspace.slug}
+        products={products.map((product) => ({
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          productType: product.product_type,
+        }))}
+        profile={
+          profile ? { handle: profile.profile.handle, status: profile.profile.status } : null
+        }
+      />
+      <div className="min-h-dvh">
+        <header className="border-b border-[var(--color-rule)]">
+          {/*
           One row on a laptop and wider, with the sections centred between the
           identity and the account controls. Narrower than that the sections take
           a second row of their own rather than squeezing a long workspace name
           into nothing.
         */}
-        <div className="mx-auto flex w-full max-w-[1160px] flex-wrap items-center gap-x-4 px-6 pt-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:gap-x-6 lg:py-3">
-          <Link
-            href={routes.workspace(workspace.slug)}
-            className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-[6px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] sm:gap-4 lg:justify-self-start"
-          >
-            <span className="flex shrink-0 items-center gap-2 text-[var(--color-ink)]">
-              <FanMark size={22} />
-              <span className="font-display text-[19px] font-normal tracking-[-0.02em] max-sm:sr-only">
-                Fanwise
+          <div className="mx-auto flex w-full max-w-[1160px] flex-wrap items-center gap-x-4 px-6 pt-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:gap-x-6 lg:py-3">
+            <Link
+              href={routes.workspace(workspace.slug)}
+              className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-[6px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] sm:gap-4 lg:justify-self-start"
+            >
+              <span className="flex shrink-0 items-center gap-2 text-[var(--color-ink)]">
+                <FanMark size={22} />
+                <span className="font-display text-[19px] font-normal tracking-[-0.02em] max-sm:sr-only">
+                  Fanwise
+                </span>
               </span>
-            </span>
-            <span aria-hidden="true" className="h-5 w-px shrink-0 bg-[var(--color-rule)]" />
-            <span className="truncate text-[15px] text-[var(--color-ink)]">{workspace.name}</span>
-          </Link>
-          {/*
+              <span aria-hidden="true" className="h-5 w-px shrink-0 bg-[var(--color-rule)]" />
+              <span className="truncate text-[15px] text-[var(--color-ink)]">{workspace.name}</span>
+            </Link>
+            {/*
             Products is listed although the identity link to the left also goes
             to the catalog. The identity says whose workspace this is; the
             sections say where in it you are, and a section list with the
             catalog missing has nowhere to put the current-page marker.
           */}
-          <WorkspaceNav
-            workspaceSlug={workspace.slug}
-            className="order-last -mx-3 w-[calc(100%+1.5rem)] lg:order-none lg:mx-0 lg:w-auto"
-          />
-          <div className="flex shrink-0 items-center gap-3 lg:justify-self-end lg:gap-4">
-            <ThemeToggle />
-            <span aria-hidden="true" className="h-5 w-px bg-[var(--color-rule)]" />
-            <form action={signOutAction}>
-              <button
-                type="submit"
-                className="min-h-11 rounded-[6px] text-[14px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
-              >
-                Sign out
-              </button>
-            </form>
+            <WorkspaceNav
+              workspaceSlug={workspace.slug}
+              className="order-last -mx-3 w-[calc(100%+1.5rem)] lg:order-none lg:mx-0 lg:w-auto"
+            />
+            <div className="flex shrink-0 items-center gap-3 lg:justify-self-end lg:gap-4">
+              {/* Desktop only; renders nothing narrower than a laptop. */}
+              <CommandsButton />
+              <ThemeToggle />
+              <span aria-hidden="true" className="h-5 w-px bg-[var(--color-rule)]" />
+              {/* The palette's Sign out submits this same form. */}
+              <form action={signOutAction} data-command-target="sign-out">
+                <button
+                  type="submit"
+                  className="min-h-11 rounded-[6px] text-[14px] text-[var(--color-ink-2)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                >
+                  Sign out
+                </button>
+              </form>
+            </div>
           </div>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-[1160px] px-6 py-10">{children}</main>
-    </div>
+        </header>
+        <main className="mx-auto w-full max-w-[1160px] px-6 py-10">{children}</main>
+      </div>
+    </CommandProvider>
   )
 }

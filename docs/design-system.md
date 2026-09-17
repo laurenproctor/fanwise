@@ -103,6 +103,12 @@ uppercase, display face at 17px in the first column, tabular numbers everywhere,
 x n = total`, set in large extralight Archivo with the total in accent. Reuse it wherever
 pricing is explained. It is the most memorable thing in the system.
 
+**Keycaps** are mono at 10px, uppercase, on a 5px-radius hairline tile of the raised
+paper (`components/commands/kbd.tsx`). They label a shortcut beside the button it presses,
+in the command palette (⌘K) and in the shortcut reference (?); the system behind them is
+`docs/keyboard-commands.md`. The palette and the reference are native dialogs with the
+16px card radius, and the `F` guide is a pill along the bottom of the window.
+
 **The fan mark** is five strokes radiating from a filled pivot dot, drawn on a 24 by 24
 viewBox with `stroke-width: 1.5` and round caps, taking `currentColor`. The same geometry
 scales up into the hero canvas as six beams from one light source.

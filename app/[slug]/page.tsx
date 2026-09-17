@@ -6,6 +6,7 @@ import { ButtonLink } from "@/components/ui/button"
 import { FirstRun } from "@/components/onboarding/first-run"
 import { routes } from "@/lib/routes"
 import { CatalogControls } from "./catalog-controls"
+import { CatalogKeyboard } from "./catalog-keyboard"
 import { CatalogList, toRow } from "./catalog-list"
 
 export const metadata = { title: "Products · Fanwise" }
@@ -99,7 +100,13 @@ export default async function ProductsPage({
         </p>
       </div>
 
-      {rows.length === 0 ? <NoResults workspaceSlug={slug} /> : <CatalogList rows={rows} />}
+      {rows.length === 0 ? (
+        <NoResults workspaceSlug={slug} />
+      ) : (
+        <CatalogKeyboard>
+          <CatalogList rows={rows} />
+        </CatalogKeyboard>
+      )}
     </div>
   )
 }

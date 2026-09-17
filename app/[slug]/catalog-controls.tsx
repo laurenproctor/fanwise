@@ -72,6 +72,7 @@ export function CatalogControls({
           <input
             type="search"
             name="q"
+            data-command-target="product-search"
             defaultValue={query}
             placeholder="Product name or type"
             className="w-full rounded-[10px] border border-[var(--color-rule)] bg-[var(--color-card)] py-2.5 pl-9 pr-3 text-[15px] text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink-3)] focus:border-[var(--color-accent)]"

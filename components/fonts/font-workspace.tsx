@@ -5,6 +5,14 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { SaveStatusIndicator } from "@/components/ui/save-status"
+import { useRegisterCommands } from "@/components/commands/command-provider"
+import { ShortcutHint, useAriaKeyShortcuts } from "@/components/commands/shortcut-hint"
+import {
+  EDITOR_COMMAND_IDS,
+  PREVIEW_SHORTCUT,
+  PUBLISH_SHORTCUT,
+  SAVE_SHORTCUT,
+} from "@/lib/commands/workspace"
 import type { ChannelListingCard } from "@/components/channels/listing-panel"
 import type { RunChannelSummary } from "@/components/channels/publish-everywhere"
 import { routes } from "@/lib/routes"
@@ -454,6 +462,62 @@ export function FontWorkspace(props: FontWorkspaceProps) {
 
   const name = values.name.trim() || "Untitled font"
 
+  /*
+   * The keyboard's three: the same flush, the same publish and the same
+   * dialog the header's controls use. Publish carries the header's own
+   * blocked reason, and is absent where the header has no Publish at all.
+   */
+  const saveReason =
+    autosave.status === "saving"
+      ? "A save is already in progress."
+      : autosave.unsaved
+        ? null
+        : "Nothing to save. Changes save themselves."
+  const publishReason = !props.canPublishSomewhere
+    ? "No connected channel can be published to from Fanwise."
+    : publishing
+      ? "Publishing is starting."
+      : publishBlockedReason
+  useRegisterCommands([
+    {
+      id: EDITOR_COMMAND_IDS.save,
+      label: "Save draft",
+      description: "Save the font now, without waiting for autosave.",
+      group: "page",
+      scope: "page",
+      keywords: ["save", "draft"],
+      shortcuts: [SAVE_SHORTCUT],
+      enabled: saveReason === null,
+      disabledReason: saveReason ?? undefined,
+      execute: () => void autosave.flush(),
+    },
+    {
+      id: EDITOR_COMMAND_IDS.publish,
+      label: "Publish everywhere",
+      description: "Send this font to every channel that is ready for it.",
+      group: "page",
+      scope: "page",
+      keywords: ["publish", "send", "channels"],
+      shortcuts: [PUBLISH_SHORTCUT],
+      enabled: publishReason === null,
+      disabledReason: publishReason ?? undefined,
+      execute: () => void publish(),
+    },
+    {
+      id: EDITOR_COMMAND_IDS.preview,
+      label: "Preview storefront",
+      description: `How ${name} reads on a storefront.`,
+      group: "page",
+      scope: "page",
+      keywords: ["preview", "storefront", "specimen"],
+      shortcuts: [PREVIEW_SHORTCUT],
+      enabled: true,
+      execute: () => previewDialog.current?.showModal(),
+    },
+  ])
+  const previewKeys = useAriaKeyShortcuts(EDITOR_COMMAND_IDS.preview)
+  const publishKeys = useAriaKeyShortcuts(EDITOR_COMMAND_IDS.publish)
+
   return (
     <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-8">
       <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
@@ -490,22 +554,28 @@ export function FontWorkspace(props: FontWorkspaceProps) {
                 Try again
               </button>
             ) : null}
+            <ShortcutHint commandId={EDITOR_COMMAND_IDS.preview} />
             <Button
               variant="secondary"
               className="px-[18px] py-[9px]"
               onClick={() => previewDialog.current?.showModal()}
+              aria-keyshortcuts={previewKeys}
             >
               Preview
             </Button>
             {props.canPublishSomewhere ? (
-              <Button
-                className="px-[20px] py-[9px]"
-                disabled={publishing || publishBlockedReason !== null}
-                aria-describedby={publishBlockedReason ? "font-publish-blocked" : undefined}
-                onClick={() => void publish()}
-              >
-                {publishing ? "Publishing…" : "Publish"}
-              </Button>
+              <>
+                <ShortcutHint commandId={EDITOR_COMMAND_IDS.publish} />
+                <Button
+                  className="px-[20px] py-[9px]"
+                  disabled={publishing || publishBlockedReason !== null}
+                  aria-describedby={publishBlockedReason ? "font-publish-blocked" : undefined}
+                  onClick={() => void publish()}
+                  aria-keyshortcuts={publishKeys}
+                >
+                  {publishing ? "Publishing…" : "Publish"}
+                </Button>
+              </>
             ) : null}
           </div>
           {props.canPublishSomewhere && publishBlockedReason ? (

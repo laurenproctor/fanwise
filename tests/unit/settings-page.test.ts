@@ -322,9 +322,9 @@ describe("the settings page", () => {
    * holds that side), and a second way in from here would be two answers to
    * "where is my profile".
    */
-  it("renders three sections, in order, and no fourth", () => {
+  it("renders four sections, in order, and no profile among them", () => {
     const headings = [...code.matchAll(/heading="([^"]+)"/g)].map((m) => m[1])
-    expect(headings).toEqual(["Studio details", "Subscription", "Account"])
+    expect(headings).toEqual(["Studio details", "Subscription", "Account", "Keyboard"])
   })
 
   it("is no longer a way into the public profile", () => {
