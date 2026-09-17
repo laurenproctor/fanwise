@@ -124,7 +124,16 @@ that makes the row ready, so a ready font with neither was settled by a worker b
 before fonts were read (worker deploys are by hand and lag `main`). The font workspace
 asks for each such row to be read (`readFontFileAction`, which queues `finalize_asset`
 again); on a ready row the job writes `metadata` only, which the immutability trigger
-permits, and a re-upload is never needed. Decodable images get
+permits, and a re-upload is never needed. A ZIP package (`asset_type = 'archive'`, sniffed `application/zip`) gets `metadata.archive`
+since 17 September 2026: its table of contents, with every font inside read by the same
+inspector as a loose file (`lib/fonts/archive.ts`, bounded at 500 entries listed, 100 fonts
+read, 64 MB per font and 256 MB in all; `__MACOSX` and `.DS_Store` leftovers counted, not
+listed), or `metadata.archiveProblem` when the ZIP cannot be opened (malformed, or ZIP64 and
+split archives, which are refused). The package itself is delivered as uploaded; nothing is
+unpacked into storage. The font workspace detects a family from packaged fonts exactly as
+from loose ones, the readiness blocker `files.present` counts them, and the FactSheet's
+deliverable formats include what the package holds. A ready package with neither key was
+settled by an older worker and is read on request like an unread font. Decodable images get
 `metadata.width` and `height`; product images add `metadata.altText` and
 `metadata.altTextSource` (`creator` or `generated`, ADR 0014), written by the creator from
 the product page or the font workspace, or suggested by the `describe_image` job after the

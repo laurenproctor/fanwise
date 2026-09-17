@@ -6,11 +6,15 @@ import { uploadProductFile } from "@/lib/products/upload-client"
 import { useBackgroundRefresh } from "@/lib/use-background-refresh"
 import { readFontFileAction } from "@/lib/fonts/actions"
 import {
+  ARCHIVE_ENTRY_PROBLEM_TEXT,
+  ARCHIVE_PROBLEM_TEXT,
   FONT_PROBLEM_TEXT,
   WIDTH_NAMES,
   formatFromFilename,
   weightLabel,
+  type ArchiveEntry,
 } from "@/lib/fonts/detected"
+import { collectDroppedFiles, pickedFolder } from "@/lib/fonts/dropped-files"
 import { FIELD_IDS } from "@/lib/fonts/readiness"
 import { unreadFontFiles, type FontFileView } from "@/lib/fonts/workspace"
 import type { AssetType } from "@/lib/products/types"
@@ -97,6 +101,7 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
   const [removing, setRemoving] = useState(false)
   const [announcement, setAnnouncement] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
+  const folderRef = useRef<HTMLInputElement>(null)
   const replaceRef = useRef<HTMLInputElement>(null)
   const replaceTarget = useRef<FontFileView | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -230,14 +235,23 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
     }
   }, [removals, workspaceSlug, refresh])
 
-  async function start(file: File, options: { replaces?: string; allowDuplicate?: boolean } = {}) {
+  type StartOutcome = "started" | "rejected" | "skipped"
+
+  async function start(
+    file: File,
+    options: { replaces?: string; allowDuplicate?: boolean; quiet?: boolean } = {},
+  ): Promise<StartOutcome> {
     const accepted = classify(file)
     if ("rejected" in accepted) {
-      setNotices((n) => [
-        ...n,
-        { id: crypto.randomUUID(), filename: file.name, message: accepted.rejected },
-      ])
-      return
+      // A folder says its rejections once, in `startAll`; a single file says
+      // its own.
+      if (!options.quiet) {
+        setNotices((n) => [
+          ...n,
+          { id: crypto.randomUUID(), filename: file.name, message: accepted.rejected },
+        ])
+      }
+      return "rejected"
     }
 
     if (!options.allowDuplicate && !options.replaces) {
@@ -253,7 +267,7 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
             retry: file,
           },
         ])
-        return
+        return "skipped"
       }
     }
 
@@ -282,7 +296,7 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
       if (result.error) {
         patch(localId, { state: "failed", assetId: result.assetId, error: result.error })
         setAnnouncement(`${file.name} did not upload.`)
-        return
+        return "started"
       }
       patch(localId, { state: "processing", assetId: result.assetId })
       ctx.refresh()
@@ -293,19 +307,38 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
       })
       setAnnouncement(`${file.name} did not upload.`)
     }
+    return "started"
   }
 
-  async function startAll(list: FileList | File[]) {
+  /**
+   * Uploads a batch. From a folder, the files that are not font files (a
+   * readme, an installer) are named in one notice rather than one each: a
+   * foundry's folder has several, and none of them is a mistake to fix.
+   */
+  async function startAll(list: FileList | File[], options: { folder?: string } = {}) {
     // One at a time: a family is many small files, and parallel PUTs mostly
     // compete with each other on a creator's upload link.
     const batch = Array.from(list)
+    const rejected: string[] = []
     setQueued((n) => n + batch.length)
     for (const file of batch) {
       try {
-        await start(file)
+        const outcome = await start(file, { quiet: options.folder !== undefined })
+        if (outcome === "rejected") rejected.push(file.name)
       } finally {
         setQueued((n) => n - 1)
       }
+    }
+    if (options.folder !== undefined && rejected.length > 0) {
+      const shown = rejected.slice(0, 5).join(", ")
+      setNotices((n) => [
+        ...n,
+        {
+          id: crypto.randomUUID(),
+          filename: options.folder || "Folder",
+          message: `${rejected.length} ${rejected.length === 1 ? "file was" : "files were"} left out because ${rejected.length === 1 ? "it is" : "they are"} not font files: ${shown}${rejected.length > 5 ? ` and ${rejected.length - 5} more` : ""}.`,
+        },
+      ])
     }
   }
 
@@ -328,7 +361,23 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
   function onDrop(event: DragEvent) {
     event.preventDefault()
     setDragging(false)
-    if (event.dataTransfer.files.length > 0) void startAll(event.dataTransfer.files)
+    // Entries are taken from the transfer now, synchronously; the folders are
+    // walked after the event has returned.
+    const dropped = collectDroppedFiles(event.dataTransfer)
+    void dropped.then(async ({ loose, fromFolders, folders }) => {
+      if (loose.length > 0) await startAll(loose)
+      if (fromFolders.length > 0) await startAll(fromFolders, { folder: folders.join(", ") })
+      if (folders.length > 0 && fromFolders.length === 0) {
+        setNotices((n) => [
+          ...n,
+          {
+            id: crypto.randomUUID(),
+            filename: folders.join(", "),
+            message: "That folder holds no files Fanwise can take.",
+          },
+        ])
+      }
+    })
   }
 
   async function confirmRemove() {
@@ -404,18 +453,49 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
             : "border-[var(--color-rule)]"
         }`}
       >
-        <p className="text-[15px]">Drop font files here</p>
+        <p className="text-[15px]">Drop font files, a folder or a ZIP here</p>
         <p className="text-[13px] text-[var(--color-ink-3)]">
-          OTF, TTF, WOFF and WOFF2, including variable fonts. A ZIP package or a PDF specimen or
-          license can go here too.
+          OTF, TTF, WOFF and WOFF2, including variable fonts. A folder is uploaded file by file; a
+          ZIP package is delivered as one file and Fanwise reads the fonts inside it. A PDF specimen
+          or license can go here too.
         </p>
-        <button
-          type="button"
-          className={QUIET_BUTTON_CLASS}
-          onClick={() => inputRef.current?.click()}
-        >
-          Choose files
-        </button>
+        <span className="flex flex-wrap justify-center gap-2">
+          <button
+            type="button"
+            className={QUIET_BUTTON_CLASS}
+            onClick={() => inputRef.current?.click()}
+          >
+            Choose files
+          </button>
+          <button
+            type="button"
+            className={QUIET_BUTTON_CLASS}
+            onClick={() => folderRef.current?.click()}
+          >
+            Choose a folder
+          </button>
+        </span>
+        {/*
+          webkitdirectory is not in React's attribute types, so it is spread
+          in. Every current browser honours it; one that does not shows the
+          ordinary picker, which still works.
+        */}
+        <input
+          ref={folderRef}
+          type="file"
+          multiple
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden
+          {...{ webkitdirectory: "" }}
+          onChange={(event) => {
+            const picked = pickedFolder(Array.from(event.target.files ?? []))
+            event.target.value = ""
+            if (picked.files.length > 0) {
+              void startAll(picked.files, { folder: picked.folder ?? "Folder" })
+            }
+          }}
+        />
         <input
           ref={inputRef}
           type="file"
@@ -535,8 +615,8 @@ export function FontFilesSection({ ctx }: { ctx: SectionContext }) {
       </div>
 
       <p className="text-[12.5px] text-[var(--color-ink-3)]">
-        ZIP packages are delivered as uploaded. Fanwise does not unpack them, so upload the font
-        files themselves as well if you want their details detected.
+        ZIP packages are delivered to buyers exactly as uploaded. Fanwise looks inside to read the
+        fonts and list the contents, so you can check the package is what you meant to ship.
       </p>
 
       <dialog
@@ -589,7 +669,39 @@ function rowStatus(
   if (file.reading.kind === "problem") {
     return { status: "error", text: FONT_PROBLEM_TEXT[file.reading.problem] }
   }
-  if (file.kind === "archive") return { status: "complete", text: "Package, not inspected" }
+  if (file.kind === "archive") {
+    if (file.archive.kind === "problem") {
+      return { status: "error", text: ARCHIVE_PROBLEM_TEXT[file.archive.problem] }
+    }
+    if (file.archive.kind === "archive") {
+      const { fontCount, entryCount } = file.archive.contents
+      if (fontCount === 0) {
+        return {
+          status: "attention",
+          text: `Package with no font files inside (${entryCount} ${entryCount === 1 ? "file" : "files"})`,
+        }
+      }
+      const unreadable = file.archive.contents.entries.filter(
+        (entry) => entry.kind === "font" && entry.problem,
+      ).length
+      return unreadable > 0
+        ? {
+            status: "attention",
+            text: `Package · ${fontCount} ${fontCount === 1 ? "font" : "fonts"} inside, ${unreadable} could not be read`,
+          }
+        : {
+            status: "complete",
+            text: `Package · ${fontCount} ${fontCount === 1 ? "font" : "fonts"} read inside`,
+          }
+    }
+    if (readRequest === "stalled") {
+      return { status: "attention", text: "Fanwise could not look inside this package yet." }
+    }
+    return {
+      status: "incomplete",
+      text: readRequest === "reading" ? "Looking inside…" : "Not looked inside yet",
+    }
+  }
   if (file.kind === "document") {
     return {
       status: "complete",
@@ -620,7 +732,12 @@ function FileRow({
 }) {
   const { status, text } = rowStatus(file, readRequest)
   const font = file.reading.kind === "font" ? file.reading.font : null
-  const style = font ? [font.familyName, font.styleName].filter(Boolean).join(" · ") : null
+  const contents = file.archive.kind === "archive" ? file.archive.contents : null
+  const style = font
+    ? [font.familyName, font.styleName].filter(Boolean).join(" · ")
+    : contents
+      ? packageSummary(contents.entries)
+      : null
 
   return (
     <li className="flex flex-col gap-2 py-3">
@@ -634,7 +751,12 @@ function FileRow({
             </span>
             <span className="tabular-nums"> · {formatBytes(file.byteSize)}</span>
             {" · "}
-            {style ?? (file.kind === "font" ? "Family and style unknown" : "Not a font file")}
+            {style ??
+              (file.kind === "font"
+                ? "Family and style unknown"
+                : file.kind === "archive"
+                  ? "Package"
+                  : "Not a font file")}
           </p>
         </div>
         <span className="flex shrink-0 gap-1.5">
@@ -671,6 +793,41 @@ function FileRow({
           ) : null}
         </span>
       </p>
+
+      {contents ? (
+        <details className="text-[12.5px]">
+          <summary className="w-fit cursor-pointer text-[var(--color-ink-3)] hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]">
+            Contents, {contents.entryCount} {contents.entryCount === 1 ? "file" : "files"}
+            <span className="sr-only"> of {file.filename}</span>
+          </summary>
+          <ul className="mt-2 flex flex-col divide-y divide-[var(--color-rule-2)]">
+            {contents.entries.map((entry) => (
+              <li
+                key={entry.path}
+                className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-1.5"
+              >
+                <span className="min-w-0 break-all font-mono text-[11.5px] text-[var(--color-ink)]">
+                  {entry.path}
+                </span>
+                <span className="flex min-w-0 items-baseline gap-2 text-[var(--color-ink-2)]">
+                  <span className="tabular-nums text-[var(--color-ink-3)]">
+                    {formatBytes(entry.byteSize)}
+                  </span>
+                  <span className="min-w-0">{describeEntry(entry)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {contents.ignoredCount > 0 || contents.truncated ? (
+            <p className="mt-2 text-[var(--color-ink-3)]">
+              {contents.ignoredCount > 0
+                ? `${contents.ignoredCount} system ${contents.ignoredCount === 1 ? "file" : "files"} (.DS_Store and the like) left out. `
+                : ""}
+              {contents.truncated ? "The package holds more files than are listed here." : ""}
+            </p>
+          ) : null}
+        </details>
+      ) : null}
 
       {font ? (
         <details className="text-[12.5px]">
@@ -718,6 +875,28 @@ function FileRow({
       ) : null}
     </li>
   )
+}
+
+/** "Blimp Display, 6 fonts" from what a package holds, for the row's one line. */
+function packageSummary(entries: readonly ArchiveEntry[]): string {
+  const fonts = entries.flatMap((entry) => (entry.font ? [entry.font] : []))
+  const families = [...new Set(fonts.flatMap((font) => (font.familyName ? [font.familyName] : [])))]
+  const parts = [
+    families.join(" / ") || null,
+    `${fonts.length} ${fonts.length === 1 ? "font" : "fonts"}`,
+  ].filter(Boolean)
+  return parts.join(" · ")
+}
+
+function describeEntry(entry: ArchiveEntry): string {
+  if (entry.font) {
+    return (
+      [entry.font.familyName, entry.font.styleName].filter(Boolean).join(" · ") ||
+      "Font, family and style unknown"
+    )
+  }
+  if (entry.problem) return ARCHIVE_ENTRY_PROBLEM_TEXT[entry.problem]
+  return { font: "Font", document: "Document", image: "Image", other: "Other file" }[entry.kind]
 }
 
 function Detail({ term, value }: { term: string; value: string | undefined }) {
