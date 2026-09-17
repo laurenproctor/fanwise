@@ -17,6 +17,7 @@ const stubs = {
   sync_billing: async () => {},
   import_source: async () => {},
   transcribe_import_source: async () => {},
+  channel_webhook: async () => {},
 } satisfies Omit<JobHandlers, "noop">
 
 describe("job queue", () => {

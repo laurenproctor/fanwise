@@ -51,6 +51,11 @@ export function grantUrl(channelKey: string): string {
   return `${appOrigin()}/api/channels/${channelKey}/oauth/grant`
 }
 
+/** Where a provider delivers events about a connected account (ADR 0014). */
+export function webhookUrl(channelKey: string): string {
+  return `${appOrigin()}/api/channels/${channelKey}/webhook`
+}
+
 export async function createAuthorizationState(params: {
   workspaceId: string
   channelId: string

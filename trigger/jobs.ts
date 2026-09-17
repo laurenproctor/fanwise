@@ -86,3 +86,13 @@ export const transcribeImportSource = task({
   run: async (payload: JobPayloads["transcribe_import_source"]) =>
     handlers.transcribe_import_source(payload),
 })
+
+export const channelWebhook = task({
+  id: "channel_webhook",
+  // The receipt row is skipped once processed and the provider refuses to
+  // fulfil a line twice, so a retry cannot double-act. The handler rethrows
+  // only a retryable provider failure — the shop briefly down — which is the
+  // case this is for; everything else is recorded on the receipt and stops.
+  retry: { maxAttempts: 3, minTimeoutInMs: 10_000, factor: 3 },
+  run: async (payload: JobPayloads["channel_webhook"]) => handlers.channel_webhook(payload),
+})

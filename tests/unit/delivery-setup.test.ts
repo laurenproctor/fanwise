@@ -63,6 +63,7 @@ describe("the setup card", () => {
         connectionId: "c1",
         setup,
         confirmed,
+        automation: { state: "unknown" as const },
       }),
     )
   }

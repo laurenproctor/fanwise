@@ -1,10 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 import { z } from "zod"
-import { ChannelError, normalized } from "@/lib/channels/errors"
+import { ChannelError, normalizeUnknown, normalized } from "@/lib/channels/errors"
+import { DELIVERY_AUTOMATION_ERROR_KEY, DELIVERY_AUTOMATION_REF_KEY } from "@/lib/delivery/setup"
 import type { ChannelOAuth, OAuthAuthorizeRequest, OAuthGrant } from "@/lib/channels/types"
-import { createShopifyClient } from "./client"
+import { createShopifyClient, type ShopifyClient } from "./client"
 import { SCOPES, holdsScope, shopifyConfig } from "./config"
 import { fail, httpError, transportError } from "./errors"
+import { ensureRoutingWebhook } from "./webhooks"
 
 /**
  * Shopify authorization.
@@ -176,7 +178,7 @@ export const shopifyOAuth: ChannelOAuth = {
     return verifyCallbackHmac(query, shopifyConfig().clientSecret)
   },
 
-  async exchange({ accountHint, query }): Promise<OAuthGrant> {
+  async exchange({ accountHint, query, webhookUrl }): Promise<OAuthGrant> {
     const code = query.get("code")
     if (!code) {
       throw new ChannelError(
@@ -217,6 +219,8 @@ export const shopifyOAuth: ChannelOAuth = {
       schema: shopQuerySchema,
     })
 
+    const automation = webhookUrl ? await subscribeForFulfilment(client, webhookUrl) : {}
+
     return {
       externalAccountId: shop.myshopifyDomain.toLowerCase(),
       externalAccountName: shop.name,
@@ -230,14 +234,34 @@ export const shopifyOAuth: ChannelOAuth = {
       metadata: {
         currencyCode: shop.currencyCode,
         ianaTimezone: shop.ianaTimezone ?? null,
+        ...automation,
       },
     }
   },
 }
 
-/** The shape lib/credentials seals and opens for this channel. */
-export const shopifyCredentialsSchema = z.object({
-  accessToken: z.string().min(1),
-})
+export { shopifyCredentialsSchema, type ShopifyCredentials } from "./connection"
 
-export type ShopifyCredentials = z.infer<typeof shopifyCredentialsSchema>
+/**
+ * The fulfilment subscription, recorded on the connection (ADR 0014).
+ *
+ * Best effort, on purpose. A shop whose app version was released without the
+ * fulfilment scopes answers this with an access error, and refusing the whole
+ * connection over it would take publishing away to protect bookkeeping. The
+ * answer lands on the connection's metadata either way, under the generic
+ * keys the Channels page reads, so the creator sees which it was. Nothing
+ * here is a credential.
+ */
+async function subscribeForFulfilment(
+  client: ShopifyClient,
+  webhookUrl: string,
+): Promise<Record<string, string>> {
+  try {
+    const id = await ensureRoutingWebhook(client, webhookUrl)
+    return { [DELIVERY_AUTOMATION_REF_KEY]: id }
+  } catch (error) {
+    const failure = normalizeUnknown(error, "Shopify")
+    console.warn("[oauth] fulfilment subscription failed", { code: failure.code })
+    return { [DELIVERY_AUTOMATION_ERROR_KEY]: failure.message }
+  }
+}

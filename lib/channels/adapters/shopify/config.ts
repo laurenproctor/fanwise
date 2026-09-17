@@ -40,13 +40,20 @@ export type ShopifyConfig = z.infer<typeof schema>
 export const ADMIN_API_VERSION = "2026-07"
 
 /**
- * Only what publishing needs.
+ * Only what publishing and delivery need.
  *
- * read_orders arrives at B5 with transaction ingestion, and adding it will
- * force every connected creator to re-authorize. That is correct: the ask
- * changed, so the creator should be asked again. Requesting it now to avoid the
- * re-prompt would mean holding order-reading permission on a creator's shop for
- * two gates before there is any code that reads an order.
+ * The three fulfilment-side scopes arrived with ADR 0014, 17 September 2026,
+ * and each has one reader. `read_merchant_managed_fulfillment_orders` is what
+ * the routing-complete webhook topic requires and what reads a fulfillment
+ * order back; `write_merchant_managed_fulfillment_orders` is `fulfillmentCreate`;
+ * `read_orders` is one field, the order's financial status, so nothing is
+ * marked fulfilled before it is paid. No protected customer field is ever
+ * requested: the fulfilment order query names line items, products and a
+ * status, and the webhook topic carries an id. B5's transaction ingestion will
+ * find `read_orders` already granted.
+ *
+ * Adding them re-authorizes every connected creator. That is correct: the ask
+ * changed, so the creator should be asked again.
  *
  * The two publication scopes arrived with ADR 0004, and they are a pair rather
  * than a choice. `publishablePublish` needs write access; finding which
@@ -65,6 +72,9 @@ export const SCOPES = [
   "read_products",
   "read_publications",
   "write_publications",
+  "read_orders",
+  "read_merchant_managed_fulfillment_orders",
+  "write_merchant_managed_fulfillment_orders",
 ] as const
 
 /**

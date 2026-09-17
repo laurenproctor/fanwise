@@ -459,6 +459,9 @@ describe("scopes a connection is missing", () => {
     expect(missingScopes(adapter, ["write_products"])).toEqual([
       "read_publications",
       "write_publications",
+      "read_orders",
+      "read_merchant_managed_fulfillment_orders",
+      "write_merchant_managed_fulfillment_orders",
     ])
   })
 
@@ -481,14 +484,25 @@ describe("scopes a connection is missing", () => {
       forever, which teaches people to ignore the prompt that matters.
     */
     const adapter = getAdapter("shopify")
-    expect(missingScopes(adapter, ["write_products", "write_publications"])).toEqual([])
+    expect(
+      missingScopes(adapter, [
+        "write_products",
+        "write_publications",
+        "read_orders",
+        "write_merchant_managed_fulfillment_orders",
+      ]),
+    ).toEqual([])
     // The implication runs one way only. Holding the read half is not holding
     // the write half, and treating it as such would let a token that cannot
     // publish look like one that can.
-    expect(missingScopes(adapter, ["read_products", "read_publications"])).toEqual([
-      "write_products",
-      "write_publications",
-    ])
+    expect(
+      missingScopes(adapter, [
+        "read_products",
+        "read_publications",
+        "read_orders",
+        "read_merchant_managed_fulfillment_orders",
+      ]),
+    ).toEqual(["write_products", "write_publications", "write_merchant_managed_fulfillment_orders"])
   })
 
   it("treats an unrecorded scope list as unknown, not as nothing granted", () => {

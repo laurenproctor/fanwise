@@ -4,7 +4,6 @@ import type { ProductAsset } from "@/lib/products/types"
 import { z } from "zod"
 import { ChannelError, normalized } from "@/lib/channels/errors"
 import { listingImages } from "@/lib/channels/images"
-import { readConnectionCredentials } from "@/lib/credentials"
 import type {
   AdapterSubject,
   ChannelAdapter,
@@ -13,11 +12,11 @@ import type {
   PublishResult,
   RequirementSpec,
 } from "@/lib/channels/types"
-import { createShopifyClient } from "./client"
 import { userErrors } from "./errors"
-import { shopifyCredentialsSchema, shopifyOAuth } from "./oauth"
+import { shopifyOAuth } from "./oauth"
+import { clientForConnection } from "./connection"
+import { shopifyWebhooks } from "./webhooks"
 import { CATEGORY_LABELS, defaultCategoryLabel, taxonomyCategoryId } from "./categories"
-import { staleScopes } from "./config"
 import {
   PUBLICATIONS,
   publicationsSchema,
@@ -49,6 +48,11 @@ import {
  *   confirmed that, readiness blocks publishing, because a Shopify product that
  *   can take money with nothing behind it is the one outcome worth engineering
  *   against. Once they have, a publish puts the product on sale in one action.
+ *
+ * Fulfilment is ADR 0014, 17 September 2026: once that confirmation exists, a
+ * paid order line for a product Fanwise published is marked fulfilled by the
+ * routing-complete webhook (./webhooks.ts), because the buyer already holds the
+ * download. Lines that need shipping are never touched.
  */
 
 const requirements: readonly RequirementSpec[] = [
@@ -421,60 +425,6 @@ function needsMedia(state: ProductState, intended: number): boolean {
 const OPTION_NAME = "Title"
 const OPTION_VALUE = "Default Title"
 
-async function clientFor(context: PublishContext) {
-  /*
-   * The connection is authorized, but is it authorized for what this build
-   * needs? ADR 0004 added two scopes, and Fanwise runs its own OAuth rather
-   * than Shopify's managed installation, so nothing has prompted the creator
-   * on its behalf. Their existing token simply cannot do the new thing.
-   *
-   * Asked here, before any call, so the ask arrives as an explanation rather
-   * than as a 403 at the end of an activate — after the product exists and
-   * after the creator has already attached the file by hand.
-   */
-  const missing = staleScopes(context.connection.scopes ?? [])
-  if (missing.length > 0) {
-    throw new ChannelError(
-      normalized(
-        "permission_denied",
-        "Fanwise needs one more permission on this Shopify store before it can put products on " +
-          "sale. Reconnect the store and accept the permissions it asks for. Your existing " +
-          "products are not affected.",
-        { missing },
-      ),
-    )
-  }
-
-  const shopDomain = context.connection.external_account_id
-  if (!shopDomain) {
-    throw new ChannelError(
-      normalized(
-        "credentials_invalid",
-        "This Shopify connection is missing its store domain. Reconnect the store.",
-      ),
-    )
-  }
-
-  const credentials = await readConnectionCredentials({
-    workspaceId: context.connection.workspace_id,
-    connectionId: context.connection.id,
-    schema: shopifyCredentialsSchema,
-  })
-  if (!credentials) {
-    throw new ChannelError(
-      normalized(
-        "credentials_invalid",
-        "Fanwise no longer holds an authorization for this Shopify store. Reconnect it.",
-      ),
-    )
-  }
-
-  return {
-    shopDomain,
-    client: createShopifyClient({ shopDomain, accessToken: credentials.accessToken }),
-  }
-}
-
 /**
  * What a write intends the product's published state to be.
  *
@@ -510,7 +460,7 @@ const SHOPIFY_STATUSES = ["ACTIVE", "DRAFT", "ARCHIVED"] as const
  */
 async function productSet(context: PublishContext, intent: PublishIntent): Promise<PublishResult> {
   const { listing, subject } = context
-  const { shopDomain, client } = await clientFor(context)
+  const { shopDomain, client } = await clientForConnection(context.connection)
 
   const externalId = listing.external_listing_id
   const price = toMoney(listing.price === null ? null : Number(listing.price))
@@ -794,7 +744,7 @@ async function publishToSalesChannel(
   context: PublishContext,
   productId: string,
 ): Promise<{ purchasable: boolean; publication: ResolvedPublication; count: number }> {
-  const { client } = await clientFor(context)
+  const { client } = await clientForConnection(context.connection)
 
   const publications = await client.request({
     query: PUBLICATIONS,
@@ -906,6 +856,8 @@ export const shopifyAdapter: ChannelAdapter = {
     title: "Add download links to order emails",
     description:
       "Shopify has no field for a digital file. Fanwise puts each product's download link on the product, and your order confirmation email shows it to the buyer. Do this once for the shop; every product Fanwise publishes uses it.",
+    automation:
+      "Once confirmed, Fanwise marks each paid order line for a product it published as fulfilled, because the buyer has the download. Lines that need shipping are left to you.",
     steps: [
       "In Shopify admin, open Settings, then Notifications, then Customer notifications.",
       "Open Order confirmation and click Edit code.",
@@ -919,6 +871,7 @@ export const shopifyAdapter: ChannelAdapter = {
   manualSteps: [],
   merchandising: shopifyMerchandising,
   oauth: shopifyOAuth,
+  webhooks: shopifyWebhooks,
 
   buildListing({ product }: AdapterSubject): ChannelListingDraft {
     return {

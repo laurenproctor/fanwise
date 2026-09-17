@@ -21,6 +21,7 @@ export type JobName =
   | "sync_billing"
   | "import_source"
   | "transcribe_import_source"
+  | "channel_webhook"
 
 export interface JobPayloads {
   noop: { message: string }
@@ -73,6 +74,16 @@ export interface JobPayloads {
    * the row is claimed by compare-and-swap on `transcribing`.
    */
   transcribe_import_source: { workspaceId: string; sourceId: string }
+  /**
+   * Act on one provider delivery (ADR 0014).
+   *
+   * The receipt row's id only. The route recorded the delivery before
+   * enqueueing, and the job reads the provider object afresh when it runs, so
+   * a delivery that sat in the queue acts on the order as it stands. A
+   * finished receipt is skipped, and the provider refuses to fulfil a line
+   * twice, so a redelivery does nothing.
+   */
+  channel_webhook: { eventId: string }
 }
 
 /**
@@ -90,6 +101,7 @@ export const JOB_NAMES = [
   "sync_billing",
   "import_source",
   "transcribe_import_source",
+  "channel_webhook",
 ] as const satisfies readonly JobName[]
 
 export interface EnqueueOptions {
