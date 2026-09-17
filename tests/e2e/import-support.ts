@@ -199,3 +199,25 @@ export async function saveListing(page: Page) {
   await page.getByRole("button", { name: "Save draft" }).click()
   await expect(page.getByText(/Saved/)).toBeVisible({ timeout: 20_000 })
 }
+
+/**
+ * Drops the buyer file onto the checklist's upload control.
+ *
+ * Playwright cannot perform an operating-system drag, so this dispatches a drop
+ * with a real DataTransfer built in the page, the way journey 1 does for
+ * images. It goes through the drop target rather than `setInputFiles` on
+ * purpose: the input is the path that always worked, and a file let go on the
+ * visible button never reached it until the control took drops itself.
+ */
+export async function dropZipFile(page: Page) {
+  const file = zipFile()
+  const transfer = await page.evaluateHandle(
+    ([bytes, name, type]) => {
+      const data = new DataTransfer()
+      data.items.add(new File([new Uint8Array(bytes as number[])], name as string, { type }))
+      return data
+    },
+    [Array.from(file.buffer), file.name, file.mimeType] as const,
+  )
+  await page.getByTestId("buyer-files-drop").dispatchEvent("drop", { dataTransfer: transfer })
+}

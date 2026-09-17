@@ -657,6 +657,9 @@ describe("the completion checklist", () => {
     expect(count(markup, 'aria-expanded="false"')).toBe(2)
     // Buyer files is the next step, so its control is the open one.
     expect(textOf(markup)).toContain("Upload files")
+    // The control is also a drop target, and says so; the file input is
+    // visually hidden, so a file let go on the button needs somewhere to land.
+    expect(textOf(markup)).toContain("Or drop them here.")
     expect(textOf(markup)).not.toContain("Extended commercial")
   })
 
