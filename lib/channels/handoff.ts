@@ -1,3 +1,4 @@
+import type { ChannelAdapter, HandoffInput } from "./types"
 import type { ChannelListingDraft } from "./types"
 
 /**
@@ -10,37 +11,65 @@ import type { ChannelListingDraft } from "./types"
  * what to paste: both render these steps.
  *
  * The order here is generic: title, description, tags, price, images, then the
- * submission itself. A channel whose editor runs in a different order gets its
- * own order when its handoff is specified; Creative Market's is §10 of its
- * spec, and it is A8's to build.
+ * submission itself. A channel whose editor runs in a different order declares
+ * `buildHandoff` on its adapter and `handoffSteps` below hands it the same
+ * input; Behance's is the first, ordered to its project editor. Creative
+ * Market's is §10 of its spec, and it is A8's to build.
  */
 
 export interface HandoffFile {
   assetId: string
   filename: string
+  /**
+   * The name the file should arrive under, when it differs from the row's.
+   * A channel that shows the filename to buyers, or sorts uploads by it,
+   * wants a name Fanwise chose rather than whatever the creator uploaded.
+   */
+  downloadAs?: string
+}
+
+interface HandoffStepBase {
+  key: string
+  label: string
+  /**
+   * The part of the channel's editor this step belongs to. Steps that share a
+   * section are shown together under its heading, numbered as one. Absent on
+   * every step, the panel numbers the steps themselves.
+   */
+  section?: string
 }
 
 export type HandoffStep =
-  | { kind: "copy"; key: string; label: string; value: string; multiline: boolean }
-  | { kind: "files"; key: string; label: string; files: HandoffFile[]; note: string }
-  | { kind: "missing"; key: string; label: string }
-  | { kind: "submit"; key: string; label: string; text: string }
+  | (HandoffStepBase & {
+      kind: "copy"
+      value: string
+      multiline: boolean
+      /** A line under the value: what the channel does with it, a fee, a caveat. */
+      note?: string
+    })
+  | (HandoffStepBase & { kind: "files"; files: HandoffFile[]; note: string })
+  | (HandoffStepBase & { kind: "missing" })
+  /** An instruction with nothing to copy: a click to make, a setting to accept. */
+  | (HandoffStepBase & { kind: "note"; text: string })
+  | (HandoffStepBase & { kind: "submit"; text: string })
 
 /** Assets as the handoff needs them: in channel order, with their state. */
 export interface HandoffImage extends HandoffFile {
   ready: boolean
 }
 
-function textStep(
+export function textStep(
   key: string,
   label: string,
   value: string | null,
   multiline = false,
+  section?: string,
 ): HandoffStep {
   const trimmed = value?.trim() ?? ""
+  const base = section ? { key, label, section } : { key, label }
   return trimmed === ""
-    ? { kind: "missing", key, label }
-    : { kind: "copy", key, label, value: trimmed, multiline }
+    ? { kind: "missing", ...base }
+    : { kind: "copy", ...base, value: trimmed, multiline }
 }
 
 /**
@@ -95,4 +124,17 @@ export function buildHandoffSteps(
   })
 
   return steps
+}
+
+/**
+ * The handoff for one channel: its own order where it declares one, the
+ * generic order otherwise. One entry point, so the listing page and the
+ * companion window cannot pick differently.
+ */
+export function handoffSteps(
+  adapter: Pick<ChannelAdapter, "name" | "buildHandoff">,
+  input: HandoffInput,
+): HandoffStep[] {
+  if (adapter.buildHandoff) return adapter.buildHandoff(input)
+  return buildHandoffSteps(input.draft, input.images, adapter.name)
 }

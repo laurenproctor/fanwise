@@ -197,6 +197,18 @@ export default async function ChannelsPage({
                         }
                       : null
                   }
+                  /*
+                    Same bargain for a channel that names an account: the two
+                    strings, never the parser.
+                  */
+                  accountPrompt={
+                    adapter.accountHint
+                      ? {
+                          label: adapter.accountHint.label,
+                          placeholder: adapter.accountHint.placeholder,
+                        }
+                      : null
+                  }
                 />
               </div>
             </section>

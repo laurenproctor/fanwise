@@ -210,14 +210,23 @@ export function draftToColumns(draft: ChannelListingDraft) {
  */
 const PUBLICATION_OWNED_KEYS = ["externalState", "purchasable"] as const
 
+/**
+ * A third owner arrived with B9: the creator. A channel's declared choices
+ * (`ChannelAdapter.choices`) are the creator's settings for the channel's
+ * form, seeded by the adapter on the first build and edited by hand after.
+ * A rebuild regenerates the adapter's suggestions and must not overwrite a
+ * choice already made, so the caller names the keys the creator owns and
+ * those survive alongside publication's.
+ */
 export function rebuildColumns(
   draft: ChannelListingDraft,
   existingMetadata: unknown,
   generatedAt: string,
+  creatorOwnedKeys: readonly string[] = [],
 ) {
   const existing = (existingMetadata as Record<string, unknown> | null) ?? {}
   const kept: Record<string, unknown> = {}
-  for (const key of PUBLICATION_OWNED_KEYS) {
+  for (const key of [...creatorOwnedKeys, ...PUBLICATION_OWNED_KEYS]) {
     if (existing[key] !== undefined) kept[key] = existing[key]
   }
 

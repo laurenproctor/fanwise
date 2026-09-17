@@ -14,10 +14,11 @@ import {
 /**
  * Connect and disconnect.
  *
- * Two shapes, decided by the adapter rather than by this component. A channel
- * with an authorization asks for the account first and then hands the creator
- * to the provider; a channel without one writes a row. The mocks are the second
- * kind and are the only ones left.
+ * Three shapes, decided by the adapter rather than by this component. A
+ * channel with an authorization asks for the account first and then hands the
+ * creator to the provider; a channel that names an account asks for it and
+ * writes a row; a channel with neither writes a row on the click. The mocks
+ * are the third kind.
  *
  * Disconnecting is destructive and irreversible from here, so it confirms.
  * Since C1 it is also a billing event, and the confirmation says so when the
@@ -30,6 +31,12 @@ export interface OAuthPrompt {
   accountHintPlaceholder: string
 }
 
+/** What to ask for on a channel connected by naming an account, not authorizing it. */
+export interface AccountPrompt {
+  label: string
+  placeholder: string
+}
+
 export function ConnectButton({
   workspaceSlug,
   channelKey,
@@ -39,6 +46,7 @@ export function ConnectButton({
   disabled,
   publishedCount,
   oauth,
+  accountPrompt = null,
   needsReauthorization,
   paidThroughPeriod,
 }: {
@@ -61,6 +69,12 @@ export function ConnectButton({
   disabled?: boolean
   /** Present when this channel is connected by authorizing it. */
   oauth: OAuthPrompt | null
+  /**
+   * Present when this channel is connected by naming an account: an assisted
+   * channel, which holds no credential and asks which profile the creator
+   * will submit to.
+   */
+  accountPrompt?: AccountPrompt | null
   /**
    * True when this build asks the provider for more than this connection was
    * granted.
@@ -93,7 +107,7 @@ export function ConnectButton({
   function connect() {
     setError(null)
     startTransition(async () => {
-      const result = await connectChannelAction(workspaceSlug, channelKey)
+      const result = await connectChannelAction(workspaceSlug, channelKey, accountHint)
       setError(result.error)
       if (!result.error) router.refresh()
     })
@@ -165,10 +179,46 @@ export function ConnectButton({
       )
     }
 
+    if (accountPrompt && authorizing) {
+      return (
+        <form
+          className="grid gap-3"
+          onSubmit={(event) => {
+            event.preventDefault()
+            connect()
+          }}
+        >
+          <Field
+            label={accountPrompt.label}
+            name="accountHint"
+            value={accountHint}
+            onChange={(event) => setAccountHint(event.target.value)}
+            placeholder={accountPrompt.placeholder}
+            autoFocus
+            required
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={pending}>
+              {pending ? "Connecting…" : `Connect ${channelName}`}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setAuthorizing(false)}
+              disabled={pending}
+            >
+              Cancel
+            </Button>
+          </div>
+          <FormError message={error} />
+        </form>
+      )
+    }
+
     return (
       <div className="grid gap-2">
         <Button
-          onClick={() => (oauth ? setAuthorizing(true) : connect())}
+          onClick={() => (oauth || accountPrompt ? setAuthorizing(true) : connect())}
           disabled={pending || disabled}
         >
           {pending ? "Connecting…" : "Connect"}

@@ -579,7 +579,8 @@ on the key; one recorded but never finished is applied again, one finished is ac
 
 ## B9: Behance
 
-Planned 11 September 2026, not built. The migration lands with B9.
+Planned 11 September 2026; built 17 September 2026. The migration is
+`20260917120000_behance_channel.sql`.
 
 One row in `channels`: key `behance`, `integration_type = assisted`, `billable = true`, since
 it is a marketplace and decision 16 governs what an assisted one costs. No new table, and
@@ -587,12 +588,24 @@ nothing in `channel_connection_secrets`: the adapter declares no `oauth`, so Con
 the connection row and nothing else, and no credential for this channel ever exists.
 
 What the existing columns hold: `external_account_id` is the profile username, parsed from
-`behance.net/{username}`; `external_account_name` is the display name the creator typed, if
-any. On the listing, `external_url` is the project URL captured at mark submitted,
-`external_listing_id` the numeric project id parsed from it, and `metadata` carries the
-chosen Creative Fields, the asset category, the license type and `handoffMode`, `new` or
-`existing`. `status_source` is `self_reported` on every row and the trigger that refuses
-`verified` on an assisted channel applies unchanged.
+`behance.net/{username}` by the adapter's `accountHint`; `external_account_name` is
+`behance.net/{username}`. On the listing, `external_url` and `public_url` are the project
+URL captured at mark submitted, canonicalized to `https://www.behance.net/gallery/{id}/{slug}`;
+`external_listing_id` is the numeric project id parsed from it; `category` is the asset
+category; and `metadata` carries `creativeFields` (an array of Creative Field names),
+`licenseType` (`personal` or `standard_commercial`), `handoffMode` (`new` or `existing`),
+`existingProjectUrl` in existing mode, and `submittedAt`. Those keys are the adapter's
+declared choices and are written only through `updateListingChoicesAction`, which validates
+each against the declaration; a rebuild keeps them, because they are the creator's and not
+the draft's, the way it keeps publication's `externalState` and `purchasable`. Only the first
+build seeds them from the product. `status_source` is `self_reported` on every row and the trigger
+that refuses `verified` on an assisted channel applies unchanged; `markSubmittedAction`
+also refuses to overwrite a row whose source is `verified`.
+
+Renditions for the handoff are ordinary derivative rows in `product_assets`, keyed on
+`(derived_from, spec_hash)` like every other; nothing new is stored for them. Mark submitted
+writes one `publish` snapshot and one `workspace_events` row of type
+`listing_marked_submitted`.
 
 One question this channel puts to the model and does not answer: a Behance project holds up
 to five assets, so one product could be several priced downloads on one project. Listing

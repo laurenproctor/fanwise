@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useSyncExternalStore, type MouseEvent } from "react"
-import type { HandoffStep } from "@/lib/channels/handoff"
+import type { HandoffFile, HandoffStep } from "@/lib/channels/handoff"
 import { routes } from "@/lib/routes"
 
 /**
@@ -13,11 +13,33 @@ import { routes } from "@/lib/routes"
  *
  * Nothing here says Publish, and nothing implies Fanwise did anything on the
  * channel. The creator submits; this is what they submit from.
+ *
+ * Steps that name a section are grouped under it, numbered as one, because a
+ * channel whose editor has parts wants the creator to move through those
+ * parts top to bottom in both windows. Steps that name none are numbered
+ * themselves, as the generic handoff has always been.
  */
 
 const noSubscription = () => () => {}
 
 const COPY_FAILED = "Could not copy from this window. Select the text and copy it by hand."
+
+interface Group {
+  section: string | null
+  steps: HandoffStep[]
+}
+
+/** Consecutive steps that share a section, in order. */
+export function groupSteps(steps: readonly HandoffStep[]): Group[] {
+  const groups: Group[] = []
+  for (const step of steps) {
+    const section = step.section ?? null
+    const last = groups[groups.length - 1]
+    if (last && last.section === section && section !== null) last.steps.push(step)
+    else groups.push({ section, steps: [step] })
+  }
+  return groups
+}
 
 export function HandoffPanel({
   workspaceSlug,
@@ -60,6 +82,106 @@ export function HandoffPanel({
     }
   }
 
+  function downloadHref(file: HandoffFile): string {
+    const base = `${origin}${routes.assetDownload(workspaceSlug, file.assetId)}`
+    return file.downloadAs ? `${base}?name=${encodeURIComponent(file.downloadAs)}` : base
+  }
+
+  const groups = groupSteps(steps)
+  const sectioned = groups.some((group) => group.section !== null)
+
+  function renderStep(step: HandoffStep, index: number | null) {
+    return (
+      <li
+        key={step.key}
+        className={
+          index === null
+            ? "grid gap-1.5 border-t border-[var(--color-rule-2)] pt-3"
+            : "grid grid-cols-[1.25rem_minmax(0,1fr)] gap-x-2 border-t border-[var(--color-rule-2)] pt-3"
+        }
+      >
+        {index === null ? null : (
+          <span className="tabular font-mono text-[11px] leading-5 text-[var(--color-ink-3)]">
+            {index + 1}
+          </span>
+        )}
+        <div className="grid min-w-0 gap-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[13px] font-medium text-[var(--color-ink)]">{step.label}</span>
+            {step.kind === "copy" ? (
+              <button
+                type="button"
+                aria-label={`${copied === step.key ? "Copied" : "Copy"} ${step.label.charAt(0).toLowerCase()}${step.label.slice(1)}`}
+                onClick={(event) => copy(event, step.key, step.value)}
+                className={
+                  "label-mono rounded-[var(--radius-pill)] border px-2.5 py-1 transition-colors " +
+                  (copied === step.key
+                    ? "border-[var(--color-ok)] text-[var(--color-ok)]"
+                    : "border-[var(--color-rule)] text-[var(--color-ink-2)] hover:border-[var(--color-ink-3)]")
+                }
+              >
+                {copied === step.key ? "Copied" : "Copy"}
+              </button>
+            ) : null}
+          </div>
+
+          {step.kind === "copy" ? (
+            <p
+              className={
+                "select-all text-[13px] break-words text-[var(--color-ink-2)] " +
+                (step.multiline ? "line-clamp-4 whitespace-pre-wrap" : "")
+              }
+            >
+              {step.value}
+            </p>
+          ) : null}
+          {step.kind === "copy" && step.note ? (
+            <p className="text-[12px] text-[var(--color-ink-3)]">{step.note}</p>
+          ) : null}
+          {step.kind === "copy" && failed === step.key ? (
+            <p className="text-[12px] text-[var(--color-ink-2)]">{COPY_FAILED}</p>
+          ) : null}
+
+          {step.kind === "files" ? (
+            <>
+              <ul className="grid gap-1">
+                {step.files.map((file) => (
+                  <li
+                    key={`${file.assetId}:${file.filename}`}
+                    className="min-w-0 truncate text-[13px]"
+                  >
+                    <a
+                      className="underline underline-offset-2 hover:text-[var(--color-accent)]"
+                      href={downloadHref(file)}
+                      download={file.downloadAs ?? file.filename}
+                    >
+                      {file.filename}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[12px] text-[var(--color-ink-3)]">{step.note}</p>
+            </>
+          ) : null}
+
+          {step.kind === "missing" ? (
+            <p className="text-[13px] text-[var(--color-ink-3)]">
+              Not ready yet. Add it to the listing and save, or wait for the images to be prepared.
+            </p>
+          ) : null}
+
+          {step.kind === "note" ? (
+            <p className="text-[13px] text-[var(--color-ink-2)]">{step.text}</p>
+          ) : null}
+
+          {step.kind === "submit" ? (
+            <p className="text-[13px] text-[var(--color-ink-2)]">{step.text}</p>
+          ) : null}
+        </div>
+      </li>
+    )
+  }
+
   return (
     <section className="grid gap-4" aria-labelledby="handoff-heading">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -76,85 +198,27 @@ export function HandoffPanel({
         ) : null}
       </div>
 
-      <ol className="grid gap-3">
-        {steps.map((step, index) => {
-          return (
-            <li
-              key={step.key}
-              className="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-x-2 border-t border-[var(--color-rule-2)] pt-3"
-            >
-              <span className="tabular font-mono text-[11px] leading-5 text-[var(--color-ink-3)]">
-                {index + 1}
-              </span>
-              <div className="grid min-w-0 gap-1.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-[13px] font-medium text-[var(--color-ink)]">
-                    {step.label}
-                  </span>
-                  {step.kind === "copy" ? (
-                    <button
-                      type="button"
-                      aria-label={`${copied === step.key ? "Copied" : "Copy"} ${step.label.charAt(0).toLowerCase()}${step.label.slice(1)}`}
-                      onClick={(event) => copy(event, step.key, step.value)}
-                      className={
-                        "label-mono rounded-[var(--radius-pill)] border px-2.5 py-1 transition-colors " +
-                        (copied === step.key
-                          ? "border-[var(--color-ok)] text-[var(--color-ok)]"
-                          : "border-[var(--color-rule)] text-[var(--color-ink-2)] hover:border-[var(--color-ink-3)]")
-                      }
-                    >
-                      {copied === step.key ? "Copied" : "Copy"}
-                    </button>
-                  ) : null}
-                </div>
-
-                {step.kind === "copy" ? (
-                  <p
-                    className={
-                      "select-all text-[13px] break-words text-[var(--color-ink-2)] " +
-                      (step.multiline ? "line-clamp-4 whitespace-pre-wrap" : "")
-                    }
-                  >
-                    {step.value}
-                  </p>
-                ) : null}
-                {step.kind === "copy" && failed === step.key ? (
-                  <p className="text-[12px] text-[var(--color-ink-2)]">{COPY_FAILED}</p>
-                ) : null}
-
-                {step.kind === "files" ? (
-                  <>
-                    <ul className="grid gap-1">
-                      {step.files.map((file) => (
-                        <li key={file.assetId} className="min-w-0 truncate text-[13px]">
-                          <a
-                            className="underline underline-offset-2 hover:text-[var(--color-accent)]"
-                            href={`${origin}${routes.assetDownload(workspaceSlug, file.assetId)}`}
-                            download={file.filename}
-                          >
-                            {file.filename}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="text-[12px] text-[var(--color-ink-3)]">{step.note}</p>
-                  </>
-                ) : null}
-
-                {step.kind === "missing" ? (
-                  <p className="text-[13px] text-[var(--color-ink-3)]">
-                    Not written yet. Add it to the listing and save.
-                  </p>
-                ) : null}
-
-                {step.kind === "submit" ? (
-                  <p className="text-[13px] text-[var(--color-ink-2)]">{step.text}</p>
-                ) : null}
+      {sectioned ? (
+        <ol className="grid gap-5">
+          {groups.map((group, index) => (
+            <li key={group.section ?? `ungrouped-${index}`} className="grid gap-2">
+              <div className="flex items-baseline gap-2">
+                <span className="tabular font-mono text-[11px] leading-5 text-[var(--color-ink-3)]">
+                  {index + 1}
+                </span>
+                <span className="label-mono text-[var(--color-ink)]">
+                  {group.section ?? group.steps[0]?.label}
+                </span>
               </div>
+              <ul className="grid gap-3 pl-[1.25rem]">
+                {group.steps.map((step) => renderStep(step, null))}
+              </ul>
             </li>
-          )
-        })}
-      </ol>
+          ))}
+        </ol>
+      ) : (
+        <ol className="grid gap-3">{steps.map((step, index) => renderStep(step, index))}</ol>
+      )}
     </section>
   )
 }
