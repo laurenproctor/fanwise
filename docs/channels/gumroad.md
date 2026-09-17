@@ -144,8 +144,11 @@ each file. This is §13 item 1, and it decides code before B10's exit.
 
 **Covers.** JPEG, PNG or GIF, at most 50 MB each, at most 8 per product, shown in the order
 added; `cover_ids[]` on an update reorders them. No cover dimension appears in the source
-read, so the adapter sends the 2000-pixel long-edge derivative Etsy already uses rather
-than adding a spec on a guess **[verify]**.
+read. Covers go as the source image when it is JPEG, PNG or GIF within 2560 pixels and 50 MB,
+and as a rendition scaled inside 2560 (JPEG, or PNG for a PNG) otherwise, so a WebP export
+reaches Gumroad as a JPEG rather than a refusal. This replaced, on 17 September 2026, an
+earlier line here that claimed a 2000-pixel derivative Etsy used; no such derivative existed
+(`docs/roadmap.md`, B10). Covers carry no alt text: the endpoint has no field for one.
 
 **Thumbnail.** Square, at least 600 × 600, under 5 MB, JPEG, PNG or GIF. This is a new
 derivative: **1200 × 1200 JPEG, cropped from the cover**, keyed on source checksum plus spec

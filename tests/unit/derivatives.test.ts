@@ -139,6 +139,33 @@ describe("renderDerivative", () => {
     expect(out.height).toBe(1000)
   })
 
+  it("scales down inside a frame without cropping, keeping the source's own ratio", async () => {
+    const out = await renderDerivative(await large(), {
+      key: "inside",
+      width: 1000,
+      height: 1000,
+      format: "jpeg",
+      fit: "inside",
+    })
+    // 3000x2000 fitted inside 1000x1000 is 1000 wide and two thirds as tall.
+    expect(out.width).toBe(1000)
+    expect(out.height).toBe(667)
+  })
+
+  it("leaves a source already inside the frame at its own size, only re-encoded", async () => {
+    const out = await renderDerivative(await small(), {
+      key: "ceiling",
+      width: 3000,
+      height: 3000,
+      format: "jpeg",
+      fit: "inside",
+    })
+    expect(out.width).toBe(800)
+    expect(out.height).toBe(600)
+    expect(out.format).toBe("jpeg")
+    expect((await sharp(out.data).metadata()).format).toBe("jpeg")
+  })
+
   it("refuses to upscale instead of shipping a blurry enlargement", async () => {
     await expect(renderDerivative(await small(), THREE_TWO)).rejects.toBeInstanceOf(UpscaleRefused)
   })

@@ -2,7 +2,6 @@
 
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
-import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { routes } from "@/lib/routes"
 import { toJson } from "@/lib/imports/json"
@@ -146,55 +145,6 @@ export async function saveFontProductAction(
     revalidatePath(routes.product(workspaceSlug, saved.slug))
   }
   return { ok: true, savedAt: Date.now(), slug: saved.slug }
-}
-
-const altTextSchema = z.string().trim().max(250, "Keep alt text under 250 characters.")
-
-/**
- * Alt text for a product image, kept on the asset beside its dimensions.
- *
- * `metadata` is outside the columns the immutability trigger protects, so a
- * ready image can be described without being replaced. Only cover and preview
- * images are accepted: the deliverable is not a picture and has nothing to
- * describe.
- */
-export async function setImageAltTextAction(
-  workspaceSlug: string,
-  assetId: string,
-  altText: string,
-): Promise<{ error: string | null }> {
-  const parsed = altTextSchema.safeParse(altText)
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the alt text." }
-
-  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
-
-  const { data: asset } = await supabase
-    .from("product_assets")
-    .select("id, asset_type, metadata")
-    .eq("id", assetId)
-    .eq("workspace_id", workspace.id)
-    .maybeSingle()
-
-  if (!asset || (asset.asset_type !== "cover_image" && asset.asset_type !== "preview_image")) {
-    return { error: "That image could not be found." }
-  }
-
-  const { error } = await supabase
-    .from("product_assets")
-    .update({
-      metadata: toJson({
-        ...((asset.metadata as Record<string, unknown>) ?? {}),
-        altText: parsed.data,
-      }),
-    })
-    .eq("id", assetId)
-    .eq("workspace_id", workspace.id)
-
-  if (error) {
-    console.error("[fonts] could not save alt text", { assetId, code: error.code })
-    return { error: "That alt text could not be saved. Try again." }
-  }
-  return { error: null }
 }
 
 /**

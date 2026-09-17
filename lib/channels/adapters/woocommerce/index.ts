@@ -1,6 +1,8 @@
 import { z } from "zod"
 import { ChannelError, normalized } from "@/lib/channels/errors"
 import { listingImages } from "@/lib/channels/images"
+import { channelImage, type ImagePolicy } from "@/lib/channels/image-policy"
+import { altTextFor } from "@/lib/products/image-metadata"
 import { readConnectionCredentials } from "@/lib/credentials"
 import type {
   AdapterSubject,
@@ -22,6 +24,20 @@ import {
   toMoney,
   toShortDescriptionHtml,
 } from "./transform"
+
+/**
+ * What a WordPress store sideloads without complaint. WordPress scales any
+ * picture wider than 2560 into a "-scaled" copy of its own and serves that,
+ * so 2560 is the most a store will ever show; the upload ceiling is the
+ * host's PHP limit, which is commonly 8 MB and rarely lower. WebP is taken
+ * since WordPress 5.8. Themes crop for their own grids, so nothing is cropped.
+ */
+export const IMAGE_POLICY: ImagePolicy = {
+  key: "fit-2560",
+  maxEdge: 2560,
+  accepts: ["image/jpeg", "image/png", "image/gif", "image/webp"],
+  maxByteSize: 8 * 1024 * 1024,
+}
 
 /**
  * WooCommerce. The second owned storefront.
@@ -372,8 +388,8 @@ async function writeProduct(
   if (images.length > 0 && (!current || current.images.length < images.length)) {
     body.images = await Promise.all(
       images.map(async (asset) => ({
-        src: await context.assetUrl(asset),
-        alt: listing.title ?? subject.product.name,
+        src: (await channelImage(context, IMAGE_POLICY, asset)).url,
+        alt: altTextFor(asset.metadata, listing.title ?? subject.product.name),
       })),
     )
   }

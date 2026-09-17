@@ -22,6 +22,7 @@ export type JobName =
   | "import_source"
   | "transcribe_import_source"
   | "channel_webhook"
+  | "describe_image"
 
 export interface JobPayloads {
   noop: { message: string }
@@ -75,7 +76,7 @@ export interface JobPayloads {
    */
   transcribe_import_source: { workspaceId: string; sourceId: string }
   /**
-   * Act on one provider delivery (ADR 0014).
+   * Act on one provider delivery (ADR 0015).
    *
    * The receipt row's id only. The route recorded the delivery before
    * enqueueing, and the job reads the provider object afresh when it runs, so
@@ -84,6 +85,14 @@ export interface JobPayloads {
    * twice, so a redelivery does nothing.
    */
   channel_webhook: { eventId: string }
+  /**
+   * Write alt text for one product image from the image itself (ADR 0014).
+   *
+   * Ids only. The asset and its product are read when the job runs, the
+   * FactSheet is derived then, and an image that has alt text by the time the
+   * job looks is left alone, so a redelivery does nothing.
+   */
+  describe_image: { workspaceId: string; assetId: string }
 }
 
 /**
@@ -102,6 +111,7 @@ export const JOB_NAMES = [
   "import_source",
   "transcribe_import_source",
   "channel_webhook",
+  "describe_image",
 ] as const satisfies readonly JobName[]
 
 export interface EnqueueOptions {

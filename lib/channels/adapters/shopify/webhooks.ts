@@ -14,7 +14,7 @@ import { clientForConnection } from "./connection"
 import { emptyPayload, fail } from "./errors"
 
 /**
- * Marking a digital order fulfilled (ADR 0014).
+ * Marking a digital order fulfilled (ADR 0015).
  *
  * A Shopify product Fanwise publishes needs no shipping, so an order for one
  * sits in the admin as "Unfulfilled" until somebody clicks. The download

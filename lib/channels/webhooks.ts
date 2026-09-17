@@ -4,7 +4,7 @@ import { findAdapter } from "./registry"
 import type { ChannelConnection, ChannelWebhookEvent, WebhookHandleResult } from "./types"
 
 /**
- * Acting on one recorded delivery (ADR 0014).
+ * Acting on one recorded delivery (ADR 0015).
  *
  * The route recorded the receipt and enqueued this with the row's id and
  * nothing else. Here the row is loaded, every active connection to the account

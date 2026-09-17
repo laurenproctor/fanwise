@@ -46,7 +46,7 @@ No manual steps. Etsy takes the file, so ADR 0001's assisted step does not apply
 | `category` | `taxonomy_id` | A label from §14, required |
 | `tags` | `tags` | ≤ 13, ≤ 20 chars, sanitized |
 | `short_description`, `seo_*` | **nothing** | No fields |
-| `cover_image`, then `preview_image` assets | `uploadListingImage` | Up to 10, multipart, cover first |
+| `cover_image`, then `preview_image` assets | `uploadListingImage` | Up to 10, multipart, cover first. Since 17 September 2026 the eleventh and later are not sent, `alt_text` is the image's own when written, and a WebP or a source over 3000 pixels or 20 MB goes as a JPEG rendition (`docs/channel-adapters.md`, Images) |
 | `deliverable`, `archive` assets | `uploadListingFile` | Up to 5 of 20 MB, multipart |
 | — | `type: download`, `quantity: 999`, `who_made: i_did`, `when_made: made_to_order`, `is_supply: false`, `should_auto_renew: true` | Constants. `when_made: made_to_order` was accepted on a download listing, 11 September 2026 |
 
@@ -76,7 +76,8 @@ Four calls, one job:
    and returns `listing_id`. No fee.
 2. `POST .../listings/{listing_id}/images`, multipart `image`, `rank`, `alt_text`, once per
    image, cover first. Bytes are read from the asset's signed URL and forwarded; Etsy does
-   not fetch URLs.
+   not fetch URLs. `alt_text` is the image's own alt text when someone has written it
+   (`metadata.altText`), the listing title otherwise, at most 250 characters.
 3. `POST .../listings/{listing_id}/files`, multipart `file`, `name`, `rank`, once per
    deliverable.
 4. `PATCH .../listings/{listing_id}` with `state: active`. Etsy charges its listing fee

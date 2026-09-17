@@ -1,4 +1,4 @@
-# ADR 0014: Shopify marks a paid digital order line fulfilled
+# ADR 0015: Shopify marks a paid digital order line fulfilled
 
 **Status:** accepted, 17 September 2026, at the founder's request.
 **Date:** September 2026

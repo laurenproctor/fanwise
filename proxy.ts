@@ -89,7 +89,7 @@ export const PUBLIC_PATHS = [
  *     bytes before a field is read, and records the event by the provider's
  *     own id so a redelivery collides at the database.
  *   - A channel's **webhook** does the same for a marketplace's deliveries
- *     (ADR 0014), behind the adapter's own signature check.
+ *     (ADR 0015), behind the adapter's own signature check.
  *
  * Guarding either does not make it safer, it makes it unreachable. Both were
  * answering with a 307 to /sign-in: the grant threw away the store's consumer

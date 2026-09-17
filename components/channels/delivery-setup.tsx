@@ -27,7 +27,7 @@ export function DeliverySetup({
   connectionId: string
   setup: DeliverySetupSpec
   confirmed: boolean
-  /** What the channel switched on for itself at authorization (ADR 0014). */
+  /** What the channel switched on for itself at authorization (ADR 0015). */
   automation: DeliveryAutomationState
 }) {
   const router = useRouter()

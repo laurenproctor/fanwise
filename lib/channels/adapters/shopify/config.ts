@@ -42,7 +42,7 @@ export const ADMIN_API_VERSION = "2026-07"
 /**
  * Only what publishing and delivery need.
  *
- * The three fulfilment-side scopes arrived with ADR 0014, 17 September 2026,
+ * The three fulfilment-side scopes arrived with ADR 0015, 17 September 2026,
  * and each has one reader. `read_merchant_managed_fulfillment_orders` is what
  * the routing-complete webhook topic requires and what reads a fulfillment
  * order back; `write_merchant_managed_fulfillment_orders` is `fulfillmentCreate`;

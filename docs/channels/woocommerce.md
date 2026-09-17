@@ -54,7 +54,7 @@ provider's limits. ADR 0012 changed the decision; §6 records how.
 | `tags` | `tags[].id` | Created by name first, §5 |
 | `seo_title`, `seo_description` | **nothing** | No native fields. Left null, profile says leave empty |
 | `category` | **nothing** | Store-defined terms. Left null; the creator assigns in the admin |
-| `cover_image`, then `preview_image` assets | `images[].src` | Sideloaded on create, resent only when the store is short |
+| `cover_image`, then `preview_image` assets | `images[].src`, `images[].alt` | Sideloaded on create, resent only when the store is short. Since 17 September 2026 `alt` is the image's own when written, and a source over 2560 pixels or 8 MB, or in a format WordPress cannot take, goes as a rendition (`docs/channel-adapters.md`, Images) |
 | `deliverable`, `archive` assets | `downloads[]` | A Fanwise address per file, §6 |
 | — | `type: simple`, `virtual: true`, `downloadable: true`, `sold_individually: true` | Constants for a digital product |
 

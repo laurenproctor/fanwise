@@ -243,7 +243,7 @@ export const shopifyOAuth: ChannelOAuth = {
 export { shopifyCredentialsSchema, type ShopifyCredentials } from "./connection"
 
 /**
- * The fulfilment subscription, recorded on the connection (ADR 0014).
+ * The fulfilment subscription, recorded on the connection (ADR 0015).
  *
  * Best effort, on purpose. A shop whose app version was released without the
  * fulfilment scopes answers this with an access error, and refusing the whole

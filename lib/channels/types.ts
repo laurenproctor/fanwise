@@ -428,7 +428,7 @@ export interface ChannelOAuth {
     codeVerifier?: string
     /**
      * Where the provider should deliver events about this account, for an
-     * adapter that subscribes at authorization time (ADR 0014). Built by the
+     * adapter that subscribes at authorization time (ADR 0015). Built by the
      * shared flow from NEXT_PUBLIC_APP_URL, never by the adapter.
      */
     webhookUrl?: string
@@ -516,7 +516,7 @@ export interface DeliverySetupSpec {
   /**
    * What Fanwise does on the channel once the setup is confirmed, in one
    * sentence, for a channel whose confirmation also switches something on
-   * (ADR 0014: fulfilment). Absent when confirming only unlocks readiness.
+   * (ADR 0015: fulfilment). Absent when confirming only unlocks readiness.
    */
   automation?: string
 }
@@ -565,7 +565,7 @@ export interface WebhookContext {
 
 /**
  * Present on a channel that tells Fanwise about events on a connected account
- * (ADR 0014). Verification runs over the raw bytes before any field is read,
+ * (ADR 0015). Verification runs over the raw bytes before any field is read,
  * per docs/security.md rule 5, and the shared route owns the receipt and the
  * job; the adapter owns the signature, the shape and the act.
  */
@@ -635,7 +635,7 @@ export interface ChannelAdapter {
   buildListing(subject: AdapterSubject): ChannelListingDraft
   /** Present only on a channel Fanwise can authorize against. */
   oauth?: ChannelOAuth
-  /** Present on a channel that delivers events to Fanwise. ADR 0014. */
+  /** Present on a channel that delivers events to Fanwise. ADR 0015. */
   webhooks?: ChannelWebhooks
   publish?(context: PublishContext): Promise<PublishResult>
   update?(context: PublishContext): Promise<PublishResult>

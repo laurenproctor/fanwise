@@ -5,6 +5,7 @@ import { isDerivableImage, sniffMimeType } from "./sniff"
 import { describeUpload, isUnreadFont } from "@/lib/fonts/read-upload"
 import type { ProductAsset } from "./types"
 import { toJson } from "@/lib/imports/json"
+import { readAltText } from "./image-metadata"
 import {
   buildStoragePath,
   downloadObject,
@@ -37,6 +38,14 @@ export function sha256(data: Buffer): string {
   return createHash("sha256").update(data).digest("hex")
 }
 
+export interface FinalizeOutcome {
+  /**
+   * True when a product image (a cover or preview, not a rendition) became
+   * ready in this run and has no alt text yet, so the caller may ask for one.
+   */
+  describe: boolean
+}
+
 /**
  * Verifies an uploaded object and moves the row to ready.
  *
@@ -48,7 +57,7 @@ export function sha256(data: Buffer): string {
  * that can be missing, a font's reading (`completeReading`), and otherwise does
  * nothing. A failed row is never revisited: the creator replaces it.
  */
-export async function finalizeAsset(payload: FinalizeAssetPayload): Promise<void> {
+export async function finalizeAsset(payload: FinalizeAssetPayload): Promise<FinalizeOutcome> {
   const admin = createAdminClient()
 
   const { data: asset, error } = await admin
@@ -62,9 +71,9 @@ export async function finalizeAsset(payload: FinalizeAssetPayload): Promise<void
   if (!asset) throw new Error("asset not found")
   if (asset.asset_state === "ready") {
     await completeReading(admin, asset, payload.workspaceId)
-    return
+    return { describe: false }
   }
-  if (asset.asset_state !== "pending") return // failed; jobs may retry, creators replace
+  if (asset.asset_state !== "pending") return { describe: false } // failed; jobs may retry, creators replace
 
   try {
     const data = await downloadObject(asset.storage_path)
@@ -93,6 +102,14 @@ export async function finalizeAsset(payload: FinalizeAssetPayload): Promise<void
       })
       .eq("id", asset.id)
       .eq("workspace_id", payload.workspaceId)
+
+    return {
+      describe:
+        asset.derived_from === null &&
+        (asset.asset_type === "cover_image" || asset.asset_type === "preview_image") &&
+        isDerivableImage(mimeType) &&
+        readAltText(asset.metadata).trim().length === 0,
+    }
   } catch (cause) {
     // Rule 8: persist the original, show the creator something they can act on.
     console.error("[assets] finalize failed", { assetId: asset.id, cause })
@@ -104,6 +121,7 @@ export async function finalizeAsset(payload: FinalizeAssetPayload): Promise<void
       })
       .eq("id", asset.id)
       .eq("workspace_id", payload.workspaceId)
+    return { describe: false }
   }
 }
 

@@ -9,7 +9,7 @@ import {
 } from "./harness"
 
 /**
- * Webhook receipts (ADR 0014) are a provider's event stream, and nothing in
+ * Webhook receipts (ADR 0015) are a provider's event stream, and nothing in
  * the browser has any business reading one. Service role only: RLS is on with
  * zero policies and no grant to anon or authenticated, the shape
  * billing_webhook_events established at C1.

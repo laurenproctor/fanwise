@@ -219,7 +219,7 @@ one per attempt, so a retry can never be a second write.
 
 ## Channel webhooks
 
-ADR 0014, in `app/api/channels/[channelKey]/webhook/route.ts` and `lib/channels/webhooks.ts`,
+ADR 0015, in `app/api/channels/[channelKey]/webhook/route.ts` and `lib/channels/webhooks.ts`,
 generic in the channel key like the OAuth callback. The same four steps as billing, with the
 signature check behind `adapter.webhooks.verify`: raw body as text, verify before any field is
 read (an HMAC over the bytes with the app's client secret, compared in constant time), record

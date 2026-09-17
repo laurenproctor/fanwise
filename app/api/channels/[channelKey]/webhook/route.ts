@@ -6,7 +6,7 @@ import { findAdapter } from "@/lib/channels/registry"
 import { jobs } from "@/lib/jobs"
 
 /**
- * A channel's webhook, for every channel that delivers one (ADR 0014).
+ * A channel's webhook, for every channel that delivers one (ADR 0015).
  *
  * Generic in the channel key for the reason the OAuth callback is: a route
  * named after a marketplace would put a provider name in the application

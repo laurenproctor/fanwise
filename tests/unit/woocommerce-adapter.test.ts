@@ -294,6 +294,36 @@ describe("publish", () => {
     })
   })
 
+  it("sends each image's own alt text, and a rendition of a format the store cannot take", async () => {
+    const calls: Call[] = []
+    scriptStore(store(calls, { existingTags: ["sans"] }))
+
+    await woocommerceAdapter.publish!(
+      context({
+        subject: subject({
+          assets: [
+            asset({
+              mime_type: "image/heic",
+              filename: "cover.heic",
+              metadata: { altText: "Aster set large in black on white." },
+            }),
+          ],
+        }),
+        derivativeUrl: async (a, spec) => `https://signed.example/${spec.key}/${a.filename}`,
+      }),
+    )
+
+    const create = write(calls, "POST")!
+    expect(create.body).toMatchObject({
+      images: [
+        {
+          src: "https://signed.example/fit-2560-jpeg/cover.heic",
+          alt: "Aster set large in black on white.",
+        },
+      ],
+    })
+  })
+
   it("is not purchasable when the product has no deliverable to attach", async () => {
     const calls: Call[] = []
     scriptStore(store(calls))

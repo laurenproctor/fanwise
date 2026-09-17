@@ -4,6 +4,8 @@ import type { ProductAsset } from "@/lib/products/types"
 import { z } from "zod"
 import { ChannelError, normalized } from "@/lib/channels/errors"
 import { listingImages } from "@/lib/channels/images"
+import { channelImage, type ImagePolicy } from "@/lib/channels/image-policy"
+import { altTextFor } from "@/lib/products/image-metadata"
 import type {
   AdapterSubject,
   ChannelAdapter,
@@ -36,6 +38,19 @@ import {
 } from "./transform"
 
 /**
+ * What Shopify takes as a product image: JPEG, PNG, GIF, WebP and HEIC, up to
+ * 20 megapixels (4472 on a side) and 20 MB each. Its themes crop for their
+ * own grids, so nothing is cropped here; a larger export is scaled to the
+ * ceiling and everything else goes as the creator made it.
+ */
+export const IMAGE_POLICY: ImagePolicy = {
+  key: "fit-4472",
+  maxEdge: 4472,
+  accepts: ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"],
+  maxByteSize: 20 * 1024 * 1024,
+}
+
+/**
  * Shopify. The first real channel, and the one Fanwise does not bill for.
  *
  * The field-level spec is docs/channels/shopify.md. Delivery is ADR 0013,
@@ -49,7 +64,7 @@ import {
  *   can take money with nothing behind it is the one outcome worth engineering
  *   against. Once they have, a publish puts the product on sale in one action.
  *
- * Fulfilment is ADR 0014, 17 September 2026: once that confirmation exists, a
+ * Fulfilment is ADR 0015, 17 September 2026: once that confirmation exists, a
  * paid order line for a product Fanwise published is marked fulfilled by the
  * routing-complete webhook (./webhooks.ts), because the buyer already holds the
  * download. Lines that need shipping are never touched.
@@ -674,11 +689,12 @@ async function productSet(context: PublishContext, intent: PublishIntent): Promi
   if (images.length > 0 && (!externalId || (state && needsMedia(state, images.length)))) {
     input.files = await Promise.all(
       images.map(async (asset) => ({
-        originalSource: await context.assetUrl(asset),
+        originalSource: (await channelImage(context, IMAGE_POLICY, asset)).url,
         contentType: "IMAGE",
-        // The product's name, not the filename. Alt text is read aloud to a
-        // buyer; "Screenshot 2026-09-05 at 6.51.39 PM.jpg" tells them nothing.
-        alt: listing.title ?? subject.product.name,
+        // What the image shows when someone has said, else the product's name.
+        // Never the filename: alt text is read aloud to a buyer, and
+        // "Screenshot 2026-09-05 at 6.51.39 PM.jpg" tells them nothing.
+        alt: altTextFor(asset.metadata, listing.title ?? subject.product.name),
       })),
     )
   }

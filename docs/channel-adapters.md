@@ -60,6 +60,48 @@ outside the adapter layer and the tree test is right to fail on it; and the mapp
 provider payload to a canonical proposal is a pure function, so the whole of it is testable
 without a network.
 
+## Images
+
+Images are product assets, not listing fields. An adapter receives `subject.assets` and asks
+`listingImages(subject)` (`lib/channels/images.ts`) for the ones a channel should receive:
+ready cover and preview images, cover first, then the creator's order. The same function
+orders the grid on the product page, so the two cannot drift, and `imagesFingerprint` feeds the
+update idempotency key so an image-only edit is a change that reaches the channel.
+
+How the bytes reach the channel is injected on `PublishContext`, never imported:
+
+- `assetUrl(asset)`: a time-limited signed link to the source, for a provider that fetches by
+  URL (Shopify, WooCommerce, Gumroad). Etsy fetches it itself and forwards bytes.
+- `derivativeUrl(asset, spec)`: the same, to a rendition built by the derivative engine to an
+  `ImageSpec` the adapter names. Rendered once per (source, spec) and cached as a derivative
+  asset. Optional; only the runner supplies it.
+
+**Image policy.** Every marketplace has three rules about a picture: the formats it accepts,
+its byte ceiling, and how large a picture is worth sending. Each adapter states them as an
+`ImagePolicy` (`lib/channels/image-policy.ts`), and `channelImage(context, policy, asset)`
+returns either the source or a rendition that fits: scaled down inside the ceiling with the
+`inside` fit, PNG kept as PNG where the channel takes it, everything else re-encoded as JPEG
+under the byte ceiling. A source already inside the policy is sent as it is. A GIF is never
+re-encoded. A rendition that cannot be built falls back to the source rather than failing the
+publish. Renditions never crop: storefront grids crop for themselves, and the font workspace
+shows the creator how much a square or 4:3 grid takes off so they can compose for it. The one
+cropped shape in the catalog is Gumroad's square thumbnail, its own spec.
+
+Policy keys name a shape (`fit-3000`), never a channel, so two channels with the same ceiling
+share one cached rendition.
+
+| Channel | Ceiling | Accepts | Bytes | Source |
+|---|---|---|---|---|
+| Shopify | 4472 on a side | JPEG, PNG, GIF, WebP, HEIC | 20 MB | Shopify's stated product image limits |
+| WooCommerce | 2560 on a side | JPEG, PNG, GIF, WebP | 8 MB | WordPress scales anything wider than 2560 itself; the byte ceiling is a common PHP upload limit **[verify per store]** |
+| Etsy | 3000 on a side | JPEG, PNG, GIF | 20 MB | Etsy recommends 2000 on the shortest side and refuses WebP; the byte ceiling is Etsy's stated maximum **[verify]** |
+| Gumroad | 2560 on a side | JPEG, PNG, GIF | 50 MB | `docs/channels/gumroad.md` §6 |
+
+**Alt text.** Each image carries its own alt text in `product_assets.metadata.altText`, written
+by the creator or suggested by the model (ADR 0014). Adapters send it through `altTextFor(asset.metadata,
+fallback)`, which falls back to the listing title, never the filename. Shopify `files[].alt`,
+WooCommerce `images[].alt`, Etsy `alt_text`; Gumroad's covers take none.
+
 ## Manual steps
 
 A channel may be able to publish and still be unable to do one necessary thing. Shopify is
@@ -143,7 +185,7 @@ reuse it.
 
 ## Webhooks
 
-ADR 0014. A channel that tells Fanwise about events on a connected account declares
+ADR 0015. A channel that tells Fanwise about events on a connected account declares
 `webhooks`:
 
 ```ts

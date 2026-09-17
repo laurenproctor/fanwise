@@ -442,6 +442,27 @@ fact.
 weakening it, and it puts the one judgement a machine cannot make — is this sentence true
 about my product — in front of the only person who knows.
 
+### 30. Does a suggested alt text need the creator's acceptance before a channel gets it
+
+Raised on 17 September 2026 by ADR 0014, proposed. Since that date the model writes alt text
+for a product image from the image, labelled `generated`, and the channels send an image's
+alt text at the next publish. Listing copy works differently: no first generation reaches a
+marketplace without explicit approval (`docs/ai-merchandising.md`, Review). Alt text ships on
+the B2 precedent, that publishing is the approval, because the creator publishes from a page
+that shows every image with its words beside it. The validator has already refused anything
+the FactSheet does not support, so what can reach a buyer unreviewed is a description that is
+harmless and wrong, not a claim.
+
+- **Publishing is the approval.** What is built. One field, no extra step, and the readiness
+  nudge still says which images have no words.
+- **Suggested until accepted.** A `generated` alt text is shown in the editor but the channel
+  receives the listing title until the creator edits or accepts it. One more control per
+  image, and most suggestions would never be accepted because most creators never open the
+  field, which is the situation this exists to fix.
+
+**Recommendation:** the first, and revisit if a live listing ever carries a suggestion the
+creator would not have written.
+
 ### 23. Is a second owned storefront included
 
 Raised on 8 September 2026 by the WooCommerce assessment in `docs/channel-feasibility.md`.

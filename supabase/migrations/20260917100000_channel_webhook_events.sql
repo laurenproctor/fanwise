@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Channel webhook receipts (ADR 0014).
+-- Channel webhook receipts (ADR 0015).
 --
 -- A provider that tells Fanwise about an event on a connected account posts
 -- it to /api/channels/<key>/webhook. Every delivery is recorded here by the

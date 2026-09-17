@@ -51,7 +51,7 @@ export function grantUrl(channelKey: string): string {
   return `${appOrigin()}/api/channels/${channelKey}/oauth/grant`
 }
 
-/** Where a provider delivers events about a connected account (ADR 0014). */
+/** Where a provider delivers events about a connected account (ADR 0015). */
 export function webhookUrl(channelKey: string): string {
   return `${appOrigin()}/api/channels/${channelKey}/webhook`
 }

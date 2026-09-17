@@ -23,7 +23,7 @@ import { DELIVERY_SETUP_CONFIRMED_KEY } from "@/lib/delivery/setup"
 import type { ChannelConnection, WebhookContext } from "@/lib/channels/types"
 
 /**
- * Marking a digital order fulfilled (ADR 0014).
+ * Marking a digital order fulfilled (ADR 0015).
  *
  * The three things a wrong version of this would do, each pinned: mark a mug
  * fulfilled because it shared an order with a font; mark anything fulfilled

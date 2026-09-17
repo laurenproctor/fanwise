@@ -20,7 +20,7 @@ export type ShopifyCredentials = z.infer<typeof shopifyCredentialsSchema>
  * any call:
  *
  * The connection is authorized, but is it authorized for what this build
- * needs? ADR 0004 and ADR 0014 each added scopes, and Fanwise runs its own
+ * needs? ADR 0004 and ADR 0015 each added scopes, and Fanwise runs its own
  * OAuth rather than Shopify's managed installation, so nothing has prompted
  * the creator on its behalf. Their existing token simply cannot do the new
  * thing. Asked here so the ask arrives as an explanation rather than as a 403

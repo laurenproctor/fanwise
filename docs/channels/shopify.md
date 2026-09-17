@@ -66,7 +66,7 @@ them true now would have the UI offer a sales report that does not exist.
 | `category` | `category` | A Standard Product Taxonomy id, §14 |
 | `brand_name` | `vendor` | Falls back to the workspace name |
 | `slug` | — | **Not sent, since 7 September 2026.** Shopify uniquifies a handle it derives from the title and refuses one it is given that is already in use, so a slug that existed on the store as a product Fanwise never made blocked every publish. Shopify derives the handle on create and keeps it on update |
-| `cover_image`, then `preview_image` assets | `files` | `FileSetInput`, `contentType: IMAGE`, cover first |
+| `cover_image`, then `preview_image` assets | `files` | `FileSetInput`, `contentType: IMAGE`, cover first. Since 17 September 2026 each carries the image's own `alt` when one is written, and a source over 4472 pixels or 20 MB goes as a rendition (`docs/channel-adapters.md`, Images) |
 | `deliverable` asset | **nothing** | No API exists. §6 |
 
 `currency` is the one field that does not survive the trip, and it is worth stating plainly
@@ -204,7 +204,7 @@ The address is minted once per listing and file and re-sent unchanged on every w
 download link** revokes it and writes a new one, after warning that past buyers' emails hold the
 old link.
 
-**Fulfilment**, ADR 0014, 17 September 2026. Once the snippet is confirmed, the same confirmation
+**Fulfilment**, ADR 0015, 17 September 2026. Once the snippet is confirmed, the same confirmation
 switches on the bookkeeping:
 
 ```
@@ -225,7 +225,7 @@ job                  fulfillmentOrder(id) { status, order.displayFinancialStatus
 ```
 
 A mug in the same order stays Unfulfilled for the creator. A pending bank transfer is skipped and
-not revisited: the routing delivery comes once, at placement. See ADR 0014 for what this does not
+not revisited: the routing delivery comes once, at placement. See ADR 0015 for what this does not
 catch.
 
 **[verify]** on a live shop that the template resolves `line.product.metafields.fanwise.download_url`.
@@ -289,7 +289,7 @@ Standard Shopify authorization code grant against the shop domain the creator ty
   line, an error message, or the browser.
 
 Scopes requested: `write_products`, `read_products`, `read_publications`,
-`write_publications`, and since ADR 0014 `read_orders`,
+`write_publications`, and since ADR 0015 `read_orders`,
 `read_merchant_managed_fulfillment_orders` and `write_merchant_managed_fulfillment_orders`.
 Nothing else. The three fulfilment scopes each have one reader (§6); `read_orders` reads one
 field, the financial status, and no protected customer field is ever named. Adding them forced
@@ -369,7 +369,7 @@ time the creator clicked, which is the duplicate §7 exists to prevent.
 - `channels` — one row, `shopify`, `billable = false`.
 - `channel_connections` — `external_account_id` is the shop domain,
   `external_account_name` the shop's display name, `metadata` the shop currency and timezone,
-  `deliverySetupConfirmedAt` (ADR 0013, carried across a reconnect) and, since ADR 0014,
+  `deliverySetupConfirmedAt` (ADR 0013, carried across a reconnect) and, since ADR 0015,
   `deliveryAutomationRef` or `deliveryAutomationError` (written fresh at every authorization).
 - `channel_connection_secrets` — the sealed offline access token, with `key_version`.
 - `channel_listings` — `external_listing_id` is the product GID,
@@ -381,7 +381,7 @@ time the creator clicked, which is the duplicate §7 exists to prevent.
 - `delivery_links` — one active row per listing and deliverable (ADR 0012).
 - Product metafields `fanwise.download_url` and `fanwise.download_name`, on the Shopify side.
 - `channel_webhook_events` — one receipt per routing-complete delivery, by Shopify's delivery
-  id, with the outcome per connection (ADR 0014). Ids only, never a payload.
+  id, with the outcome per connection (ADR 0015). Ids only, never a payload.
 - A fulfillment on the Shopify side, on exactly the Fanwise digital lines of a paid order,
   with `notifyCustomer: false` and the message `FULFILLMENT_MESSAGE`.
 - `listing_snapshots` — one `publish` snapshot per successful publication.
@@ -447,7 +447,7 @@ Nothing below is a guess about intent; each is a shape that only a 2xx can confi
 7. and 8. are likewise **answered, 7 September 2026**: `category` with `so-2-5` and
    `seo.title` were both accepted and read back from a live product. §16.
 
-10. ADR 0014, in order, from the first reconnect after the app version carries the three
+10. ADR 0015, in order, from the first reconnect after the app version carries the three
     fulfilment scopes: that the reconnect grants them (§9: the app's configuration is the
     ceiling); that `webhookSubscriptionCreate` accepts `webhookSubscription: { uri }` against
     `2026-07` and the id lands in `deliveryAutomationRef`; that a real order delivers a

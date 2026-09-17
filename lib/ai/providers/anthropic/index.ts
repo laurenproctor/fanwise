@@ -113,7 +113,27 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
             text: block.text,
             ...(block.cacheBoundary ? { cache_control: { type: "ephemeral" as const } } : {}),
           })),
-          messages: [{ role: "user", content: request.user }],
+          messages: [
+            {
+              role: "user",
+              // A plain string when there is nothing to look at, so the wire
+              // shape of a listing generation is the one the tests pinned.
+              content:
+                request.images && request.images.length > 0
+                  ? [
+                      ...request.images.map((image) => ({
+                        type: "image" as const,
+                        source: {
+                          type: "base64" as const,
+                          media_type: image.mediaType,
+                          data: image.data,
+                        },
+                      })),
+                      { type: "text" as const, text: request.user },
+                    ]
+                  : request.user,
+            },
+          ],
           output_config: {
             effort: EFFORT,
             format: { type: "json_schema", schema: request.outputSchema },

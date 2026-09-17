@@ -1066,9 +1066,12 @@ against any non-local database. The microphone is allowed for this origin only
   on a configured deployment is its live check. Cloudflare's per-request audio size limit is
   not documented, which is why recordings are captured at 48 kbps and capped at 10 MB.
 - No OCR, no images from PDFs, and no clean-up job for staged sources abandoned in a closed tab.
-- A picture is a product image and nothing else: no vision model reads it, and nothing it shows
-  becomes a fact. Several pictures added at once are read by parallel jobs, so which one is the
-  cover is the first to finish, not the first added; the product page can reorder them.
+- A picture is a product image and nothing else: import reads no words off it, and nothing it
+  shows becomes a fact. (Since 17 September 2026 the model is shown a product image to write
+  that image's alt text, ADR 0014; that happens after the image is a product image, writes one
+  key on that asset, and tells the draft nothing.) Several pictures added at once are read by
+  parallel jobs, so which one is the cover is the first to finish, not the first added; the
+  product page can reorder them.
 - Conflicts are detected for four fact kinds with narrow patterns; others fall to the claims
   check and the creator's review.
 - A handed-over source cannot be replaced from the review screen; a failed one can be retried.

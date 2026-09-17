@@ -40,7 +40,7 @@ export function carryDurableMetadata(
 
 /**
  * What a channel switched on for itself at authorization time, once the setup
- * above is confirmed (ADR 0014: marking digital lines fulfilled).
+ * above is confirmed (ADR 0015: marking digital lines fulfilled).
  *
  * Two keys, written fresh at every authorization by the adapter that owns
  * them and read generically by the Channels page. Not durable: a reconnect
