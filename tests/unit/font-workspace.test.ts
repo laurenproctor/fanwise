@@ -292,7 +292,98 @@ describe("the family, as the files describe it", () => {
       asset({ filename: "package.zip", asset_type: "archive", mime_type: "application/zip" }),
     ])
     expect(files[0]!.reading).toEqual({ kind: "none" })
-    expect(unreadFontFiles(files).map((file) => file.id)).toEqual([unread.id])
+    // A ready package nobody has looked inside is asked to be read, like a
+    // font settled before fonts were read.
+    expect(unreadFontFiles(files).map((file) => file.filename)).toEqual([
+      files[0]!.filename,
+      "package.zip",
+    ])
+  })
+
+  it("reads a package's contents, and a package that could not be opened", () => {
+    const opened = asset({
+      filename: "blimp.zip",
+      asset_type: "archive",
+      mime_type: "application/zip",
+      metadata: {
+        archive: {
+          entries: [
+            {
+              path: "Blimp/Blimp-Regular.otf",
+              byteSize: 10,
+              kind: "font",
+              font: read(buildSfnt(blimp("Regular"))),
+            },
+            { path: "Blimp/README.txt", byteSize: 3, kind: "document" },
+          ],
+          entryCount: 2,
+          fontCount: 1,
+          ignoredCount: 0,
+          truncated: false,
+        },
+      },
+    })
+    const broken = asset({
+      filename: "broken.zip",
+      asset_type: "archive",
+      mime_type: "application/zip",
+      metadata: { archiveProblem: "malformed" },
+    })
+    const files = fontFileViews([opened, broken])
+    expect(files[0]!.archive.kind).toBe("archive")
+    expect(files[1]!.archive).toEqual({ kind: "problem", problem: "malformed" })
+    expect(unreadFontFiles(files)).toEqual([])
+  })
+})
+
+describe("a family uploaded as one package", () => {
+  const entry = (path: string, font: DetectedFont) => ({ path, byteSize: 10, kind: "font", font })
+  const packaged = asset({
+    filename: "blimp-display.zip",
+    asset_type: "archive",
+    mime_type: "application/zip",
+    metadata: {
+      archive: {
+        entries: [
+          entry("OTF/BlimpDisplay-Regular.otf", read(buildSfnt(blimp("Regular", { weight: 400 })))),
+          entry("OTF/BlimpDisplay-Bold.otf", read(buildSfnt(blimp("Bold", { weight: 700 })))),
+          entry(
+            "Web/BlimpDisplay-Regular.woff2",
+            read(buildWoff2(blimp("Regular", { weight: 400 }))),
+          ),
+          { path: "Web/odd.otf", byteSize: 10, kind: "font", problem: "malformed" },
+          { path: "License.pdf", byteSize: 10, kind: "document" },
+        ],
+        entryCount: 5,
+        fontCount: 4,
+        ignoredCount: 1,
+        truncated: false,
+      },
+    },
+  })
+
+  it("is detected exactly as it would be from its files", () => {
+    const family = detectFamily(fontFileViews([packaged]))
+    expect(family.familyNames).toEqual(["Blimp Display"])
+    expect(family.styles.map((style) => style.name)).toEqual([
+      "Blimp Display Regular",
+      "Blimp Display Bold",
+    ])
+    // buildSfnt writes TrueType outlines, so the fixture's .otf reads as ttf.
+    expect(family.styles[0]!.formats).toEqual(["ttf", "woff2"])
+    expect(family.formats).toEqual(["ttf", "woff2"])
+    expect(family.readCount).toBe(3)
+  })
+
+  it("satisfies the font-files blocker and flags the font inside it could not read", () => {
+    const files = fontFileViews([packaged])
+    const readiness = evaluateFontReadiness(readinessInput({ files, family: detectFamily(files) }))
+    const byKey = new Map(readiness.rules.map((rule) => [rule.key, rule]))
+    expect(byKey.get("files.present")?.satisfied).toBe(true)
+    expect(byKey.get("files.packagedFonts")?.satisfied).toBe(false)
+    expect(byKey.get("files.packagedFonts")?.label).toBe(
+      "Check the font file inside blimp-display.zip",
+    )
   })
 })
 

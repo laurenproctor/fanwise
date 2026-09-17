@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import { PRODUCT_TYPE_LABELS, type Product, type ProductAsset } from "@/lib/products/types"
 import { parseMetadata, type ProductMetadata } from "@/lib/products/metadata"
 import { featureLabel } from "@/lib/fonts/coverage"
-import { WEIGHT_NAMES, WIDTH_NAMES } from "@/lib/fonts/detected"
+import { WEIGHT_NAMES, WIDTH_NAMES, readArchive } from "@/lib/fonts/detected"
 import { FONT_CLASSIFICATION_LABELS, FONT_LICENSE_LABELS } from "@/lib/fonts/labels"
 
 /**
@@ -201,6 +201,14 @@ export function buildFactSheet(product: Product, assets: readonly ProductAsset[]
   for (const asset of deliverables) {
     const ext = extensionOf(asset.filename)
     if (ext && !formats.includes(ext)) formats.push(ext)
+    // What a package holds is measured from its bytes by the finalize job, so
+    // a ZIP of OTFs is a fact about OTFs and not only about a zip.
+    const archive = readArchive(asset.metadata)
+    if (archive.kind === "archive") {
+      for (const entry of archive.contents.entries) {
+        if (entry.font && !formats.includes(entry.font.format)) formats.push(entry.font.format)
+      }
+    }
   }
   const images = ready.filter(
     (asset) =>

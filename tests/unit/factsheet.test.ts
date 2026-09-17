@@ -48,6 +48,54 @@ function asset(overrides: Partial<ProductAsset>): ProductAsset {
 }
 
 describe("buildFactSheet", () => {
+  it("measures the formats inside a ZIP package from what the finalize job read there", () => {
+    const sheet = buildFactSheet(product(), [
+      asset({
+        asset_type: "archive",
+        metadata: {
+          archive: {
+            entries: [
+              {
+                path: "a.otf",
+                byteSize: 1,
+                kind: "font",
+                font: {
+                  format: "otf",
+                  isVariable: false,
+                  axes: [],
+                  scripts: [],
+                  languages: [],
+                  blocks: [],
+                  features: [],
+                },
+              },
+              {
+                path: "a.woff2",
+                byteSize: 1,
+                kind: "font",
+                font: {
+                  format: "woff2",
+                  isVariable: false,
+                  axes: [],
+                  scripts: [],
+                  languages: [],
+                  blocks: [],
+                  features: [],
+                },
+              },
+              { path: "readme.txt", byteSize: 1, kind: "document" },
+            ],
+            entryCount: 3,
+            fontCount: 2,
+            ignoredCount: 0,
+            truncated: false,
+          },
+        },
+      }),
+    ])
+    expect(sheet.files).toEqual({ deliverableCount: 1, formats: ["zip", "otf", "woff2"] })
+  })
+
   it("carries identity, price and the typed details", () => {
     const sheet = buildFactSheet(product(), [])
     expect(sheet.title).toBe("Aster Grotesk")

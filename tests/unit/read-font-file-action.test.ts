@@ -75,9 +75,21 @@ describe("asking for a font file's reading", () => {
     expect(state.enqueued).toEqual([])
   })
 
-  it("queues nothing for a row that is not ready, or not a font", async () => {
+  it("queues nothing for a row that is not ready, or neither a font nor a package", async () => {
     state.asset = { id: "asset-1", asset_state: "pending", mime_type: null, metadata: {} }
     await readFontFileAction("northbound-type", "asset-1")
+    state.asset = {
+      id: "asset-1",
+      asset_state: "ready",
+      mime_type: "application/pdf",
+      metadata: {},
+    }
+    await readFontFileAction("northbound-type", "asset-1")
+
+    expect(state.enqueued).toEqual([])
+  })
+
+  it("queues a look inside a ready package nobody has looked inside, once", async () => {
     state.asset = {
       id: "asset-1",
       asset_state: "ready",
@@ -85,8 +97,16 @@ describe("asking for a font file's reading", () => {
       metadata: {},
     }
     await readFontFileAction("northbound-type", "asset-1")
+    expect(state.enqueued).toHaveLength(1)
 
-    expect(state.enqueued).toEqual([])
+    state.asset = {
+      id: "asset-1",
+      asset_state: "ready",
+      mime_type: "application/zip",
+      metadata: { archiveProblem: "unsupported" },
+    }
+    await readFontFileAction("northbound-type", "asset-1")
+    expect(state.enqueued).toHaveLength(1)
   })
 
   it("says so when the workspace cannot see the file", async () => {

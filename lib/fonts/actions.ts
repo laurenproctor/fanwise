@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server"
 import { routes } from "@/lib/routes"
 import { toJson } from "@/lib/imports/json"
 import { jobs } from "@/lib/jobs"
-import { isUnreadFont } from "./read-upload"
+import { isUnread } from "./read-upload"
 import type { Product } from "@/lib/products/types"
 import { mergeFontMetadata, patchColumns, productPatchSchema, type PatchField } from "./save"
 
@@ -175,7 +175,7 @@ export async function readFontFileAction(
     return { error: "That file could not be read. Try again." }
   }
   if (!asset) return { error: "That file could not be found." }
-  if (asset.asset_state !== "ready" || !isUnreadFont(asset.mime_type, asset.metadata)) {
+  if (asset.asset_state !== "ready" || !isUnread(asset.mime_type, asset.metadata)) {
     return { error: null }
   }
 
