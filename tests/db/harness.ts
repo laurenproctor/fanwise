@@ -140,3 +140,60 @@ export async function destroyActor(actor: Actor): Promise<void> {
 
 /** Postgres insufficient_privilege / RLS violation, as surfaced by PostgREST. */
 export const RLS_DENIED = "42501"
+
+/**
+ * Waits until every publication job on a listing has reached a terminal state.
+ *
+ * The suite runs the in-process queue, which hands a job to its handler on the
+ * next microtask, so `startPublication` returns while the runner is still
+ * writing. The runner records the listing and its snapshot before it marks the
+ * job succeeded or failed, so a job that has left `pending` and `running` is a
+ * job whose every write has landed, and that is the only thing a test needs to
+ * know before it reads.
+ *
+ * A retry is the one case where "not pending or running" is not enough. A
+ * retried job is re-queued as it stands, `failed`, and stays `failed` until
+ * the runner's compare-and-swap claims it, so a poll that started in that gap
+ * would see nothing in flight and return before the retry had begun. A test
+ * that retried a job passes it as `retried`, with the attempt count it read
+ * beforehand, and the wait also holds until the claim has moved that count.
+ *
+ * This replaced a fixed 250 ms sleep. The sleep held on a laptop and failed on
+ * a slow CI runner in four ways that all read like idempotency bugs: a listing
+ * still carrying the previous fingerprint, an update still `running` when the
+ * test expected `already_done`, and a retry test that forced a job to `failed`
+ * while the first run was still going, so the first run finished afterwards
+ * and the retry found `already_done`. Polling the rows says what the sleep
+ * guessed. A re-attempt that the runner schedules puts a row back to
+ * `pending`, so this waits through those too.
+ */
+export async function settle(
+  listingId: string,
+  options: { retried?: { jobId: string; attemptsBefore: number } } = {},
+  timeoutMs = 20_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const { data, error } = await adminClient()
+      .from("publication_jobs")
+      .select("id, status, attempt_count")
+      .eq("channel_listing_id", listingId)
+    if (error) throw new Error(`could not read publication jobs: ${error.message}`)
+    const jobs = data ?? []
+    const inFlight = jobs.filter((job) => job.status === "pending" || job.status === "running")
+    const retry = options.retried
+    const unclaimed =
+      retry !== undefined &&
+      jobs.some((job) => job.id === retry.jobId && job.attempt_count <= retry.attemptsBefore)
+    if (inFlight.length === 0 && !unclaimed) return
+    if (Date.now() > deadline) {
+      const states = jobs
+        .map((job) => `${job.id} ${job.status} attempt ${job.attempt_count}`)
+        .join(", ")
+      throw new Error(
+        `publication jobs for listing ${listingId} did not settle in ${timeoutMs} ms: ${states}`,
+      )
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+}

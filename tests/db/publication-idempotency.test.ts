@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import { adminClient, createActor, destroyActor, type Actor } from "./harness"
+import { adminClient, createActor, destroyActor, settle, type Actor } from "./harness"
 import { startPublication } from "@/lib/publishing/start"
 import { runPublication } from "@/lib/publishing/runner"
 import { publishKey } from "@/lib/publishing/idempotency"
@@ -40,16 +40,6 @@ const draft: ChannelListingDraft = {
   category: "font",
   tags: [],
   metadata: {},
-}
-
-/**
- * The in-process queue runs handlers on a microtask, so a publication started
- * through startPublication may already have completed by the time the call
- * returns. Settling here rather than asserting immediately keeps the tests
- * about idempotency instead of about scheduling.
- */
-async function settle(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 250))
 }
 
 async function createListing(label: string): Promise<{ listingId: string; productId: string }> {
@@ -136,7 +126,7 @@ describe("publishing once", () => {
       generation: 0,
     })
     expect(outcome.kind).toBe("started")
-    await settle()
+    await settle(listingId)
 
     const listing = await listingRow(listingId)
     expect(listing.status).toBe("published")
@@ -184,7 +174,7 @@ describe("a second click creates nothing", () => {
       draft,
       generation: 0,
     })
-    await settle()
+    await settle(listingId)
 
     expect(outcome.kind).toBe("already_done")
 
@@ -213,7 +203,7 @@ describe("a second click creates nothing", () => {
       draft: { ...draft, title: "Aster Grotesk Variable", price: 99 },
       generation: 0,
     })
-    await settle()
+    await settle(listingId)
 
     expect(outcome.kind).toBe("already_done")
     expect(await jobsFor(listingId)).toHaveLength(1)
@@ -284,7 +274,7 @@ describe("retrying a failure", () => {
       draft,
       generation: 0,
     })
-    await settle()
+    await settle(retryId)
     expect(first.kind).toBe("started")
 
     // Force the row back to a failed state, as a transport error would leave
@@ -299,6 +289,8 @@ describe("retrying a failure", () => {
       .update({ external_listing_id: null, status: "failed" })
       .eq("id", retryId)
 
+    const attemptsBefore = (await jobsFor(retryId))[0]!.attempt_count
+
     const second = await startPublication({
       supabase: alice.client,
       workspaceId: alice.workspaceId,
@@ -307,7 +299,7 @@ describe("retrying a failure", () => {
       draft,
       generation: 0,
     })
-    await settle()
+    await settle(retryId, { retried: { jobId, attemptsBefore } })
 
     expect(second.kind).toBe("retried")
     expect((second as { jobId: string }).jobId).toBe(jobId)
@@ -353,7 +345,7 @@ describe("publishing again after the channel lost the product", () => {
       draft,
       generation: 0,
     })
-    await settle()
+    await settle(goneId)
     expect(first.kind).toBe("started")
     expect((await listingRow(goneId)).external_listing_id).toBe(`mock-api-${goneId}`)
 
@@ -396,7 +388,7 @@ describe("publishing again after the channel lost the product", () => {
       draft,
       generation: 1,
     })
-    await settle()
+    await settle(goneId)
 
     // A new operation, not a repeat: a new row, a new key, and a product at
     // the end of it. Before the generation existed this was `already_done`
