@@ -4,11 +4,11 @@ import { newCreator } from "./support"
 import {
   chooseLicense,
   confirmOwnership,
+  dropZipFile,
   fillListing,
   importAnalyzedSource,
   openChecklistRow,
   saveListing,
-  zipFile,
 } from "./import-support"
 
 /**
@@ -66,7 +66,8 @@ test("a creator goes from a pasted link to the marketplace drafts", async ({ pag
 
   // 4: a buyer file, through the pipeline the product page uses.
   await openChecklistRow(page, "upload customer files")
-  await page.getByLabel(/Upload files/).setInputFiles(zipFile())
+  await expect(page.getByText("Or drop them here.")).toBeVisible()
+  await dropZipFile(page)
   await expect(progressOf(page)).toHaveAttribute("aria-valuenow", "3", { timeout: 20_000 })
 
   // 5: a licence, recorded with its version.

@@ -1,6 +1,6 @@
 "use client"
 
-import { useId, useState, useTransition } from "react"
+import { useId, useRef, useState, useTransition } from "react"
 import { FIELD_INPUT_CLASS } from "@/components/ui/field"
 import { FormError } from "@/components/ui/form-error"
 import {
@@ -323,8 +323,74 @@ function BuyerFilesControl({
   const [pending, startTransition] = useTransition()
   const hasReady = deliverables.some((file) => file.state === "ready")
 
+  /*
+   * The whole control takes a drop, the same way the product page's files
+   * section does. The file input here is visually hidden, so a file let go on
+   * the button lands on the label, not the input, and without this the browser
+   * treated it as a request to open the file: the page-wide guard turned that
+   * into a refusal, and a creator holding a ZIP over "Upload files" was told no.
+   */
+  const [fileOver, setFileOver] = useState(false)
+  const dragDepth = useRef(0)
+
+  /** The one path the picker and a drop share. */
+  function send(files: readonly File[]) {
+    if (files.length === 0 || busy || pending) return
+    setError(null)
+    setBusy(true)
+    void handlers.onFilesChosen(files).then((message) => {
+      setBusy(false)
+      setError(message)
+    })
+  }
+
+  /*
+   * A drop straight onto the file input is the browser's own business: it
+   * fills the input, which fires change, which uploads. Taking it here as well
+   * would upload the same file twice, and the root guard's exemption has to
+   * agree with this one.
+   */
+  function acceptsDrop(event: { dataTransfer: DataTransfer; target: EventTarget | null }) {
+    const boundForTheInput =
+      event.target instanceof Element && event.target.closest('input[type="file"]') !== null
+    return event.dataTransfer.types.includes("Files") && !boundForTheInput
+  }
+
   return (
-    <div className="mt-2 flex flex-col gap-3">
+    <div
+      onDragEnter={(event) => {
+        if (!acceptsDrop(event)) return
+        dragDepth.current += 1
+        setFileOver(true)
+      }}
+      onDragOver={(event) => {
+        if (!acceptsDrop(event)) return
+        // Without preventDefault here the drop never fires at all.
+        event.preventDefault()
+        event.dataTransfer.dropEffect = "copy"
+      }}
+      onDragLeave={(event) => {
+        if (!acceptsDrop(event)) return
+        dragDepth.current -= 1
+        if (dragDepth.current <= 0) {
+          dragDepth.current = 0
+          setFileOver(false)
+        }
+      }}
+      onDrop={(event) => {
+        if (!acceptsDrop(event)) return
+        event.preventDefault()
+        dragDepth.current = 0
+        setFileOver(false)
+        send(Array.from(event.dataTransfer.files))
+      }}
+      data-testid="buyer-files-drop"
+      className={`mt-2 flex flex-col gap-3 rounded-[10px] border border-dashed p-3 transition-colors ${
+        fileOver
+          ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
+          : "border-transparent"
+      }`}
+    >
       <div className="flex flex-wrap items-center gap-3">
         {/*
           A label around the input rather than a button that clicks a hidden
@@ -347,21 +413,15 @@ function BuyerFilesControl({
             onChange={(event) => {
               const chosen = Array.from(event.target.files ?? [])
               event.target.value = ""
-              if (chosen.length === 0) return
-              setError(null)
-              setBusy(true)
-              void handlers.onFilesChosen(chosen).then((message) => {
-                setBusy(false)
-                setError(message)
-              })
+              send(chosen)
             }}
           />
         </label>
-        {hasReady ? (
-          <span className="text-[13px] text-[var(--color-ink-2)]">
-            The new file is added beside this one. Remove the old one once it is ready.
-          </span>
-        ) : null}
+        <span className="text-[13px] text-[var(--color-ink-2)]">
+          {hasReady
+            ? "Or drop them here. The new file is added beside this one. Remove the old one once it is ready."
+            : "Or drop them here."}
+        </span>
       </div>
 
       <FormError message={error} />
