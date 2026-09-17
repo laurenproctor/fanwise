@@ -20,9 +20,11 @@ re-attempt schedule) is merged, exit unrun. The exit — one action, two live UR
 failure recovered without duplicates — needs a live Shopify and a live Etsy in one click,
 which is a run a person does by hand. A6 is done; its exit ran on 11 September 2026 against
 a live shop, and the fifth question in `docs/channels/etsy.md` §13, refresh-token rotation,
-still waits on the first refresh. Two things shipped outside the step order and are not part
-of any gate: first-run onboarding on 11 September 2026 as PR #61, and the public creator
-pages (`/@handle`) on 12 September 2026 as PR #72, migration applied and live. B11, the
+still waits on the first refresh. Three things shipped outside the step order and are not part
+of any gate: first-run onboarding on 11 September 2026 as PR #61, the public creator
+pages (`/@handle`) on 12 September 2026 as PR #72, migration applied and live, and Shopify
+marking paid digital order lines fulfilled (ADR 0015) on 17 September 2026, whose exit is a
+mixed live order once the app version carries its three scopes. B11, the
 companion window (`docs/companion-window.md`), was opened on 13 September 2026 at the
 founder's request ahead of the evidence its plan waits for; code complete, no migration, exit
 unrun. B10, Gumroad (`docs/channels/gumroad.md`), was opened on 16 September 2026 at the

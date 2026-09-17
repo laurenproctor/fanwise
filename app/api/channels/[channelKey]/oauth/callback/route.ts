@@ -10,6 +10,7 @@ import {
   consumeAuthorizationState,
   peekAuthorizationState,
   pruneExpiredStates,
+  webhookUrl,
 } from "@/lib/channels/oauth"
 import { findAdapter } from "@/lib/channels/registry"
 import { normalizeUnknown } from "@/lib/channels/errors"
@@ -123,6 +124,7 @@ export async function GET(
       accountHint: consumed.accountHint ?? "",
       query,
       redirectUri: callbackUrl(channelKey),
+      webhookUrl: webhookUrl(channelKey),
       ...(consumed.codeVerifier ? { codeVerifier: consumed.codeVerifier } : {}),
     })
 

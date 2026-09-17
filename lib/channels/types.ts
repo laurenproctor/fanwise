@@ -428,6 +428,12 @@ export interface ChannelOAuth {
     redirectUri: string
     /** The PKCE verifier minted when the flow started, for a `pkce` adapter. */
     codeVerifier?: string
+    /**
+     * Where the provider should deliver events about this account, for an
+     * adapter that subscribes at authorization time (ADR 0015). Built by the
+     * shared flow from NEXT_PUBLIC_APP_URL, never by the adapter.
+     */
+    webhookUrl?: string
   }): Promise<OAuthGrant>
   /**
    * Tells the provider the credential is finished with, before the connection
@@ -509,6 +515,71 @@ export interface DeliverySetupSpec {
   steps: readonly string[]
   /** Text the creator copies into the channel, shown verbatim with a Copy button. */
   snippet: string
+  /**
+   * What Fanwise does on the channel once the setup is confirmed, in one
+   * sentence, for a channel whose confirmation also switches something on
+   * (ADR 0015: fulfilment). Absent when confirming only unlocks readiness.
+   */
+  automation?: string
+}
+
+/**
+ * A delivery from a provider about a connected account, as the adapter read it.
+ *
+ * Ids only. The route records one of these before anything acts on it, and the
+ * job that acts loads what it needs from the provider when it runs. No payload
+ * is kept: the deliveries worth keeping are the ones that carry a buyer, and
+ * those are the ones Fanwise must not hold.
+ */
+export interface ChannelWebhookEvent {
+  /** The provider's own id for this delivery. A redelivery repeats it. */
+  id: string
+  topic: string
+  /** The account concerned, in the form channel_connections.external_account_id holds. */
+  externalAccountId: string
+  /** The provider object the delivery is about. */
+  externalObjectId: string
+}
+
+/** Why a delivery was acknowledged and left alone. Recorded, never rendered. */
+export type WebhookSkipReason =
+  | "delivery_setup_unconfirmed"
+  | "reauthorization_needed"
+  | "object_gone"
+  | "not_open"
+  | "not_paid"
+  | "no_digital_lines"
+
+export type WebhookHandleResult =
+  | { action: "fulfilled"; externalFulfillmentId: string; lineItemIds: string[] }
+  | { action: "skipped"; reason: WebhookSkipReason }
+
+/**
+ * What a webhook handler is handed, per connection. `externalListingIds` is
+ * injected for the reason `PublishContext.assetUrl` is: the adapter names
+ * what it needs and never reads a tenant table itself.
+ */
+export interface WebhookContext {
+  connection: ChannelConnection
+  /** The provider ids of every listing published through this connection. */
+  externalListingIds(): Promise<string[]>
+}
+
+/**
+ * Present on a channel that tells Fanwise about events on a connected account
+ * (ADR 0015). Verification runs over the raw bytes before any field is read,
+ * per docs/security.md rule 5, and the shared route owns the receipt and the
+ * job; the adapter owns the signature, the shape and the act.
+ */
+export interface ChannelWebhooks {
+  verify(rawBody: string, headers: Headers): boolean
+  /**
+   * Reads a verified delivery. Null for a topic this adapter does not act on;
+   * throws a ChannelError for a body that is not the shape the topic promises.
+   */
+  parse(rawBody: string, headers: Headers): ChannelWebhookEvent | null
+  /** Acts on one delivery for one connection. Safe to run twice. */
+  handle(event: ChannelWebhookEvent, context: WebhookContext): Promise<WebhookHandleResult>
 }
 
 /**
@@ -670,6 +741,8 @@ export interface ChannelAdapter {
   buildListing(subject: AdapterSubject): ChannelListingDraft
   /** Present only on a channel Fanwise can authorize against. */
   oauth?: ChannelOAuth
+  /** Present on a channel that delivers events to Fanwise. ADR 0015. */
+  webhooks?: ChannelWebhooks
   /**
    * Present on a channel connected by naming an account rather than
    * authorizing one. Never alongside `oauth`.

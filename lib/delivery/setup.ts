@@ -37,3 +37,33 @@ export function carryDurableMetadata(
   }
   return { ...fresh, ...carried }
 }
+
+/**
+ * What a channel switched on for itself at authorization time, once the setup
+ * above is confirmed (ADR 0015: marking digital lines fulfilled).
+ *
+ * Two keys, written fresh at every authorization by the adapter that owns
+ * them and read generically by the Channels page. Not durable: a reconnect
+ * re-establishes the subscription and records the new answer, so carrying an
+ * old one forward would report a state that may no longer hold.
+ */
+export const DELIVERY_AUTOMATION_REF_KEY = "deliveryAutomationRef"
+export const DELIVERY_AUTOMATION_ERROR_KEY = "deliveryAutomationError"
+
+export type DeliveryAutomationState =
+  | { state: "on" }
+  | { state: "failed"; message: string }
+  /** Authorized before the automation existed, or a channel without one. */
+  | { state: "unknown" }
+
+export function deliveryAutomationState(
+  connectionMetadata: Record<string, unknown> | undefined,
+): DeliveryAutomationState {
+  const ref = connectionMetadata?.[DELIVERY_AUTOMATION_REF_KEY]
+  if (typeof ref === "string" && ref.length > 0) return { state: "on" }
+  const failure = connectionMetadata?.[DELIVERY_AUTOMATION_ERROR_KEY]
+  if (typeof failure === "string" && failure.length > 0) {
+    return { state: "failed", message: failure }
+  }
+  return { state: "unknown" }
+}

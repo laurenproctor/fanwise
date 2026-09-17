@@ -217,6 +217,19 @@ keeps a provider's original refusal, which is a subscription item and never a cr
 The idempotency keys the sync job sends are persisted on the ledger row before the call,
 one per attempt, so a retry can never be a second write.
 
+## Channel webhooks
+
+ADR 0015, in `app/api/channels/[channelKey]/webhook/route.ts` and `lib/channels/webhooks.ts`,
+generic in the channel key like the OAuth callback. The same four steps as billing, with the
+signature check behind `adapter.webhooks.verify`: raw body as text, verify before any field is
+read (an HMAC over the bytes with the app's client secret, compared in constant time), record
+the receipt by the provider's delivery id in `channel_webhook_events`, then enqueue a job
+carrying the receipt's id and nothing else. The work runs on the worker through the service
+role, scoped in code to the connections whose account the *verified* delivery named, never to
+anything in a payload. A body that fails to parse is acknowledged and logged by code, not
+retried: a redelivery of the same bytes is the same shape. The route is exempt from the
+sign-in redirect in `proxy.ts`, exactly and only at that path.
+
 ## The three things that never bend
 
 RLS, idempotency checks, and the factuality validator. If a feature appears to require

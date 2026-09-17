@@ -523,6 +523,48 @@ export type Database = {
           },
         ]
       }
+      channel_webhook_events: {
+        Row: {
+          channel_key: string
+          claimed_at: string | null
+          error: string | null
+          external_account_id: string
+          external_object_id: string
+          id: string
+          idempotency_key: string
+          outcome: Json | null
+          processed_at: string | null
+          received_at: string
+          topic: string
+        }
+        Insert: {
+          channel_key: string
+          claimed_at?: string | null
+          error?: string | null
+          external_account_id: string
+          external_object_id: string
+          id: string
+          idempotency_key: string
+          outcome?: Json | null
+          processed_at?: string | null
+          received_at?: string
+          topic: string
+        }
+        Update: {
+          channel_key?: string
+          claimed_at?: string | null
+          error?: string | null
+          external_account_id?: string
+          external_object_id?: string
+          id?: string
+          idempotency_key?: string
+          outcome?: Json | null
+          processed_at?: string | null
+          received_at?: string
+          topic?: string
+        }
+        Relationships: []
+      }
       channels: {
         Row: {
           billable: boolean

@@ -577,6 +577,24 @@ processed_at, error
 No grant to anon or authenticated, RLS on with zero policies. A redelivered event collides
 on the key; one recorded but never finished is applied again, one finished is acknowledged.
 
+## Channel webhooks
+
+ADR 0015, 17 September 2026. Built for Shopify's fulfilment, shaped for any channel that
+delivers events.
+
+**channel_webhook_events** — id (the provider's delivery id), channel_key,
+external_account_id, topic, external_object_id (the provider object the delivery is about),
+idempotency_key (unique: channel, account, topic and object), received_at, claimed_at,
+processed_at, outcome (jsonb, per connection: what was done or why nothing was), error
+
+No grant to anon or authenticated, RLS on with zero policies, the billing receipts' shape. The
+route inserts the receipt after verifying the signature and before enqueueing the job, so the
+idempotency key is on disk before the external write (invariant 3). A redelivery collides on
+the id; a second delivery about the same provider object collides on the idempotency key;
+either is answered from the earlier receipt. No payload is stored: the deliveries worth
+keeping are the ones that carry a buyer, and those are the ones Fanwise must not hold. A
+provider body from a failure lands in `outcome`, persisted and never rendered (rule 8).
+
 ## B9: Behance
 
 Planned 11 September 2026; built 17 September 2026. The migration is

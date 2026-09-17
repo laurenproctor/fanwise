@@ -183,6 +183,32 @@ The callback route is generic in the channel key
 a provider name in the application tree, and the next channel would copy the file rather than
 reuse it.
 
+## Webhooks
+
+ADR 0015. A channel that tells Fanwise about events on a connected account declares
+`webhooks`:
+
+```ts
+interface ChannelWebhooks {
+  verify(rawBody: string, headers: Headers): boolean
+  parse(rawBody: string, headers: Headers): ChannelWebhookEvent | null
+  handle(event: ChannelWebhookEvent, context: WebhookContext): Promise<WebhookHandleResult>
+}
+```
+
+The route (`app/api/channels/[channelKey]/webhook`) is generic for the reason the callback is,
+and owns the receipt and the job; the adapter owns the signature, the shape and the act.
+`verify` runs over the raw bytes before any field is read. `parse` returns null for a topic the
+adapter does not act on and throws for a body that is not the shape its topic promises, which
+the route acknowledges and logs rather than retries. `handle` runs on the worker once per
+active connection to the account the delivery named, is handed `externalListingIds()` rather
+than a database client, and must be safe to run twice. Its result is recorded on the receipt:
+what was done, or a named reason nothing was.
+
+An adapter that subscribes at authorization time does so inside `oauth.exchange`, from the
+`webhookUrl` the shared flow hands it, and records the answer on the connection's metadata
+under the generic keys in `lib/delivery/setup.ts`, best effort.
+
 ## Errors
 
 `lib/channels/errors.ts` holds the shared vocabulary; each adapter owns the mapping into it,
