@@ -3,7 +3,10 @@
 The first channel to build and test end to end. Complete enough to implement from.
 Verified against Creative Market seller documentation, September 2026. Items marked
 **[verify]** could not be confirmed from published docs and need checking against a live
-shop.
+shop. **Built on 17 September 2026** at the founder's request, ahead of the seller login
+§13 waited on, so every **[verify]** below still stands and the figures in §4 that carry
+one are marked unverified in `lib/channels/adapters/creative-market/fields.ts`. The roadmap's
+A8 section says what was built and what the exit run still owes.
 
 On 7 September 2026 the upload step of the Shop Owner Application form was observed
 directly, which settled several markers below and contradicted others. Two caveats apply to
@@ -75,6 +78,13 @@ export const creativeMarket: ChannelAdapter = {
 `publish` is deliberately absent. The UI must never offer it, and `channel_listings.status`
 for this channel moves `draft → ready → self_reported_published` by human action, with
 `status_source = "self_reported"` on every row.
+
+As built, the adapter also declares the assisted members B9 added to the contract:
+`accountHint` (the shop, parsed in `account.ts`), `choices` (the subcategory the creator
+picked on the form, and family versus individual weight for a font's prices),
+`handoffImages` (§8), `handoffPackage` (§7), `buildHandoff` (§10) and `submission` (the
+listing URL, parsed in `account.ts`). The category is the listing's own `category` field,
+constrained to the nine names by an `enum` requirement so the editor offers exactly those.
 
 ---
 
@@ -205,6 +215,19 @@ misrepresent what is delivered.
   requirements engine should catch this from the canonical product's file types and block it.
 - A license file inside the zip is not required, but README, PDF and TXT files are supported
   as attachments and Fanwise should include one by default.
+
+**As built.** `lib/products/package.ts` builds the zip in the `build_package` job: every
+ready buyer file in the creator's order, then the documentation and license files, then a
+`README.txt` written from the canonical record alone (title, brand, version, the short
+description, the file list, the license summary, the support and documentation links). A
+zip the creator uploaded is re-wrapped: its entries are copied through still compressed
+under a folder named for it, operating-system leftovers dropped, so the buyer never opens a
+zip inside a zip. The archive is written by `lib/products/zip-write.ts`, deterministic, no
+ZIP64. Inputs are capped at 512 MB in this version, well under the 4 GB above; the
+`package_size` rule says which limit was hit. The row is a derivative of the first buyer
+file (`derived_from`, `spec_hash`), type `other`, so it is cached on its inputs and never
+read as a buyer file by another channel. The download arrives as
+`{slug}-creative-market.zip`.
 
 ---
 
@@ -362,6 +385,14 @@ On mark submitted: status `published`, `status_source` stays `self_reported`,
 `published`, `workspace_events` row.
 
 Nothing in this flow may write a row that another part of the system would read as verified.
+
+**As built.** Build writes the listing (status `draft`, `self_reported`) and a `build`
+snapshot, and enqueues the renditions and the package; there is no separate `ready` write,
+readiness being computed on read. Mark submitted is the shared `markSubmittedAction`: status
+`published`, `self_reported`, the listing URL as `external_url` and `public_url`, the
+numeric id as `external_listing_id`, a `publish` snapshot and a `listing_marked_submitted`
+event. The generative AI disclosure is read from `products.made_with_generative_ai`
+(decision 24, resolved) and the handoff says to change it there.
 
 ---
 

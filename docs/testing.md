@@ -139,7 +139,14 @@ the product heading, usually.
    live channels, and Shopify and Etsy are both live as of 11 September 2026; WooCommerce,
    once connected, is a third the action includes. Unrun against live channels)*
 6. Publication failure, correction, retry, no duplicate.
-7. Generate a Creative Market submission package.
+7. Generate a Creative Market submission package. *(built at A8 on 17 September 2026 and
+   running against the channel itself in `tests/e2e/journey-07-creative-market-handoff.spec.ts`,
+   since it needs no credential: the package and the screenshots are built in the
+   background and arrive under the editor's names, the generative AI question blocks until
+   the product answers it, and mark submitted leaves a self-reported row with the listing's
+   address. The adapter is covered by `tests/unit/creative-market-adapter.test.ts` and the
+   package build by `tests/unit/package-build.test.ts`. The exit run needs a live seller
+   account)*
 8. Analytics shows an ingested sale.
 9. **Workspace A attempts Workspace B access, denied.** *(covered at A1, in the browser at
    `tests/e2e/journey-09-tenancy.spec.ts` and at the database in `tests/db/tenancy.test.ts`;

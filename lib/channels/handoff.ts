@@ -46,6 +46,13 @@ export type HandoffStep =
       multiline: boolean
       /** A line under the value: what the channel does with it, a fee, a caveat. */
       note?: string
+      /**
+       * The same value as formatted text, for a channel whose field is a
+       * rich-text editor: pasted markdown lands there as literal asterisks.
+       * The panel puts both on the clipboard, and `value` is the plain
+       * fallback for an editor that takes only text.
+       */
+      html?: string
     })
   | (HandoffStepBase & { kind: "files"; files: HandoffFile[]; note: string })
   | (HandoffStepBase & { kind: "missing" })

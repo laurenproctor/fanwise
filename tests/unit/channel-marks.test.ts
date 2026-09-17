@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { CHANNEL_MARKS, findChannelMark } from "@/components/channels/channel-mark"
+import {
+  CHANNEL_MARKS,
+  NO_PUBLISHED_MARK,
+  findChannelMark,
+} from "@/components/channels/channel-mark"
 import { SHOP_MARKS, findShopMark } from "@/components/marketing/shop-mark"
 import { RAIL, SHOPS } from "@/components/marketing/channels"
 import { listAdapters } from "@/lib/channels/registry"
@@ -68,12 +72,21 @@ describe("a channel without a mark degrades instead of guessing", () => {
     // The one test here that will fail on purpose. A new adapter lands, this
     // goes red, and somebody has to decide what the card shows before the
     // channel reaches a creator.
+    // A channel may instead be listed as deliberately unmarked, which is a
+    // decision too: the provider publishes no mark Fanwise may redraw.
     const unmarked = listAdapters()
       .filter((adapter) => !adapter.key.startsWith("mock_"))
+      .filter((adapter) => !NO_PUBLISHED_MARK.includes(adapter.key))
       .filter((adapter) => findChannelMark(adapter.key) === null)
       .map((adapter) => adapter.key)
 
     expect(unmarked).toEqual([])
+  })
+
+  it("never both marks a channel and lists it as unmarked", () => {
+    for (const key of NO_PUBLISHED_MARK) {
+      expect(findChannelMark(key), `${key} is listed as unmarked but has a mark`).toBeNull()
+    }
   })
 })
 
@@ -135,6 +148,7 @@ describe("the marketing marks and the channel marks agree", () => {
     // recognise, and the one least excusable to leave as a grey initial.
     const unmarked = listAdapters()
       .filter((adapter) => shopNames.has(adapter.name))
+      .filter((adapter) => !NO_PUBLISHED_MARK.includes(adapter.key))
       .filter((adapter) => !findShopMark(adapter.name))
       .map((adapter) => adapter.name)
 

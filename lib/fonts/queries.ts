@@ -1,4 +1,5 @@
 import { listProductAssets } from "@/lib/products/queries"
+import { generativeAiAnswer } from "@/lib/products/schemas"
 import { listChannels, listConnections, listProductListings } from "@/lib/channels/queries"
 import { loadPublicationViews } from "@/lib/publishing/queries"
 import { liveness, mergeManualSteps } from "@/lib/publishing/manual-steps"
@@ -57,6 +58,7 @@ export function productValues(product: Product): FontProductValues {
     basePrice: product.base_price === null ? null : Number(product.base_price),
     currency: product.currency,
     licenseSummary: product.license_summary ?? "",
+    madeWithGenerativeAi: generativeAiAnswer(product.made_with_generative_ai),
   }
 }
 

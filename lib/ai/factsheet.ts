@@ -30,6 +30,13 @@ export interface FactSheet {
   price: { amount: number; currency: string } | null
   version: string | null
   licenseSummary: string | null
+  /**
+   * The generative AI disclosure, decision 24: whether the product or one of
+   * its key features was primarily made with generative AI tools. A fact the
+   * creator stated, so a model may repeat it in a channel's own words; null
+   * is unanswered and is not rendered at all.
+   */
+  madeWithGenerativeAi: boolean | null
   supportUrl: string | null
   documentationUrl: string | null
   /** Product-type facts, straight from the validated metadata union. */
@@ -233,6 +240,7 @@ export function buildFactSheet(product: Product, assets: readonly ProductAsset[]
     price,
     version: blank(product.version),
     licenseSummary: blank(product.license_summary),
+    madeWithGenerativeAi: product.made_with_generative_ai ?? null,
     supportUrl: blank(product.support_url),
     documentationUrl: blank(product.documentation_url),
     details: details(parseMetadata(product.metadata)),
@@ -306,6 +314,9 @@ export function renderFactSheet(sheet: FactSheet): string {
   if (sheet.price) add("Price", `${sheet.price.amount} ${sheet.price.currency}`)
   add("Version", sheet.version)
   add("License", sheet.licenseSummary)
+  if (sheet.madeWithGenerativeAi !== null) {
+    add("Made with generative AI", sheet.madeWithGenerativeAi ? "yes" : "no")
+  }
   add("Support URL", sheet.supportUrl)
   add("Documentation URL", sheet.documentationUrl)
 

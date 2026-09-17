@@ -8,7 +8,10 @@ import { FONT_LICENSE_LABELS } from "@/lib/fonts/labels"
 import { FIELD_IDS } from "@/lib/fonts/readiness"
 import { liveDraftValue } from "@/lib/fonts/workspace"
 import type { SectionContext } from "../context"
+import { GENERATIVE_AI_PROMPT, type GenerativeAiAnswer } from "@/lib/products/schemas"
 import {
+  FieldShell,
+  INPUT_CLASS,
   LINK_BUTTON_CLASS,
   OriginBadge,
   SectionHeading,
@@ -246,6 +249,34 @@ export function LicensingSection({ ctx }: { ctx: SectionContext }) {
         hint="Plain words every listing carries: who may use the font, and for what."
         onChange={(event) => ctx.setValue("licenseSummary", event.target.value)}
       />
+
+      {/*
+        Decision 24. Asked here rather than in a channel's draft because it is
+        a fact about the font, and a marketplace that requires it (Creative
+        Market is the first) reads the product's answer. Saved at once: a
+        choice, not typing.
+      */}
+      <FieldShell
+        id="font-generative-ai"
+        label="Generative AI"
+        hint={GENERATIVE_AI_PROMPT}
+        error={null}
+      >
+        <select
+          id="font-generative-ai"
+          value={values.madeWithGenerativeAi}
+          onChange={(event) =>
+            ctx.setValue("madeWithGenerativeAi", event.target.value as GenerativeAiAnswer, {
+              immediate: true,
+            })
+          }
+          className={INPUT_CLASS}
+        >
+          <option value="">Not answered</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </FieldShell>
 
       <div id={FIELD_IDS.eula} tabIndex={-1} className="flex flex-col gap-2 outline-none">
         <TextInput

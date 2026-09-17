@@ -91,7 +91,7 @@ One real product, syndicated to three channels, by a person who is not you.
 | A5 | Shopify: OAuth, adapter, publish, idempotency, error normalization, digital delivery decision | Real product publishes, second click creates nothing, the file is actually deliverable to a buyer | **done**, 7 September 2026. Ran in full against the live store, twice — the second time on a product deleted underneath it. `docs/channels/shopify.md` §16 |
 | A6 | Etsy: OAuth, adapter, draft, images, digital file, activate, idempotency | Real product publishes and is purchasable | **done**, 11 September 2026. Listing `4573259073` in shop `Fanwise` went draft, images, file, active in one job; four of the five §13 questions settled, the fifth waits on the first token refresh. See "The A6 exit run" |
 | A7 | Publish Everywhere orchestration, jobs, progress, retry, activity log | One action, two live URLs, one failure recovered without duplicates | |
-| A8 | Creative Market syndication: category and license schema, package build, image derivatives, guided submission handoff, mark submitted, URL capture. See `docs/channels/creative-market.md` | A creator carries one real product through the handoff to a live Creative Market listing without composing anything outside Fanwise, the URL is captured, and every row reads `status_source = self_reported`. No surface anywhere offers Publish for this channel | |
+| A8 | Creative Market syndication: category and license schema, package build, image derivatives, guided submission handoff, mark submitted, URL capture. See `docs/channels/creative-market.md` | A creator carries one real product through the handoff to a live Creative Market listing without composing anything outside Fanwise, the URL is captured, and every row reads `status_source = self_reported`. No surface anywhere offers Publish for this channel | **built 17 September 2026** at the founder's request, ahead of the seller login; code complete, exit unrun. See "A8, what was built" |
 
 **Gate A passes when** an outside creator, unassisted, takes one of their real products from
 empty workspace to three listings, and leaves them up: Shopify and Etsy live and verified by
@@ -278,9 +278,62 @@ Two costs, stated plainly rather than argued away:
 - **Gate A gets wider, which is what the earlier text was protecting against.** That
   objection was right and is not answered, only accepted.
 
-A8 is blocked on a live Creative Market seller login, which is free and which nobody has
-done. Section 13 of the channel spec lists ten questions marked **[verify]** that can only be
-settled from inside a real shop. Get the account before A8 opens, not during it.
+A8 was planned to wait on a live Creative Market seller login, which is free and which
+nobody has done. Section 13 of the channel spec lists thirteen questions marked **[verify]**
+that can only be settled from inside a real shop. **The founder opened A8 on 17 September
+2026 without it**, on the B9, B10 and B11 precedent, so the build below carries every
+**[verify]** as a marked guess and the exit run is what settles them.
+
+### A8, what was built and what is still owed
+
+**What was built, 17 September 2026.** The scope in the table, filling in the assisted
+machinery B9 built as contract members rather than building it again:
+
+- `lib/channels/adapters/creative-market`: capabilities (every one false but `drafts`,
+  all for the permanent reason: no seller API, and the Terms of Use close browser
+  automation in writing); the §9 requirements in their order, category first because it
+  decides the license shape; the nine categories, the two license shapes and the published
+  floors (`fields.ts`, with the unpublished ones null and never checked, and the font
+  figures marked unverified); the §6 description transform (`description.ts`, headings to
+  bold, ordered lists to bullets, links to their words, and an HTML rendering built from
+  the subset alone for the rich-text editor the form was observed to have); the shop and
+  listing-URL parsers (`account.ts`); a search-audience merchandising profile; the package
+  spec and its README (`package.ts`); and the handoff ordered to the editor (`handoff.ts`).
+- **The package build**, channel-neutral, in `lib/products/package.ts` behind a
+  `build_package` job: the buyer files in the creator's order, the documentation and
+  license files, and a README written from the canonical record alone, in one zip written
+  by `lib/products/zip-write.ts` (no archive dependency; the reader already existed). A
+  file the creator already zipped is re-wrapped with its entries copied through compressed,
+  not nested. The row is a derivative of the first file with the spec hash as its key, so it
+  is cached like a rendition and never read as a buyer file by any other channel. Inputs are
+  capped at 512 MB. Declared on the adapter as `handoffPackage`, asked for at build and on a
+  choice change through `lib/channels/handoff-package.ts`.
+- **The generative AI disclosure**, decision 24 resolved: `products.made_with_generative_ai`,
+  nullable, set in the product form and the font workspace's licensing section, stated in the
+  FactSheet, required by Creative Market's `ai_disclosure_set` rule and by nothing else.
+- One rendition shape, keyed as a shape: 1820 × 1214 JPEG under 5 MB, cropped 3:2 with
+  attention, and 910 × 607 when the source cannot fill it. A GIF is handed over as uploaded.
+- The handoff panel copies formatted text where a step carries it (`html` on a copy step),
+  with the words as the plain fallback; `showWhen` on a choice takes several values.
+- The channel card wears the fallback tile on purpose (`NO_PUBLISHED_MARK`): Creative
+  Market publishes no mark Fanwise may redraw, and the marketing site's table already says so.
+- One migration, `20260917210000_creative_market_channel.sql`: the catalog row,
+  `billable = true`, and the column.
+- Journey 7 in `tests/e2e/journey-07-creative-market-handoff.spec.ts` against the channel
+  itself; unit coverage in `tests/unit/creative-market-adapter.test.ts`,
+  `creative-market-description.test.ts`, `package-build.test.ts` and `zip-write.test.ts`.
+
+**What is still owed.**
+
+- **The exit run**, journey 7 against a live shop, and the thirteen §13 answers it settles.
+  The font price shape (§13 item 13) decides whether the `fontTiers` figures are floors,
+  defaults or neither.
+- **Tier prices beyond the first.** The listing's price is the first tier; a font's E-Pub
+  and App prices come from the product's own license list; the Commercial and Extended
+  prices of a standard product are typed on the form, with the floor shown beside each.
+  Whether they should be modelled on the listing waits on §13 items 5 and 6.
+- **Video URL, cover designation and crop controls**: not modelled, per the spec.
+- **A withdraw.** As on Behance, a self-reported listing has no unpublish.
 
 **A7 still says two live URLs, and that is not an oversight.** Publish Everywhere orchestrates
 the channels that can be published to, and Creative Market is not one of them — it declares
@@ -578,10 +631,13 @@ contract so A8 fills them in rather than building them again:
 - **The exit run**, journey 12 against a live profile with Stripe connected (decision 26),
   and the twelve §13 answers it settles. Two of them decide the mapping tables, which are
   guessed from the marketplace's navigation and marked so in `fields.ts`.
-- **The package build.** A8's package (zip, README, license inside) is still A8's. Behance
-  hands over the product's one deliverable or archive under the buyer-facing name, and its
-  `package_single_file` rule refuses a product with more than one file until then.
-- **A generative-AI disclosure** in Tools Used waits on the product field decision 24 owes.
+- **The package build** landed with A8 on 17 September 2026 as a channel-neutral job.
+  Behance still hands over the product's one deliverable or archive under the buyer-facing
+  name, and its `package_single_file` rule refuses a product with more than one file;
+  declaring `handoffPackage` on the Behance adapter would lift that, and is a one-line
+  change once the exit run says the asset form takes a zip.
+- **A generative-AI disclosure** in Tools Used: the product field exists since A8
+  (`products.made_with_generative_ai`); mapping a yes onto Tools Used is still owed.
 - **Withdrawing a submission.** A self-reported listing has no unpublish; disconnecting the
   channel is refused while it holds a project id, as for every channel. Correcting the
   address is possible; clearing it is not.

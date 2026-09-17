@@ -101,6 +101,12 @@ buyer reads them: "Weights: 3 (Thin, Regular, Bold)", "Weight (wght): 100 to 700
 styles, stylistic sets) derived deterministically. What the files detected but the creator
 has not confirmed stays on the asset rows and is not a fact.
 
+**The generative AI disclosure in the FactSheet**, added 17 September 2026 with A8 (decision
+24). `madeWithGenerativeAi` is the creator's yes or no, rendered as "Made with generative AI:
+yes" or "no" and omitted entirely while unanswered, so the model has nothing to fill in. It is
+the clearest case of the rule above: a marketplace requires the answer, and the answer is a
+fact only the creator can state.
+
 The validator admits all of it to the corpus and the allowed numbers, including the counts
 derived from it and the number of languages and writing systems. It also gained two
 vocabularies, used for every product type:

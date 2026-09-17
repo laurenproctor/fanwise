@@ -232,3 +232,29 @@ describe("a channel-ordered handoff", () => {
     expect(html).not.toMatch(/fanwise (has )?published/i)
   })
 })
+
+describe("a copy step with formatted text", () => {
+  it("renders the plain value on the page and keeps the html for the clipboard", () => {
+    const html = renderToStaticMarkup(
+      createElement(HandoffPanel, {
+        workspaceSlug: "studio",
+        channelName: "Own",
+        productName: "Aster Grotesk",
+        readiness: null,
+        steps: [
+          {
+            kind: "copy",
+            key: "description",
+            label: "Description",
+            value: "Bold words and a list",
+            html: "<p><strong>Bold</strong> words and a list</p>",
+            multiline: true,
+          },
+        ],
+      }),
+    )
+    expect(html).toContain("Bold words and a list")
+    expect(html).not.toContain("<strong>")
+    expect(html).toContain('aria-label="Copy description"')
+  })
+})

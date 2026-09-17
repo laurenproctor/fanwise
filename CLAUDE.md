@@ -32,10 +32,15 @@ migration, exit unrun, waiting on the seller account in decision 27. B9, Behance
 of A8, which it was planned to wait on: it builds the assisted machinery A8 would have
 (listing choices, channel-ordered handoff, handoff renditions, mark submitted with URL
 capture) as shared, channel-neutral pieces; code complete with one catalog migration, exit
-unrun, waiting on the profile in decision 26. B1, B2 and B8
+unrun, waiting on the profile in decision 26. A8, Creative Market
+(`docs/channels/creative-market.md`), was built on 17 September 2026 at the founder's request
+ahead of the seller login its plan waited on: it fills in B9's machinery for Creative Market
+and adds the package build (`lib/products/package.ts`, a zip of the buyer files with a README
+and the license documents, cached like a derivative) and the generative AI disclosure on
+`products` (decision 24, resolved); code complete with one migration (catalog row plus the
+column), exit unrun, and the thirteen §13 questions still wait on a live shop. B1, B2 and B8
 are on `main`; B8's exit passed on 16 September 2026. Gate A is
-not passed; A8 waits on a Creative Market seller login and the questions in that spec's
-§13.** See `docs/roadmap.md`. Implement the current step only. Do not build ahead.
+not passed; its exit and A8's both need a live Creative Market seller account.** See `docs/roadmap.md`. Implement the current step only. Do not build ahead.
 
 ## Architecture invariants
 
