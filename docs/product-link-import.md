@@ -1140,3 +1140,35 @@ queues the runner without re-reading anything.
 The failure itself was the vendor refusing an organization-level key that names no
 workspace, in about 200 ms, on every request. `ANTHROPIC_WORKSPACE_ID` is now read beside the
 key and sent as the `anthropic-workspace-id` header; a workspace-scoped key needs neither.
+
+## 17. The schema the vendor compiles (16 September 2026)
+
+Found on the same day as §16's "Composing again": once the workspace header was in place, the
+next composition still failed in half a second, and the row said only `unknown`, which the
+notice has no sentence for. No production import had ever been composed by the model, and
+the reason was never the key. The vendor's structured-output compiler refuses the wire schema
+`lib/imports/draft-output.ts` sent, in three ways, each learned from one 400:
+
+- **Refused keywords.** `minimum` and `maximum` on a number, `maxItems` on an array, and by
+  the vendor's documentation `minLength`, `maxLength` and `multipleOf` too. A cap now travels
+  in the field's description ("At most four…") and the Zod schema, which still refuses an
+  answer that ignores it.
+- **A nullable enum** written as `type: ["string", "null"]` with `null` inside the `enum` is
+  refused as a value not matching its type. It is an `anyOf` of the enum and `null`.
+- **A size ceiling.** With the keywords gone the schema parsed and was refused as "the
+  compiled grammar is too large". Probed by variant: the ten suggested fields, each carrying
+  its own confidence-and-evidence wrapper, are what put it over; dropping the wrappers or the
+  details object fits, dropping enums, descriptions or evidence alone does not. Sharing the
+  wrappers through `$defs` fits with everything kept. The answer's shape is identical, so the
+  Zod schema and every stored row are untouched.
+
+`tests/unit/import-draft.test.ts` keeps the refused keywords and the null-in-enum shape out
+and checks every `$ref` resolves. The ceiling cannot be tested offline: a field added to the
+schema is followed by one composition in a real environment, and the probe that found this
+is three lines of Vitest calling `composeDraft` with a fetch that prints the vendor's error
+body, which the provider itself never records (it keeps only the code, by rule 8).
+
+Worth knowing for the next fast failure: a run of `import_source` that completes in under a
+second never reached generation, `unknown` is the provider's word for any 400 or 404, and
+the Trigger API has no endpoint for run logs, so the `[ai] provider call failed` line with
+the status is only in the dashboard.

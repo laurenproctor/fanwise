@@ -8,6 +8,7 @@ import {
 import { checkDraftClaims, evidenceCorpus, withoutWithheldFields } from "@/lib/imports/claims"
 import {
   DRAFT_FIELDS,
+  DRAFT_OUTPUT_JSON_SCHEMA,
   draftOutputSchema,
   emptyDraftDetails,
   type DraftOutput,
@@ -576,6 +577,67 @@ describe("composing a draft", () => {
     const swept = new Set(DRAFT_FIELDS)
     for (const field of DRAFT_FIELDS) expect(swept.has(field)).toBe(true)
     expect(DRAFT_FIELDS.length).toBeGreaterThanOrEqual(10)
+  })
+})
+
+/* ------------------------------------------------------- the wire schema */
+
+describe("the schema the vendor compiles", () => {
+  /** Every object in the schema, in no particular order. */
+  function objects(node: unknown, out: Record<string, unknown>[] = []): Record<string, unknown>[] {
+    if (Array.isArray(node)) node.forEach((item) => objects(item, out))
+    else if (node && typeof node === "object") {
+      out.push(node as Record<string, unknown>)
+      Object.values(node).forEach((value) => objects(value, out))
+    }
+    return out
+  }
+
+  it("carries no keyword the vendor refuses", () => {
+    // Found 16 September 2026 on the first production composition: minimum,
+    // maximum and maxItems each cost a 400 in half a second, and the row said
+    // only "unknown". A cap belongs in the description and in the Zod schema.
+    const refused = [
+      "minimum",
+      "maximum",
+      "multipleOf",
+      "minItems",
+      "maxItems",
+      "minLength",
+      "maxLength",
+      "pattern",
+    ]
+    for (const object of objects(DRAFT_OUTPUT_JSON_SCHEMA)) {
+      for (const keyword of refused) expect(object, keyword).not.toHaveProperty(keyword)
+      if (Array.isArray(object.enum)) {
+        // A nullable enum is an anyOf; null inside an enum is refused.
+        expect(object.enum, "enum with null").not.toContain(null)
+      }
+      if (object.type === "object") expect(object.additionalProperties).toBe(false)
+    }
+  })
+
+  it("resolves every shared definition", () => {
+    const defs = DRAFT_OUTPUT_JSON_SCHEMA.$defs as Record<string, unknown>
+    for (const object of objects(DRAFT_OUTPUT_JSON_SCHEMA)) {
+      if (typeof object.$ref !== "string") continue
+      const name = object.$ref.replace("#/$defs/", "")
+      expect(defs, object.$ref).toHaveProperty(name)
+    }
+    // The wrappers are shared so the compiled grammar fits the vendor's ceiling;
+    // a wrapper that stops being shared is what put it over.
+    expect(Object.keys(defs).sort()).toEqual([
+      "confidence",
+      "evidence",
+      "suggestedString",
+      "suggestedStringList",
+    ])
+  })
+
+  it("asks for every draft field the Zod schema reads", () => {
+    const properties = DRAFT_OUTPUT_JSON_SCHEMA.properties as Record<string, unknown>
+    for (const field of DRAFT_FIELDS) expect(properties, field).toHaveProperty(field)
+    expect(DRAFT_OUTPUT_JSON_SCHEMA.required).toEqual([...DRAFT_FIELDS, "missingInformation"])
   })
 })
 
