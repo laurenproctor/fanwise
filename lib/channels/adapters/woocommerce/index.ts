@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { ChannelError, normalized } from "@/lib/channels/errors"
 import { listingImages } from "@/lib/channels/images"
+import { carriesStamp, listingStamp } from "@/lib/channels/stamp"
 import { readConnectionCredentials } from "@/lib/credentials"
 import type {
   AdapterSubject,
@@ -148,6 +149,7 @@ const productSchema = z.object({
   permalink: z.string().nullish(),
   catalog_visibility: z.string().nullish(),
   downloadable: z.boolean().nullish(),
+  sku: z.string().nullish(),
   downloads: z
     .array(
       z.object({
@@ -233,6 +235,29 @@ async function readProduct(client: WooClient, id: string): Promise<Product> {
 }
 
 /**
+ * The create guard's search. ADR 0005; lib/channels/stamp.ts says why.
+ *
+ * The stamp is the product's SKU, the one merchant reference the products
+ * list can filter on: `meta_data` cannot be searched through the REST API and
+ * the slug is the product's address, which the spec keeps out of Fanwise's
+ * hands. WooCommerce also keeps SKUs unique, so even a search that missed
+ * would meet a refusal rather than a duplicate. The SKU is set on the create
+ * only; a creator who replaces it in the admin keeps their change and loses
+ * only this recovery.
+ */
+const stampedSchema = z.array(z.object({ id: z.number(), sku: z.string().nullish() }))
+
+async function findStamped(client: WooClient, listingId: string): Promise<string | null> {
+  const found = await client.request({
+    method: "GET",
+    path: `products?sku=${encodeURIComponent(listingStamp(listingId))}`,
+    schema: stampedSchema,
+  })
+  const match = found.find((product) => carriesStamp(product.sku, listingId))
+  return match ? String(match.id) : null
+}
+
+/**
  * Tag ids for tag names.
  *
  * WooCommerce attaches tags to a product by id, and a tag is created by a
@@ -309,6 +334,12 @@ function isPurchasable(product: Product): boolean {
  * duplicating. It reads before it writes whenever the product should exist,
  * for the same three reasons Shopify's does: whether the store is short of
  * images, whether the product is on sale, and whether it is there at all.
+ *
+ * Before a create it looks for its own stamp (ADR 0005). A create whose
+ * answer was lost on the wire is the one request Fanwise cannot repeat
+ * safely, so the listing id goes out as the product's SKU, and a later attempt
+ * that finds that SKU adopts the product and proceeds as an update. The create
+ * itself is sent once, with no in-call retry, for the same reason.
  */
 async function writeProduct(
   context: PublishContext,
@@ -317,7 +348,12 @@ async function writeProduct(
   const { listing, subject } = context
   const { storeUrl, client } = await clientFor(context)
 
-  const externalId = listing.external_listing_id
+  let externalId = listing.external_listing_id
+  let adopted: string | null = null
+  if (!externalId) {
+    adopted = await findStamped(client, listing.id)
+    externalId = adopted
+  }
   const images = listingImages(subject)
 
   let current: Product | null = null
@@ -360,6 +396,9 @@ async function writeProduct(
     catalog_visibility: "visible",
     tags: tagIds.map((id) => ({ id })),
     downloads: await downloadsFor(context, current),
+    // The stamp findStamped looks for. On the create only: an update leaves
+    // whatever the SKU has become alone.
+    ...(externalId ? {} : { sku: listingStamp(listing.id) }),
   }
 
   /*
@@ -383,6 +422,9 @@ async function writeProduct(
     path: externalId ? `products/${externalId}` : "products",
     body,
     schema: productSchema,
+    // A create is sent once. A PUT against an id converges however often it
+    // is repeated.
+    idempotent: externalId !== null,
   })
 
   return {
@@ -394,7 +436,11 @@ async function writeProduct(
     publicUrl: product.permalink ?? null,
     externalState: product.status === "publish" ? "live" : "draft",
     purchasable: isPurchasable(product),
-    providerResponse: current === null ? product : { product, stateBefore: current },
+    providerResponse: {
+      ...(current === null ? { product } : { product, stateBefore: current }),
+      // Named on the job row when an earlier create was found and taken over.
+      ...(adopted === null ? {} : { adopted }),
+    },
   }
 }
 

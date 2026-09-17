@@ -144,6 +144,15 @@ function gumroad(
     missing?: boolean
     failAt?: "covers" | "enable" | "thumbnail" | "complete"
     failDelete?: boolean
+    /** The seller's products, as the guard's search reads them. */
+    listed?: Array<{
+      id: string
+      name?: string
+      published?: boolean
+      custom_permalink?: string
+      covers?: number
+      files?: Array<{ id: string; name: string; url?: string }>
+    }>
   } = {},
 ) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -162,6 +171,19 @@ function gumroad(
       return new Response(null, { status: 200, headers: { ETag: '"etag-1"' } })
 
     const api = url.replace("https://api.gumroad.com/v2/", "")
+    if (api === "products" && method === "GET") {
+      return json({
+        success: true,
+        products: (options.listed ?? []).map((product) => ({
+          name: "Aster Grotesk",
+          published: false,
+          custom_permalink: "aster-grotesk",
+          files: [],
+          ...product,
+          covers: Array.from({ length: product.covers ?? 0 }, (_, i) => ({ id: `C${i + 1}` })),
+        })),
+      })
+    }
     if (api === "files/presign") {
       return json({
         success: true,
@@ -185,7 +207,8 @@ function gumroad(
     )
     const heldFiles = [...(held.files ?? ["F1"]), ...(replaced ? ["F2"] : [])].map((id) => ({
       id,
-      name: "aster",
+      name: "aster.zip",
+      url: FILE_URL,
     }))
     const heldCovers = Array.from({ length: held.covers ?? 1 }, (_, i) => ({ id: `C${i + 1}` }))
     const productBody = (published: boolean) =>
@@ -402,6 +425,7 @@ describe("publish", () => {
     const result = await gumroadAdapter.publish!(context())
 
     expect(apiCalls(calls)).toEqual([
+      "GET products",
       "POST files/presign",
       "POST files/complete",
       "POST products",
@@ -628,5 +652,68 @@ describe("update", () => {
       normalized: { code: "external_object_missing" },
     })
     expect(calls.some((c) => c.method === "PUT")).toBe(false)
+  })
+})
+
+describe("the create guard", () => {
+  // ADR 0005. The permalink is the stamp, and it is also the product's slug,
+  // so only a product that looks exactly like the draft a lost create would
+  // have left is adopted; a creator's own product never is.
+
+  it("adopts the unpublished draft an earlier create left, without uploading again", async () => {
+    const calls: Call[] = []
+    vi.stubGlobal(
+      "fetch",
+      gumroad(calls, {
+        listed: [{ id: "P1", files: [{ id: "F1", name: "aster.zip", url: FILE_URL }] }],
+      }),
+    )
+
+    const result = await gumroadAdapter.publish!(context())
+
+    expect(apiCalls(calls)).toEqual([
+      "GET products",
+      "POST products/P1/covers",
+      "POST products/P1/thumbnail",
+      "PUT products/P1/enable",
+      "GET products/P1",
+    ])
+    expect(result).toMatchObject({
+      externalListingId: "P1",
+      externalState: "live",
+      purchasable: true,
+      listingMetadata: {
+        coverIds: ["C1"],
+        files: [{ assetId: "asset-2", fileId: "F1", fileUrl: FILE_URL }],
+      },
+      providerResponse: { adopted: "P1" },
+    })
+  })
+
+  it("sends an adopted draft only the covers it is short of", async () => {
+    const calls: Call[] = []
+    vi.stubGlobal("fetch", gumroad(calls, { listed: [{ id: "P1", covers: 1 }] }))
+    await gumroadAdapter.publish!(context())
+    expect(apiCalls(calls)).not.toContain("POST products/P1/covers")
+    expect(apiCalls(calls)).toContain("PUT products/P1/enable")
+  })
+
+  it("leaves a published product under the same permalink alone, so a hand-made product is never taken over", async () => {
+    const calls: Call[] = []
+    vi.stubGlobal("fetch", gumroad(calls, { listed: [{ id: "P9", published: true }] }))
+    await gumroadAdapter.publish!(context())
+    expect(apiCalls(calls)).toContain("POST products")
+    expect(apiCalls(calls).some((c) => c.includes("P9"))).toBe(false)
+  })
+
+  it("leaves an unpublished product under another name alone", async () => {
+    const calls: Call[] = []
+    vi.stubGlobal(
+      "fetch",
+      gumroad(calls, { listed: [{ id: "P9", name: "Aster Grotesk Variable" }] }),
+    )
+    await gumroadAdapter.publish!(context())
+    expect(apiCalls(calls)).toContain("POST products")
+    expect(apiCalls(calls).some((c) => c.includes("P9"))).toBe(false)
   })
 })

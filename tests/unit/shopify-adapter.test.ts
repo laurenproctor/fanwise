@@ -199,9 +199,14 @@ function respondTo(
     publications?: { id: string; handle: string | null; autoPublish?: boolean }[]
     /** How many publications the product sits on after publishablePublish. */
     publishedTo?: number
+    /** What the stamp search finds: product ids and the SKU each carries. */
+    stamped?: { id: string; sku: string | null }[]
   } = {},
 ): Response {
   const query = String((body as { query?: string }).query ?? "")
+  if (query.includes("FanwiseProductByStamp")) {
+    return jsonResponse(productsByStamp(options.stamped ?? []))
+  }
   if (query.includes("FanwiseProductState")) {
     if (options.missing) return jsonResponse({ data: { product: null } })
     return jsonResponse(productStateOk(options.media, options.holds))
@@ -213,6 +218,17 @@ function respondTo(
     return jsonResponse(publishablePublishOk(options.publishedTo ?? 1))
   }
   return jsonResponse(productSetOk(options.status))
+}
+
+/** A product search answer, shaped as the stamp query asks for it. */
+function productsByStamp(nodes: { id: string; sku: string | null }[]) {
+  return {
+    data: {
+      products: {
+        nodes: nodes.map((node) => ({ id: node.id, variants: { nodes: [{ sku: node.sku }] } })),
+      },
+    },
+  }
 }
 
 /** A publications response: one channel, handled like an Online Store. */
@@ -941,9 +957,10 @@ describe("publish", () => {
     expect(productSetVariables(bodies).input).not.toHaveProperty("files")
   })
 
-  it("does not read anything when it is creating the product", async () => {
-    // Nothing exists yet, so there is nothing to ask about. A create is still
-    // one round trip.
+  it("reads nothing but its own stamp when it is creating the product", async () => {
+    // Nothing exists yet, so there is no product to ask about. The one read
+    // before a create is the guard's search for a create whose answer was
+    // lost, and it is the only one.
     const bodies: unknown[] = []
     vi.stubGlobal(
       "fetch",
@@ -959,6 +976,9 @@ describe("publish", () => {
 
     const queries = bodies.map((b) => String((b as { query?: string }).query ?? ""))
     expect(queries.some((q) => q.includes("FanwiseProductState"))).toBe(false)
+    expect(
+      queries.filter((q) => q.includes("query Fanwise")).map((q) => q.trim().slice(0, 30)),
+    ).toEqual(["query FanwiseProductByStamp($q"])
   })
 
   it("sets ACTIVE on the existing product through an update", async () => {
@@ -1408,8 +1428,10 @@ describe("error normalization", () => {
   it("turns userErrors into a readable message naming the field", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        jsonResponse({
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const query = String((JSON.parse(String(init?.body)) as { query?: string }).query ?? "")
+        if (query.includes("FanwiseProductByStamp")) return jsonResponse(productsByStamp([]))
+        return jsonResponse({
           data: {
             productSet: {
               product: null,
@@ -1418,8 +1440,8 @@ describe("error normalization", () => {
               ],
             },
           },
-        }),
-      ),
+        })
+      }),
     )
 
     const error = await shopifyAdapter.publish!(context()).catch((e: unknown) => e)
@@ -1564,5 +1586,95 @@ describe("the client", () => {
     const headers = seen[0]!.headers as Record<string, string>
     expect(headers["X-Shopify-Access-Token"]).toBe("shpat-secret")
     expect(String(seen[0]!.body)).not.toContain("shpat-secret")
+  })
+})
+
+describe("the create guard", () => {
+  // ADR 0005. A create whose answer was lost on the wire may have landed, so
+  // the product carries the listing id as its SKU and a later attempt looks
+  // for that SKU before creating again.
+
+  it("stamps the default variant with the listing id on a create, and never on an update", async () => {
+    const creates: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(creates, (body) => respondTo(body, { status: "ACTIVE" })),
+    )
+    await shopifyAdapter.publish!(context())
+    const created = productSetVariables(creates).input as { variants: { sku?: string }[] }
+    expect(created.variants[0]!.sku).toBe("fanwise-listing-1")
+
+    const updates: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(updates, (body) => respondTo(body)),
+    )
+    await shopifyAdapter.update!(
+      context({ listing: listing({ external_listing_id: "gid://shopify/Product/900" }) }),
+    )
+    const updated = productSetVariables(updates).input as { variants: { sku?: string }[] }
+    expect(updated.variants[0]).not.toHaveProperty("sku")
+  })
+
+  it("asks for its stamp before a create, and creates when nothing carries it", async () => {
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) => respondTo(body, { status: "ACTIVE" })),
+    )
+    await shopifyAdapter.publish!(context())
+
+    const search = bodies.find((b) =>
+      String((b as { query?: string }).query ?? "").includes("FanwiseProductByStamp"),
+    ) as { variables: { query: string } }
+    expect(search.variables.query).toBe('sku:"fanwise-listing-1"')
+    expect(productSetVariables(bodies).identifier).toBeNull()
+  })
+
+  it("adopts the product an earlier create left behind, and proceeds as an update", async () => {
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) =>
+        respondTo(body, {
+          status: "ACTIVE",
+          stamped: [{ id: "gid://shopify/Product/777", sku: "fanwise-listing-1" }],
+        }),
+      ),
+    )
+    const result = await shopifyAdapter.publish!(context())
+
+    // With an identifier the same mutation is an update, which reads first.
+    expect(productSetVariables(bodies).identifier).toEqual({ id: "gid://shopify/Product/777" })
+    const queries = bodies.map((b) => String((b as { query?: string }).query ?? ""))
+    expect(queries.some((q) => q.includes("FanwiseProductState"))).toBe(true)
+    // goLive nests the productSet answer beside the publication it then made.
+    expect(result.providerResponse).toMatchObject({
+      productSet: { adopted: "gid://shopify/Product/777" },
+    })
+    expect(result.externalState).toBe("live")
+  })
+
+  it("ignores a search hit whose SKU is not exactly the stamp", async () => {
+    // The search index is eventually consistent and tokenized; only the exact
+    // stamp on the variant proves the product is this listing's.
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      "fetch",
+      captureFetch(bodies, (body) =>
+        respondTo(body, {
+          status: "ACTIVE",
+          stamped: [
+            { id: "gid://shopify/Product/777", sku: "fanwise-listing-10" },
+            { id: "gid://shopify/Product/778", sku: null },
+          ],
+        }),
+      ),
+    )
+    const result = await shopifyAdapter.publish!(context())
+    expect(productSetVariables(bodies).identifier).toBeNull()
+    expect(result.providerResponse).not.toMatchObject({
+      productSet: { adopted: expect.anything() },
+    })
   })
 })

@@ -119,6 +119,19 @@ Shared machinery. The publish key is per listing; the update key carries a conte
 fingerprint; the runner's three guards apply. A retried create that already returned an id
 becomes an update of that id.
 
+**The create guard, ADR 0005, since 16 September 2026.** The create is the one request whose
+answer can be lost after it landed, so it is sent once, with no in-call retry, and it carries
+a stamp: `sku` is `fanwise-<listing id>` (`lib/channels/stamp.ts`), on the create only.
+Before every create the adapter runs `GET /products?sku=fanwise-<listing id>` and adopts a hit
+whose `sku` is exactly that, reading it and writing with `PUT` from then on as any update
+does. The job row names the adopted id under `adopted`. The SKU is the stamp because it is
+the one merchant reference the products list can filter on; `meta_data` cannot be searched
+through the REST API, and the slug is the product's address (§3). WooCommerce keeps SKUs
+unique besides, so a search that missed would meet `product_invalid_sku` rather than a
+duplicate. An update never sends `sku`, so a creator who replaces it in the admin keeps
+their change and loses only this recovery. The cost is visible: most themes print
+"SKU: fanwise-…" in the product meta on the single product page.
+
 ## 8. Description transform
 
 `description` receives `markdownToHtml` from `lib/text/markdown-html.ts`, shared with Shopify
@@ -216,6 +229,11 @@ product's `permalink`, kept only while the product is on sale.
 4. Whether sideloading a Supabase signed URL completes inside the URL's lifetime on typical
    hosting. Shopify's did.
 5. Billing: `docs/decisions/0002` item 23.
+6. **Open, added 16 September 2026 with the create guard, §7.** Whether `GET /products?sku=`
+   matches the whole SKU only, and whether the store's theme prints the SKU on the product
+   page. The check: give a hand-made product the SKU `fanwise-<listing id>` of an unpublished
+   Fanwise listing, publish that listing, and expect the product to be updated in place with
+   `adopted` on the job row and no second product.
 
 Partly settled on 9 September 2026, before the first connection: `houseofproctor.com`
 answers `GET /wp-json/wc/v3/` with the full route index and no credentials, so a store's

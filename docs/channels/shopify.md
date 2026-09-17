@@ -234,6 +234,17 @@ just made possible.
 A failed job is retried on its own row, incrementing `attempt_count`. It is not a new row,
 because it is not a new operation.
 
+**The create guard, ADR 0005, since 16 September 2026.** The one request that creates the
+product is the one whose answer can be lost after it landed, so it is sent once, with no
+in-call retry, and it carries a stamp: the default variant's `sku` is `fanwise-<listing id>`
+(`lib/channels/stamp.ts`), on the create only. Before every create the adapter runs
+`products(first: 5, query: "sku:\"fanwise-<listing id>\"")` and adopts a hit whose variant
+carries exactly that SKU, sending the identifier from then on as any update does. The job row
+names the adopted id under `adopted`. The SKU is the stamp because it is the one merchant
+reference the product search can filter on: metafields cannot be searched, a handle cannot
+be given (§3), and a tag would show on the storefront. An update never sends `sku`, so a
+creator who replaces it in the admin keeps their change and loses only this recovery.
+
 ## 8. Description transform
 
 The description is Markdown (ADR 0011). `descriptionHtml` receives `markdownToHtml` from
@@ -409,6 +420,14 @@ Nothing below is a guess about intent; each is a shape that only a 2xx can confi
    entry, for a product deleted in the admin minutes earlier. §16 records the run.
 7. and 8. are likewise **answered, 7 September 2026**: `category` with `so-2-5` and
    `seo.title` were both accepted and read back from a live product. §16.
+
+**Item 10, open, added 16 September 2026 with the create guard, §7.** Whether
+`products(query: "sku:\"fanwise-<listing id>\"")` returns the product, how long the
+search index lags a create, and whether the SKU shows anywhere a buyer looks. The guard
+checks the variant's SKU on every hit, so a wrong match is impossible and a late index only
+means a create rather than an adoption. The check: give a hand-made draft product the SKU
+`fanwise-<listing id>` of an unpublished Fanwise listing, publish that listing, and expect
+the draft updated and put on sale with `adopted` on the job row and no second product.
 
 ## 14. Category, product type, and the two SEO fields
 

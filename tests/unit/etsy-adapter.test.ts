@@ -42,6 +42,7 @@ function listing(overrides: Partial<ChannelListing> = {}): ChannelListing {
     product_id: "product-1",
     channel_id: "channel-1",
     channel_connection_id: "conn-1",
+    created_at: "2026-09-01T00:00:00Z",
     external_listing_id: null,
     external_url: null,
     status: "draft",
@@ -139,6 +140,15 @@ function etsy(
     missing?: boolean
     failAt?: "images" | "files" | "activate"
     failDelete?: boolean
+    /** The shop's newest drafts, as the guard's search reads them. */
+    drafts?: Array<{
+      listing_id: number
+      title?: string
+      taxonomy_id?: number
+      listing_type?: string
+      created_timestamp?: number
+      images?: number
+    }>
   } = {},
 ) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -158,6 +168,22 @@ function etsy(
     if (url.endsWith("/public/oauth/token"))
       return json({ access_token: "1.new", expires_in: 3600, refresh_token: "1.newref" })
 
+    if (/\/listings\?state=draft/.test(url) && method === "GET") {
+      return json({
+        results: (options.drafts ?? []).map((draft) => ({
+          state: "draft",
+          url: null,
+          title: "Aster Grotesk",
+          taxonomy_id: 1875,
+          listing_type: "download",
+          created_timestamp: Math.floor(Date.now() / 1000),
+          ...draft,
+          images: Array.from({ length: draft.images ?? 0 }, (_, i) => ({
+            listing_image_id: 10 + i,
+          })),
+        })),
+      })
+    }
     if (/\/listings$/.test(url) && method === "POST")
       return json({ listing_id: 900, state: "draft", url: null })
     if (/\/listings\/900\/images$/.test(url)) {
@@ -297,12 +323,13 @@ describe("publish", () => {
     expect(
       etsyCalls.map((c) => `${c.method} ${c.url.replace("https://api.etsy.com/v3/", "")}`),
     ).toEqual([
+      "GET application/shops/777/listings?state=draft&limit=100&sort_on=created&sort_order=desc&includes=Images",
       "POST application/shops/777/listings",
       "POST application/shops/777/listings/900/images",
       "POST application/shops/777/listings/900/files",
       "PATCH application/shops/777/listings/900",
     ])
-    expect(etsyCalls[0]!.json).toMatchObject({
+    expect(etsyCalls[1]!.json).toMatchObject({
       title: "Aster Grotesk",
       description: "A grotesque in nine weights.\n\nDrawn for long text.",
       price: 48,
@@ -312,10 +339,10 @@ describe("publish", () => {
       who_made: "i_did",
       quantity: 999,
     })
-    expect(etsyCalls[1]!.form?.get("rank")).toBe("1")
-    expect((etsyCalls[1]!.form?.get("image") as File).name).toBe("cover.png")
-    expect((etsyCalls[2]!.form?.get("file") as File).name).toBe("aster.zip")
-    expect(etsyCalls[3]!.json).toEqual({ state: "active" })
+    expect(etsyCalls[2]!.form?.get("rank")).toBe("1")
+    expect((etsyCalls[2]!.form?.get("image") as File).name).toBe("cover.png")
+    expect((etsyCalls[3]!.form?.get("file") as File).name).toBe("aster.zip")
+    expect(etsyCalls[4]!.json).toEqual({ state: "active" })
     expect(result).toMatchObject({
       externalListingId: "900",
       externalUrl: "https://www.etsy.com/listing/900",
@@ -424,5 +451,82 @@ describe("the token", () => {
         }),
       ),
     ).rejects.toMatchObject({ normalized: { code: "permission_denied" } })
+  })
+})
+
+describe("the create guard", () => {
+  // ADR 0005, without a stamp: Etsy's create takes no merchant reference, so
+  // the draft a lost create left is recognised by what the create sent, among
+  // the shop's drafts made since the listing existed.
+
+  const etsyCallsOf = (calls: Call[]) =>
+    calls
+      .filter((c) => c.url.includes("api.etsy.com"))
+      .map((c) => `${c.method} ${c.url.replace("https://api.etsy.com/v3/", "")}`)
+
+  it("adopts the draft an earlier create left, sends only what it is short of, and activates it", async () => {
+    const calls: Call[] = []
+    vi.stubGlobal(
+      "fetch",
+      etsy(calls, { drafts: [{ listing_id: 900, images: 1 }], held: { files: 1 } }),
+    )
+
+    const result = await etsyAdapter.publish!(context())
+
+    expect(etsyCallsOf(calls)).toEqual([
+      "GET application/shops/777/listings?state=draft&limit=100&sort_on=created&sort_order=desc&includes=Images",
+      "PATCH application/shops/777/listings/900",
+      "GET application/shops/777/listings/900/files",
+      "PATCH application/shops/777/listings/900",
+    ])
+    // The fields are brought up to date, then the state.
+    expect(calls.find((c) => c.method === "PATCH")!.json).toMatchObject({ title: "Aster Grotesk" })
+    expect(calls.filter((c) => c.method === "PATCH")[1]!.json).toEqual({ state: "active" })
+    expect(result).toMatchObject({
+      externalListingId: "900",
+      externalState: "live",
+      purchasable: true,
+      providerResponse: { adopted: 900 },
+    })
+  })
+
+  it("uploads what an adopted draft is short of", async () => {
+    const calls: Call[] = []
+    vi.stubGlobal("fetch", etsy(calls, { drafts: [{ listing_id: 900, images: 0 }] }))
+    await etsyAdapter.publish!(context())
+    expect(etsyCallsOf(calls)).toContain("POST application/shops/777/listings/900/images")
+    expect(etsyCallsOf(calls)).toContain("POST application/shops/777/listings/900/files")
+    expect(etsyCallsOf(calls)).not.toContain("POST application/shops/777/listings")
+  })
+
+  it("does not adopt a draft older than the listing, under another title, in another category, or not a download", async () => {
+    const calls: Call[] = []
+    vi.stubGlobal(
+      "fetch",
+      etsy(calls, {
+        drafts: [
+          { listing_id: 901, created_timestamp: 1_000 },
+          { listing_id: 902, title: "Aster Grotesk Variable" },
+          { listing_id: 903, taxonomy_id: 1 },
+          { listing_id: 904, listing_type: "physical" },
+        ],
+      }),
+    )
+    await etsyAdapter.publish!(context())
+    expect(etsyCallsOf(calls)).toContain("POST application/shops/777/listings")
+    expect(calls.some((c) => /\/listings\/90[1-4]/.test(c.url))).toBe(false)
+  })
+
+  it("refuses rather than guesses when two drafts could be this listing's", async () => {
+    const calls: Call[] = []
+    vi.stubGlobal("fetch", etsy(calls, { drafts: [{ listing_id: 900 }, { listing_id: 901 }] }))
+    await expect(etsyAdapter.publish!(context())).rejects.toMatchObject({
+      normalized: {
+        code: "unknown",
+        message: expect.stringContaining("2 drafts"),
+        raw: { candidates: [900, 901] },
+      },
+    })
+    expect(calls.some((c) => c.method === "POST" || c.method === "PATCH")).toBe(false)
   })
 })

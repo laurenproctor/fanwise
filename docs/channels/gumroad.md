@@ -169,11 +169,21 @@ seller's prefix unattached, and whether Gumroad expires them is **[verify]**.
 
 **The stamp is `custom_permalink`.** It is unique per seller, case-insensitively, so a
 second create with the same permalink is refused with "already used by another one of your
-products." A create whose response was lost is not retried automatically, per ADR 0005;
-the next attempt that meets the collision reports it, with a link to the seller's product
-list, and adopts nothing. Adoption would be wrong in the common case for this channel: a
-creator who already sells the product on Gumroad by hand is exactly who connects it, and
-their existing product holds the same slug.
+products." A create whose response was lost is not retried automatically, per ADR 0005, and
+the create itself is sent once, with no in-call retry, since 16 September 2026.
+
+Adoption is narrow on this channel, and the reason has not changed: a creator who already
+sells the product on Gumroad by hand is exactly who connects it, and their existing product
+holds the same slug, so a guard that adopted whatever carried the permalink would take over
+their product. Since 16 September 2026 the adapter reads `GET /v2/products` before the
+upload and the create, and adopts only a product that looks exactly like the draft a lost
+create would have left: `custom_permalink` equal to the slug, `published: false`, and `name`
+equal to the title this publish sends. That product gets the covers it is short of, a
+thumbnail, and the enable, and its files are read back rather than sent again; the job row
+names it under `adopted`. Anything else falls through to the create, and Gumroad's own
+refusal of a taken permalink says which product is in the way, with a link to the seller's
+product list, as before. A hand-made draft under the same slug and the same name is adopted,
+which is the one case where the two readings agree on what the creator meant.
 
 An update reads before it writes: the product by id, raising `external_object_missing` when
 Gumroad answers "The product was not found.", its cover count, and its files, and uploads
@@ -290,6 +300,13 @@ canonical URL back.
    create limit. Decision 27.
 10. Whether an API-created product is eligible for Discover with no further seller action.
 11. Recommended cover dimensions, §6.
+12. **Added 16 September 2026 with the create guard, §7.** Whether `GET /v2/products` lists
+    unpublished products, and whether each file in it carries `name` as the uploaded filename
+    and `url` as the canonical file address. The guard pairs an adopted draft's files with
+    the listing's deliverables by filename and records only those with a URL; a file without
+    one is left unrecorded, and a later update that adds a file then refuses rather than
+    guesses (§7). The check: create a draft by hand with a Fanwise product's slug and title,
+    publish the listing, and expect the draft enabled with `adopted` on the job row.
 
 ## 14. Categories
 

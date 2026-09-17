@@ -6,7 +6,9 @@ product, names every channel it skipped and why, records the run in `workspace_e
 re-attempts a retryable failure three times over twenty-one minutes before it stops. The
 exit — one action, two live URLs, one failure recovered without duplicates — needs a live
 Shopify and a live Etsy, and is a run a person does by hand. ADR 0005 was accepted to build
-it, with the stamp-and-search create guard deferred.
+it, with the stamp-and-search create guard deferred; **the guard was built on 16 September
+2026** on all four automatic adapters, with the create sent once and a live check per channel
+still owed, see "The create guard" at the end of that ADR and §7 of each channel spec.
 
 **A6 is done.** Its exit ran on 11 September 2026 against the live shop `Fanwise`: connect,
 publish, and an active listing in one job, with four of the five §13 questions in

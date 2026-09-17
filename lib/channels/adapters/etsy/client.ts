@@ -38,6 +38,13 @@ export interface EtsyRequest<T> {
   path: string
   body?: EtsyBody
   schema: z.ZodType<T>
+  /**
+   * False for the one request that creates an object: a transport failure on
+   * it is not retried inside the call, because the request may have landed
+   * and a repeat would create twice (ADR 0005). Every other request is
+   * repeatable and retried on the shared curve.
+   */
+  idempotent?: boolean
 }
 
 export interface EtsyClient {
@@ -65,11 +72,18 @@ export function createEtsyClient(options: EtsyClientOptions): EtsyClient {
   const sleep = options.sleep ?? defaultSleep
 
   return {
-    async request<T>({ method, path, body, schema }: EtsyRequest<T>): Promise<T> {
+    async request<T>({
+      method,
+      path,
+      body,
+      schema,
+      idempotent = true,
+    }: EtsyRequest<T>): Promise<T> {
       const url = /^https?:\/\//.test(path) ? path : `${API_BASE}/${path}`
       let lastError: ChannelError | null = null
+      const attempts = idempotent ? IN_CALL_MAX_ATTEMPTS : 1
 
-      for (let attempt = 1; attempt <= IN_CALL_MAX_ATTEMPTS; attempt += 1) {
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
         // The key and the token are used here and nowhere else. Never logged,
         // never in an error: errors carry the response body, which is Etsy's.
         const headers: Record<string, string> = {
@@ -94,7 +108,7 @@ export function createEtsyClient(options: EtsyClientOptions): EtsyClient {
           response = await doFetch(url, { method, headers, body: payload })
         } catch (error) {
           lastError = new ChannelError(transportError(error))
-          if (attempt === IN_CALL_MAX_ATTEMPTS) throw lastError
+          if (attempt === attempts) throw lastError
           await sleep(inCallBackoffMs(attempt))
           continue
         }
@@ -109,7 +123,7 @@ export function createEtsyClient(options: EtsyClientOptions): EtsyClient {
             // Not JSON. The text stands.
           }
           const error = new ChannelError(httpError(response.status, parsedBody))
-          if (!error.normalized.retryable || attempt === IN_CALL_MAX_ATTEMPTS) throw error
+          if (!error.normalized.retryable || attempt === attempts) throw error
           lastError = error
           await sleep(inCallBackoffMs(attempt, retryAfterMs(response.headers.get("retry-after"))))
           continue

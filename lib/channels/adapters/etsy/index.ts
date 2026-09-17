@@ -167,6 +167,22 @@ const listingSchema = z.object({
 })
 type Listing = z.infer<typeof listingSchema>
 
+/** A shop's drafts, as far as the create guard reads them. */
+const draftsSchema = z.object({
+  results: z
+    .array(
+      listingSchema.extend({
+        title: z.string().nullish(),
+        taxonomy_id: z.number().nullish(),
+        listing_type: z.string().nullish(),
+        /** Epoch seconds, Etsy's convention. */
+        created_timestamp: z.number().nullish(),
+      }),
+    )
+    .default([]),
+})
+type Draft = z.infer<typeof draftsSchema>["results"][number]
+
 const filesSchema = z.object({
   count: z.number().optional(),
   results: z
@@ -237,6 +253,55 @@ async function readListing(client: EtsyClient, id: string): Promise<Listing> {
     }
     throw error
   }
+}
+
+/**
+ * The create guard's search, ADR 0005, without a stamp to search for.
+ *
+ * Etsy's create takes no merchant reference: a SKU lives on the inventory,
+ * which is a second call, and a second call never ran if the first one's
+ * answer was lost. So the draft that call may have left is recognised by what
+ * the call sent. A draft is this listing's if it is still a draft, is a
+ * download, carries exactly the title and category this publish would send,
+ * and was created no earlier than the listing it would belong to, since a
+ * draft older than the listing cannot have been made for it.
+ *
+ * One page of the shop's newest drafts is read. Exactly one match is adopted;
+ * none creates; more than one is refused rather than guessed, because taking
+ * over the wrong draft would put somebody else's work on sale.
+ */
+async function findDraft(
+  client: EtsyClient,
+  shopId: number,
+  context: PublishContext,
+  fields: { title: unknown; taxonomy_id: unknown },
+): Promise<Draft | null> {
+  const drafts = await client.request({
+    method: "GET",
+    path: `application/shops/${shopId}/listings?state=draft&limit=100&sort_on=created&sort_order=desc&includes=Images`,
+    schema: draftsSchema,
+  })
+  // A minute of skew, because the two clocks are not the same clock.
+  const notBefore = Math.floor(new Date(context.listing.created_at).getTime() / 1000) - 60
+  const matches = drafts.results.filter(
+    (draft) =>
+      draft.state === "draft" &&
+      draft.listing_type === "download" &&
+      draft.title === fields.title &&
+      draft.taxonomy_id === fields.taxonomy_id &&
+      typeof draft.created_timestamp === "number" &&
+      draft.created_timestamp >= notBefore,
+  )
+  if (matches.length > 1) {
+    throw new ChannelError(
+      normalized(
+        "unknown",
+        `Etsy holds ${matches.length} drafts titled "${String(fields.title)}" that could be this listing's, and Fanwise cannot tell which. Remove the extra drafts in your Etsy shop and publish again.`,
+        { candidates: matches.map((draft) => draft.listing_id) },
+      ),
+    )
+  }
+  return matches[0] ?? null
 }
 
 async function bytesOf(url: string): Promise<Blob> {
@@ -403,11 +468,66 @@ export const etsyAdapter: ChannelAdapter = {
    * external id and the next click starts clean. The delete is best effort:
    * if it fails too, the original error is the one reported, and the orphan
    * is noted on the job row for a person to remove.
+   *
+   * Before the create it looks for a draft an earlier create may have left
+   * (ADR 0005, findDraft). One found is adopted: its fields are brought up to
+   * date, it receives only the images and files it is short of, and it is
+   * activated, so a create whose answer was lost ends as one listing rather
+   * than two. The create itself is sent once, with no in-call retry, for the
+   * same reason.
    */
   async publish(context: PublishContext): Promise<PublishResult> {
     const { client, shopId } = await clientFor(context)
     const images = listingImages(context.subject)
     const files = deliverables(context.subject.assets)
+    const fields = listingFields(context)
+
+    const adopted = await findDraft(client, shopId, context, {
+      title: fields.title,
+      taxonomy_id: fields.taxonomy_id,
+    })
+
+    if (adopted) {
+      const listingId = adopted.listing_id
+      // Not inside the cleanup below: this draft was not created by this
+      // attempt, and a failure now leaves it exactly as it was found.
+      await client.request({
+        method: "PATCH",
+        path: `application/shops/${shopId}/listings/${listingId}`,
+        body: { kind: "json", value: fields },
+        schema: listingSchema,
+      })
+      const heldImages = adopted.images?.length ?? 0
+      const imageIds =
+        images.length > heldImages
+          ? await uploadImages(
+              client,
+              shopId,
+              listingId,
+              context,
+              images.slice(heldImages),
+              heldImages + 1,
+            )
+          : []
+      const heldFiles = await client.request({
+        method: "GET",
+        path: `application/shops/${shopId}/listings/${listingId}/files`,
+        schema: filesSchema,
+      })
+      const fileIds =
+        files.length > heldFiles.results.length
+          ? await uploadFiles(
+              client,
+              shopId,
+              listingId,
+              context,
+              files.slice(heldFiles.results.length),
+              heldFiles.results.length + 1,
+            )
+          : []
+      const live = await activate(client, shopId, listingId)
+      return result(live, { adopted: listingId, imageIds, fileIds, activated: live })
+    }
 
     const draft = await client.request({
       method: "POST",
@@ -415,7 +535,7 @@ export const etsyAdapter: ChannelAdapter = {
       body: {
         kind: "json",
         value: {
-          ...listingFields(context),
+          ...fields,
           quantity: 999,
           who_made: "i_did",
           when_made: "made_to_order",
@@ -425,6 +545,8 @@ export const etsyAdapter: ChannelAdapter = {
         },
       },
       schema: listingSchema,
+      // Sent once. A lost answer here is what findDraft exists to recover.
+      idempotent: false,
     })
 
     try {

@@ -62,6 +62,13 @@ export interface GumroadRequest<T> {
    * the runner acts on; every other refusal is normalized here.
    */
   refusals?: readonly string[]
+  /**
+   * False for the one request that creates an object: a transport failure on
+   * it is not retried inside the call, because the request may have landed
+   * and a repeat would create twice (ADR 0005). Every other request is
+   * repeatable and retried on the shared curve.
+   */
+  idempotent?: boolean
 }
 
 export class GumroadRefusal extends Error {
@@ -98,11 +105,19 @@ export function createGumroadClient(options: GumroadClientOptions = {}): Gumroad
   const sleep = options.sleep ?? defaultSleep
 
   return {
-    async request<T>({ method, path, body, schema, refusals }: GumroadRequest<T>): Promise<T> {
+    async request<T>({
+      method,
+      path,
+      body,
+      schema,
+      refusals,
+      idempotent = true,
+    }: GumroadRequest<T>): Promise<T> {
       const url = /^https?:\/\//.test(path) ? path : `${API_BASE}/${path}`
       let lastError: ChannelError | null = null
+      const attempts = idempotent ? IN_CALL_MAX_ATTEMPTS : 1
 
-      for (let attempt = 1; attempt <= IN_CALL_MAX_ATTEMPTS; attempt += 1) {
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
         // The token is used here and nowhere else. Never logged, never in an
         // error: errors carry the response body, which is Gumroad's.
         const headers: Record<string, string> = {
@@ -123,7 +138,7 @@ export function createGumroadClient(options: GumroadClientOptions = {}): Gumroad
           response = await doFetch(url, { method, headers, body: payload })
         } catch (error) {
           lastError = new ChannelError(transportError(error))
-          if (attempt === IN_CALL_MAX_ATTEMPTS) throw lastError
+          if (attempt === attempts) throw lastError
           await sleep(inCallBackoffMs(attempt))
           continue
         }
@@ -138,7 +153,7 @@ export function createGumroadClient(options: GumroadClientOptions = {}): Gumroad
             // Not JSON. The text stands.
           }
           const error = new ChannelError(httpError(response.status, parsedBody))
-          if (!error.normalized.retryable || attempt === IN_CALL_MAX_ATTEMPTS) throw error
+          if (!error.normalized.retryable || attempt === attempts) throw error
           lastError = error
           await sleep(inCallBackoffMs(attempt, retryAfterMs(response.headers.get("retry-after"))))
           continue
