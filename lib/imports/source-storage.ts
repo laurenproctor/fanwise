@@ -26,13 +26,15 @@ import type { ContentSourceKind } from "./types"
  * URLs is one careless link away from being rendered on the storage host.
  */
 
-export type SourceExtension = "txt" | "pdf" | "html" | "webm" | "ogg" | "m4a" | "wav"
+export type SourceExtension =
+  "txt" | "pdf" | "html" | "webm" | "ogg" | "m4a" | "wav" | "png" | "jpg" | "gif" | "webp"
 
 export const SOURCE_EXTENSIONS: Record<ContentSourceKind, SourceExtension> = {
   pasted_text: "txt",
   pdf_document: "pdf",
   html_document: "html",
   audio_recording: "webm",
+  image_file: "png",
 }
 
 export const SOURCE_LIMITS = {
@@ -40,6 +42,7 @@ export const SOURCE_LIMITS = {
   maxPdfBytes: IMPORT_LIMITS.maxPdfBytes,
   maxHtmlBytes: IMPORT_LIMITS.maxHtmlBytes,
   maxAudioBytes: IMPORT_LIMITS.maxAudioBytes,
+  maxImageBytes: IMPORT_LIMITS.maxImageBytes,
 } as const
 
 /** The bytes a file of this kind may be. Paste limits are characters, above. */
@@ -62,9 +65,9 @@ export function sourcePathFor(
 /** Whether a stored path is one this workspace's server could have built. */
 export function isSourcePathFor(workspaceId: string, path: string): boolean {
   const escaped = workspaceId.replace(/[^0-9a-f-]/gi, "")
-  return new RegExp(`^${escaped}/import-sources/${UUID}\\.(txt|html|pdf|webm|ogg|m4a|wav)$`).test(
-    path,
-  )
+  return new RegExp(
+    `^${escaped}/import-sources/${UUID}\\.(txt|html|pdf|webm|ogg|m4a|wav|png|jpg|gif|webp)$`,
+  ).test(path)
 }
 
 /** Stores pasted text. The server wrote the bytes, so it knows their size. */

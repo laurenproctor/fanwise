@@ -855,7 +855,7 @@ recording is staged in the composer:
 
 | Column | Notes |
 |---|---|
-| `source_type` | `public_url`, `pasted_text`, `pdf`, `html`, `audio` |
+| `source_type` | `public_url`, `pasted_text`, `pdf`, `html`, `audio`, `image` (a picture, copied to `product_assets` when read) |
 | `status` | `uploading`, `staged`, `transcribing`, `pending`, `reading`, `ready`, `failed`, `unavailable`, `removed` |
 | `position` | the creator's order, unique per live import |
 | `source_url`, `normalized_url` | links only; at most one live link per import |
@@ -869,6 +869,7 @@ recording is staged in the composer:
 `is_workspace_member`; no delete grant, removal is `removed`. `create_import_session` (security
 invoker) creates the product, the session and every source in one transaction. Migration
 `20260912230000_product_import_sources` backfilled one source for every existing import.
+`20260916150000_import_image_sources` added `image` and the `png|jpg|gif|webp` paths.
 
 ## B12: importing a live listing
 

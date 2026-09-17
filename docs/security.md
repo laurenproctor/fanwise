@@ -322,8 +322,8 @@ collapse at once.
 
 ## Import sources and recordings
 
-The product composer (`docs/product-link-import.md` §15) stores pasted HTML, PDFs, HTML files and
-voice recordings a creator hands over. What holds:
+The product composer (`docs/product-link-import.md` §15) stores pasted HTML, PDFs, HTML files,
+pictures and voice recordings a creator hands over. What holds:
 
 1. **Private, and never a deliverable.** Objects live under `<workspace_id>/import-sources/` in
    the private `product-assets` bucket, uploaded through server-minted signed URLs as
@@ -332,7 +332,9 @@ voice recordings a creator hands over. What holds:
    `storage_path` outside the row's own workspace prefix, and the runner checks
    `isSourcePathFor` again before reading.
 3. **Bytes decide, not names.** The server measures each object and sniffs its first bytes
-   (`lib/imports/file-signature.ts`) before a source is staged.
+   (`lib/imports/file-signature.ts`) before a source is staged. A picture is also decoded with
+   `sharp` under the pixel cap (`lib/imports/retrieval/image.ts`), the same inspection a picture
+   fetched from a page gets; SVG is refused as markup, whichever way it arrives.
 4. **Nothing handed over runs.** HTML is parsed as text, PDFs are read for their text layer only,
    and no source is rendered, framed or evaluated. `tests/unit/import-source-boundaries.test.ts`
    sweeps the import feature and the transcription layer.

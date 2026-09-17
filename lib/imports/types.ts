@@ -44,6 +44,8 @@ export const CONTENT_SOURCE_KINDS = [
   "pdf_document",
   "html_document",
   "audio_recording",
+  /** A picture the creator uploaded: PNG, JPEG, GIF or WebP. Becomes a product image, never words. */
+  "image_file",
 ] as const
 export type ContentSourceKind = (typeof CONTENT_SOURCE_KINDS)[number]
 
@@ -71,7 +73,14 @@ export type SessionProvider = SourceKind | "composed"
  * Coarser than `SourceKind`: which service a link belongs to is decided when it
  * is read, by the registry, not when it is added.
  */
-export const IMPORT_SOURCE_TYPES = ["public_url", "pasted_text", "pdf", "html", "audio"] as const
+export const IMPORT_SOURCE_TYPES = [
+  "public_url",
+  "pasted_text",
+  "pdf",
+  "html",
+  "audio",
+  "image",
+] as const
 export type ImportSourceType = (typeof IMPORT_SOURCE_TYPES)[number]
 
 export const IMPORT_SOURCE_STATUSES = [
@@ -103,6 +112,7 @@ export const CONTENT_KIND_FOR_TYPE: Record<
   pdf: "pdf_document",
   html: "html_document",
   audio: "audio_recording",
+  image: "image_file",
 }
 
 /**
@@ -122,6 +132,7 @@ export const OBSERVATION_ORIGINS = [
   "document",
   "properties",
   "transcript",
+  "upload",
 ] as const
 export type ObservationOrigin = (typeof OBSERVATION_ORIGINS)[number]
 
@@ -134,6 +145,7 @@ export const OBSERVATION_ORIGIN_LABELS: Record<ObservationOrigin, string> = {
   document: "Document text",
   properties: "Document properties",
   transcript: "Recording transcript",
+  upload: "Uploaded file",
 }
 
 /**

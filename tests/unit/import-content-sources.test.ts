@@ -1,5 +1,6 @@
+import sharp from "sharp"
 import { describe, expect, it } from "vitest"
-import { renderEvidence } from "@/lib/imports/compose"
+import { hasWords, renderEvidence } from "@/lib/imports/compose"
 import { evidenceCorpus } from "@/lib/imports/claims"
 import { IMPORT_ERROR_CODES, IMPORT_ERROR_RECOVERIES, ImportError } from "@/lib/imports/errors"
 import { hashEvidence, productSourceEvidenceSchema } from "@/lib/imports/evidence"
@@ -26,10 +27,13 @@ import {
   looksLikeCode,
   readPlainText,
 } from "@/lib/imports/retrieval/plain-text"
+import { sniff } from "@/lib/imports/file-signature"
+import { IMAGE_LIMITS, inspectImage } from "@/lib/imports/retrieval/image"
 import {
   CONTENT_IMPORTERS,
   decodeText,
   htmlDocumentImporter,
+  imageFileImporter,
   pastedTextImporter,
   pdfDocumentImporter,
 } from "@/lib/imports/sources/content"
@@ -614,10 +618,123 @@ describe("a PDF import", () => {
   })
 })
 
+describe("a picture import", () => {
+  const picture = (format: "png" | "gif" | "webp" | "jpeg", size = 64) =>
+    sharp({ create: { width: size, height: size, channels: 3, background: "#c04040" } })
+      .toFormat(format)
+      .toBuffer()
+
+  it("reads a PNG as one uploaded picture, with no words, and hashes on its bytes", async () => {
+    const bytes = await picture("png")
+    const evidence = await imageFileImporter.read({ bytes, filename: "cover.png" })
+    expect(productSourceEvidenceSchema.safeParse(evidence).success).toBe(true)
+    expect(evidence.provider).toBe("image_file")
+    expect(evidence.sourceName).toBe("cover.png")
+    expect(evidence.title).toBeUndefined()
+    expect(evidence.bodyText).toBeUndefined()
+    expect(evidence.visibleFeatures.value).toEqual([])
+    expect(evidence.publicDemoAvailable).toBe(false)
+    expect(evidence.previewAssets).toHaveLength(1)
+    const [asset] = evidence.previewAssets
+    expect(asset?.sourceUrl).toBeUndefined()
+    expect(asset).toMatchObject({
+      origin: "upload",
+      mimeType: "image/png",
+      width: 64,
+      height: 64,
+      byteSize: bytes.byteLength,
+    })
+    expect(asset?.checksum).toMatch(/^[0-9a-f]{64}$/)
+    expect(hasWords(evidence)).toBe(false)
+
+    // The same bytes read the same way twice; a different picture does not.
+    const again = await imageFileImporter.read({ bytes, filename: "cover.png" })
+    expect(again.contentHash).toBe(evidence.contentHash)
+    const other = await imageFileImporter.read({
+      bytes: await picture("png", 96),
+      filename: "cover.png",
+    })
+    expect(other.contentHash).not.toBe(evidence.contentHash)
+  })
+
+  it("keeps a GIF and a WebP whole, measured by their first frame", async () => {
+    for (const format of ["gif", "webp", "jpeg"] as const) {
+      const bytes = await picture(format, 48)
+      const evidence = await imageFileImporter.read({ bytes, filename: `loop.${format}` })
+      expect(evidence.previewAssets[0], format).toMatchObject({
+        mimeType: `image/${format}`,
+        width: 48,
+        height: 48,
+      })
+    }
+    const animated = await inspectImage(await picture("gif"))
+    expect(animated.ok && animated.image.frames).toBe(1)
+  })
+
+  it("tells the model it cannot see the picture, and nothing else about it", async () => {
+    const evidence = await imageFileImporter.read({
+      bytes: await picture("png"),
+      filename: "cover.png",
+    })
+    const rendered = renderEvidence(evidence)
+    expect(rendered).toContain("a picture the creator uploaded, which you cannot see")
+    expect(rendered).toContain("Pictures the creator uploaded: 1")
+    expect(rendered).not.toContain("cover.png")
+  })
+
+  it("refuses what is not a raster image it can decode, and says so as one code", async () => {
+    const svg = bytes('<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>')
+    expect(await refusal(imageFileImporter.read({ bytes: svg, filename: "logo.svg" }))).toBe(
+      "image_unusable",
+    )
+    const pdf = buildPdf(["x"])
+    expect(await refusal(imageFileImporter.read({ bytes: pdf, filename: "cover.png" }))).toBe(
+      "image_unusable",
+    )
+    // A PNG signature over garbage is not a PNG.
+    const broken = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3])
+    expect(await refusal(imageFileImporter.read({ bytes: broken, filename: "cover.png" }))).toBe(
+      "image_unusable",
+    )
+    expect(IMPORT_ERROR_RECOVERIES.image_unusable).toContain("upload_files")
+  })
+
+  it("refuses a tracking pixel and a decompression bomb", async () => {
+    const tiny = await inspectImage(await picture("png", IMAGE_LIMITS.minEdge - 1))
+    expect(tiny).toEqual({ ok: false, problem: "not_an_image" })
+    const huge = new Uint8Array(IMAGE_LIMITS.maxBytes + 1)
+    expect(await inspectImage(Buffer.from(huge))).toEqual({ ok: false, problem: "too_large" })
+  })
+
+  it("sniffs a stored picture by its bytes and names the extension the bytes earn", async () => {
+    expect(sniff("image", await picture("png"))).toEqual({
+      type: "image",
+      mimeType: "image/png",
+      extension: "png",
+    })
+    expect(sniff("image", await picture("jpeg"))).toMatchObject({ extension: "jpg" })
+    expect(sniff("image", await picture("gif"))).toMatchObject({ mimeType: "image/gif" })
+    expect(sniff("image", buildPdf(["x"]))).toBeNull()
+    expect(sniff("image", bytes("<svg></svg>"))).toBeNull()
+  })
+})
+
 describe("storage paths", () => {
   const WORKSPACE = "3f0c7a52-3a5f-4b5e-9f3c-2f9d6f1b7a10"
   const OTHER = "9b1d2c3e-4f5a-4b6c-8d7e-0f1a2b3c4d5e"
   const UPLOAD = "11111111-1111-4111-8111-111111111111"
+
+  it("builds a picture's path with the extension its name earned", () => {
+    const w = "0b7e5c1a-2d3f-4a5b-9c8d-7e6f5a4b3c2d"
+    const id = "9f1b1a2e-3c4d-4e5f-8a9b-0c1d2e3f4a5b"
+    expect(sourcePathFor(w, id, "image_file", "gif")).toBe(`${w}/import-sources/${id}.gif`)
+    expect(sourcePathFor(w, id, "image_file")).toBe(`${w}/import-sources/${id}.png`)
+    for (const ext of ["png", "jpg", "gif", "webp"]) {
+      expect(isSourcePathFor(w, `${w}/import-sources/${id}.${ext}`), ext).toBe(true)
+    }
+    expect(isSourcePathFor(w, `${w}/import-sources/${id}.svg`)).toBe(false)
+    expect(isSourcePathFor(w, `${w}/import-sources/${id}.jpeg`)).toBe(false)
+  })
 
   it("builds a path under the workspace, and recognises only paths it could have built", () => {
     const path = sourcePathFor(WORKSPACE, UPLOAD, "pdf_document")

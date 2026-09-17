@@ -52,9 +52,50 @@ export function linkLabel(url: string): string {
 
 /* ------------------------------------------------------------------- files */
 
-export type FileSourceType = "pdf" | "html"
+export type FileSourceType = "pdf" | "html" | "image"
 
 export type FileCheck = { ok: true; type: FileSourceType } | { ok: false; message: string }
+
+/** The file names the composer takes, by extension. The server sniffs the bytes. */
+export const FILE_EXTENSIONS: Record<FileSourceType, readonly string[]> = {
+  pdf: [".pdf"],
+  html: [".html", ".htm"],
+  image: [".png", ".jpg", ".jpeg", ".gif", ".webp"],
+}
+
+/** What the file input asks the browser for: every extension, and the image types. */
+export const FILE_INPUT_ACCEPT = [
+  ...Object.values(FILE_EXTENSIONS).flat(),
+  "application/pdf",
+  "text/html",
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+].join(",")
+
+/** How the composer names each kind of file when it says what it takes. */
+const FILE_WORDS: Record<FileSourceType, string> = {
+  pdf: "a PDF",
+  html: "an HTML file",
+  image: "an image",
+}
+
+export function fileTypeFor(name: string): FileSourceType | null {
+  const lower = name.toLowerCase()
+  for (const type of Object.keys(FILE_EXTENSIONS) as FileSourceType[]) {
+    if (FILE_EXTENSIONS[type].some((extension) => lower.endsWith(extension))) return type
+  }
+  return null
+}
+
+export function maxBytesForFile(type: FileSourceType): number {
+  return type === "pdf"
+    ? IMPORT_LIMITS.maxPdfBytes
+    : type === "html"
+      ? IMPORT_LIMITS.maxHtmlBytes
+      : IMPORT_LIMITS.maxImageBytes
+}
 
 /**
  * A chosen or dropped file, checked by name and size.
@@ -63,19 +104,16 @@ export type FileCheck = { ok: true; type: FileSourceType } | { ok: false; messag
  * answer decides; a `.pdf` that is really a zip is refused there.
  */
 export function checkFile(file: { name: string; size: number }): FileCheck {
-  const name = file.name.toLowerCase()
-  const type: FileSourceType | null = name.endsWith(".pdf")
-    ? "pdf"
-    : name.endsWith(".html") || name.endsWith(".htm")
-      ? "html"
-      : null
-  if (!type) return { ok: false, message: `${file.name} is not a PDF or HTML file.` }
+  const type = fileTypeFor(file.name)
+  if (!type) {
+    return { ok: false, message: `${file.name} is not a PDF, HTML, PNG, JPEG, GIF or WebP file.` }
+  }
   if (file.size === 0) return { ok: false, message: `${file.name} is empty.` }
-  const max = type === "pdf" ? IMPORT_LIMITS.maxPdfBytes : IMPORT_LIMITS.maxHtmlBytes
+  const max = maxBytesForFile(type)
   if (file.size > max) {
     return {
       ok: false,
-      message: `${file.name} is larger than ${megabytes(max)}, the most Fanwise reads from ${type === "pdf" ? "a PDF" : "an HTML file"}.`,
+      message: `${file.name} is larger than ${megabytes(max)}, the most Fanwise ${type === "image" ? "keeps for" : "reads from"} ${FILE_WORDS[type]}.`,
     }
   }
   return { ok: true, type }

@@ -98,7 +98,7 @@ export function SourcePill({
 export function SourceGlyph({
   type,
 }: {
-  type: "link" | "public_url" | "pdf" | "html" | "audio" | "pasted_text"
+  type: "link" | "public_url" | "pdf" | "html" | "audio" | "pasted_text" | "image"
 }) {
   const common = {
     width: 16,
@@ -151,6 +151,29 @@ export function SourceGlyph({
           strokeWidth="1.3"
           strokeLinecap="round"
         />
+      </svg>
+    )
+  }
+  if (type === "image") {
+    return (
+      <svg {...common}>
+        <rect
+          x="2.25"
+          y="2.75"
+          width="11.5"
+          height="10.5"
+          rx="1.5"
+          stroke="currentColor"
+          strokeWidth="1.3"
+        />
+        <path
+          d="M2.75 11.25 6 8l2.5 2.5L10.5 8.75l2.75 2.5"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="10.25" cy="5.75" r="1" fill="currentColor" />
       </svg>
     )
   }

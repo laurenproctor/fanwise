@@ -16,13 +16,14 @@ import {
   stripOpaqueElements,
 } from "../retrieval/html"
 import { isPlausibleDocumentTitle, readPdf } from "../retrieval/pdf"
+import { asBuffer, inspectImage } from "../retrieval/image"
 import { TEXT_LIMITS, readPlainText } from "../retrieval/plain-text"
 import type { ContentSourceKind } from "../types"
 import { refuseEmpty } from "./importer"
 
 /**
  * The importers for sources a creator hands over: pasted text, a PDF, an HTML
- * file.
+ * file, a recording, a picture.
  *
  * The counterpart of `SourceImporter`, and deliberately a different contract.
  * A link importer claims URLs and is chosen by looking at one; nothing claims a
@@ -244,9 +245,42 @@ export const htmlDocumentImporter: ContentImporter = {
   },
 }
 
+/**
+ * A picture, read as a picture.
+ *
+ * No words come out of it: Fanwise does not describe an image, and a model
+ * that did would be stating facts the creator never gave (invariant 5). What
+ * comes out is one preview asset with the measurements the bytes earned, and
+ * the runner copies the bytes into the product's own assets — cover first,
+ * like a picture a page advertised. The evidence hashes on the checksum, so
+ * the same picture reads the same twice and a different one does not.
+ */
+export const imageFileImporter: ContentImporter = {
+  kind: "image_file",
+  async read(source) {
+    const inspected = await inspectImage(asBuffer(source.bytes))
+    if (!inspected.ok) throw new ImportError("image_unusable", { reason: inspected.problem })
+    const { image } = inspected
+    return finish("image_file", source, {
+      visibleFeatures: observedValue([], "upload"),
+      previewAssets: [
+        {
+          origin: "upload",
+          checksum: image.checksum,
+          mimeType: image.mimeType,
+          byteSize: image.byteSize,
+          width: image.width,
+          height: image.height,
+        },
+      ],
+    })
+  },
+}
+
 export const CONTENT_IMPORTERS: Record<ContentSourceKind, ContentImporter> = {
   pasted_text: pastedTextImporter,
   pdf_document: pdfDocumentImporter,
   html_document: htmlDocumentImporter,
   audio_recording: audioRecordingImporter,
+  image_file: imageFileImporter,
 }

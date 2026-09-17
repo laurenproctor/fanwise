@@ -68,6 +68,7 @@ export const CONTENT_SOURCE_DESCRIPTORS: readonly SourceDescriptor[] = [
   { kind: "pdf_document", label: "PDF document", hosts: [], publishHint: null },
   { kind: "html_document", label: "HTML file", hosts: [], publishHint: null },
   { kind: "audio_recording", label: "Recording", hosts: [], publishHint: null },
+  { kind: "image_file", label: "Image", hosts: [], publishHint: null },
 ]
 
 export const SOURCE_LABELS: Record<SourceKind, string> = {
@@ -77,6 +78,7 @@ export const SOURCE_LABELS: Record<SourceKind, string> = {
   pdf_document: "PDF document",
   html_document: "HTML file",
   audio_recording: "Recording",
+  image_file: "Image",
 }
 
 /**

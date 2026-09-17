@@ -35,6 +35,8 @@ export const EVIDENCE_ORIGINS = [
   "properties",
   /** What a creator said in a recording, as transcribed. */
   "transcript",
+  /** A file the creator uploaded, as itself: an image that becomes a product picture. */
+  "upload",
 ] as const
 export type EvidenceOrigin = (typeof EVIDENCE_ORIGINS)[number]
 
@@ -66,14 +68,23 @@ function observed<T extends z.ZodType>(inner: T) {
  *
  * `sourceUrl` is where it was advertised and is never rendered: the production
  * CSP admits images from this origin, `data:`, `blob:` and the storage host
- * only, and a remote `og:image` is a URL a stranger chose. `storagePath` is
- * filled in once the bytes have been fetched server-side, measured, and written
- * to the product's own asset row — and until then the asset is a claim, not a
+ * only, and a remote `og:image` is a URL a stranger chose. `assetId` is filled
+ * in once the bytes have been fetched server-side, measured, and written to
+ * the product's own asset row — and until then the asset is a claim, not a
  * picture.
+ *
+ * A picture the creator uploaded has no `sourceUrl`: its bytes are the source
+ * itself, already in private storage, and `checksum` is what names it.
  */
 export const sourceAssetSchema = z.object({
-  sourceUrl: z.string().max(2048),
+  /** Where a page advertised it. Absent for a picture the creator uploaded. */
+  sourceUrl: z.string().max(2048).optional(),
   origin: evidenceOriginSchema,
+  /** SHA-256 of the bytes, for an uploaded picture. Set before the asset row exists. */
+  checksum: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
   /** Set by the fetcher after the bytes were read and sniffed. Never trusted from the page. */
   mimeType: z.string().max(120).optional(),
   byteSize: z.number().int().nonnegative().optional(),
@@ -161,7 +172,8 @@ export function hashEvidence(
     summary: evidence.summary?.value ?? null,
     visibleFeatures: evidence.visibleFeatures.value,
     productType: evidence.productType?.value ?? null,
-    assets: evidence.previewAssets.map((asset) => asset.sourceUrl).sort(),
+    // A fetched picture is named by its address, an uploaded one by its bytes.
+    assets: evidence.previewAssets.map((asset) => asset.sourceUrl ?? asset.checksum ?? "").sort(),
     language: evidence.language ?? null,
     // Added only when present, so a link import hashes exactly as it did before
     // these fields existed and a refresh does not mistake that for a change.

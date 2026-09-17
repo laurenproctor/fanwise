@@ -17,6 +17,12 @@ export const IMPORT_LIMITS = {
   /** Pages of a PDF read for text. */
   maxPdfPages: 40,
   maxHtmlBytes: Math.floor(4.8 * 1024 * 1024),
+  /**
+   * An uploaded picture: PNG, JPEG, GIF or WebP. The same cap as a picture a
+   * page advertises (`ASSET_LIMITS.maxBytes`), so an image reaches the product
+   * by the same rules whichever way it arrived.
+   */
+  maxImageBytes: 8 * 1024 * 1024,
   /** Characters of running text carried from one source into evidence. */
   maxBodyText: 20_000,
   /**

@@ -962,12 +962,26 @@ untouched: nothing here uses `/[slug]/import`, a channel connection or an adapte
 
 ### What a creator sees
 
-`Create a product listing`: one text box, source pills, **Add PDF or HTML**, **Record**, and
+`Create a product listing`: one text box, source pills, **Add files**, **Record**, and
 **Create draft**. A standalone `https://` link, pasted or entered, becomes a pill; anything else
 typed stays text and becomes a "Pasted text" source when the draft is created — a paragraph that
 mentions a URL is still a paragraph. Files are uploaded and checked the moment they are added;
 a recording is uploaded and transcribed before it says `Transcribed`. "Create draft" waits for
 unfinished pills and refuses to submit around one that needs attention.
+
+**Add files** takes a PDF or an HTML file, which are read for their words, and since 16
+September 2026 a picture — PNG, JPEG, GIF or WebP — which is not. A picture is a `source_type`
+of `image`, staged and sniffed like a PDF and decoded on the spot (`lib/imports/retrieval/image.ts`,
+the same inspection a picture a page advertises gets), so a `.png` that is not a PNG, a tracking
+pixel or a decompression bomb says `Needs attention` before "Create draft", with
+`image_unusable` as its reason. Reading it copies the bytes into `product_assets` — the product's
+first picture becomes the cover and the rest previews, in the order the reads finish — and its
+evidence is one preview asset with the checksum and measurements the bytes earned, no title, no
+text. An animated GIF is measured by its first frame and kept whole. The review screen says
+`Added` for it rather than `Read`. Fanwise does not describe a picture: a session whose readable
+sources are all pictures settles `ready` with no draft and the reason `no_words`, the pictures
+on the product, and the creator writes the listing; the model is never asked to draft from what
+it cannot see (invariant 5).
 
 ### Limits
 
@@ -980,6 +994,7 @@ All in `lib/imports/limits.ts`.
 | Pasted text | 200,000 characters |
 | PDF | 20 MB; text of the first 40 pages |
 | HTML | 2 MB |
+| Picture (PNG, JPEG, GIF, WebP) | 8 MB, at least 32 px on each side, at most 40 million pixels — the same limits as a fetched preview |
 | Running text per source in evidence | 20,000 characters |
 | Recording | 10 MB and ten minutes, stopped automatically at ten; captured at 48 kbps (~3.6 MB for ten minutes) |
 
@@ -1051,6 +1066,9 @@ against any non-local database. The microphone is allowed for this origin only
   on a configured deployment is its live check. Cloudflare's per-request audio size limit is
   not documented, which is why recordings are captured at 48 kbps and capped at 10 MB.
 - No OCR, no images from PDFs, and no clean-up job for staged sources abandoned in a closed tab.
+- A picture is a product image and nothing else: no vision model reads it, and nothing it shows
+  becomes a fact. Several pictures added at once are read by parallel jobs, so which one is the
+  cover is the first to finish, not the first added; the product page can reorder them.
 - Conflicts are detected for four fact kinds with narrow patterns; others fall to the claims
   check and the creator's review.
 - A handed-over source cannot be replaced from the review screen; a failed one can be retried.

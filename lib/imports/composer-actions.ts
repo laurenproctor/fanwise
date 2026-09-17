@@ -8,8 +8,10 @@ import { jobs } from "@/lib/jobs"
 import { routes } from "@/lib/routes"
 import { isTranscriptionConfigured } from "@/lib/ai/transcription"
 import { IMPORT_ERROR_MESSAGES, type ImportErrorCode } from "./errors"
-import { sniff, type AudioExtension } from "./file-signature"
+import { fileTypeFor, maxBytesForFile } from "./composer"
+import { sniff, type AudioExtension, type ImageExtension } from "./file-signature"
 import { IMPORT_LIMITS } from "./limits"
+import { inspectImage } from "./retrieval/image"
 import { isWholeHtmlDocument } from "./paste"
 import {
   createSourceUploadUrl,
@@ -63,9 +65,18 @@ const AUDIO_EXTENSIONS: Record<string, AudioExtension> = {
   "audio/wav": "wav",
 }
 
+/** The extension an image is stored under, from its name. The bytes are sniffed after. */
+function imageExtensionFor(filename: string): ImageExtension {
+  const lower = filename.toLowerCase()
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "jpg"
+  if (lower.endsWith(".gif")) return "gif"
+  if (lower.endsWith(".webp")) return "webp"
+  return "png"
+}
+
 const stageSchema = z.discriminatedUnion("type", [
   z.object({
-    type: z.enum(["pdf", "html"]),
+    type: z.enum(["pdf", "html", "image"]),
     filename: z.string().trim().min(1).max(255),
     byteSize: z.number().int().positive(),
   }),
@@ -103,14 +114,12 @@ export async function stageSourceAction(
     if (data.durationMs > IMPORT_LIMITS.maxAudioMs)
       return { error: IMPORT_ERROR_MESSAGES.audio_too_long }
   } else {
-    const lower = data.filename.toLowerCase()
-    const extensionOk =
-      data.type === "pdf"
-        ? lower.endsWith(".pdf")
-        : lower.endsWith(".html") || lower.endsWith(".htm")
-    if (!extensionOk) return { error: `${data.filename} is not a PDF or HTML file.` }
-    const max = data.type === "pdf" ? IMPORT_LIMITS.maxPdfBytes : IMPORT_LIMITS.maxHtmlBytes
-    if (data.byteSize > max) return { error: `${data.filename} is larger than Fanwise reads.` }
+    if (fileTypeFor(data.filename) !== data.type) {
+      return { error: `${data.filename} is not a PDF, HTML, PNG, JPEG, GIF or WebP file.` }
+    }
+    if (data.byteSize > maxBytesForFile(data.type)) {
+      return { error: `${data.filename} is larger than Fanwise takes.` }
+    }
   }
 
   const { supabase, user, workspace } = await requireWorkspace(workspaceSlug)
@@ -120,11 +129,15 @@ export async function stageSourceAction(
       ? "pdf_document"
       : data.type === "html"
         ? "html_document"
-        : "audio_recording"
+        : data.type === "image"
+          ? "image_file"
+          : "audio_recording"
   const extension =
     data.type === "audio"
       ? (AUDIO_EXTENSIONS[data.mimeType.split(";")[0]!.trim()] ?? "webm")
-      : undefined
+      : data.type === "image"
+        ? imageExtensionFor(data.filename)
+        : undefined
   const path = sourcePathFor(workspace.id, sourceId, kind, extension)
 
   const { error } = await supabase.from("product_import_sources").insert({
@@ -228,7 +241,7 @@ export async function confirmStagedSourceAction(
       }
     )
   }
-  if (row.source_type !== "pdf" && row.source_type !== "html" && row.source_type !== "audio") {
+  if (row.source_type === "public_url" || row.source_type === "pasted_text") {
     return { error: "That file could not be found." }
   }
 
@@ -236,25 +249,30 @@ export async function confirmStagedSourceAction(
   if (size === null) return failStaged(supabase, workspace.id, sourceId, "upload_incomplete")
 
   const max =
-    row.source_type === "pdf"
-      ? IMPORT_LIMITS.maxPdfBytes
-      : row.source_type === "html"
-        ? IMPORT_LIMITS.maxHtmlBytes
-        : IMPORT_LIMITS.maxAudioBytes
+    row.source_type === "audio" ? IMPORT_LIMITS.maxAudioBytes : maxBytesForFile(row.source_type)
   if (size > max) {
     await removeStoredSource(row.storage_path).catch(() => undefined)
     return failStaged(supabase, workspace.id, sourceId, "too_large")
   }
 
   let sniffed: ReturnType<typeof sniff>
+  let stored: Buffer
   try {
-    sniffed = sniff(row.source_type, await readStoredSource(row.storage_path))
+    stored = await readStoredSource(row.storage_path)
+    sniffed = sniff(row.source_type, stored)
   } catch {
     return failStaged(supabase, workspace.id, sourceId, "upload_incomplete")
   }
   if (!sniffed) {
     await removeStoredSource(row.storage_path).catch(() => undefined)
     return failStaged(supabase, workspace.id, sourceId, "unsupported_file")
+  }
+
+  // A picture is decoded now, so a pill says at once that it will not be
+  // kept, rather than the review screen saying so after "Create draft".
+  if (row.source_type === "image" && !(await inspectImage(stored)).ok) {
+    await removeStoredSource(row.storage_path).catch(() => undefined)
+    return failStaged(supabase, workspace.id, sourceId, "image_unusable")
   }
 
   if (row.source_type === "audio" && !isTranscriptionConfigured()) {

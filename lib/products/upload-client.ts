@@ -104,7 +104,7 @@ export async function uploadComposerSource(params: {
   workspaceSlug: string
   body: Blob
   source:
-    | { type: "pdf" | "html"; filename: string }
+    | { type: "pdf" | "html" | "image"; filename: string }
     | { type: "audio"; label: string; durationMs: number; mimeType: string }
   onStaged?: (sourceId: string) => void
 }): Promise<StagedSourceStatus | { error: string; sourceId: string | null }> {

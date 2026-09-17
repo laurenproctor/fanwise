@@ -280,6 +280,8 @@ describe("shape", () => {
     for (const [fields, why] of [
       [{ source_type: "audio" }, "audio with a .pdf path"],
       [{ source_type: "html" }, "html with a .pdf path"],
+      [{ source_type: "image" }, "a picture with a .pdf path"],
+      [{ source_type: "pdf", storage_path: null }, "a pdf with no stored object"],
       [
         { source_url: "https://example.com/x", normalized_url: "https://example.com/x" },
         "a file with a URL",
@@ -303,6 +305,34 @@ describe("shape", () => {
       duration_ms: 84_000,
     })
     expect(error).toBeNull()
+  })
+
+  it("accepts a picture stored as an image, and never with words", async () => {
+    for (const ext of ["png", "jpg", "gif", "webp"]) {
+      const id = crypto.randomUUID()
+      const { error } = await alice.client.from("product_import_sources").insert({
+        id,
+        workspace_id: alice.workspaceId,
+        source_type: "image",
+        status: "staged",
+        display_name: `cover.${ext}`,
+        storage_path: pathFor(alice.workspaceId, id, ext),
+      })
+      expect(error, ext).toBeNull()
+    }
+    const { error: svg } = await stage(alice, {
+      source_type: "image",
+      storage_path: pathFor(alice.workspaceId, crypto.randomUUID(), "svg"),
+    })
+    expect(svg?.code).toBe("23514")
+    const worded = crypto.randomUUID()
+    const { error: words } = await stage(alice, {
+      id: worded,
+      source_type: "image",
+      storage_path: pathFor(alice.workspaceId, worded, "png"),
+      text_content: "not from a picture",
+    })
+    expect(words?.code).toBe("23514")
   })
 
   it("keeps one link per live import", async () => {
