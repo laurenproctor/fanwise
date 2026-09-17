@@ -148,8 +148,9 @@ Behance needs neither either: a profile and a Stripe account connected to it, bo
 is planned as B9 and its twelve seller-side questions are decision 26.
 
 Gumroad needs an OAuth application registered in a Gumroad account's settings, which is
-self-serve, and a seller account with a payout method for its exit. It is planned as B10;
-its details are decision 27.
+self-serve, and a seller account with a payout method for its exit. It was built as B10 on
+16 September 2026 and its exit passed on 17 September 2026; the email to Gumroad in decision
+27 is still owed.
 
 ## Working with Claude Code
 

@@ -294,6 +294,13 @@ canonical URL back.
 10. Whether an API-created product is eligible for Discover with no further seller action.
 11. Recommended cover dimensions, §6.
 
+**The exit passed on 17 September 2026** (journey 13 in `docs/testing.md`), which means the
+OAuth grant, the multipart upload, the draft-then-enable publish and a purchasable product
+all worked against the live seller account. What that run showed for the items above has not
+been recorded here yet. Item 1 is the one to write down first: the adapter shipped with
+`files[]` alone and no `rich_content` embed, so the run is the first evidence on whether the
+buyer's download page shows the file.
+
 ## 14. Categories
 
 `category` takes a taxonomy path. From `db/seeds/010_development_staging_test/taxonomy_create.rb`

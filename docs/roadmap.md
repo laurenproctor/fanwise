@@ -11,8 +11,8 @@ it, with the stamp-and-search create guard deferred.
 **A6 is done.** Its exit ran on 11 September 2026 against the live shop `Fanwise`: connect,
 publish, and an active listing in one job, with four of the five §13 questions in
 `docs/channels/etsy.md` settled; see "The A6 exit run" below. B1, B2, B8 and B10 are also on
-`main`, each code complete; B8's exit passed on 16 September 2026 and the others are unrun;
-see their sections under Gate B. A5 is done; all three exit clauses ran against a live Shopify
+`main`, each code complete; B8's exit passed on 16 September 2026, B10's on 17 September
+2026, and the other two are unrun; see their sections under Gate B. A5 is done; all three exit clauses ran against a live Shopify
 store. What remains of Gate A: A7 has its two live channels, Shopify and Etsy, and is blocked
 on nothing; A8 waits on a Creative Market seller login; and the gate's own exit — an outside
 creator, unassisted — waits on a real portfolio to hand them.
@@ -42,7 +42,7 @@ step completes, and do not work on more than one step at a time.
 | Shopify Partner account | A5 | yes, date unrecorded | by 5 Sep 2026 |
 | WooCommerce test store | B8 exit, and A7 if it runs before Etsy's | nothing to file | exists, 9 Sep 2026: `houseofproctor.com`, permalinks on. Fanwise needs a public HTTPS origin to meet it |
 | Behance profile with Stripe connected | B9, and its §13 questions before B9 opens | nothing to file | not yet. A profile and a Stripe account; decision 26 |
-| Gumroad OAuth application and seller account | B10 build and exit | nothing to file: self-serve in account settings | not yet. Decision 27, which also carries an email to Gumroad |
+| Gumroad OAuth application and seller account | B10 build and exit | nothing to file: self-serve in account settings | exists: applications registered 16 Sep 2026, and B10's exit passed against the seller account on 17 Sep 2026. The email to Gumroad in decision 27 is still owed |
 
 The WooCommerce row is not an application. It is in this table because it is the one thing
 B8's exit waits on, and because it is the cheapest unblock the roadmap has: no developer
@@ -295,11 +295,11 @@ Everywhere must visibly skip**, for the same reason as Creative Market: it decla
 per row stops being a courtesy and becomes the feature; ADR 0005's vocabulary already
 covers it.
 
-**Gumroad, planned as B10 on 11 September 2026, would be a fourth channel Publish Everywhere
-can call**, and the first whose rate limit is not per connection. Gumroad throttles product
-creation by IP address, so every Fanwise workspace draws on one allowance of about ten
-creates a minute. A7 does not have to solve that; if its queueing cannot hold one channel's
-creates to a platform-wide pace, B10 adds it. `docs/channels/gumroad.md` §10.
+**Gumroad is the fourth channel Publish Everywhere can call**, since B10's exit passed on
+17 September 2026, and the first whose rate limit is not per connection. Gumroad throttles
+product creation by IP address, so every Fanwise workspace draws on one allowance of about
+ten creates a minute. A7 did not have to solve that: B10 added a declared per-adapter pace
+that the runner and the durable queue honour. `docs/channels/gumroad.md` §10.
 
 **WooCommerce is the third channel Publish Everywhere can call**, since B8 landed on `main`
 on 8 September 2026, and it changes A7's blocker rather than its exit. The exit still reads
@@ -414,7 +414,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B7 | CSV import foundation |
 | B8 | WooCommerce: store authorization, adapter, draft, images, activate with the file verified, idempotency. See `docs/channels/woocommerce.md`. Added 8 September 2026 at the founder's request; **code complete the same day**, exit unrun, see below |
 | B9 | Behance: creative-field and category mapping, the project-and-asset package, two new image derivative specs, guided handoff in new-project and existing-project modes, mark submitted, project URL capture. See `docs/channels/behance.md`. **Planned 11 September 2026 at the founder's request, not opened**; waits on A8, see below |
-| B10 | Gumroad: OAuth with PKCE, adapter, presigned multipart file upload, draft then enable, covers and thumbnail, the compensating delete, a platform-wide create pace, idempotency. See `docs/channels/gumroad.md`. Planned 11 September 2026 at the founder's request; **opened 16 September 2026 at the founder's request, ahead of A7's exit; code complete, exit unrun**, see below |
+| B10 | Gumroad: OAuth with PKCE, adapter, presigned multipart file upload, draft then enable, covers and thumbnail, the compensating delete, a platform-wide create pace, idempotency. See `docs/channels/gumroad.md`. Planned 11 September 2026 at the founder's request; **opened 16 September 2026 at the founder's request, ahead of A7's exit; code complete the same day**; **exit passed 17 September 2026**, journey 13, see below |
 | B11 | The companion window: the assisted handoff shown beside the marketplace's own editor, in a pop-out that touches nothing on the marketplace's page. See `docs/companion-window.md` and `docs/decisions/0010`. Planned 12 September 2026. **Opened 13 September 2026 at the founder's request, ahead of its evidence; code complete, exit unrun**, see below |
 | B12 | Import a live listing: an inward read per `api` adapter, listing-URL resolution inside the adapter, a reviewed mapping to a canonical product, fetched images, the `import` snapshot, and the claim that makes a second import a navigation. See `docs/listing-import.md`. **Planned 12 September 2026 at the founder's request, not opened**; opens after Gate A passes, see below |
 
@@ -609,10 +609,13 @@ Three departures from the spec, each the simplest correct version:
 - **A refused thumbnail never fails a publish.** It is cosmetic; the product goes live and
   the job row says the thumbnail was skipped and why.
 
-Still owed: the exit, journey 13, against the seller account in decision 27; the §13
-questions, the first of which decides whether `rich_content` is needed for the buyer to see
-the file; the two category paths marked unverified in `categories.ts`; the hosted migration;
-and the worker redeploy that carries the new queue, which is deployed by hand.
+**B10's exit passed on 17 September 2026**, run by the founder against the seller account in
+decision 27, on the hosted deployment: the migration was applied there and the worker
+carrying the `paced_creates` queue deployed by hand on 16 September 2026. What the run
+answered in §13 of the spec is not yet written down there and is owed, the first item above
+all, since the code shipped without a `rich_content` embed and the run is the first evidence
+on whether the buyer needs one. Also still owed: the two category paths marked unverified in
+`categories.ts`, and Gumroad's answer to the email in decision 27.
 
 What Gumroad is to the plan, in one sentence: the second billable automatic channel, the
 relief for the Etsy concentration that decision 2 was written about, and the first provider
@@ -633,13 +636,14 @@ Scope, when it opens:
 
 **B10 waited on nothing in code.** It depends on A3's contract, A5's publishing machinery,
 and A6's OAuth with PKCE and file upload, all done. It was opened ahead of A7's exit on the
-B8 precedent. What its exit still waits on is the rest of decision 27: a seller account with
-a confirmed email and a payout method, and Gumroad's answer on the per-IP create limit.
+B8 precedent. Its exit waited on the rest of decision 27, a seller account with a confirmed
+email and a payout method, and ran once that existed. Gumroad's answer on the per-IP create
+limit is the one part of decision 27 still open.
 
 **B10's exit test** is journey 13: connect through OAuth, publish a real product with its
 covers and its file, confirm it is purchasable, and settle the spec's §13 questions, the
 first of which decides whether the adapter also sends a rich-content embed. A second click
-creates nothing, and a failure after the draft leaves nothing behind.
+creates nothing, and a failure after the draft leaves nothing behind. **It passed on 17 September 2026.**
 
 What B10 changes elsewhere in this file:
 
