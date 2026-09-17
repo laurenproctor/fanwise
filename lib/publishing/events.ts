@@ -21,6 +21,11 @@ export const WORKSPACE_EVENT_TYPES = [
   "publish_run_started",
   /** One job inside a run reached a terminal outcome. */
   "publish_run_job_settled",
+  /**
+   * A creator reported a listing on an assisted channel as up, and pasted its
+   * address. Self-reported by definition: nothing confirmed it.
+   */
+  "listing_marked_submitted",
 ] as const
 
 export type WorkspaceEventType = (typeof WORKSPACE_EVENT_TYPES)[number]

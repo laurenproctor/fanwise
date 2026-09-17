@@ -1,9 +1,10 @@
-import { brotliDecompressSync, inflateSync } from "node:zlib"
+import { brotliDecompressSync, inflateRawSync, inflateSync } from "node:zlib"
 import sharp from "sharp"
 import { isDerivableImage } from "@/lib/products/sniff"
-import { readFontAsset } from "./detected"
+import { inspectArchive, type ArchiveDecompressors } from "./archive"
+import { readArchive, readFontAsset } from "./detected"
+import { isFontMimeType } from "./font-mime"
 import { inspectFont } from "./inspect"
-import type { Decompressors } from "./sfnt"
 
 /**
  * What the finalize job records about an upload beyond its size and type.
@@ -21,16 +22,15 @@ import type { Decompressors } from "./sfnt"
 /** Generous for a font, bounded against a zip bomb dressed as WOFF2. */
 const MAX_DECOMPRESSED_BYTES = 128 * 1024 * 1024
 
-const decompressors: Decompressors = {
+const decompressors: ArchiveDecompressors = {
   inflate: (data) => inflateSync(data, { maxOutputLength: MAX_DECOMPRESSED_BYTES }),
   brotli: (data) => brotliDecompressSync(data, { maxOutputLength: MAX_DECOMPRESSED_BYTES }),
+  inflateRaw: (data, maxOutputLength) => inflateRawSync(data, { maxOutputLength }),
 }
 
-const FONT_MIME_TYPES = new Set(["font/otf", "font/ttf", "font/woff", "font/woff2"])
+export { isFontMimeType }
 
-export function isFontMimeType(mimeType: string | null | undefined): boolean {
-  return mimeType !== null && mimeType !== undefined && FONT_MIME_TYPES.has(mimeType)
-}
+export const ZIP_MIME_TYPE = "application/zip"
 
 export async function describeUpload(
   data: Buffer,
@@ -39,6 +39,14 @@ export async function describeUpload(
   if (isFontMimeType(mimeType)) {
     const inspection = inspectFont(data, decompressors)
     return inspection.ok ? { font: inspection.font } : { fontProblem: inspection.problem }
+  }
+
+  // A package is looked inside and every font in it read, so a creator who
+  // uploads one ZIP sees what they would from the files themselves. The
+  // bytes buyers receive are untouched; this is a table of contents.
+  if (mimeType === ZIP_MIME_TYPE) {
+    const inspection = inspectArchive(data, decompressors)
+    return inspection.ok ? { archive: inspection.contents } : { archiveProblem: inspection.problem }
   }
 
   if (isDerivableImage(mimeType)) {
@@ -62,4 +70,14 @@ export async function describeUpload(
  */
 export function isUnreadFont(mimeType: string | null | undefined, metadata: unknown): boolean {
   return isFontMimeType(mimeType) && readFontAsset(metadata).kind === "none"
+}
+
+/** A ready package nobody has looked inside: settled before packages were read. */
+export function isUnreadArchive(mimeType: string | null | undefined, metadata: unknown): boolean {
+  return mimeType === ZIP_MIME_TYPE && readArchive(metadata).kind === "none"
+}
+
+/** Either kind of file the finalize job would read again on request. */
+export function isUnread(mimeType: string | null | undefined, metadata: unknown): boolean {
+  return isUnreadFont(mimeType, metadata) || isUnreadArchive(mimeType, metadata)
 }

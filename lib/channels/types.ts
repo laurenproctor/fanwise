@@ -2,6 +2,7 @@ import { z } from "zod"
 import type { Database } from "@/lib/supabase/database.types"
 import type { Product, ProductAsset } from "@/lib/products/types"
 import type { ImageSpec } from "@/lib/products/derivatives"
+import type { HandoffImage, HandoffStep } from "./handoff"
 
 export type Channel = Database["public"]["Tables"]["channels"]["Row"]
 export type ChannelConnection = Database["public"]["Tables"]["channel_connections"]["Row"]
@@ -29,6 +30,7 @@ export const CHANNEL_KEYS = [
   "woocommerce",
   "etsy",
   "gumroad",
+  "behance",
 ] as const
 export type ChannelKey = (typeof CHANNEL_KEYS)[number]
 export const channelKeySchema = z.enum(CHANNEL_KEYS)
@@ -426,6 +428,12 @@ export interface ChannelOAuth {
     redirectUri: string
     /** The PKCE verifier minted when the flow started, for a `pkce` adapter. */
     codeVerifier?: string
+    /**
+     * Where the provider should deliver events about this account, for an
+     * adapter that subscribes at authorization time (ADR 0015). Built by the
+     * shared flow from NEXT_PUBLIC_APP_URL, never by the adapter.
+     */
+    webhookUrl?: string
   }): Promise<OAuthGrant>
   /**
    * Tells the provider the credential is finished with, before the connection
@@ -507,6 +515,71 @@ export interface DeliverySetupSpec {
   steps: readonly string[]
   /** Text the creator copies into the channel, shown verbatim with a Copy button. */
   snippet: string
+  /**
+   * What Fanwise does on the channel once the setup is confirmed, in one
+   * sentence, for a channel whose confirmation also switches something on
+   * (ADR 0015: fulfilment). Absent when confirming only unlocks readiness.
+   */
+  automation?: string
+}
+
+/**
+ * A delivery from a provider about a connected account, as the adapter read it.
+ *
+ * Ids only. The route records one of these before anything acts on it, and the
+ * job that acts loads what it needs from the provider when it runs. No payload
+ * is kept: the deliveries worth keeping are the ones that carry a buyer, and
+ * those are the ones Fanwise must not hold.
+ */
+export interface ChannelWebhookEvent {
+  /** The provider's own id for this delivery. A redelivery repeats it. */
+  id: string
+  topic: string
+  /** The account concerned, in the form channel_connections.external_account_id holds. */
+  externalAccountId: string
+  /** The provider object the delivery is about. */
+  externalObjectId: string
+}
+
+/** Why a delivery was acknowledged and left alone. Recorded, never rendered. */
+export type WebhookSkipReason =
+  | "delivery_setup_unconfirmed"
+  | "reauthorization_needed"
+  | "object_gone"
+  | "not_open"
+  | "not_paid"
+  | "no_digital_lines"
+
+export type WebhookHandleResult =
+  | { action: "fulfilled"; externalFulfillmentId: string; lineItemIds: string[] }
+  | { action: "skipped"; reason: WebhookSkipReason }
+
+/**
+ * What a webhook handler is handed, per connection. `externalListingIds` is
+ * injected for the reason `PublishContext.assetUrl` is: the adapter names
+ * what it needs and never reads a tenant table itself.
+ */
+export interface WebhookContext {
+  connection: ChannelConnection
+  /** The provider ids of every listing published through this connection. */
+  externalListingIds(): Promise<string[]>
+}
+
+/**
+ * Present on a channel that tells Fanwise about events on a connected account
+ * (ADR 0015). Verification runs over the raw bytes before any field is read,
+ * per docs/security.md rule 5, and the shared route owns the receipt and the
+ * job; the adapter owns the signature, the shape and the act.
+ */
+export interface ChannelWebhooks {
+  verify(rawBody: string, headers: Headers): boolean
+  /**
+   * Reads a verified delivery. Null for a topic this adapter does not act on;
+   * throws a ChannelError for a body that is not the shape the topic promises.
+   */
+  parse(rawBody: string, headers: Headers): ChannelWebhookEvent | null
+  /** Acts on one delivery for one connection. Safe to run twice. */
+  handle(event: ChannelWebhookEvent, context: WebhookContext): Promise<WebhookHandleResult>
 }
 
 /**
@@ -525,6 +598,110 @@ export interface PublishPace {
   queue: string
   /** How long a publish holds its turn, from when it started. */
   minIntervalMs: number
+}
+
+/**
+ * How a channel with nothing to authorize against is connected.
+ *
+ * An assisted channel holds no credential, so Connect writes a row and starts
+ * no flow. What it still needs is which account the row is for: the profile a
+ * creator will submit to, so the connection can be named and so a second
+ * workspace cannot quietly claim the same one. The adapter parses what was
+ * typed for the same reason an OAuth adapter parses its account hint: the
+ * value becomes `external_account_id`, and a guess there is a wrong row.
+ */
+export interface AccountHintSpec {
+  label: string
+  placeholder: string
+  parse(raw: string): { ok: true; value: string; name: string } | { ok: false; message: string }
+}
+
+/**
+ * A per-listing setting the channel asks for that is not a listing field.
+ *
+ * A marketplace form has controls the canonical listing has no column for:
+ * which of its own creative fields a piece belongs to, which of two fixed
+ * licenses the seller grants, which of two ways the handoff should run. They
+ * are stored under `channel_listings.metadata[key]`, declared here as data so
+ * the editor renders them without knowing the channel, and read back by the
+ * adapter's requirements and handoff. The server validates a saved value
+ * against this declaration, so the browser cannot write a key the adapter did
+ * not ask for.
+ */
+export interface ListingChoiceOption {
+  value: string
+  label: string
+  /** One line under the label, when the option needs one. */
+  hint?: string
+}
+
+interface ListingChoiceBase {
+  /** The metadata key. camelCase, never a provider name. */
+  key: string
+  label: string
+  description?: string
+  /** Rendered only while another choice holds the named value. */
+  showWhen?: { key: string; value: string }
+}
+
+export type ListingChoiceSpec =
+  | (ListingChoiceBase & { kind: "single"; options: readonly ListingChoiceOption[] })
+  | (ListingChoiceBase & {
+      kind: "multiple"
+      options: readonly ListingChoiceOption[]
+      /** A ceiling the channel's own form enforces. */
+      max?: number
+    })
+  | (ListingChoiceBase & { kind: "text"; placeholder?: string; maxLength?: number })
+
+/**
+ * One rendition the handoff hands the creator, named by the adapter.
+ *
+ * Built by the derivative engine from the adapter's spec, cached on the
+ * source, and listed on the handoff as a download. `role` is what the file is
+ * for on the channel's form, in the adapter's words; `position` orders files
+ * that share a role.
+ */
+export interface HandoffRenditionSpec {
+  source: ProductAsset
+  spec: ImageSpec
+  role: string
+  position: number
+}
+
+/** A rendition as the handoff receives it: built, or not yet. */
+export interface HandoffRendition {
+  role: string
+  position: number
+  source: ProductAsset
+  /** The derivative row, once the engine has produced it. */
+  asset: ProductAsset | null
+}
+
+/** Everything an adapter's handoff is built from. */
+export interface HandoffInput {
+  draft: ChannelListingDraft
+  subject: AdapterSubject
+  /** The channel's images in channel order, as the generic handoff lists them. */
+  images: readonly HandoffImage[]
+  renditions: readonly HandoffRendition[]
+}
+
+/**
+ * How a creator tells Fanwise a listing they submitted by hand is up.
+ *
+ * Present only on an assisted channel, and the only way such a listing ever
+ * reaches `published`. The URL the creator pastes is the one handle Fanwise
+ * will hold on the listing; the adapter parses it, because the shape of a
+ * provider's address is the provider's business, and the id it yields is
+ * what keeps the same project from being claimed twice.
+ */
+export interface SubmissionSpec {
+  urlLabel: string
+  urlPlaceholder: string
+  parseUrl(
+    raw: string,
+  ): { ok: true; externalListingId: string; externalUrl: string } | { ok: false; message: string }
 }
 
 export interface ChannelAdapter {
@@ -564,6 +741,27 @@ export interface ChannelAdapter {
   buildListing(subject: AdapterSubject): ChannelListingDraft
   /** Present only on a channel Fanwise can authorize against. */
   oauth?: ChannelOAuth
+  /** Present on a channel that delivers events to Fanwise. ADR 0015. */
+  webhooks?: ChannelWebhooks
+  /**
+   * Present on a channel connected by naming an account rather than
+   * authorizing one. Never alongside `oauth`.
+   */
+  accountHint?: AccountHintSpec
+  /** Settings the channel's form asks for beyond the listing fields. */
+  choices?: readonly ListingChoiceSpec[]
+  /**
+   * The renditions an assisted channel's handoff hands over. Built when the
+   * listing is built and matched to their rows when the handoff is shown.
+   */
+  handoffImages?(subject: AdapterSubject): HandoffRenditionSpec[]
+  /**
+   * The handoff in this channel's own order. Absent, the generic order in
+   * lib/channels/handoff.ts is used.
+   */
+  buildHandoff?(input: HandoffInput): HandoffStep[]
+  /** Mark submitted with URL capture. Assisted channels only. */
+  submission?: SubmissionSpec
   publish?(context: PublishContext): Promise<PublishResult>
   update?(context: PublishContext): Promise<PublishResult>
   /** Moves a provider draft to live. Required when a step gates activation. */

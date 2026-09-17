@@ -9,9 +9,13 @@ import { buildDraft, draftToColumns, evaluate, rebuildColumns, snapshotPayload }
 import { listingImages } from "./images"
 import { findAdapter } from "./registry"
 import { updateListingSchema } from "./schemas"
+import { prepareHandoffImages } from "./handoff-renditions"
+import { parseChoices } from "./choices"
+import { recordEvent } from "@/lib/publishing/events"
 import { callbackUrl, createAuthorizationState, grantUrl } from "./oauth"
 import { codeChallenge, generateCodeVerifier } from "./pkce"
 import type { AdapterSubject, ChannelListingDraft } from "./types"
+import { resolvedDraft } from "./listings"
 import { requestBillingSync } from "@/lib/billing/request-sync"
 import { DELIVERY_SETUP_CONFIRMED_KEY } from "@/lib/delivery/setup"
 
@@ -58,10 +62,11 @@ async function requireWorkspace(workspaceSlug: string) {
 /**
  * Connects a channel.
  *
- * This is the path for a channel with no authorization to perform, which since
- * A5 means the mocks only. A real channel goes through
- * beginAuthorizationAction and the callback route, which write the same
- * connection row plus a sealed credential.
+ * This is the path for a channel with no authorization to perform: the mocks,
+ * and since B9 an assisted channel that holds no credential and is connected
+ * by naming the account the creator will submit to. A real API channel goes
+ * through beginAuthorizationAction and the callback route, which write the
+ * same connection row plus a sealed credential.
  *
  * Since C1 the insert is a billing event in the same transaction as the row,
  * per docs/billing.md rule 1: a trigger on channel_connections writes the
@@ -71,9 +76,20 @@ async function requireWorkspace(workspaceSlug: string) {
 export async function connectChannelAction(
   workspaceSlug: string,
   channelKey: string,
+  accountHint = "",
 ): Promise<ActionState> {
   const adapter = findAdapter(channelKey)
   if (!adapter) return { error: "That channel is not available." }
+
+  // A channel that names an account is connected to that account and no
+  // other, so the name is parsed before anything is written, as an OAuth
+  // account hint is: what is stored becomes the connection's identity.
+  let account: { id: string; name: string } | null = null
+  if (adapter.accountHint) {
+    const parsed = adapter.accountHint.parse(accountHint)
+    if (!parsed.ok) return { error: parsed.message }
+    account = { id: parsed.value, name: parsed.name }
+  }
 
   // A channel Fanwise can authorize against is never connected by writing a
   // row. Doing so would create a connection with no credential behind it, which
@@ -100,9 +116,10 @@ export async function connectChannelAction(
     workspace_id: workspace.id,
     channel_id: channel.id,
     // A real adapter learns these from the provider during OAuth. The mocks
-    // stand in for one account per workspace.
-    external_account_id: `mock-account-${workspace.id}`,
-    external_account_name: `${channel.name} account`,
+    // stand in for one account per workspace; an assisted channel records
+    // the account the creator named.
+    external_account_id: account?.id ?? `mock-account-${workspace.id}`,
+    external_account_name: account?.name ?? `${channel.name} account`,
     status: "active",
   })
 
@@ -434,7 +451,14 @@ export async function buildListingAction(
 
     const { data: updated, error: updateError } = await supabase
       .from("channel_listings")
-      .update(rebuildColumns(draft, existing.metadata, generatedAt))
+      .update(
+        rebuildColumns(
+          draft,
+          existing.metadata,
+          generatedAt,
+          (adapter.choices ?? []).map((choice) => choice.key),
+        ),
+      )
       .eq("id", existing.id)
       .eq("workspace_id", workspace.id)
       .select("id")
@@ -467,6 +491,12 @@ export async function buildListingAction(
     // rolled back: losing the listing to save the record of it would be worse.
     console.error("[channels] snapshot insert failed", snapshotError)
   }
+
+  // An assisted channel's handoff hands over renditions in the channel's own
+  // shapes. Asked for here, at build, so they are ready by the time the
+  // creator reaches the handoff; cached by the engine, so a rebuild re-asks
+  // for nothing that already exists.
+  await prepareHandoffImages(adapter, workspace.id, subject)
 
   revalidatePath(routes.product(workspaceSlug, product.slug))
   return { error: null }
@@ -588,4 +618,231 @@ export async function updateListingAction(
 
   revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
   return { error: null, savedAt: Date.now() }
+}
+
+/**
+ * Saves the choices a channel's form asks for beyond the listing fields.
+ *
+ * Validated against the adapter's declaration rather than trusted: the keys
+ * that reach `metadata` are the ones the adapter named, with values from the
+ * options it listed. Everything else in `metadata`, publication's own keys
+ * above all, is left exactly as it was.
+ */
+export async function updateListingChoicesAction(
+  workspaceSlug: string,
+  listingId: string,
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const { supabase, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data: existing, error: readError } = await supabase
+    .from("channel_listings")
+    .select("*, channel:channels(*), connection:channel_connections(metadata)")
+    .eq("id", listingId)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+
+  if (readError) throw readError
+  if (!existing) return { error: "That listing could not be found.", savedAt: null }
+
+  const channel = (existing as { channel: { id: string; key: string } }).channel
+  const adapter = findAdapter(channel.key)
+  if (!adapter?.choices || adapter.choices.length === 0) {
+    return { error: "This channel asks for nothing beyond the listing.", savedAt: null }
+  }
+
+  const parsed = parseChoices(adapter.choices, formData)
+  if (!parsed.ok) return { error: parsed.message, savedAt: null }
+
+  const metadata = {
+    ...((existing.metadata as Record<string, unknown>) ?? {}),
+    ...parsed.values,
+  }
+
+  const { error: updateError } = await supabase
+    .from("channel_listings")
+    .update({ metadata: metadata as never })
+    .eq("id", listingId)
+    .eq("workspace_id", workspace.id)
+
+  if (updateError) {
+    console.error("[channels] listing choices update failed", updateError)
+    return { error: "Those changes could not be saved. Try again.", savedAt: null }
+  }
+
+  const { data: product } = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", existing.product_id)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+
+  if (product) {
+    const assets = await listProductAssets(product.id)
+    const connectionMetadata =
+      ((existing as { connection: { metadata: unknown } | null }).connection?.metadata as
+        Record<string, unknown> | undefined) ?? {}
+    const subject: AdapterSubject = { product, assets, connectionMetadata }
+    const draft = resolvedDraft({ ...existing, metadata: metadata as never }, product, adapter)
+    const evaluation = evaluate(adapter, draft, subject)
+
+    const { error: snapshotError } = await supabase.from("listing_snapshots").insert({
+      workspace_id: workspace.id,
+      channel_listing_id: listingId,
+      product_id: product.id,
+      channel_id: channel.id,
+      snapshot_type: "update",
+      payload: snapshotPayload(draft, evaluation, listingImages(subject)) as never,
+    })
+    if (snapshotError) console.error("[channels] snapshot insert failed", snapshotError)
+
+    // A choice can change which renditions the handoff wants.
+    await prepareHandoffImages(adapter, workspace.id, subject)
+    revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
+  }
+
+  return { error: null, savedAt: Date.now() }
+}
+
+export interface SubmissionState {
+  error: string | null
+  externalUrl: string | null
+}
+
+/**
+ * Records that a creator submitted a listing to an assisted channel by hand,
+ * and the address they got back.
+ *
+ * The only way a listing on such a channel reaches `published`, and every
+ * word of it is the creator's: `status_source` stays `self_reported`, the
+ * trigger on the table would refuse anything else, and the card says so. The
+ * URL is parsed by the adapter, whose id keeps one project from being claimed
+ * by two products through the same unique index a real publish relies on.
+ *
+ * A listing already marked may be marked again with a corrected address. It
+ * is a report, not a write to a provider, and a typo in it should cost one
+ * paste rather than a support email.
+ */
+export async function markSubmittedAction(
+  workspaceSlug: string,
+  listingId: string,
+  _prev: SubmissionState,
+  formData: FormData,
+): Promise<SubmissionState> {
+  const raw = formData.get("url")
+  const { supabase, user, workspace } = await requireWorkspace(workspaceSlug)
+
+  const { data: existing, error: readError } = await supabase
+    .from("channel_listings")
+    .select("*, channel:channels(*), connection:channel_connections(metadata)")
+    .eq("id", listingId)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+
+  if (readError) throw readError
+  if (!existing) return { error: "That listing could not be found.", externalUrl: null }
+
+  const channel = (existing as { channel: { id: string; key: string; name: string } }).channel
+  const adapter = findAdapter(channel.key)
+  if (!adapter?.submission || adapter.integrationType !== "assisted") {
+    return {
+      error: "This channel is published through Fanwise, not marked by hand.",
+      externalUrl: null,
+    }
+  }
+  // Belt and braces with the trigger: a row that reads as confirmed by a
+  // provider is never overwritten with a person's word.
+  if (existing.status_source !== "self_reported") {
+    return {
+      error: "This listing's status was confirmed by the channel and cannot be marked by hand.",
+      externalUrl: null,
+    }
+  }
+
+  const parsed = adapter.submission.parseUrl(typeof raw === "string" ? raw : "")
+  if (!parsed.ok) return { error: parsed.message, externalUrl: null }
+
+  const { data: product, error: productError } = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", existing.product_id)
+    .eq("workspace_id", workspace.id)
+    .maybeSingle()
+  if (productError) throw productError
+  if (!product) return { error: "That product could not be found.", externalUrl: null }
+
+  const publishedAt = new Date().toISOString()
+  const metadata = (existing.metadata as Record<string, unknown>) ?? {}
+
+  const { error: updateError } = await supabase
+    .from("channel_listings")
+    .update({
+      status: "published",
+      status_source: "self_reported",
+      external_listing_id: parsed.externalListingId,
+      external_url: parsed.externalUrl,
+      // The project page is the buyer's address too: an asset lives on it.
+      public_url: parsed.externalUrl,
+      published_at: existing.published_at ?? publishedAt,
+      metadata: { ...metadata, submittedAt: publishedAt } as never,
+    })
+    .eq("id", listingId)
+    .eq("workspace_id", workspace.id)
+
+  if (updateError) {
+    // One external object is represented once, across every workspace: the
+    // same unique index a real publish relies on. A project already claimed
+    // by another listing is refused rather than shared.
+    if (updateError.code === UNIQUE_VIOLATION) {
+      return {
+        error: `Another listing already points at that ${channel.name} project. Paste the address of this product's own project.`,
+        externalUrl: null,
+      }
+    }
+    console.error("[channels] mark submitted failed", updateError)
+    return { error: "That could not be saved. Try again.", externalUrl: null }
+  }
+
+  const assets = await listProductAssets(product.id)
+  const connectionMetadata =
+    ((existing as { connection: { metadata: unknown } | null }).connection?.metadata as
+      Record<string, unknown> | undefined) ?? {}
+  const subject: AdapterSubject = { product, assets, connectionMetadata }
+  const draft = resolvedDraft(existing, product, adapter)
+  const evaluation = evaluate(adapter, draft, subject)
+
+  const { error: snapshotError } = await supabase.from("listing_snapshots").insert({
+    workspace_id: workspace.id,
+    channel_listing_id: listingId,
+    product_id: product.id,
+    channel_id: channel.id,
+    snapshot_type: "publish",
+    payload: {
+      ...snapshotPayload(draft, evaluation, listingImages(subject)),
+      submission: {
+        externalUrl: parsed.externalUrl,
+        externalListingId: parsed.externalListingId,
+        statusSource: "self_reported",
+        handoffMode: metadata.handoffMode ?? null,
+      },
+    } as never,
+  })
+  if (snapshotError) console.error("[channels] snapshot insert failed", snapshotError)
+
+  await recordEvent(supabase, {
+    workspaceId: workspace.id,
+    type: "listing_marked_submitted",
+    productId: product.id,
+    listingId,
+    actorUserId: user.id,
+    payload: {
+      channelName: channel.name,
+      externalUrl: parsed.externalUrl,
+      handoffMode: metadata.handoffMode ?? null,
+    },
+  })
+
+  revalidatePath(routes.product(workspaceSlug, product.slug), "layout")
+  return { error: null, externalUrl: parsed.externalUrl }
 }

@@ -6,7 +6,7 @@ import { CapabilityList } from "@/components/channels/capability-list"
 import { ChannelMark } from "@/components/channels/channel-mark"
 import { ConnectButton } from "@/components/channels/connect-button"
 import { DeliverySetup } from "@/components/channels/delivery-setup"
-import { isDeliverySetupConfirmed } from "@/lib/delivery/setup"
+import { deliveryAutomationState, isDeliverySetupConfirmed } from "@/lib/delivery/setup"
 import { InfoTip } from "@/components/ui/info-tip"
 import { countPublishedByConnection } from "@/lib/channels/queries"
 import { missingScopes } from "@/lib/channels/oauth"
@@ -154,6 +154,9 @@ export default async function ChannelsPage({
                   confirmed={isDeliverySetupConfirmed(
                     (connection.metadata as Record<string, unknown>) ?? {},
                   )}
+                  automation={deliveryAutomationState(
+                    (connection.metadata as Record<string, unknown>) ?? {},
+                  )}
                 />
               ) : null}
 
@@ -194,6 +197,18 @@ export default async function ChannelsPage({
                       ? {
                           accountHintLabel: adapter.oauth.accountHintLabel,
                           accountHintPlaceholder: adapter.oauth.accountHintPlaceholder,
+                        }
+                      : null
+                  }
+                  /*
+                    Same bargain for a channel that names an account: the two
+                    strings, never the parser.
+                  */
+                  accountPrompt={
+                    adapter.accountHint
+                      ? {
+                          label: adapter.accountHint.label,
+                          placeholder: adapter.accountHint.placeholder,
                         }
                       : null
                   }

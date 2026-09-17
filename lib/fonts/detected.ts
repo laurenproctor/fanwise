@@ -86,6 +86,91 @@ export function readFontAsset(metadata: unknown): FontAssetReading {
     : { kind: "problem", problem: parsed.data.fontProblem }
 }
 
+/* ---------------------------------------------------------------- archives */
+
+/**
+ * What the finalize job found inside a ZIP package (`metadata.archive`), or
+ * why it could not look (`metadata.archiveProblem`).
+ *
+ * Every font inside is read with the same inspector as a loose file, so the
+ * workspace can detect a family from a package alone. The package itself is
+ * still what buyers download, exactly as uploaded: this is a table of
+ * contents, never an unpacking.
+ */
+export const ARCHIVE_ENTRY_KINDS = ["font", "document", "image", "other"] as const
+export type ArchiveEntryKind = (typeof ARCHIVE_ENTRY_KINDS)[number]
+
+/** Why one entry inside a package has no reading. */
+export const ARCHIVE_ENTRY_PROBLEMS = [
+  ...FONT_PROBLEMS,
+  "encrypted",
+  "too_large",
+  "unsupported",
+  "not_read",
+] as const
+export type ArchiveEntryProblem = (typeof ARCHIVE_ENTRY_PROBLEMS)[number]
+
+export const archiveEntrySchema = z.object({
+  path: z.string().max(512),
+  byteSize: z.number().int().min(0),
+  kind: z.enum(ARCHIVE_ENTRY_KINDS),
+  font: detectedFontSchema.optional(),
+  problem: z.enum(ARCHIVE_ENTRY_PROBLEMS).optional(),
+})
+export type ArchiveEntry = z.infer<typeof archiveEntrySchema>
+
+export const archiveContentsSchema = z.object({
+  entries: z.array(archiveEntrySchema).max(500),
+  /** Every file in the package, junk and unlisted ones included. */
+  entryCount: z.number().int().min(0),
+  fontCount: z.number().int().min(0),
+  /** Operating-system leftovers left out of the list. */
+  ignoredCount: z.number().int().min(0),
+  /** True when the package held more files than the list shows. */
+  truncated: z.boolean(),
+})
+export type ArchiveContents = z.infer<typeof archiveContentsSchema>
+
+export const ARCHIVE_PROBLEMS = ["malformed", "unsupported"] as const
+export type ArchiveProblem = (typeof ARCHIVE_PROBLEMS)[number]
+
+const archiveMetadataSchema = z.union([
+  z.object({ archive: archiveContentsSchema }),
+  z.object({ archiveProblem: z.enum(ARCHIVE_PROBLEMS) }),
+])
+
+export type ArchiveReading =
+  | { kind: "archive"; contents: ArchiveContents }
+  | { kind: "problem"; problem: ArchiveProblem }
+  | { kind: "none" }
+
+/** Reads a package's table of contents without ever throwing on an old shape. */
+export function readArchive(metadata: unknown): ArchiveReading {
+  const parsed = archiveMetadataSchema.safeParse(metadata)
+  if (!parsed.success) return { kind: "none" }
+  return "archive" in parsed.data
+    ? { kind: "archive", contents: parsed.data.archive }
+    : { kind: "problem", problem: parsed.data.archiveProblem }
+}
+
+export const ARCHIVE_PROBLEM_TEXT: Record<ArchiveProblem, string> = {
+  malformed:
+    "This ZIP file could not be opened. It may be damaged; zip the folder again and replace it.",
+  unsupported:
+    "This ZIP uses a format Fanwise cannot look inside (a very large or split archive). Buyers still receive it as uploaded.",
+}
+
+export const ARCHIVE_ENTRY_PROBLEM_TEXT: Record<ArchiveEntryProblem, string> = {
+  unrecognised: "Not a font file Fanwise can read",
+  collection: "A font collection; upload each face on its own",
+  malformed: "Damaged or incomplete",
+  missing_tables: "Missing tables every font needs",
+  encrypted: "Password-protected, so it was not read",
+  too_large: "Too large to read inside a package",
+  unsupported: "Compressed in a way Fanwise cannot read",
+  not_read: "Not read; the package holds more fonts than Fanwise reads",
+}
+
 export const FONT_PROBLEM_TEXT: Record<FontProblem, string> = {
   unrecognised: "This is not a font file Fanwise can read. Upload OTF, TTF, WOFF or WOFF2.",
   collection:

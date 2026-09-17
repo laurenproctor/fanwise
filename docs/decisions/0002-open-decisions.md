@@ -127,6 +127,12 @@ disclosure field exists on the form, feeds decision 24.
 **Recommendation:** do it before A8 closes, so B9 can open the day A8 does. It is the
 cheapest item on this page after the Creative Market login, and unlike 25 it needs no host.
 
+**Overtaken on 17 September 2026:** B9 was opened and built at the founder's request without
+the profile. The two tables are guessed from the marketplace's navigation and marked
+`verified: false` in `lib/channels/adapters/behance/fields.ts`; the handoff shows them as
+values to pick, never as facts about the form. What this item now gates is B9's exit run and
+the twelve §13 answers, and a correction to either table is a one-file change.
+
 ### 27. Register a Gumroad OAuth application, and tell Gumroad a multi-tenant app is coming
 
 B10 is planned and not opened. Its build needs an OAuth application, which is self-serve in

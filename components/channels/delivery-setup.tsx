@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { setDeliverySetupAction } from "@/lib/channels/actions"
 import type { DeliverySetupSpec } from "@/lib/channels/types"
+import type { DeliveryAutomationState } from "@/lib/delivery/setup"
 
 /**
  * A channel's one-time delivery setup, on its Channels card (ADR 0013).
@@ -20,11 +21,14 @@ export function DeliverySetup({
   connectionId,
   setup,
   confirmed,
+  automation,
 }: {
   workspaceSlug: string
   connectionId: string
   setup: DeliverySetupSpec
   confirmed: boolean
+  /** What the channel switched on for itself at authorization (ADR 0015). */
+  automation: DeliveryAutomationState
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -57,16 +61,19 @@ export function DeliverySetup({
 
   if (confirmed && !open) {
     return (
-      <div className="flex flex-wrap items-center gap-3 border-l-2 border-[var(--color-ok)] py-1.5 pl-3">
-        <span className="label-mono text-[var(--color-ok)]">Set up</span>
-        <span className="text-[13px] text-[var(--color-ink-2)]">{setup.title}</span>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="text-[13px] text-[var(--color-ink-3)] underline underline-offset-4 hover:text-[var(--color-ink)]"
-        >
-          Show instructions
-        </button>
+      <div className="grid gap-1.5 border-l-2 border-[var(--color-ok)] py-1.5 pl-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="label-mono text-[var(--color-ok)]">Set up</span>
+          <span className="text-[13px] text-[var(--color-ink-2)]">{setup.title}</span>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="text-[13px] text-[var(--color-ink-3)] underline underline-offset-4 hover:text-[var(--color-ink)]"
+          >
+            Show instructions
+          </button>
+        </div>
+        <AutomationNote setup={setup} confirmed={confirmed} automation={automation} />
       </div>
     )
   }
@@ -132,7 +139,47 @@ export function DeliverySetup({
         )}
       </div>
 
+      <AutomationNote setup={setup} confirmed={confirmed} automation={automation} />
+
       <FormError message={error} />
     </div>
+  )
+}
+
+/**
+ * What confirming switches on, and whether the switch took.
+ *
+ * The sentence is the adapter's. The state is what the channel recorded at
+ * authorization: on, or the one-line reason it could not be, which is almost
+ * always a store authorized before the permission existed and is answered by
+ * the Reconnect the card already offers.
+ */
+function AutomationNote({
+  setup,
+  confirmed,
+  automation,
+}: {
+  setup: DeliverySetupSpec
+  confirmed: boolean
+  automation: DeliveryAutomationState
+}) {
+  if (!setup.automation) return null
+
+  if (automation.state === "failed") {
+    return (
+      <p className="max-w-prose text-[12px] text-[var(--color-warn)]">
+        Marking orders fulfilled is not switched on for this store: {automation.message} Reconnect
+        the store to switch it on.
+      </p>
+    )
+  }
+
+  return (
+    <p className="max-w-prose text-[12px] text-[var(--color-ink-3)]">
+      {setup.automation}
+      {confirmed && automation.state === "unknown"
+        ? " Reconnect the store once to switch this on."
+        : null}
+    </p>
   )
 }

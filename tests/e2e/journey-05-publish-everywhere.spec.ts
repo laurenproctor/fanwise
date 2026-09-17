@@ -88,9 +88,14 @@ test("one click publishes what it can and names what it skipped", async ({ page 
   // What it will do, before it is pressed: one channel ready, and the assisted
   // one named with its reason rather than left out.
   await expect(run.getByText("One channel is ready to receive this product.")).toBeVisible()
-  await expect(run.getByText(/Mock Marketplace/)).toBeVisible()
+  // Scoped to the connected channel's own row: since B9 the catalog holds a
+  // second assisted channel, unconnected, and the planner names it with the
+  // same reason, because what it cannot do does not depend on a connection.
   await expect(
-    run.getByText("Fanwise cannot publish here. You submit this listing yourself."),
+    run
+      .getByRole("listitem")
+      .filter({ hasText: "Mock Marketplace" })
+      .getByText("Fanwise cannot publish here. You submit this listing yourself."),
   ).toBeVisible()
 
   await run.getByRole("button", { name: "Publish everywhere" }).click()

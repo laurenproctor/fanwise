@@ -16,9 +16,13 @@ import { listGenerations, summarize } from "@/lib/ai/queries"
 import { listingFieldSchema } from "@/lib/ai/output"
 import { isAiConfigured } from "@/lib/ai/providers"
 import { awaitingReview } from "@/lib/ai/review"
-import { buildHandoffSteps } from "@/lib/channels/handoff"
+import { handoffSteps } from "@/lib/channels/handoff"
+import { findHandoffRenditions } from "@/lib/channels/handoff-renditions"
+import { choicesKey } from "@/lib/channels/choices"
 import { HandoffPanel } from "@/components/channels/handoff-panel"
 import { CompanionWindow } from "@/components/channels/companion-window"
+import { ListingChoices } from "@/components/channels/listing-choices"
+import { MarkSubmitted } from "@/components/channels/mark-submitted"
 
 export const metadata = { title: "Listing · Fanwise" }
 
@@ -66,6 +70,13 @@ export default async function ListingPage({
         : listingFieldSchema.parse(inFlightGeneration.field)
   const configured = isAiConfigured()
   const waiting = awaitingReview(view.listing)
+  const subject = {
+    product,
+    assets,
+    connectionMetadata: (view.connection?.metadata as Record<string, unknown>) ?? {},
+  }
+  const choices = view.adapter.choices ?? []
+  const listingMetadata = (view.listing.metadata as Record<string, unknown>) ?? {}
 
   /*
    * The images in the order the channel would receive them, which is the order
@@ -129,7 +140,12 @@ export default async function ListingPage({
         never thrown away by its own refresh.
       */}
       <ListingEditor
-        key={view.listing.generated_at ?? "unbuilt"}
+        /*
+          The choices below are part of the draft the editor judges readiness
+          on, so a saved choice remounts it too, or the readiness the creator
+          watches would lag the one the server records.
+        */
+        key={`${view.listing.generated_at ?? "unbuilt"}:${choicesKey(choices, listingMetadata)}`}
         workspaceSlug={slug}
         listingId={view.listing.id}
         channelKey={view.channel.key}
@@ -142,11 +158,7 @@ export default async function ListingPage({
           wrong one. These are the non-secret facts from channel_connections;
           credentials live in a different table the browser has no path to.
         */
-        subject={{
-          product,
-          assets,
-          connectionMetadata: (view.connection?.metadata as Record<string, unknown>) ?? {},
-        }}
+        subject={subject}
         initial={listingToDraft(view.listing)}
         canonical={{
           name: product.name,
@@ -181,31 +193,67 @@ export default async function ListingPage({
         beside the marketplace's editor, and touches nothing on the
         marketplace's page. docs/companion-window.md; ADR 0010.
       */}
+      {choices.length > 0 ? (
+        <ListingChoices
+          workspaceSlug={slug}
+          listingId={view.listing.id}
+          channelName={view.channel.name}
+          choices={choices}
+          initial={listingMetadata}
+        />
+      ) : null}
+
       {view.adapter.integrationType === "assisted" ? (
-        <CompanionWindow title={`${view.channel.name} handoff · ${product.name}`}>
-          <HandoffPanel
-            workspaceSlug={slug}
-            channelName={view.channel.name}
-            productName={product.name}
-            readiness={
-              view.evaluation
-                ? {
-                    resolved: view.evaluation.readiness.errorsResolved,
-                    total: view.evaluation.readiness.errorsTotal,
-                  }
-                : null
-            }
-            steps={buildHandoffSteps(
-              listingToDraft(view.listing),
-              images.map((image) => ({
-                assetId: image.id,
-                filename: image.filename,
-                ready: image.state === "ready",
-              })),
-              view.channel.name,
-            )}
-          />
-        </CompanionWindow>
+        <>
+          <CompanionWindow title={`${view.channel.name} handoff · ${product.name}`}>
+            <HandoffPanel
+              workspaceSlug={slug}
+              channelName={view.channel.name}
+              productName={product.name}
+              readiness={
+                view.evaluation
+                  ? {
+                      resolved: view.evaluation.readiness.errorsResolved,
+                      total: view.evaluation.readiness.errorsTotal,
+                    }
+                  : null
+              }
+              /*
+                The handoff reads the listing as it resolves — inherited
+                where the row says nothing — because what gets pasted into
+                a marketplace should be what the channel would be sent.
+                Renditions are matched to their rows here, on the server,
+                and named by the adapter.
+              */
+              steps={handoffSteps(view.adapter, {
+                draft: view.draft,
+                subject,
+                images: images.map((image) => ({
+                  assetId: image.id,
+                  filename: image.filename,
+                  ready: image.state === "ready",
+                })),
+                renditions: findHandoffRenditions(view.adapter, subject, assets),
+              })}
+            />
+          </CompanionWindow>
+
+          {/*
+            Mark submitted, with the address captured. On the page rather
+            than in the companion: it ends the handoff, and the creator is
+            back here to see the card change.
+          */}
+          {view.adapter.submission ? (
+            <MarkSubmitted
+              workspaceSlug={slug}
+              listingId={view.listing.id}
+              channelName={view.channel.name}
+              urlLabel={view.adapter.submission.urlLabel}
+              urlPlaceholder={view.adapter.submission.urlPlaceholder}
+              submittedUrl={view.listing.external_url}
+            />
+          ) : null}
+        </>
       ) : null}
     </div>
   )

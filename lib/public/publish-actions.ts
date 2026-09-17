@@ -5,7 +5,13 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { publicInternal, publicRoutes, routes } from "@/lib/routes"
 import { removeAvatars } from "./avatars"
-import { loadBuilderContext } from "./draft-store"
+import { loadBuilderContext, readDraft, writeDraftProducts } from "./draft-store"
+import {
+  PROFILE_CHOICE_TEXT,
+  planProfileChoice,
+  withProductShown,
+  type ProfileChoiceOutcome,
+} from "./profile-choice"
 import { loadProductCandidates } from "./product-candidates"
 import { confirmedAndEligible, planPublishAll } from "./publish-all"
 import type { ReadinessIssue } from "./publish-readiness"
@@ -255,6 +261,112 @@ export async function publishAllProductsAction(
     publishedCount: result.data.published_count,
     noLongerEligible,
   }
+}
+
+export type ProfileChoiceResult =
+  { ok: true; outcome: ProfileChoiceOutcome; message: string } | { ok: false; message: string }
+
+const profileChoiceInput = z.object({ onProfile: z.boolean() })
+
+const CHOICE_FAILED = "That could not be saved. Nothing changed; try again."
+
+/**
+ * The checkbox on a product's public page: on or off the creator's profile.
+ *
+ * Writes the profile builder's own draft, so the builder shows the same
+ * arrangement afterwards, and when the profile is live and the product is
+ * eligible, publishes that one page through the same function "Publish all
+ * products" uses, which appends it to the live order and switches it on in
+ * the draft in one transaction. Turning a product off returns its page to
+ * draft and switches its draft entry off in place. See lib/public/profile-choice.ts.
+ */
+export async function setProductOnProfileAction(
+  workspaceSlug: string,
+  productSlug: string,
+  input: unknown,
+): Promise<ProfileChoiceResult> {
+  const parsed = profileChoiceInput.safeParse(input)
+  if (!parsed.success) return { ok: false, message: CHOICE_FAILED }
+  const { onProfile } = parsed.data
+
+  const supabase = await createClient()
+  const ctx = await loadBuilderContext(supabase, workspaceSlug)
+  if (!ctx) return { ok: false, message: CHOICE_FAILED }
+
+  const { data: product } = await supabase
+    .from("products")
+    .select("id")
+    .eq("workspace_id", ctx.workspaceId)
+    .eq("slug", productSlug)
+    .maybeSingle()
+  if (!product) return { ok: false, message: "That product could not be found." }
+
+  let live: boolean
+  let eligible: boolean
+  let draft
+  try {
+    const [candidates, liveIds, read] = await Promise.all([
+      loadProductCandidates(supabase, ctx, workspaceSlug),
+      loadLiveProductIds(supabase, ctx.profile.id),
+      readDraft(supabase, ctx.profile),
+    ])
+    live = liveIds.has(product.id)
+    eligible = candidates.find((c) => c.id === product.id)?.eligibility.eligible ?? false
+    draft = read.draft
+  } catch (error) {
+    console.error("[public] profile choice: read failed", error)
+    return { ok: false, message: CHOICE_FAILED }
+  }
+
+  const plan = planProfileChoice({ onProfile, profileStatus: ctx.profile.status, eligible, live })
+
+  if (plan.publishNow) {
+    // One transaction: the page goes live at the end of the order and the
+    // draft, where one exists, is switched on to match.
+    const { error } = await supabase.rpc("publish_all_profile_products", {
+      p_public_profile_id: ctx.profile.id,
+      p_product_ids: [product.id],
+    })
+    if (error) {
+      console.error("[public] profile choice: publish failed", error)
+      return { ok: false, message: CHOICE_FAILED }
+    }
+  } else {
+    const saved = await writeDraftProducts(
+      supabase,
+      ctx,
+      withProductShown(draft.products, product.id, onProfile),
+      draft.revision,
+    )
+    if (!saved.ok) {
+      return {
+        ok: false,
+        message:
+          saved.reason === "conflict"
+            ? "Your profile builder changed in another tab. Reload this page and try again."
+            : CHOICE_FAILED,
+      }
+    }
+  }
+
+  if (plan.unpublishPage) {
+    const { error } = await supabase
+      .from("public_product_pages")
+      .update({ status: "draft", published_at: null })
+      .eq("public_profile_id", ctx.profile.id)
+      .eq("product_id", product.id)
+      .eq("workspace_id", ctx.workspaceId)
+    if (error) {
+      console.error("[public] profile choice: unpublish failed", error)
+      return { ok: false, message: CHOICE_FAILED }
+    }
+  }
+
+  if (plan.publishNow || plan.unpublishPage) {
+    revalidateProfile(workspaceSlug, ctx.profile.handle, ctx.profile.handle)
+  }
+  revalidatePath(routes.product(workspaceSlug, productSlug))
+  return { ok: true, outcome: plan.outcome, message: PROFILE_CHOICE_TEXT[plan.outcome] }
 }
 
 /**

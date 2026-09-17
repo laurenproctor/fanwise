@@ -21,6 +21,7 @@ export type JobName =
   | "sync_billing"
   | "import_source"
   | "transcribe_import_source"
+  | "channel_webhook"
   | "describe_image"
 
 export interface JobPayloads {
@@ -75,6 +76,16 @@ export interface JobPayloads {
    */
   transcribe_import_source: { workspaceId: string; sourceId: string }
   /**
+   * Act on one provider delivery (ADR 0015).
+   *
+   * The receipt row's id only. The route recorded the delivery before
+   * enqueueing, and the job reads the provider object afresh when it runs, so
+   * a delivery that sat in the queue acts on the order as it stands. A
+   * finished receipt is skipped, and the provider refuses to fulfil a line
+   * twice, so a redelivery does nothing.
+   */
+  channel_webhook: { eventId: string }
+  /**
    * Write alt text for one product image from the image itself (ADR 0014).
    *
    * Ids only. The asset and its product are read when the job runs, the
@@ -99,6 +110,7 @@ export const JOB_NAMES = [
   "sync_billing",
   "import_source",
   "transcribe_import_source",
+  "channel_webhook",
   "describe_image",
 ] as const satisfies readonly JobName[]
 

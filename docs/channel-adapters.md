@@ -35,8 +35,8 @@ Current reality, from `docs/channel-feasibility.md`:
 | Envato | assisted | no | no | yes | no | no |
 
 **Behance note.** Every `no` on that row is the permanent kind: the provider cannot. Its API
-is read-only and closed, and Adobe's terms forbid the alternative. Planned at B9; the spec is
-`docs/channels/behance.md`.
+is read-only and closed, and Adobe's terms forbid the alternative. Built at B9 on 17 September
+2026; the spec is `docs/channels/behance.md`.
 
 **Gumroad note.** Its row changed on 11 September 2026 from assisted to api: the product
 endpoints this matrix recorded as missing shipped in April 2026. Built at B10 on 16 September 2026 and its exit passed on 17 September 2026; the spec is
@@ -183,6 +183,32 @@ The callback route is generic in the channel key
 a provider name in the application tree, and the next channel would copy the file rather than
 reuse it.
 
+## Webhooks
+
+ADR 0015. A channel that tells Fanwise about events on a connected account declares
+`webhooks`:
+
+```ts
+interface ChannelWebhooks {
+  verify(rawBody: string, headers: Headers): boolean
+  parse(rawBody: string, headers: Headers): ChannelWebhookEvent | null
+  handle(event: ChannelWebhookEvent, context: WebhookContext): Promise<WebhookHandleResult>
+}
+```
+
+The route (`app/api/channels/[channelKey]/webhook`) is generic for the reason the callback is,
+and owns the receipt and the job; the adapter owns the signature, the shape and the act.
+`verify` runs over the raw bytes before any field is read. `parse` returns null for a topic the
+adapter does not act on and throws for a body that is not the shape its topic promises, which
+the route acknowledges and logs rather than retries. `handle` runs on the worker once per
+active connection to the account the delivery named, is handed `externalListingIds()` rather
+than a database client, and must be safe to run twice. Its result is recorded on the receipt:
+what was done, or a named reason nothing was.
+
+An adapter that subscribes at authorization time does so inside `oauth.exchange`, from the
+`webhookUrl` the shared flow hands it, and records the answer on the connection's metadata
+under the generic keys in `lib/delivery/setup.ts`, best effort.
+
 ## Errors
 
 `lib/channels/errors.ts` holds the shared vocabulary; each adapter owns the mapping into it,
@@ -320,6 +346,23 @@ the second.
 No `publish`. Status moves draft, ready, then published by human action with
 `status_source = "self_reported"`. Nothing that implies verification may treat those rows as
 equal to verified ones.
+
+Since B9 the human action has a shape, declared on the adapter as data and rendered by
+components that know no channel:
+
+- `accountHint`: Connect asks for the account the creator will submit to, the adapter parses
+  it, and the parsed value becomes `external_account_id`. Never alongside `oauth`.
+- `choices`: the settings the channel's own form asks for beyond the listing fields, each
+  `single`, `multiple` or `text`, stored in `channel_listings.metadata` under the key the
+  adapter names and validated against the declaration on save. Requirements and the handoff
+  read them back from `draft.metadata`.
+- `handoffImages` and `buildHandoff`: the renditions the handoff hands over, named as shapes
+  and built by the derivative engine when the listing is built, and the handoff in the
+  channel's editor order, with steps grouped by section. Absent, the generic handoff order
+  applies.
+- `submission`: mark submitted with the URL parsed inside the adapter. Writes `published` with
+  `status_source = "self_reported"`, the parsed id as `external_listing_id`, and a `publish`
+  snapshot. A unit test refuses `submission` on an `api` adapter.
 
 The handoff for an assisted channel may also be shown in a companion window beside the
 marketplace's editor, as proposed in `docs/decisions/0010`. It is a layout, not a capability.

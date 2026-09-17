@@ -43,7 +43,8 @@ vi.mock("@/lib/products/storage", () => ({
 }))
 
 import { finalizeAsset } from "@/lib/products/assets"
-import { readFontAsset } from "@/lib/fonts/detected"
+import { readArchive, readFontAsset } from "@/lib/fonts/detected"
+import { buildZip } from "./zip-fixtures"
 
 const payload = { workspaceId: "workspace-1", assetId: "asset-1" }
 
@@ -113,6 +114,66 @@ describe("finalize_asset on a pending picture", () => {
     state.asset = row({ asset_state: "pending", mime_type: null })
     state.bytes = inline
     expect(await finalizeAsset(payload)).toEqual({ describe: false })
+  })
+})
+
+describe("finalize_asset on a package", () => {
+  const zip = () =>
+    new Uint8Array(
+      buildZip([
+        { path: "Blimp/BlimpDisplay-Inline.ttf", data: inline },
+        { path: "Blimp/README.txt", data: new TextEncoder().encode("hello") },
+      ]),
+    )
+
+  it("looks inside a pending ZIP in the same update that makes it ready", async () => {
+    state.asset = row({
+      asset_type: "archive",
+      asset_state: "pending",
+      filename: "blimp.zip",
+      mime_type: null,
+      metadata: {},
+    })
+    state.bytes = zip()
+
+    const outcome = await finalizeAsset(payload)
+
+    expect(outcome).toEqual({ describe: false })
+    expect(state.updates).toHaveLength(1)
+    expect(state.updates[0]).toMatchObject({ asset_state: "ready", mime_type: "application/zip" })
+    const archive = readArchive(state.updates[0]!.metadata)
+    expect(archive.kind).toBe("archive")
+    if (archive.kind === "archive") {
+      expect(archive.contents.fontCount).toBe(1)
+      expect(archive.contents.entries[0]!.font?.familyName).toBe("Blimp Display")
+    }
+  })
+
+  it("looks inside a ready package nobody looked inside, writing only its metadata", async () => {
+    state.asset = row({
+      asset_type: "archive",
+      filename: "blimp.zip",
+      mime_type: "application/zip",
+      metadata: {},
+    })
+    state.bytes = zip()
+
+    await finalizeAsset(payload)
+
+    expect(state.downloads).toBe(1)
+    expect(Object.keys(state.updates[0]!)).toEqual(["metadata"])
+    expect(readArchive(state.updates[0]!.metadata).kind).toBe("archive")
+  })
+
+  it("leaves a package that was already looked inside alone", async () => {
+    state.asset = row({
+      asset_type: "archive",
+      filename: "blimp.zip",
+      mime_type: "application/zip",
+      metadata: { archiveProblem: "malformed" },
+    })
+    await finalizeAsset(payload)
+    expect(state.downloads).toBe(0)
   })
 })
 

@@ -734,7 +734,11 @@ numbered **30 and above**, since 29 is B12's and #73 and #74 are both open.
 - **No authenticated source.** No Claude login, no cookie import, no OAuth to any source. A
   private artifact is made public by its owner or it is not imported.
 - **No code execution, no sandbox, no preview iframe.** §7.3.
-- **No ZIP extraction.** An uploaded archive is stored and offered to buyers, not unpacked.
+- **No ZIP extraction.** An uploaded archive is stored and offered to buyers as uploaded, never
+  unpacked into storage. Since 17 September 2026 the finalize job reads a ZIP's table of
+  contents and the fonts inside it in memory (`lib/fonts/archive.ts`, bounded in entries and
+  bytes) so the font workspace can show what a package holds; that is a reading, and the bytes
+  buyers receive are untouched.
 - **No bulk import.** One URL, one product.
 - **No re-import or sync.** An import is a photograph. Re-pasting replaces the source on an
   unconfirmed draft and does nothing after confirmation.

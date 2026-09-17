@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { renderDerivative, specHash, derivativeFilename, type ImageSpec } from "./derivatives"
 import { isDerivableImage, sniffMimeType } from "./sniff"
-import { describeUpload, isUnreadFont } from "@/lib/fonts/read-upload"
+import { describeUpload, isUnread } from "@/lib/fonts/read-upload"
 import type { ProductAsset } from "./types"
 import { toJson } from "@/lib/imports/json"
 import { readAltText } from "./image-metadata"
@@ -146,7 +146,7 @@ async function completeReading(
   asset: ProductAsset,
   workspaceId: string,
 ): Promise<void> {
-  if (!isUnreadFont(asset.mime_type, asset.metadata)) return
+  if (!isUnread(asset.mime_type, asset.metadata)) return
 
   const data = await downloadObject(asset.storage_path)
   const described = await describeUpload(data, asset.mime_type!)

@@ -21,6 +21,14 @@ import { ProfileAvatar } from "./profile-avatar"
  * `width`, `height` and `aspect-ratio` are always set. An image whose box is
  * unknown until it loads is a page that jumps under the reader's cursor, and
  * on a gallery of twelve cards it jumps twelve times.
+ *
+ * The default box is 16:9, which is the shape of a marketplace cover image, and
+ * so the shape a creator's promo already has. The first version of these pages
+ * used 4:3, and a wide cover placed in it lost a quarter of its width to the
+ * crop, which on a promo with a title at one edge cut the title off. Grids
+ * still crop (`fit: "cover"`), because a grid of mixed shapes is a grid that
+ * staggers; the product page's hero uses `fit: "contain"` instead, so the one
+ * picture a visitor came to see is never cut, whatever its shape.
  */
 export function PublicImage({
   assetId,
@@ -28,7 +36,8 @@ export function PublicImage({
   className = "",
   sizes,
   priority = false,
-  ratio = "4 / 3",
+  ratio = "16 / 9",
+  fit = "cover",
 }: {
   assetId: string
   /**
@@ -42,6 +51,8 @@ export function PublicImage({
   sizes?: string
   priority?: boolean
   ratio?: string
+  /** `cover` crops to the box; `contain` letterboxes inside it and never crops. */
+  fit?: "cover" | "contain"
 }) {
   return (
     /* eslint-disable-next-line @next/next/no-img-element -- see the docblock: the
@@ -55,7 +66,7 @@ export function PublicImage({
       fetchPriority={priority ? "high" : "auto"}
       decoding="async"
       style={{ aspectRatio: ratio }}
-      className={`h-full w-full bg-[var(--color-paper-2)] object-cover ${className}`}
+      className={`h-full w-full bg-[var(--color-paper-2)] ${fit === "contain" ? "object-contain" : "object-cover"} ${className}`}
     />
   )
 }

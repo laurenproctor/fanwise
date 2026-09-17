@@ -4,6 +4,7 @@ import { runGeneration } from "@/lib/ai/runner"
 import { syncBilling } from "@/lib/billing/sync"
 import { runImport } from "@/lib/imports/runner"
 import { runTranscription } from "@/lib/imports/transcribe"
+import { runChannelWebhook } from "@/lib/channels/webhooks"
 import { describeImage } from "@/lib/ai/alt-text"
 import type { JobHandlers } from "./types"
 
@@ -59,6 +60,9 @@ export const handlers: JobHandlers = {
   },
   transcribe_import_source: async (payload) => {
     await runTranscription(payload)
+  },
+  channel_webhook: async (payload) => {
+    await runChannelWebhook(payload)
   },
   describe_image: async (payload) => {
     await describeImage(payload)

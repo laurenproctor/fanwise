@@ -155,8 +155,10 @@ the product heading, usually.
     `tests/unit/woocommerce-oauth.test.ts`, `tests/unit/woocommerce-adapter.test.ts`,
     `tests/unit/delivery-route.test.ts` and `tests/db/delivery-links.test.ts`)*
 12. Generate a Behance project and asset package, hand off, capture the project URL.
-    *(planned at B9, not built; waits on A8's handoff machinery and on a profile with Stripe
-    connected, decision 26)*
+    *(built at B9 on 17 September 2026 and running against the channel itself in
+    `tests/e2e/journey-12-behance-handoff.spec.ts`, since it needs no credential; the adapter
+    is covered by `tests/unit/behance-adapter.test.ts`. The exit run needs a profile with
+    Stripe connected, decision 26)*
 13. Connect Gumroad, publish a product with its covers and its file, confirm it is
     purchasable. *(built at B10 on 16 September 2026; **passed against the live seller account
     on 17 September 2026**. Covered without it by `tests/unit/gumroad-oauth.test.ts` and
@@ -182,9 +184,11 @@ stopping the old address. The count in `CLAUDE.md` moved with it.
 
 **Journey 12 was added on 11 September 2026**, when Behance was planned as B9. It is journey
 7 with a different shape: a portfolio project composed around the product rather than a
-product form filled in, in two modes, new project and existing project. It is the first
-assisted journey that reuses A8's machinery rather than building it, which is why it cannot
-run before journey 7 does. Nothing in it may write a row that reads as verified.
+product form filled in, in two modes, new project and existing project. It was to be the
+first assisted journey that reused A8's machinery rather than building it; B9 opened first,
+on 17 September 2026, so it is the journey that built that machinery, and journey 7 will
+reuse it. Nothing in it may write a row that reads as verified: the browser run asserts the
+card says self-reported after mark submitted, and the trigger holds the rest.
 
 **Journey 13 was added on 11 September 2026**, when Gumroad was planned as B10. It is
 journey 4 with a different upload: the file goes to Gumroad's storage in parts, by presigned

@@ -175,3 +175,22 @@ describe("every route that says nobody is signed in is reachable, and only those
     expect(opened).toEqual(["/api/health"])
   })
 })
+
+describe("a channel's webhook can be reached without a session", () => {
+  it("lets a provider POST a delivery for every channel that declares webhooks", () => {
+    const withWebhooks = listAdapters().filter((adapter) => adapter.webhooks)
+    // Vacuous otherwise, for the reason the grant test gives.
+    expect(withWebhooks.length).toBeGreaterThan(0)
+    for (const adapter of withWebhooks) {
+      const path = `/api/channels/${adapter.key}/webhook`
+      expect(isPublic(path), `${adapter.key}'s webhook is behind the sign-in redirect`).toBe(true)
+    }
+  })
+
+  it("opens the webhook and nothing else under it", () => {
+    expect(isPublic("/api/channels/shopify/webhook")).toBe(true)
+    expect(isPublic("/api/channels/shopify/webhook/extra")).toBe(false)
+    expect(isPublic("/api/channels/shopify/webhooks")).toBe(false)
+    expect(isPublic("/api/channels/a/b/webhook")).toBe(false)
+  })
+})
