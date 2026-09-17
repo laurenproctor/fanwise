@@ -791,9 +791,12 @@ export async function markSubmittedAction(
     .eq("workspace_id", workspace.id)
 
   if (updateError) {
+    // One external object is represented once, across every workspace: the
+    // same unique index a real publish relies on. A project already claimed
+    // by another listing is refused rather than shared.
     if (updateError.code === UNIQUE_VIOLATION) {
       return {
-        error: `Another product in this workspace already points at that ${channel.name} project.`,
+        error: `Another listing already points at that ${channel.name} project. Paste the address of this product's own project.`,
         externalUrl: null,
       }
     }

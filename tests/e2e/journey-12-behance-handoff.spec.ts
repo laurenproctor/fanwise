@@ -23,7 +23,11 @@ import {
  * leaves a row that says so, self-reported, with the project's address.
  */
 
-const PROJECT_URL = "https://www.behance.net/gallery/123456789/Aster-Grotesk"
+// One external object is represented once, across every workspace in the
+// database, so the project id is fresh per run: a rerun against the same local
+// stack would otherwise be refused as a second claim on the first run's project.
+const PROJECT_ID = String(Date.now())
+const PROJECT_URL = `https://www.behance.net/gallery/${PROJECT_ID}/Aster-Grotesk`
 
 test("a product becomes a Behance project by hand, and Fanwise records the creator's word", async ({
   page,
@@ -104,7 +108,7 @@ test("a product becomes a Behance project by hand, and Fanwise records the creat
   await expect(page.getByText("Fanwise sends nothing to Behance.").first()).toBeVisible()
 
   // Mark submitted, with the address captured.
-  await page.getByLabel("Project URL").fill("behance.net/gallery/123456789/Aster-Grotesk")
+  await page.getByLabel("Project URL").fill(`behance.net/gallery/${PROJECT_ID}/Aster-Grotesk`)
   await page.getByRole("button", { name: "Mark submitted" }).click()
   await expect(page.getByRole("link", { name: PROJECT_URL })).toBeVisible()
 
