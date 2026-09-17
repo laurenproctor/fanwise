@@ -925,7 +925,7 @@ export const shopifyAdapter: ChannelAdapter = {
     steps: [
       "In Shopify admin, open Settings, then Notifications, then Customer notifications.",
       "Open Order confirmation and click Edit code.",
-      "Paste the snippet below where the download button should appear, for example just after the order summary heading.",
+      "Find the line <p>{{ email_body }}</p>, below <h2>{{ email_title }}</h2>, and paste the snippet on the line after it. Do not paste above <!DOCTYPE html>: everything above that line runs before the email is laid out, so the button would appear above the header.",
       "Save, then send yourself a preview to check it renders.",
       "Come back here and confirm.",
     ],
