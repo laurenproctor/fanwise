@@ -151,11 +151,19 @@ export function AltTextField({
 
   return (
     <div className={`grid min-w-0 ${compact ? "gap-1" : "gap-2"}`}>
-      <label htmlFor={id} className={compact ? "sr-only" : "text-[14px]"}>
-        Alt text{compact ? ` for ${filename}` : ""}
-      </label>
+      {/*
+        The filename is named for assistive tech only through aria-label, never
+        as text: the tile already prints it once, and a second copy, even
+        visually hidden, is a second match for anything looking for the file.
+      */}
+      {compact ? null : (
+        <label htmlFor={id} className="text-[14px]">
+          Alt text
+        </label>
+      )}
       <textarea
         id={id}
+        aria-label={compact ? `Alt text for ${filename}` : undefined}
         rows={compact ? 2 : 2}
         maxLength={ALT_TEXT_MAX}
         value={value}
@@ -183,6 +191,7 @@ export function AltTextField({
           <button
             type="button"
             onClick={suggest}
+            aria-label={`Suggest alt text from the image for ${filename}`}
             className={
               compact
                 ? "text-[12px] text-[var(--color-ink-3)] underline underline-offset-2 hover:text-[var(--color-ink)]"
@@ -190,7 +199,6 @@ export function AltTextField({
             }
           >
             Suggest from the image
-            <span className="sr-only"> for {filename}</span>
           </button>
         ) : null}
         {state === "error" && !empty ? (
@@ -202,9 +210,14 @@ export function AltTextField({
             Try again
           </button>
         ) : null}
+        {/*
+          A live region without the status role. Several of these sit on one
+          page, one per image, and a page's own save status is the one thing
+          that should answer to "the status". Announced all the same.
+        */}
         <p
           id={`${id}-status`}
-          role="status"
+          aria-live="polite"
           className={`min-w-0 text-[12px] ${
             state === "error" ? "text-[var(--color-bad)]" : "text-[var(--color-ink-3)]"
           }`}
