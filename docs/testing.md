@@ -160,9 +160,9 @@ the product heading, usually.
     is covered by `tests/unit/behance-adapter.test.ts`. The exit run needs a profile with
     Stripe connected, decision 26)*
 13. Connect Gumroad, publish a product with its covers and its file, confirm it is
-    purchasable. *(built at B10 on 16 September 2026, exit unrun; the adapter is covered by
-    `tests/unit/gumroad-oauth.test.ts` and `tests/unit/gumroad-adapter.test.ts`, and the run
-    needs the seller account in decision 27)*
+    purchasable. *(built at B10 on 16 September 2026; **passed against the live seller account
+    on 17 September 2026**. Covered without it by `tests/unit/gumroad-oauth.test.ts` and
+    `tests/unit/gumroad-adapter.test.ts`)*
 14. **A creator builds and publishes a public profile, and a stranger reads it.** *(built and
     running in `tests/e2e/journey-14-public-pages.spec.ts`, through the three-step profile
     builder; the permission half is `tests/db/public-pages-tenancy.test.ts`,

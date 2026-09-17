@@ -39,7 +39,7 @@ is read-only and closed, and Adobe's terms forbid the alternative. Built at B9 o
 2026; the spec is `docs/channels/behance.md`.
 
 **Gumroad note.** Its row changed on 11 September 2026 from assisted to api: the product
-endpoints this matrix recorded as missing shipped in April 2026. Planned at B10; the spec is
+endpoints this matrix recorded as missing shipped in April 2026. Built at B10 on 16 September 2026 and its exit passed on 17 September 2026; the spec is
 `docs/channels/gumroad.md`.
 
 **Shopify note, resolved at A5.** The Admin API creates products but has no API for

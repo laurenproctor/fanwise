@@ -161,6 +161,10 @@ credentials placed on every deployment. B10 was built the same day against them,
 create pace from the spec's §10 (one at a time, six a minute) as the default until Gumroad
 says otherwise. Still open: the seller account's payout method, and the email.
 
+**Exit passed on 17 September 2026.** Journey 13 ran against the seller account and passed,
+so the account has its confirmed email and payout method; B10 is done. What stays open here
+is the email to Gumroad, and the §13 answers the run produced are owed to the spec.
+
 ---
 
 ## Shopify, before any public launch

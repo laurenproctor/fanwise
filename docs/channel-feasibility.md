@@ -474,7 +474,7 @@ belongs in the decision 14 conversation next to MyFonts. Not assessed here.
 | Creative Market | Assisted | Manual, no automation permitted | None | **V1** |
 | Adobe Stock | Assisted | SFTP + 5,000-row CSV, manual submit | None | **V2, highest leverage** |
 | MyFonts | Assisted | Portal only, exact specs | CSV download | **V2, if fonts are the wedge** |
-| Gumroad | Automatic | Full API since April 2026, file by multipart upload, create limit shared per IP | API + webhooks | **V2, B10**, planned 11 Sep 2026 |
+| Gumroad | Automatic | Full API since April 2026, file by multipart upload, create limit shared per IP | API + webhooks | **B10**, built 16 Sep 2026, exit passed 17 Sep 2026 |
 | Envato | Assisted | No item creation, FTP for audio/video only | **API** | **V2 for analytics only** |
 | Behance | Assisted | Manual, a project plus an asset, no review queue documented | None; the seller's own Stripe | **V2, B9**, built 17 Sep 2026 ahead of A8, exit needs a profile with Stripe |
 | Creative Fabrica | Assisted | Manual, 1 to 2 day review | None | **V3** |

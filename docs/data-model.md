@@ -633,7 +633,7 @@ and v1 keeps it by mapping one product to one project with one asset. Item 12 of
 
 ## B10: Gumroad
 
-Planned 11 September 2026, not built. The migration lands with B10.
+Planned 11 September 2026, built 16 September 2026, exit passed 17 September 2026. The migration is `20260916120000_gumroad_channel`, applied to the hosted project.
 
 One row in `channels`: key `gumroad`, `integration_type = api`, `billable = true`; decision 23
 records why a Gumroad page bills when a WooCommerce store does not. No new table. The
