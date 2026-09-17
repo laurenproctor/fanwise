@@ -17,7 +17,9 @@ Behance was added the same day under Tier 3, and it is assisted for good. A wide
 that day found publishing APIs outside this set, at Polar, Fourthwall, Wix, Ecwid, CGTrader
 and Cults3D, none of them assessed here. Dribbble was assessed on 17 September 2026 and is
 cut under Tier 4: it stopped being a goods marketplace in July 2023 and its guidelines
-reject shots that sell a product. Everything else is a preparation problem, not an
+reject shots that sell a product. Fontspring, which Dribbble owns, was assessed the same day
+under Tier 3: assisted for good, on Creative Market's own terms, and the one font marketplace
+that sells the creator's own licence. Everything else is a preparation problem, not an
 integration problem.
 
 Three findings change the plan:
@@ -252,6 +254,59 @@ ingestion a viable read-side integration.
 The foundry stance on third-party automation is *unconfirmed*, governed by a non-public
 distribution agreement.
 
+### Fontspring — assisted, the creator's own licence, and Creative Market's terms
+
+Assessed 17 September 2026 against the *Become a Fontspring Foundry* page (the live site
+answers 403 to fetchers; read from the Wayback Machine's capture of 31 August 2025), the
+Terms of Service (capture of 1 January 2026), the Worry-Free licence page, the five foundry
+articles in the help center (the newest, *Commission and Sales*, updated 14 September 2026),
+Dribbble's acquisition release of 1 February 2022 and the TypeDrawers thread on the
+November 2022 redesign. The full spec is `docs/channels/fontspring.md`.
+
+No API, no FTP, no documented upload format. The only public foundry documentation is five
+help articles about commission, payouts, withholding and promotions, plus a foundry page
+whose application flow is "Contact the Fontspring team for more info". The vendor tools, the
+upload form and the *Font Foundry Terms* the Terms of Service incorporate are all behind an
+account nobody at Fanwise has.
+
+**The terms are Creative Market's.** Dribbble bought Fontspring in February 2022, the Terms
+of Service name Creative Market Labs, LLC as the DMCA agent, and they carry, word for word,
+the two clauses that closed A8's shape: never share login details or account access with
+anyone, and no automated system that accesses the Services other than by the means the
+Services provide. Assisted for good, on the same footing as Creative Market.
+
+**Why it is still attractive, and why it is not MyFonts.** Fontspring sells the foundry's
+own licence at the foundry's own prices: "you can use your license or ours. It doesn't
+matter." The font workspace prices desktop, web, app and ePub separately with the creator's
+limits, which maps to nothing on MyFonts and one to one here. Fontspring also publishes what
+its Worry-Free badge requires per licence type (logos and branding on desktop, no pageview
+tracking on web, unlimited apps, unlimited ebook copies, perpetual throughout), which is a
+quality mark Fanwise can predict deterministically before upload. Files are CFF OpenType or
+TrueType, and Fontspring generates the webfonts itself. Requirements: commercial licences
+only, no personal-use, and an `@font-face` licence on every font unless it is not suitable
+for web.
+
+**What is not published** is everything MyFonts publishes: no character-set list, no word
+count, no poster spec (a foundry reported 2000 × 1000 PNGs before the redesign and being
+asked for more), no naming rules, no review time, and no statement of whether a submission
+is reviewed at all. The requirements engine for this channel is shorter until an account
+settles the spec's §13, and that weakens the "assisted preparation earns its price where the
+rules are exact" argument that carries MyFonts.
+
+**Money.** 50% on every self-serve marketplace sale, cut from 70% in November 2022, plus a
+35% bonus on sales of fonts released in the previous 30 days; 30% on enterprise sales.
+Fontspring covers card fees and marketing. Payout is automatic through Tipalti 45 days after
+month end from a $20 default threshold, with 30% US withholding absent a treaty claim.
+
+**Sales data.** None by API. A Foundry Sales Reports page and a sales analytics tool exist
+in the vendor tools; whether either exports a file is *unconfirmed*.
+
+**Verdict: assisted, Tier 3, paired with MyFonts under decision 14.** Not a third candidate
+against Adobe Stock: if fonts are the wedge the second assisted channel is two font
+marketplaces sharing one file set and, if the poster ratio holds, one poster set, and
+Fontspring is the cheaper one to prove first. If fonts are not the wedge, neither is built.
+The foundry account is decision 31.
+
 ### Creative Market — assisted, and browser automation is contractually closed
 
 No seller API, no OAuth, no FTP ("Sorry, we do not offer nor support an FTP"), no earnings
@@ -460,7 +515,8 @@ no file, no price. It differs from Behance, which sells assets. Two residues: Cr
 is the Dribbble-family goods channel, already A8; and Dribbble also owns Fontspring (acquired
 February 2022), a real font marketplace paying a 50% royalty plus a 35% bonus on releases in
 their first 30 days, with a foundry application. If fonts turn out to be the wedge, Fontspring
-belongs in the decision 14 conversation next to MyFonts. Not assessed here.
+belongs in the decision 14 conversation next to MyFonts. Assessed the same day, under Tier 3
+above and in `docs/channels/fontspring.md`.
 
 ---
 
@@ -474,6 +530,7 @@ belongs in the decision 14 conversation next to MyFonts. Not assessed here.
 | Creative Market | Assisted | Manual, no automation permitted | None | **V1** |
 | Adobe Stock | Assisted | SFTP + 5,000-row CSV, manual submit | None | **V2, highest leverage** |
 | MyFonts | Assisted | Portal only, exact specs | CSV download | **V2, if fonts are the wedge** |
+| Fontspring | Assisted | Vendor tools only, form undocumented, sells the creator's own licences | Sales report page, export unconfirmed | **V2, paired with MyFonts if fonts are the wedge**, assessed 17 Sep 2026 |
 | Gumroad | Automatic | Full API since April 2026, file by multipart upload, create limit shared per IP | API + webhooks | **B10**, built 16 Sep 2026, exit passed 17 Sep 2026 |
 | Envato | Assisted | No item creation, FTP for audio/video only | **API** | **V2 for analytics only** |
 | Behance | Assisted | Manual, a project plus an asset, no review queue documented | None; the seller's own Stripe | **V2, B9**, built 17 Sep 2026 ahead of A8, exit needs a profile with Stripe |

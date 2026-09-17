@@ -408,7 +408,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B1 | AI provider abstraction, Anthropic, FactSheet, merchandising profiles, factuality validator, generation logs. Adopt Trigger.dev here. **Code complete 7 September 2026**, see below |
 | B2 | Listing review UI: field edit, field regenerate, full regenerate, restore, approve. **Code complete 8 September 2026**, see below |
 | B2a | Creative Market composed-listing test: the three creators and the measures in `docs/channels/creative-market.md` section 12, run against AI-composed copy on the A8 handoff |
-| B4 | Second assisted channel. Adobe Stock or MyFonts, undecided on purpose, see `docs/channel-feasibility.md` and decision 14 |
+| B4 | Second assisted channel. Adobe Stock, or the MyFonts and Fontspring pair, undecided on purpose, see `docs/channel-feasibility.md` and decision 14 |
 | B5 | `sales_events`, transaction ingestion for Shopify, Etsy and WooCommerce, dedupe constraints |
 | B6 | Analytics overview: revenue, units, by channel, by product |
 | B7 | CSV import foundation |
