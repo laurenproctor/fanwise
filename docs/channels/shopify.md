@@ -204,6 +204,30 @@ The address is minted once per listing and file and re-sent unchanged on every w
 download link** revokes it and writes a new one, after warning that past buyers' emails hold the
 old link.
 
+**Fulfilment**, ADR 0014, 17 September 2026. Once the snippet is confirmed, the same confirmation
+switches on the bookkeeping:
+
+```
+authorization       ensureRoutingWebhook: one FULFILLMENT_ORDERS_ORDER_ROUTING_COMPLETE
+                     subscription per shop, pointed at /api/channels/shopify/webhook
+                     connection.metadata.deliveryAutomationRef = its id, or
+                     connection.metadata.deliveryAutomationError = why not (best effort)
+
+buyer pays           Shopify routes the order → POST /api/channels/shopify/webhook
+                     HMAC over the raw body → receipt in channel_webhook_events → job
+
+job                  fulfillmentOrder(id) { status, order.displayFinancialStatus, lineItems }
+                     keep lines with remainingQuantity > 0, requiresShipping false, and a
+                     product id among this connection's channel_listings.external_listing_id
+                     only when status OPEN/IN_PROGRESS and the order is PAID
+                     fulfillmentCreate on exactly those lines, notifyCustomer false
+                     receipt.outcome records fulfilled line ids, or the skip reason
+```
+
+A mug in the same order stays Unfulfilled for the creator. A pending bank transfer is skipped and
+not revisited: the routing delivery comes once, at placement. See ADR 0014 for what this does not
+catch.
+
 **[verify]** on a live shop that the template resolves `line.product.metafields.fanwise.download_url`.
 An order paid by a manual method gets no link, because Shopify sends no second email on payment.
 
@@ -265,9 +289,11 @@ Standard Shopify authorization code grant against the shop domain the creator ty
   line, an error message, or the browser.
 
 Scopes requested: `write_products`, `read_products`, `read_publications`,
-`write_publications`. Nothing else. `read_orders` arrives at B5 with transaction ingestion
-and will force a re-authorization, which is correct: a creator should be asked again when the
-ask changes.
+`write_publications`, and since ADR 0014 `read_orders`,
+`read_merchant_managed_fulfillment_orders` and `write_merchant_managed_fulfillment_orders`.
+Nothing else. The three fulfilment scopes each have one reader (§6); `read_orders` reads one
+field, the financial status, and no protected customer field is ever named. Adding them forced
+a re-authorization, which is correct: a creator should be asked again when the ask changes.
 
 **The app's configuration is the ceiling, not the authorization URL.** A scope requested in
 the authorize request that the app does not declare is dropped in silence: the grant
@@ -342,7 +368,9 @@ time the creator clicked, which is the duplicate §7 exists to prevent.
 
 - `channels` — one row, `shopify`, `billable = false`.
 - `channel_connections` — `external_account_id` is the shop domain,
-  `external_account_name` the shop's display name, `metadata` the shop currency and plan.
+  `external_account_name` the shop's display name, `metadata` the shop currency and timezone,
+  `deliverySetupConfirmedAt` (ADR 0013, carried across a reconnect) and, since ADR 0014,
+  `deliveryAutomationRef` or `deliveryAutomationError` (written fresh at every authorization).
 - `channel_connection_secrets` — the sealed offline access token, with `key_version`.
 - `channel_listings` — `external_listing_id` is the product GID,
   `external_url` the admin product URL, `public_url` the storefront page (`onlineStoreUrl`, or
@@ -352,6 +380,10 @@ time the creator clicked, which is the duplicate §7 exists to prevent.
 - `listing_manual_steps` — none since ADR 0013. Rows written before it are ignored.
 - `delivery_links` — one active row per listing and deliverable (ADR 0012).
 - Product metafields `fanwise.download_url` and `fanwise.download_name`, on the Shopify side.
+- `channel_webhook_events` — one receipt per routing-complete delivery, by Shopify's delivery
+  id, with the outcome per connection (ADR 0014). Ids only, never a payload.
+- A fulfillment on the Shopify side, on exactly the Fanwise digital lines of a paid order,
+  with `notifyCustomer: false` and the message `FULFILLMENT_MESSAGE`.
 - `listing_snapshots` — one `publish` snapshot per successful publication.
 
 ## 13. Open questions to resolve against a live shop
@@ -414,6 +446,14 @@ Nothing below is a guess about intent; each is a shape that only a 2xx can confi
    entry, for a product deleted in the admin minutes earlier. §16 records the run.
 7. and 8. are likewise **answered, 7 September 2026**: `category` with `so-2-5` and
    `seo.title` were both accepted and read back from a live product. §16.
+
+10. ADR 0014, in order, from the first reconnect after the app version carries the three
+    fulfilment scopes: that the reconnect grants them (§9: the app's configuration is the
+    ceiling); that `webhookSubscriptionCreate` accepts `webhookSubscription: { uri }` against
+    `2026-07` and the id lands in `deliveryAutomationRef`; that a real order delivers a
+    routing-complete payload carrying `fulfillment_order.id`; that
+    `fulfillmentOrder.order.displayFinancialStatus` reads under `read_orders` alone, without a
+    protected-data error; and that a mixed test order leaves the shipped line Unfulfilled.
 
 ## 14. Category, product type, and the two SEO fields
 

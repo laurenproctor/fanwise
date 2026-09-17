@@ -22,9 +22,9 @@ import { jobs } from "@/lib/jobs"
  *      collides at the database and is answered without being re-queued
  *   4. only then is a job enqueued, carrying the receipt's id and nothing else
  *
- * The work itself never runs here. Shopify allows five seconds for the whole
- * request and deletes the subscription after eight consecutive failures, so
- * the route does the least it can and answers 200. A failure to record is the
+ * The work itself never runs here. A provider allows a few seconds for the
+ * whole request and drops a subscription that keeps failing, so the route does
+ * the least it can and answers 200. A failure to record is the
  * one answer that asks for a redelivery.
  */
 
