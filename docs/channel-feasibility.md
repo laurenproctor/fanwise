@@ -8,16 +8,17 @@ from a primary source.
 
 ## The short version
 
-**Four channels in this set can be automatic.** Shopify, Etsy, WooCommerce and Gumroad are
-the only platforms assessed here with a public API that lets a third party create a listing
+**Five channels in this set can be automatic.** Shopify, Etsy, WooCommerce, Gumroad and Polar
+are the only platforms assessed here with a public API that lets a third party create a listing
 on a seller's behalf. WooCommerce was added to this document on 8 September 2026, after the
 first two were built or filed for. Gumroad moved up from near miss on 11 September 2026,
 when its product API turned out to have shipped in April; see its section under Tier 1.
 Behance was added the same day under Tier 3, and it is assisted for good. A wider survey
 that day found publishing APIs outside this set, at Polar, Fourthwall, Wix, Ecwid, CGTrader
-and Cults3D, none of them assessed here. Dribbble was assessed on 17 September 2026 and is
-cut under Tier 4: it stopped being a goods marketplace in July 2023 and its guidelines
-reject shots that sell a product. Everything else is a preparation problem, not an
+and Cults3D. Polar was assessed on 23 September 2026 and qualifies as automatic; see its
+section under Tier 1. The other five are not assessed here. Dribbble was assessed on 17
+September 2026 and is cut under Tier 4: it stopped being a goods marketplace in July 2023
+and its guidelines reject shots that sell a product. Everything else is a preparation problem, not an
 integration problem.
 
 Three findings change the plan:
@@ -188,6 +189,88 @@ came through Discover.
 
 Gumroad's audience still overlaps almost perfectly with the Fanwise creator, which was the
 reason the old section wanted the email sent.
+
+### Polar — full API, the file ships with the product, not a marketplace
+
+Assessed 23 September 2026 against Polar's own documentation at `polar.sh/docs` (the
+Products, File Downloads, OAuth 2.0, API overview, API versioning, Fees, Account reviews,
+Webhooks and Sandbox pages, and the `2026-04` OpenAPI reference for files, products and
+benefits) and the Acceptable Use Policy effective 25 March 2026. Not planned as a step.
+
+**It fits the adapter contract.** Third-party access is OpenID Connect, authorization code
+only, PKCE for public clients. Tokens are user-scoped, and the seller can limit one to
+chosen organizations on the consent screen. The access token lasts ten days
+(`expires_in: 864000`) and comes with a refresh token. Every endpoint a publish needs lists
+`oidc` among its security schemes, under four scopes: `files:write`, `benefits:write`,
+`products:write` and `webhooks:write`.
+
+**It takes the file, and delivers it.** A file is a File Downloads benefit, up to 10 GB a
+file, of any type. `POST /v1/files` with `service: downloadable` returns presigned S3 URLs
+for up to 10,000 parts, with optional SHA-256 per part; a complete call closes the upload.
+The file ids go into a downloadables benefit, and the benefit attaches to the product. Polar
+then hands every buyer a signed, personal download URL. There is no fulfilment question of
+the kind ADR 0015 answers for Shopify, and no file-count ceiling like Etsy's.
+
+**The product object is small and clean.** A name of 3 to 64 characters, a Markdown
+description, visibility `draft`, `private` or `public` (the default is `public`), up to 10 MB
+images in JPEG, PNG, GIF, WebP or SVG, and key–value metadata that travels on every order
+and webhook. Price is fixed, pay-what-you-want or free, in any of 130+ currencies at once,
+but one pricing model per product: Polar has no variants, and pricing type and billing cycle
+cannot change after creation. A fixed amount can.
+
+**Four things to design around:**
+
+- **A publish is six calls, and none takes an idempotency key.** File create, part uploads,
+  complete, benefit create, product create, then attach. Nothing documented dedupes a
+  retried write. The list endpoint filters products by `metadata`, so the ADR 0005
+  stamp-and-search guard works: stamp the Fanwise listing id into metadata, search before
+  create.
+- **It is a checkout, not a marketplace.** There is no discovery surface and no product page.
+  A buyer arrives through a Checkout Link, a persistent URL created by API, and that is what
+  `external_url` would hold. A Polar storefront is mentioned once, in a third-party
+  integration guide, and is *unconfirmed*. Polar brings no buyers: it is closer to an owned
+  storefront than to Etsy, which makes it a billing question for decision 23 rather than an
+  obvious $6 channel.
+- **The API contract expires.** Versions are date-based and released each January, April,
+  July and October. Each lives about nine months, three of them as Current, and a removed
+  version answers 404. An adapter pinned with `Polar-Version` has to be upgraded at least
+  twice a year, forever. No other channel here imposes a schedule like that.
+- **The seller is reviewed before the first payout.** Polar is the Merchant of Record and
+  resells the goods, so the organization owner passes KYC through Stripe Identity and a
+  review of up to 14 days, and continuous reviews follow at sales thresholds. Polar holds
+  sellers to a 0.4% chargeback rate and expects a reply to a looped-in support thread within
+  48 hours. Fanwise cannot do any of this for the creator.
+
+**Terms.** The Acceptable Use Policy names "Templates, eBooks, PDFs, code, icons, fonts,
+design assets, photos, videos, audio" as acceptable products. It prohibits marketplaces that
+sell others' products and "any product or service that enables non-Polar Sellers to sell";
+neither describes Fanwise, since each creator is the seller on their own organization and
+Fanwise sells nothing through Polar. Its framing is "Polar serves software companies", and
+review is discretionary, so a font foundry's first review is the real test.
+
+**Rate limit:** 500 requests a minute per organization, customer or OAuth2 client, 429 with
+`Retry-After`, raisable through support. Whether an OAuth client's allowance is shared
+across every connected seller, as Etsy's is, is *unconfirmed*; at 500 a minute it matters far
+less than Etsy's 10 QPS.
+
+**Sales data:** orders by API, and `order.created`, `order.paid` and `order.updated`
+webhooks, registrable per organization under `webhooks:write`. Secrets from 8 September 2026
+sign with Standard Webhooks.
+
+**Fees:** Starter is free, 5% plus 50¢ a transaction, plus 1.5% on non-US cards. Pro ($20 a
+month, 3.8% plus 40¢), Growth ($100) and Scale ($400) trade a monthly fee for a lower rate.
+Organizations created before 27 May 2026 keep the Early Member rate, 4% plus 40¢, until they
+upgrade. Tax collection and remittance is included, since Polar is the seller of record.
+Disputes cost $15. Stripe's payout fees apply on withdrawal: $2 a month of active payouts and
+0.25% plus 25¢ a payout. Like Gumroad it costs nothing to keep and nothing to list, and on a
+direct sale it takes about half Gumroad's cut.
+
+**Testing is cheap.** A fully isolated sandbox at `sandbox-api.polar.sh`, 100 requests a
+minute, with Stripe test cards. Polar asks sellers not to test with real cards in production.
+
+**Verdict: automatic, and a good fit for the files, with a real maintenance cost.** It would
+be the fifth automatic channel and the first whose file delivery needs no work at all. What
+it lacks is buyers; what it costs is a version upgrade every two quarters.
 
 ---
 
@@ -475,6 +558,7 @@ belongs in the decision 14 conversation next to MyFonts. Not assessed here.
 | Adobe Stock | Assisted | SFTP + 5,000-row CSV, manual submit | None | **V2, highest leverage** |
 | MyFonts | Assisted | Portal only, exact specs | CSV download | **V2, if fonts are the wedge** |
 | Gumroad | Automatic | Full API since April 2026, file by multipart upload, create limit shared per IP | API + webhooks | **B10**, built 16 Sep 2026, exit passed 17 Sep 2026 |
+| Polar | Automatic | Full API, file create by presigned multipart upload, delivered by Polar | API + webhooks | **Candidate**, assessed 23 Sep 2026, not planned. Checkout only, no marketplace, so billing belongs with decision 23 |
 | Envato | Assisted | No item creation, FTP for audio/video only | **API** | **V2 for analytics only** |
 | Behance | Assisted | Manual, a project plus an asset, no review queue documented | None; the seller's own Stripe | **V2, B9**, built 17 Sep 2026 ahead of A8, exit needs a profile with Stripe |
 | Creative Fabrica | Assisted | Manual, 1 to 2 day review | None | **V3** |
