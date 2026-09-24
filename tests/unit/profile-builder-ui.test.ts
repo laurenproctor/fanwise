@@ -298,6 +298,7 @@ describe("step 2, manage products", () => {
     id: pid(n),
     slug: null,
     title,
+    productType: "template",
     typeLabel: "Templates",
     imageUrl: `/laurens-studio/assets/a${n}/preview`,
     eligibility: { eligible: true } as const,

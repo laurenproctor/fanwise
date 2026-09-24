@@ -61,6 +61,8 @@ export interface ProductCandidate {
   /** The product's slug in the workspace, for a link to fix it. Null when not known. */
   slug: string | null
   title: string
+  /** The stored product type ("font"). */
+  productType: string
   typeLabel: string
   /** A members-only image route, or null for a product with no ready image. */
   imageUrl: string | null
@@ -225,6 +227,7 @@ export function toPresentationProducts(rows: readonly ArrangementRow[]): Present
   return rows.filter(isShown).map((row) => ({
     key: row.product.id,
     title: row.product.title,
+    productType: row.product.productType,
     typeLabel: row.product.typeLabel,
     imageUrl: row.product.imageUrl,
     imageAlt: row.product.title,
@@ -272,6 +275,7 @@ export function candidatesFrom(
       id: product.id,
       slug: product.slug ?? null,
       title: page?.title_override ?? product.canonical_title ?? product.name,
+      productType: product.product_type,
       typeLabel: options.typeLabel(product.product_type),
       imageUrl: coverId ? options.imageUrl(coverId) : null,
       eligibility: eligibilityOf({

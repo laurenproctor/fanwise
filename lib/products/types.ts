@@ -55,6 +55,30 @@ export const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
   other: "Other",
 }
 
+/**
+ * The same labels for a kind of product rather than one product: "Makes
+ * Fonts", a filter reading "Fonts". "Other" stays as it is because it names a
+ * bucket, not a thing.
+ */
+export const PRODUCT_TYPE_PLURALS: Record<ProductType, string> = {
+  font: "Fonts",
+  template: "Templates",
+  graphic: "Graphics",
+  photo: "Photos",
+  illustration: "Illustrations",
+  icon: "Icons",
+  mockup: "Mockups",
+  brush: "Brushes",
+  three_d: "3D models",
+  theme: "Themes",
+  other: "Other",
+}
+
+/** A plural label for a stored product type, tolerating a value this build does not know. */
+export function pluralTypeLabel(type: string): string {
+  return (PRODUCT_TYPE_PLURALS as Record<string, string | undefined>)[type] ?? type
+}
+
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   deliverable: "Deliverable",
   source_file: "Source file",

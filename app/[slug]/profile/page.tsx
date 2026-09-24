@@ -11,7 +11,9 @@ import { appOrigin } from "@/lib/channels/oauth"
 import { routes } from "@/lib/routes"
 import { Button } from "@/components/ui/button"
 import { FanLines } from "@/components/ui/fan-lines"
+import { loadProfileAnalytics, parsePeriod } from "@/lib/public/analytics"
 import { SettingsSection } from "../settings/settings-section"
+import { ProfileAnalyticsView } from "./profile-analytics"
 import { PublishAllProducts } from "./publish-all-products"
 import { PublishControls } from "./publish-controls"
 
@@ -35,8 +37,10 @@ export const metadata = { title: "Profile · Fanwise" }
  */
 export default async function PublicProfileSettingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>
+  searchParams: Promise<{ days?: string | string[] }>
 }) {
   const user = await getCurrentUser()
   if (!user) redirect("/sign-in")
@@ -51,15 +55,17 @@ export default async function PublicProfileSettingsPage({
     loadBuilderContext(supabase, workspace.slug),
   ])
   const origin = appOrigin()
-  const [live, productPlan] = ctx
+  const period = parsePeriod((await searchParams).days)
+  const [live, productPlan, analytics] = ctx
     ? await Promise.all([
         loadPublishState(supabase, ctx, workspace.slug).then((state) => state.live),
         Promise.all([
           loadProductCandidates(supabase, ctx, workspace.slug),
           loadLiveProductIds(supabase, ctx.profile.id),
         ]).then(([candidates, liveIds]) => planPublishAll(candidates, liveIds)),
+        settings ? loadProfileAnalytics(supabase, settings.profile.id, period) : null,
       ])
-    : [null, null]
+    : [null, null, null]
 
   return (
     <div className="mx-auto flex w-full max-w-[900px] flex-col gap-12 pb-24 sm:gap-14 lg:gap-16">
@@ -116,6 +122,19 @@ export default async function PublicProfileSettingsPage({
                 reason: ATTENTION_REASONS.not_live,
               }))}
               archivedCount={productPlan.archivedCount}
+            />
+          </SettingsSection>
+
+          <SettingsSection
+            id="visitors"
+            heading="Visitors"
+            description="Who looked at your profile and its product pages, what sent them, and where they went to buy."
+          >
+            <ProfileAnalyticsView
+              analytics={analytics}
+              period={period}
+              basePath={routes.profile(workspace.slug)}
+              live={settings.profile.status === "published"}
             />
           </SettingsSection>
         </>

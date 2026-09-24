@@ -1261,6 +1261,58 @@ export type Database = {
           },
         ]
       }
+      public_page_views: {
+        Row: {
+          campaign: string | null
+          id: string
+          occurred_at: string
+          public_product_page_id: string | null
+          public_profile_id: string
+          referrer_host: string | null
+          workspace_id: string
+        }
+        Insert: {
+          campaign?: string | null
+          id?: string
+          occurred_at?: string
+          public_product_page_id?: string | null
+          public_profile_id: string
+          referrer_host?: string | null
+          workspace_id: string
+        }
+        Update: {
+          campaign?: string | null
+          id?: string
+          occurred_at?: string
+          public_product_page_id?: string | null
+          public_profile_id?: string
+          referrer_host?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_page_views_page_fk"
+            columns: ["public_product_page_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "public_product_pages"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "public_page_views_profile_fk"
+            columns: ["public_profile_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "public_page_views_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       public_product_pages: {
         Row: {
           cover_asset_id: string | null
@@ -1988,6 +2040,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      public_profile_analytics: {
+        Args: { p_days: number; p_public_profile_id: string }
+        Returns: Json
       }
       publish_all_profile_products: {
         Args: { p_product_ids: string[]; p_public_profile_id: string }
@@ -2909,7 +2965,14 @@ export const Constants = {
         "unavailable",
         "removed",
       ],
-      import_source_type: ["public_url", "pasted_text", "pdf", "html", "audio", "image"],
+      import_source_type: [
+        "public_url",
+        "pasted_text",
+        "pdf",
+        "html",
+        "audio",
+        "image",
+      ],
       import_status: [
         "pending",
         "retrieving",

@@ -229,6 +229,7 @@ const FULL: ProfilePresentation = {
     {
       key: "aster",
       title: "Aster Grotesk",
+      productType: "font",
       typeLabel: "Font",
       imageUrl: "/api/public/asset/a1",
       imageAlt: "Aster Grotesk",
@@ -240,13 +241,17 @@ const FULL: ProfilePresentation = {
     {
       key: "kit",
       title: "Campaign Kit",
+      productType: "template",
       typeLabel: "Template",
       imageUrl: null,
       imageAlt: "Campaign Kit",
       href: "/@northline/kit",
     },
   ],
-  specialties: ["Font", "Template"],
+  specialties: [
+    { type: "font", label: "Fonts" },
+    { type: "template", label: "Templates" },
+  ],
 }
 
 const EMPTY: ProfilePresentation = {
@@ -320,6 +325,56 @@ describe("the public profile", () => {
     const markup = profile(FULL)
     expect(markup).toContain("data-missing-image")
     expect(markup.match(/<img/g)?.length).toBe(2) // the avatar and the one real cover
+  })
+
+  it("names what the studio makes in the plural, each a link to that kind", () => {
+    const markup = profile(FULL)
+    const text = textOf(markup)
+    expect(text).toContain("Makes Fonts Templates")
+    expect(markup).toContain('href="?type=font#profile-products"')
+    expect(markup).toContain('href="?type=template#profile-products"')
+  })
+
+  it("filters by kind once there are two kinds, and searches once there are enough products", () => {
+    const two = profile(FULL)
+    expect(two).toMatch(/aria-pressed="true"[^>]*>All/)
+    expect(textOf(two)).toContain("Fonts 1")
+    // Two products: nothing to search through yet.
+    expect(two).not.toContain('placeholder="Search products"')
+
+    const many = profile({
+      ...FULL,
+      products: [
+        ...FULL.products,
+        { ...FULL.products[0]!, key: "b", title: "Birch Serif" },
+        { ...FULL.products[0]!, key: "c", title: "Cedar Mono" },
+      ],
+    })
+    expect(many).toContain('placeholder="Search products"')
+    expect(many).toContain("Price: low to high")
+  })
+
+  it("opens on the view the address asks for", () => {
+    const markup = render(
+      createElement(PublicProfile, {
+        profile: FULL,
+        layout: "responsive",
+        browse: { query: "", type: "template", sort: "featured" },
+      }),
+    )
+    const text = textOf(markup)
+    expect(text).toContain("Campaign Kit")
+    expect(text).not.toContain("Aster Grotesk")
+    expect(text).toContain("Showing 1 of 2 products.")
+  })
+
+  it("draws the controls in a preview but keeps them out of the tab order", () => {
+    const markup = render(
+      createElement(PublicProfile, { profile: FULL, layout: "desktop", interactive: false }),
+    )
+    expect(markup).toMatch(/role="search"[^>]*inert/)
+    // And the Makes chips are words, not links, inside the builder.
+    expect(markup).not.toContain("?type=font")
   })
 
   it("lays out for a phone as well as a desktop", () => {

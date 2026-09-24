@@ -1,4 +1,5 @@
 import { formatLocation } from "@/lib/location/countries"
+import { pluralTypeLabel } from "@/lib/products/types"
 import { parseContact, resolveLinks, type DraftLink, type ResolvedLink } from "./profile-links"
 import type { PublicProfileView, PublicProductCard } from "./types"
 
@@ -35,17 +36,28 @@ export interface ProfilePresentation {
   /**
    * The kinds of product on the page, in the order they first appear. Derived
    * from the products shown, never typed, so it cannot claim a specialty the
-   * catalog does not back up.
+   * catalog does not back up. `label` is the plural ("Fonts"), because it
+   * names what the studio makes rather than one product; `type` is the stored
+   * product type, which the product filter keys on.
    */
-  specialties: string[]
+  specialties: Specialty[]
+}
+
+export interface Specialty {
+  type: string
+  label: string
 }
 
 export interface PresentationProduct {
   key: string
   title: string
+  /** The stored product type ("font"). What the product filter matches on. */
+  productType: string
   typeLabel: string
   imageUrl: string | null
   imageAlt: string
+  /** When the product's public page went live. Absent in the builder's previews. */
+  publishedAt?: string | null
   /** The product's public page. Set on the public route; absent in the builder's previews. */
   href?: string | null
   /** One line about the product, when the page or the product has one. */
@@ -125,6 +137,7 @@ export function presentationFromPublicView(
   const products = cards.map((card) => ({
     key: card.slug,
     title: card.title,
+    productType: card.productType,
     typeLabel: card.typeLabel,
     imageUrl: card.coverAssetId ? media.imageUrl(card.coverAssetId) : null,
     imageAlt: card.coverAlt,
@@ -132,6 +145,7 @@ export function presentationFromPublicView(
     summary: card.summary,
     startingPrice: card.startingPrice,
     channelCount: card.channelCount,
+    publishedAt: card.publishedAt,
   }))
   return {
     handle: profile.handle,
@@ -152,8 +166,9 @@ export function presentationFromPublicView(
   }
 }
 
-function specialtiesOf(products: readonly PresentationProduct[]): string[] {
-  return [...new Set(products.map((product) => product.typeLabel).filter(Boolean))]
+function specialtiesOf(products: readonly PresentationProduct[]): Specialty[] {
+  const types = [...new Set(products.map((product) => product.productType).filter(Boolean))]
+  return types.map((type) => ({ type, label: pluralTypeLabel(type) }))
 }
 
 /**

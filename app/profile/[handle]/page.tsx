@@ -3,10 +3,12 @@ import { notFound, permanentRedirect } from "next/navigation"
 import { PublicShell } from "@/components/public/public-shell"
 import { PublicProfile } from "@/components/public/public-profile"
 import { ShareButton } from "@/components/public/share-button"
+import { PageViewBeacon } from "@/components/public/page-view-beacon"
 import { publicMediaRoutes } from "@/lib/public/media-routes"
 import { NOT_FOUND_METADATA, avatarPath, profileMetadata } from "@/lib/public/profile-metadata"
 import { presentationFromPublicView } from "@/lib/public/profile-presentation"
 import { loadProfileCatalog, resolveProfile } from "@/lib/public/queries"
+import { parseBrowse } from "@/lib/public/product-browse"
 import { publicRoutes, publicUrl } from "@/lib/routes"
 import { appOrigin } from "@/lib/channels/oauth"
 
@@ -41,6 +43,11 @@ interface Params {
   params: Promise<{ handle: string }>
 }
 
+interface PageProps extends Params {
+  /** `q`, `type` and `sort` open the product grid already narrowed; `c` is a campaign label. */
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}
+
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { handle } = await params
   const resolution = await resolveProfile(handle)
@@ -50,7 +57,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return profileMetadata(resolution.value, appOrigin())
 }
 
-export default async function PublicProfilePage({ params }: Params) {
+export default async function PublicProfilePage({ params, searchParams }: PageProps) {
   const { handle } = await params
   const resolution = await resolveProfile(handle)
 
@@ -71,9 +78,13 @@ export default async function PublicProfilePage({ params }: Params) {
     productHref: (slug) => publicRoutes.product(profile.handle, slug),
   })
   const canonical = publicUrl(appOrigin(), publicRoutes.profile(profile.handle))
+  const query = await searchParams
+  const browse = parseBrowse(query)
+  const campaign = typeof query.c === "string" ? query.c : null
 
   return (
     <PublicShell>
+      <PageViewBeacon profileId={profile.id} campaign={campaign} />
       <div className="mx-auto w-full max-w-[1160px] px-5 pt-6 sm:px-8">
         <div className="flex justify-end">
           <ShareButton url={canonical} title={profile.displayName} />
@@ -85,6 +96,7 @@ export default async function PublicProfilePage({ params }: Params) {
           layout="responsive"
           nameAs="h1"
           emptyProductsMessage="No products to show yet."
+          browse={browse}
         />
       </div>
     </PublicShell>

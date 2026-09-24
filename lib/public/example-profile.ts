@@ -24,12 +24,23 @@ export const EXAMPLE_PROFILE: ProfilePresentation = {
     { kind: "website", url: "https://example.com/", label: "example.com" },
     { kind: "instagram", url: "https://www.instagram.com/example/", label: "Instagram" },
   ],
-  specialties: ["Font", "Template"],
+  specialties: [
+    { type: "font", label: "Fonts" },
+    { type: "template", label: "Templates" },
+  ],
   products: [
-    { key: "aster", title: "Aster Grotesk", typeLabel: "Font", imageUrl: null, imageAlt: "" },
+    {
+      key: "aster",
+      title: "Aster Grotesk",
+      productType: "font",
+      typeLabel: "Font",
+      imageUrl: null,
+      imageAlt: "",
+    },
     {
       key: "campaign",
       title: "Campaign Template Collection",
+      productType: "template",
       typeLabel: "Template",
       imageUrl: null,
       imageAlt: "",

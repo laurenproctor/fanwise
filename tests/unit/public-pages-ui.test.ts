@@ -60,6 +60,7 @@ function card(overrides: Partial<PublicProductCard> = {}): PublicProductCard {
     coverAssetId: "0f9f2d4e-1c3b-4a5e-9f7d-2b8c6a1e4d30",
     coverAlt: "Aster Grotesk",
     featured: false,
+    publishedAt: "2026-09-12T18:00:00Z",
     startingPrice: { amount: 48, currency: "USD" },
     channelCount: 3,
     ...overrides,
