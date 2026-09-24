@@ -25,6 +25,20 @@ env:
   NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
   SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key
   NEXT_PUBLIC_APP_URL: http://127.0.0.1:3399
+  # The containers `supabase start` is told not to run. The suites talk to
+  # Postgres, the API gateway, PostgREST, Auth and Storage and nothing else:
+  # no mail is read (signups are auto-confirmed and the e2e email-change test
+  # asserts both outcomes), no image is transformed through the storage
+  # proxy, and there are no edge functions, realtime channels or log
+  # pipelines. Each excluded image is one the runner would otherwise pull
+  # cold on every run; together they were more than half of a ~100 s start.
+  #
+  # The names are the ones CLI 2.101.0 (pinned below) accepts, and they are
+  # not the ones its `--help` prints: `inbucket` is `mailpit`, `analytics` is
+  # `logflare`, `meta` is `postgres-meta`. A name the CLI does not know is a
+  # warning, not an error, and the container starts anyway, so a wrong name
+  # here costs time silently. Check the start step's log after bumping the CLI.
+  SUPABASE_EXCLUDE: edge-runtime,imgproxy,logflare,mailpit,postgres-meta,realtime,studio,supavisor,vector
 
 # Every third-party action is pinned to the full commit of a published release,
 # with the release named beside it. A tag can be moved; a commit cannot. The
@@ -34,6 +48,18 @@ env:
 #
 # Checkout never persists its token into the working tree: no job pushes, so
 # no job's build steps should be able to.
+#
+# The three jobs are independent and start together. Until 24 September 2026
+# e2e waited for verify and tenancy to finish first, which put the slowest job
+# at the end of the slowest chain and made every run about twelve minutes;
+# nothing in e2e uses either job's output (it builds the app itself), so the
+# wait bought nothing but a shorter bill on the runs that fail early. All three
+# are required checks on main (the repository ruleset names them), so a red
+# verify still blocks the merge whether or not e2e ran.
+#
+# Neither database job stops its stack at the end. The runner is discarded
+# with everything on it, and `supabase stop` was twenty seconds on the
+# critical path of each.
 
 jobs:
   # Static checks and unit tests. No database, so this stays fast and is the
@@ -79,20 +105,17 @@ jobs:
         with:
           version: 2.101.0
       - run: pnpm install --frozen-lockfile
-      - run: supabase start
+      - run: supabase start -x "$SUPABASE_EXCLUDE"
       - run: supabase db reset
       - name: Point the suite at the running stack
         run: .github/scripts/export-supabase-env.sh
       # docs/testing.md: a failing tenancy test is fixed or reported, never
       # skipped. Do not add continue-on-error to this step.
       - run: pnpm test:db
-      - if: ${{ always() }}
-        run: supabase stop
 
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    needs: [verify, tenancy]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -108,7 +131,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       # Journeys 1 and 9 sign real users up, so the auth server has to be live.
-      - run: supabase start
+      - run: supabase start -x "$SUPABASE_EXCLUDE"
       - run: supabase db reset
       - name: Point the suite at the running stack
         run: .github/scripts/export-supabase-env.sh
@@ -119,5 +142,3 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
-      - if: ${{ always() }}
-        run: supabase stop

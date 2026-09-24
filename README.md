@@ -41,10 +41,12 @@ pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build
 
 All five must pass on a clean checkout. If they do not, fix that before anything else.
 
-The tenancy and end-to-end suites additionally need the local stack running:
+The tenancy and end-to-end suites additionally need the local stack running. They use
+Postgres, Auth, PostgREST and Storage only, so the stack can be started without the rest,
+which is what CI does (`docs/testing.md`, "What runs before a merge"):
 
 ```bash
-supabase start
+supabase start -x edge-runtime,imgproxy,logflare,mailpit,postgres-meta,realtime,studio,supavisor,vector
 pnpm test:db              # RLS: workspace A cannot reach workspace B
 pnpm test:e2e             # journeys 1 and 9
 ```
