@@ -274,6 +274,41 @@ malformed address is refused without the auth server being asked anything. Neith
 token the email would have carried. What that leaves unproven is the email itself, and it is
 the only part of the flow no automated test touches.
 
+## What runs before a merge
+
+`.github/workflows/ci.yml` runs three jobs, and all three are required checks on `main`:
+
+- **verify**: typecheck, lint, format check, the unit suite and a production build. No
+  database. About two minutes.
+- **tenancy**: `pnpm test:db` against a local Supabase started on the runner.
+- **e2e**: the Playwright suite against its own local Supabase and its own production build,
+  two workers.
+
+The three start together and none waits for another. e2e builds the app itself, so it has no
+use for verify's output, and a red verify blocks the merge whether or not e2e ran. Until
+24 September 2026 e2e waited for the other two, which made every run about twelve minutes;
+now the run is as long as its slowest job.
+
+The two database jobs start only the containers the suites use: Postgres, the API gateway,
+PostgREST, Auth and Storage. Studio, the mail catcher, the image proxy, edge functions,
+realtime, postgres-meta, the connection pooler and the log pipeline are excluded
+(`SUPABASE_EXCLUDE` in the workflow), because each is an image the runner would pull cold on
+every run and none is read by a test: signups are auto-confirmed, the e2e email-change test
+asserts both the sent and the refused outcome, and no storage image is transformed. The same
+lean start works locally, and the tenancy suite was run against exactly this set on
+24 September 2026:
+
+```bash
+supabase start -x edge-runtime,imgproxy,logflare,mailpit,postgres-meta,realtime,studio,supavisor,vector
+```
+
+The names are the ones CLI 2.101.0 accepts, which differ from the ones its `--help` lists;
+an unknown name is a warning and the container starts anyway. `[analytics]` is off in
+`supabase/config.toml` as well, so the log pipeline never starts locally either.
+
+A test that comes to need one of the excluded services removes it from `SUPABASE_EXCLUDE`
+and says why here.
+
 ## Rules
 
 A failing test is fixed or reported, never disabled. A test that is hard to write usually

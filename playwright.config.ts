@@ -106,7 +106,13 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Two in CI, not one. The hosted runner has four cores, and with a single
+  // worker the 58 tests took 3.8 minutes on 24 September 2026, most of it
+  // one browser waiting on one server. The suite is fullyParallel and every
+  // test signs up its own account, so nothing is shared between workers but
+  // the server and the database, and both handle two callers. Locally the
+  // default (half the cores) stands.
+  workers: process.env.CI ? 2 : undefined,
   reporter: "html",
   use: {
     baseURL: BASE_URL,

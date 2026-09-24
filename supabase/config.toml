@@ -53,7 +53,11 @@ subject = "Reset your Fanwise password"
 content_path = "./supabase/templates/recovery.html"
 
 [analytics]
-enabled = true
+# Off. The log pipeline (Logflare and Vector) is the heaviest pair of
+# containers in the stack and nothing here reads it; the suites and the app
+# talk to Postgres, Auth, PostgREST and Storage. Studio's Logs tab is the only
+# thing that misses it. Local only: `supabase config push` does not send it.
+enabled = false
 port = 54427
 
 # --- Hosted project overrides -----------------------------------------------
