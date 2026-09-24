@@ -2,6 +2,7 @@ import { FONT_PROBLEM_TEXT } from "./detected"
 import {
   archiveFontProblems,
   archiveFonts,
+  archiveLicenseDocuments,
   FONT_SECTIONS,
   GRID_SHAPES,
   MIN_HERO_WIDTH,
@@ -551,7 +552,10 @@ export function evaluateFontReadiness(input: FontReadinessInput): FontReadiness 
     scope: ALL,
     label: "Attach a EULA",
     message: "A full license document, as a file or a link, alongside the summary.",
-    satisfied: input.hasLicenseFile || metadata.eulaUrl !== undefined,
+    satisfied:
+      input.hasLicenseFile ||
+      files.some((file) => archiveLicenseDocuments(file).length > 0) ||
+      metadata.eulaUrl !== undefined,
   })
 
   /* --------------------------------------------------------------- drafts */

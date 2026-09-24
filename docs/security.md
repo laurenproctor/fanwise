@@ -294,6 +294,15 @@ short-lived signed URL without an attachment header. The mime type it checks is
 the one the finalize job sniffed, never the browser's. The workspace fetches the
 font and hands the buffer to the FontFace API, so `font-src` is not widened.
 
+With `?entry=<path>` the same route serves one font out of a ZIP package, for
+the live preview of a family uploaded as one ZIP. The package is never served
+inline. The entry must be listed in the row's `metadata.archive` as a font the
+finalize job read (so the path was chosen from the job's own listing, not by
+the caller), the package must be under 128 MB (it is downloaded whole and read
+in the request), the entry is decompressed under the same 64 MB ceiling the job
+used, and the bytes are sniffed again before they go out with `nosniff`. A path
+that fails any of these is a 404, the same as a row the reader cannot select.
+
 If a future step ever accepts a client-supplied storage path, all three of these
 collapse at once.
 

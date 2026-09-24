@@ -153,6 +153,15 @@ export function readArchive(metadata: unknown): ArchiveReading {
     : { kind: "problem", problem: parsed.data.archiveProblem }
 }
 
+/** Whether a package's contents list `entryPath` as a font the job read. */
+export function isReadPackagedFont(metadata: unknown, entryPath: string): boolean {
+  const archive = readArchive(metadata)
+  if (archive.kind !== "archive") return false
+  return archive.contents.entries.some(
+    (entry) => entry.path === entryPath && entry.kind === "font" && entry.font !== undefined,
+  )
+}
+
 export const ARCHIVE_PROBLEM_TEXT: Record<ArchiveProblem, string> = {
   malformed:
     "This ZIP file could not be opened. It may be damaged; zip the folder again and replace it.",

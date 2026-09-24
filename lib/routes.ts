@@ -95,7 +95,9 @@ export const routes = {
   publicProfileCities: (workspace: string, country: string, query: string) =>
     `/${workspace}/profile/builder/cities?country=${encodeURIComponent(country)}&q=${encodeURIComponent(query)}`,
   assetDownload: (workspace: string, assetId: string) => `/${workspace}/assets/${assetId}/download`,
-  assetPreview: (workspace: string, assetId: string) => `/${workspace}/assets/${assetId}/preview`,
+  /** An asset rendered inline; with `entry`, one font read out of a ZIP package. */
+  assetPreview: (workspace: string, assetId: string, entry?: string) =>
+    `/${workspace}/assets/${assetId}/preview${entry ? `?entry=${encodeURIComponent(entry)}` : ""}`,
 } as const
 
 /**

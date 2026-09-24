@@ -1,7 +1,7 @@
 import { brotliDecompressSync, inflateRawSync, inflateSync } from "node:zlib"
 import sharp from "sharp"
 import { isDerivableImage } from "@/lib/products/sniff"
-import { inspectArchive, type ArchiveDecompressors } from "./archive"
+import { inspectArchive, readArchiveFont, type ArchiveDecompressors } from "./archive"
 import { readArchive, readFontAsset } from "./detected"
 import { isFontMimeType } from "./font-mime"
 import { inspectFont } from "./inspect"
@@ -59,6 +59,16 @@ export async function describeUpload(
   }
 
   return null
+}
+
+/**
+ * One font's bytes out of a stored package, for the preview route.
+ *
+ * Same decompressors and the same ceilings as the reading the finalize job
+ * made, so a font the contents list shows as read is a font this can serve.
+ */
+export function readPackagedFont(data: Buffer, entryPath: string) {
+  return readArchiveFont(data, entryPath, decompressors)
 }
 
 /**
