@@ -5,6 +5,7 @@ import { woocommerceAdapter } from "./adapters/woocommerce"
 import { etsyAdapter } from "./adapters/etsy"
 import { gumroadAdapter } from "./adapters/gumroad"
 import { behanceAdapter } from "./adapters/behance"
+import { polarAdapter } from "./adapters/polar"
 import type { ChannelAdapter, ChannelKey } from "./types"
 
 /**
@@ -27,6 +28,7 @@ const adapters: Record<ChannelKey, ChannelAdapter> = {
   etsy: etsyAdapter,
   gumroad: gumroadAdapter,
   behance: behanceAdapter,
+  polar: polarAdapter,
 }
 
 export function listAdapters(): ChannelAdapter[] {

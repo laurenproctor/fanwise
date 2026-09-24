@@ -30,7 +30,10 @@ founder's request ahead of the evidence its plan waits for; code complete, no mi
 unrun. B10, Gumroad (`docs/channels/gumroad.md`), was opened on 16 September 2026 at the
 founder's request ahead of A7's exit, on the B8 precedent, and is done: code complete with
 one catalog migration, both in production, and its exit, journey 13, passed on 17 September
-2026 against the live seller account. B9, Behance
+2026 against the live seller account. B13, Polar (`docs/channels/polar.md`), was assessed,
+opened and built on 23 September 2026 at the founder's request, on the same precedent: code
+complete with one catalog migration, exit unrun, waiting on the OAuth client and organization
+in decision 32. B9, Behance
 (`docs/channels/behance.md`), was opened on 17 September 2026 at the founder's request ahead
 of A8, which it was planned to wait on: it builds the assisted machinery A8 would have
 (listing choices, channel-ordered handoff, handoff renditions, mark submitted with URL
@@ -168,7 +171,7 @@ Integration: mock Shopify, Etsy, WooCommerce, Anthropic and Stripe. Cover OAuth 
 handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
 AI failure.
 
-E2E: the fifteen journeys in `docs/testing.md`. Journey 9 (workspace A cannot reach
+E2E: the sixteen journeys in `docs/testing.md`. Journey 9 (workspace A cannot reach
 workspace B) must never be skipped.
 
 ## Definition of done

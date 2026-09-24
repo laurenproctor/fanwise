@@ -31,6 +31,7 @@ export const CHANNEL_KEYS = [
   "etsy",
   "gumroad",
   "behance",
+  "polar",
 ] as const
 export type ChannelKey = (typeof CHANNEL_KEYS)[number]
 export const channelKeySchema = z.enum(CHANNEL_KEYS)

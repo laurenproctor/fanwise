@@ -652,6 +652,31 @@ upload, and an update that does not resend it deletes the file. So `metadata.fil
 cache: losing it would make the next update remove the buyer's download, and the adapter
 refuses an update whose stored files disagree with the product's rather than guess.
 
+## B13: Polar
+
+Assessed, planned and built 23 September 2026, exit unrun. The migration is
+`20260923120000_polar_channel`, not yet applied to the hosted project.
+
+One row in `channels`: key `polar`, `integration_type = api`, `billable = true`, provisionally;
+decision 32 asks whether a checkout with no marketplace should bill at the marketplace price.
+No new table. The authorization reuses `channel_oauth_states`, including `code_verifier`.
+
+What the existing columns hold: `external_account_id` is the Polar organization id, because
+Polar's tokens are user-scoped and a connection is to one organization;
+`external_account_name` the organization name; `metadata.slug`, `metadata.currencyCode` and
+`metadata.status`; `scopes` is the seven in the spec's §9; `expires_at` is null, because the
+refresh token's life is undocumented. Credentials are `{ accessToken, refreshToken, expiresAt }`,
+sealed, and the access token is refreshed and re-sealed by the adapter when fewer than ten
+minutes remain of its ten days. On the listing, `external_listing_id` is the product id, a
+UUID; `external_url` is the checkout link's URL, since Polar has no product page; and
+`metadata` holds the sent files and images as `{ assetId, fileId }`, the benefit id, and
+the checkout link's id and URL.
+
+One thing this channel writes that no other does: its own listing id into the provider's
+record, as `metadata.fanwise_listing_id` on the Polar product and on the checkout link.
+That stamp is what makes a publish resumable (spec §7): the adapter searches for it before
+it creates, so a create whose response was lost is found and finished, never repeated.
+
 ## Public creator pages
 
 Built. Migration `20260912010000_public_creator_pages`.

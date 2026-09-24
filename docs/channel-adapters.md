@@ -32,6 +32,7 @@ Current reality, from `docs/channel-feasibility.md`:
 | Adobe Stock | assisted | no | no | no | no | no |
 | MyFonts | assisted | no | no | no | no | no |
 | Gumroad | api | yes | yes | yes | **yes**, 20 GB by presigned multipart upload, built at B10 | yes |
+| Polar | api | yes | yes | yes | **yes**, 10 GB by presigned multipart upload into a benefit Polar delivers, built at B13 | yes |
 | Envato | assisted | no | no | yes | no | no |
 
 **Behance note.** Every `no` on that row is the permanent kind: the provider cannot. Its API
@@ -41,6 +42,12 @@ is read-only and closed, and Adobe's terms forbid the alternative. Built at B9 o
 **Gumroad note.** Its row changed on 11 September 2026 from assisted to api: the product
 endpoints this matrix recorded as missing shipped in April 2026. Built at B10 on 16 September 2026 and its exit passed on 17 September 2026; the spec is
 `docs/channels/gumroad.md`.
+
+**Polar note.** Added 23 September 2026 and built at B13 the same day; the spec is
+`docs/channels/polar.md`. The `yes` under transactions is the second kind: orders and an
+`order.paid` webhook exist and arrive at B5. Polar is a checkout rather than a marketplace,
+with no category, no tags and no product page, so its `fields` are title, description and
+price only.
 
 **Shopify note, resolved at A5.** The Admin API creates products but has no API for
 attaching a buyer-downloadable file, and Shopify's own Digital Downloads app exposes none.
