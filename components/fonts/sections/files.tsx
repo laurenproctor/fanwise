@@ -16,7 +16,7 @@ import {
 } from "@/lib/fonts/detected"
 import { collectDroppedFiles, pickedFolder } from "@/lib/fonts/dropped-files"
 import { FIELD_IDS } from "@/lib/fonts/readiness"
-import { unreadFontFiles, type FontFileView } from "@/lib/fonts/workspace"
+import { isLicenseDocumentPath, unreadFontFiles, type FontFileView } from "@/lib/fonts/workspace"
 import type { AssetType } from "@/lib/products/types"
 import type { SectionContext } from "../context"
 import {
@@ -896,7 +896,15 @@ function describeEntry(entry: ArchiveEntry): string {
     )
   }
   if (entry.problem) return ARCHIVE_ENTRY_PROBLEM_TEXT[entry.problem]
-  return { font: "Font", document: "Document", image: "Image", other: "Other file" }[entry.kind]
+  // Every file in a package is delivered as uploaded. What each one does for
+  // the listing is said here, so nothing inside a ZIP is unaccounted for: fonts
+  // feed the family and the preview, a license document counts as the EULA, and
+  // an image is delivered but only shown if it is uploaded as a specimen.
+  if (entry.kind === "document") {
+    return isLicenseDocumentPath(entry.path) ? "License document · counts as the EULA" : "Document"
+  }
+  if (entry.kind === "image") return "Image · delivered; add it under Specimen images to show it"
+  return { font: "Font", other: "Other file · delivered as is" }[entry.kind]
 }
 
 function Detail({ term, value }: { term: string; value: string | undefined }) {

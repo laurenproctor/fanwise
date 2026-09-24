@@ -5,6 +5,7 @@ import type { Decompressors } from "./sfnt"
 import { sniffMimeType } from "@/lib/products/sniff"
 import { ZipReadError, listZipEntries, readZipEntry, type ZipEntry } from "@/lib/products/zip"
 import { isFontMimeType } from "./font-mime"
+import { ARCHIVE_LIMITS, MAX_PREVIEWABLE_PACKAGE_BYTES } from "./archive-limits"
 
 /**
  * Looks inside a ZIP package and reads every font it holds.
@@ -21,16 +22,7 @@ import { isFontMimeType } from "./font-mime"
  * still delivered; only the reading is partial, and the contents say so.
  */
 
-export const ARCHIVE_LIMITS = {
-  /** Entries kept in the list. Beyond this the contents are marked truncated. */
-  maxEntries: 500,
-  /** Fonts actually decompressed and read. Beyond this an entry says not_read. */
-  maxFontsRead: 100,
-  /** One entry's bytes after decompression. */
-  maxEntryBytes: 64 * 1024 * 1024,
-  /** All entries' bytes after decompression, across the whole reading. */
-  maxTotalBytes: 256 * 1024 * 1024,
-} as const
+export { ARCHIVE_LIMITS, MAX_PREVIEWABLE_PACKAGE_BYTES }
 
 const DOCUMENT_EXTENSIONS = new Set(["pdf", "txt", "md", "rtf", "html", "htm", "doc", "docx"])
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"])
@@ -107,4 +99,42 @@ function kindOf(path: string): ArchiveEntry["kind"] {
   if (DOCUMENT_EXTENSIONS.has(extension)) return "document"
   if (IMAGE_EXTENSIONS.has(extension)) return "image"
   return "other"
+}
+
+/**
+ * One font's bytes out of a package, for the live preview.
+ *
+ * The package is what buyers download and it stays in storage as uploaded;
+ * this reads a single entry into memory and hands it back, the way the
+ * inspector above does, so the workspace can set the storefront preview in a
+ * face that was uploaded inside a ZIP. The entry is found by the cleaned path
+ * the contents list shows, sniffed like a loose upload, and refused unless it
+ * really is a font: nothing else is ever served out of a package.
+ */
+export type ArchiveFontRead =
+  | { ok: true; bytes: Buffer; mimeType: string }
+  | { ok: false; problem: "not_found" | "not_a_font" | "unreadable" }
+
+export function readArchiveFont(
+  data: Buffer,
+  entryPath: string,
+  decompress: ArchiveDecompressors,
+): ArchiveFontRead {
+  const listing = listZipEntries(data, { maxEntries: ARCHIVE_LIMITS.maxEntries })
+  if (!listing.ok) return { ok: false, problem: "unreadable" }
+
+  const entry = listing.entries.find((candidate) => candidate.path === entryPath)
+  if (!entry || entry.isDirectory) return { ok: false, problem: "not_found" }
+  if (kindOf(entry.path) !== "font") return { ok: false, problem: "not_a_font" }
+
+  let bytes: Buffer
+  try {
+    bytes = readZipEntry(data, entry, decompress.inflateRaw, ARCHIVE_LIMITS.maxEntryBytes)
+  } catch {
+    return { ok: false, problem: "unreadable" }
+  }
+
+  const mimeType = sniffMimeType(bytes)
+  if (!isFontMimeType(mimeType)) return { ok: false, problem: "not_a_font" }
+  return { ok: true, bytes, mimeType }
 }

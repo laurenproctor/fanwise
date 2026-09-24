@@ -364,10 +364,7 @@ export function FontWorkspace(props: FontWorkspaceProps) {
     setUploadsBusy,
   }
 
-  const styles = useMemo(
-    () => previewStyles(metadata, props.family, props.files),
-    [metadata, props.family, props.files],
-  )
+  const styles = useMemo(() => previewStyles(metadata, props.family), [metadata, props.family])
 
   /*
    * Publish is offered only where some connected channel can publish. Absent

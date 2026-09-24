@@ -256,7 +256,7 @@ export function FamilySection({ ctx }: { ctx: SectionContext }) {
 }
 
 function StyleRow({ style, detected }: { style: FontStyle; detected: DetectedStyle | undefined }) {
-  const hasFiles = detected !== undefined && detected.assetIds.length > 0
+  const hasFiles = detected !== undefined && detected.sources.length > 0
   const edited = detected !== undefined && detected.name !== style.name
   return (
     <tr className="border-b border-[var(--color-rule-2)] last:border-b-0">
@@ -283,7 +283,7 @@ function StyleRow({ style, detected }: { style: FontStyle; detected: DetectedSty
           {hasFiles ? (
             <>
               <span className="sr-only">
-                {detected!.assetIds.length === 1 ? "1 file" : `${detected!.assetIds.length} files`}
+                {detected!.sources.length === 1 ? "1 file" : `${detected!.sources.length} files`}
               </span>
               <StatusIcon status="complete" size={18} />
             </>

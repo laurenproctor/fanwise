@@ -10,6 +10,7 @@ import type { Product, ProductAsset } from "@/lib/products/types"
 import { routes } from "@/lib/routes"
 import { evaluateFontReadiness, type FontReadiness } from "./readiness"
 import {
+  archiveLicenseDocuments,
   detectFamily,
   fontFileViews,
   specimenImageViews,
@@ -145,9 +146,11 @@ export async function loadFontWorkspace(params: {
   const images = specimenImageViews(assets)
   const values = productValues(product)
   const metadata = fontMetadataOf(product)
-  const hasLicenseFile = assets.some(
-    (asset) => asset.asset_type === "license" && asset.asset_state === "ready",
-  )
+  // A license uploaded on its own, or one zipped in with the fonts: a family
+  // packaged with its EULA has a license document attached.
+  const hasLicenseFile =
+    assets.some((asset) => asset.asset_type === "license" && asset.asset_state === "ready") ||
+    files.some((file) => archiveLicenseDocuments(file).length > 0)
 
   return {
     assets,

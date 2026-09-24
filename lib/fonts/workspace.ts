@@ -1,4 +1,5 @@
 import { readAltTextSource, type AltTextSource } from "@/lib/products/image-metadata"
+import { ARCHIVE_LIMITS, MAX_PREVIEWABLE_PACKAGE_BYTES } from "./archive-limits"
 import { KNOWN_SCRIPTS } from "./coverage"
 import {
   FONT_FORMATS,
@@ -170,9 +171,49 @@ export function unreadFontFiles(files: readonly FontFileView[]): FontFileView[] 
  * package, is still processing, or could not be opened.
  */
 export function archiveFonts(file: FontFileView): DetectedFont[] {
+  return archiveFontEntries(file).map((entry) => entry.font)
+}
+
+/** Each font read inside a package, with where in the package it sits. */
+export function archiveFontEntries(
+  file: FontFileView,
+): Array<{ path: string; byteSize: number; font: DetectedFont }> {
   if (file.kind !== "archive" || file.state !== "ready" || file.archive.kind !== "archive")
     return []
-  return file.archive.contents.entries.flatMap((entry) => (entry.font ? [entry.font] : []))
+  return file.archive.contents.entries.flatMap((entry) =>
+    entry.font ? [{ path: entry.path, byteSize: entry.byteSize, font: entry.font }] : [],
+  )
+}
+
+/**
+ * Whether the preview route can serve a font out of this package.
+ *
+ * A packaged font is read in a request, by downloading the package and reading
+ * one entry, so both the package and the entry are bounded. Past either bound
+ * the font is still delivered and still detected; it is only not shown.
+ */
+export function isPreviewablePackage(file: FontFileView): boolean {
+  return file.byteSize !== null && file.byteSize <= MAX_PREVIEWABLE_PACKAGE_BYTES
+}
+
+const LICENSE_DOCUMENT = /licen[cs]e|eula|terms/i
+
+/** Whether a path inside a package names a license document, by its filename. */
+export function isLicenseDocumentPath(path: string): boolean {
+  return LICENSE_DOCUMENT.test(path.split("/").pop() ?? path)
+}
+
+/**
+ * Documents inside a package that read as a license: `License.pdf`,
+ * `EULA.txt` and the like. A family zipped with its license has a license
+ * document attached, and the licensing rules say so rather than asking for one.
+ */
+export function archiveLicenseDocuments(file: FontFileView): string[] {
+  if (file.kind !== "archive" || file.state !== "ready" || file.archive.kind !== "archive")
+    return []
+  return file.archive.contents.entries.flatMap((entry) =>
+    entry.kind === "document" && isLicenseDocumentPath(entry.path) ? [entry.path] : [],
+  )
 }
 
 /** Font entries inside a package that could not be read, with why. */
@@ -188,6 +229,20 @@ export function archiveFontProblems(
 
 /* ------------------------------------------------------------------- family */
 
+/**
+ * Where one reading of a style came from: a loose file, or an entry inside a
+ * package. `loadable` says whether the preview route can serve those bytes,
+ * which for a packaged font depends on the package being small enough to open
+ * in a request.
+ */
+export interface StyleSource {
+  assetId: string
+  /** The path inside the package, or null for a loose file. */
+  entryPath: string | null
+  format: FontFormat
+  loadable: boolean
+}
+
 export interface DetectedStyle {
   key: string
   name: string
@@ -196,6 +251,9 @@ export interface DetectedStyle {
   italic?: boolean
   isVariable: boolean
   formats: FontFormat[]
+  /** Every file this style was read from, packaged fonts included. */
+  sources: StyleSource[]
+  /** The distinct product assets behind `sources`. */
   assetIds: string[]
 }
 
@@ -239,8 +297,27 @@ export function detectFamily(files: readonly FontFileView[]): DetectedFamily {
   // uploaded as one ZIP is detected exactly as it would be from its files.
   const readings = files.flatMap((file) => {
     if (file.state !== "ready" || file.duplicateOf !== null) return []
-    if (file.reading.kind === "font") return [{ file, font: file.reading.font }]
-    return archiveFonts(file).map((font) => ({ file, font }))
+    if (file.reading.kind === "font") {
+      const font = file.reading.font
+      const source: StyleSource = {
+        assetId: file.id,
+        entryPath: null,
+        format: font.format,
+        loadable: true,
+      }
+      return [{ file, font, source }]
+    }
+    const previewable = isPreviewablePackage(file)
+    return archiveFontEntries(file).map(({ path, byteSize, font }) => ({
+      file,
+      font,
+      source: {
+        assetId: file.id,
+        entryPath: path,
+        format: font.format,
+        loadable: previewable && byteSize <= ARCHIVE_LIMITS.maxEntryBytes,
+      } satisfies StyleSource,
+    }))
   })
 
   const byStyle = new Map<string, Array<(typeof readings)[number]>>()
@@ -271,7 +348,8 @@ export function detectFamily(files: readonly FontFileView[]): DetectedFamily {
       italic: best.italic,
       isVariable: best.isVariable,
       formats: FONT_FORMATS.filter((format) => group.some((g) => g.font.format === format)),
-      assetIds: group.map((g) => g.file.id),
+      sources: group.map((g) => g.source),
+      assetIds: [...new Set(group.map((g) => g.file.id))],
     })
   }
   styles.sort((a, b) => (a.weight ?? 400) - (b.weight ?? 400) || a.name.localeCompare(b.name))

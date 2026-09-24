@@ -5,6 +5,7 @@ import { detectLanguages, detectScripts, groupFeatures, mergeRanges } from "@/li
 import type { DetectedFont } from "@/lib/fonts/detected"
 import {
   adoptionPatch,
+  archiveLicenseDocuments,
   cropLoss,
   detectFamily,
   fontFileViews,
@@ -15,6 +16,8 @@ import {
   unreadFontFiles,
 } from "@/lib/fonts/workspace"
 import { evaluateFontReadiness, type FontReadinessInput } from "@/lib/fonts/readiness"
+import { previewSource, previewStyles } from "@/components/fonts/live-preview"
+import { MAX_PREVIEWABLE_PACKAGE_BYTES } from "@/lib/fonts/archive-limits"
 import {
   combinePatches,
   isEmptyPatch,
@@ -384,6 +387,86 @@ describe("a family uploaded as one package", () => {
     expect(byKey.get("files.packagedFonts")?.label).toBe(
       "Check the font file inside blimp-display.zip",
     )
+  })
+
+  it("knows where inside the package each style was read from", () => {
+    const family = detectFamily(fontFileViews([packaged]))
+    const regular = family.styles[0]!
+    expect(regular.assetIds).toEqual([packaged.id])
+    expect(regular.sources).toEqual([
+      {
+        assetId: packaged.id,
+        entryPath: "OTF/BlimpDisplay-Regular.otf",
+        format: "ttf",
+        loadable: true,
+      },
+      {
+        assetId: packaged.id,
+        entryPath: "Web/BlimpDisplay-Regular.woff2",
+        format: "woff2",
+        loadable: true,
+      },
+    ])
+  })
+
+  it("shows the preview from the webfont inside the package", () => {
+    const files = fontFileViews([packaged])
+    const family = detectFamily(files)
+    const styles = previewStyles({ kind: "font" }, family)
+    expect(styles.map((style) => style.source)).toEqual([
+      { assetId: packaged.id, entryPath: "Web/BlimpDisplay-Regular.woff2" },
+      { assetId: packaged.id, entryPath: "OTF/BlimpDisplay-Bold.otf" },
+    ])
+    expect(styles.every((style) => !style.unloadable)).toBe(true)
+  })
+
+  it("prefers a loose webfont over a packaged desktop file, and a package over nothing", () => {
+    const loose = fontAsset(
+      blimp("Bold", { weight: 700 }),
+      { filename: "BlimpDisplay-Bold.woff2", mime_type: "font/woff2" },
+      buildWoff2,
+    )
+    const files = fontFileViews([packaged, loose])
+    const family = detectFamily(files)
+    const bold = family.styles.find((style) => style.name === "Blimp Display Bold")!
+    expect(previewSource(bold.sources)).toEqual({ assetId: loose.id, entryPath: null })
+  })
+
+  it("says a font inside a package too large to open is delivered but not previewable", () => {
+    const huge = { ...packaged, byte_size: MAX_PREVIEWABLE_PACKAGE_BYTES + 1 }
+    const files = fontFileViews([huge])
+    const family = detectFamily(files)
+    expect(family.readCount).toBe(3)
+    expect(family.styles[0]!.sources.every((source) => !source.loadable)).toBe(true)
+    const styles = previewStyles({ kind: "font" }, family)
+    expect(styles[0]).toMatchObject({ source: null, unloadable: true })
+  })
+
+  it("counts a license document zipped in with the fonts as the EULA", () => {
+    const files = fontFileViews([packaged])
+    expect(archiveLicenseDocuments(files[0]!)).toEqual(["License.pdf"])
+    const readiness = evaluateFontReadiness(
+      readinessInput({ files, family: detectFamily(files), hasLicenseFile: false }),
+    )
+    expect(readiness.rules.find((rule) => rule.key === "licensing.eula")?.satisfied).toBe(true)
+
+    const withoutLicense = fontFileViews([
+      {
+        ...packaged,
+        metadata: {
+          archive: { ...(packaged.metadata as { archive: object }).archive, entries: [] },
+        },
+      },
+    ])
+    expect(archiveLicenseDocuments(withoutLicense[0]!)).toEqual([])
+    const bare = evaluateFontReadiness(
+      readinessInput({
+        files: withoutLicense,
+        family: detectFamily(withoutLicense),
+        hasLicenseFile: false,
+      }),
+    )
+    expect(bare.rules.find((rule) => rule.key === "licensing.eula")?.satisfied).toBe(false)
   })
 })
 

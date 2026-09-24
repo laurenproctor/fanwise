@@ -3,31 +3,49 @@
 import { useEffect, useMemo, useState } from "react"
 import { routes } from "@/lib/routes"
 import type { FontMetadata } from "@/lib/products/metadata"
-import type { DetectedFamily, FontFileView } from "@/lib/fonts/workspace"
+import type { DetectedFamily, StyleSource } from "@/lib/fonts/workspace"
 import type { FontFormat } from "@/lib/fonts/detected"
 
 /**
  * The storefront, as a buyer would first see this family.
  *
  * Set in the uploaded font itself wherever a file can be loaded. The bytes come
- * through the workspace's own preview route (an RLS read and a short-lived
- * signed URL) and go to the FontFace API as a buffer, so no stylesheet and no
- * cross-origin font URL is involved. A file the browser refuses to load leaves
- * the preview in the interface's display face with a sentence saying so; the
- * editor beside it is never affected.
+ * through the workspace's own preview route (an RLS read, then a short-lived
+ * signed URL for a loose file or the one entry read out of a ZIP package) and
+ * go to the FontFace API as a buffer, so no stylesheet and no cross-origin
+ * font URL is involved. A family uploaded as one package is shown from the
+ * fonts inside it, the same as from loose files. A file the browser refuses to
+ * load leaves the preview in the interface's display face with a sentence
+ * saying so; the editor beside it is never affected.
  */
 
 type FaceState =
   { kind: "none" } | { kind: "loading" } | { kind: "ready"; family: string } | { kind: "failed" }
 
+/** What the preview loads: a loose font file, or one font inside a package. */
+export interface PreviewSource {
+  assetId: string
+  entryPath: string | null
+}
+
+/** One key per loadable font, so two entries of one package never share a face. */
+function sourceKey(source: PreviewSource): string {
+  return source.entryPath === null ? source.assetId : `${source.assetId}:${source.entryPath}`
+}
+
 const faces = new Map<string, Promise<string>>()
 
-function loadFace(workspaceSlug: string, assetId: string): Promise<string> {
-  const cached = faces.get(assetId)
+function loadFace(workspaceSlug: string, source: PreviewSource): Promise<string> {
+  const key = sourceKey(source)
+  const cached = faces.get(key)
   if (cached) return cached
-  const family = `fanwise-preview-${assetId}`
+  // A CSS family name from the key, kept to characters a font-family value
+  // takes without quoting trouble; the key itself stays the cache's.
+  const family = `fanwise-preview-${key.replace(/[^A-Za-z0-9-]/g, "-")}`
   const promise = (async () => {
-    const response = await fetch(routes.assetPreview(workspaceSlug, assetId))
+    const response = await fetch(
+      routes.assetPreview(workspaceSlug, source.assetId, source.entryPath ?? undefined),
+    )
     if (!response.ok) throw new Error(`preview ${response.status}`)
     const face = new FontFace(family, await response.arrayBuffer())
     await face.load()
@@ -35,31 +53,37 @@ function loadFace(workspaceSlug: string, assetId: string): Promise<string> {
     return family
   })()
   // A failure is not cached: the next attempt may be after a replacement.
-  promise.catch(() => faces.delete(assetId))
-  faces.set(assetId, promise)
+  promise.catch(() => faces.delete(key))
+  faces.set(key, promise)
   return promise
 }
 
-function useFontFace(workspaceSlug: string, assetId: string | null): FaceState {
-  const [state, setState] = useState<{ assetId: string | null; face: FaceState }>({
-    assetId: null,
+function useFontFace(workspaceSlug: string, source: PreviewSource | null): FaceState {
+  // The source is taken apart into primitives so the effect keys on what it
+  // names, not on an object rebuilt every render.
+  const assetId = source?.assetId ?? null
+  const entryPath = source?.entryPath ?? null
+  const key = assetId ? sourceKey({ assetId, entryPath }) : null
+  const [state, setState] = useState<{ key: string | null; face: FaceState }>({
+    key: null,
     face: { kind: "none" },
   })
 
   useEffect(() => {
     if (!assetId || typeof FontFace === "undefined") return
+    const key = sourceKey({ assetId, entryPath })
     let cancelled = false
-    loadFace(workspaceSlug, assetId).then(
-      (family) => !cancelled && setState({ assetId, face: { kind: "ready", family } }),
-      () => !cancelled && setState({ assetId, face: { kind: "failed" } }),
+    loadFace(workspaceSlug, { assetId, entryPath }).then(
+      (family) => !cancelled && setState({ key, face: { kind: "ready", family } }),
+      () => !cancelled && setState({ key, face: { kind: "failed" } }),
     )
     return () => {
       cancelled = true
     }
-  }, [workspaceSlug, assetId])
+  }, [workspaceSlug, assetId, entryPath])
 
-  if (!assetId) return { kind: "none" }
-  return state.assetId === assetId ? state.face : { kind: "loading" }
+  if (!key) return { kind: "none" }
+  return state.key === key ? state.face : { kind: "loading" }
 }
 
 /** Webfonts load fastest and are what a storefront would serve. */
@@ -68,37 +92,38 @@ const LOAD_PREFERENCE: readonly FontFormat[] = ["woff2", "woff", "otf", "ttf"]
 export interface PreviewStyle {
   key: string
   name: string
-  assetId: string | null
+  /** The file the preview loads for this style, or null when none can be. */
+  source: PreviewSource | null
+  /**
+   * True when the style has files but none the preview can open: a font inside
+   * a package too large to read in a request. Delivered, detected, not shown.
+   */
+  unloadable: boolean
 }
 
-export function previewStyles(
-  metadata: FontMetadata,
-  family: DetectedFamily,
-  files: readonly FontFileView[],
-): PreviewStyle[] {
-  const formatOf = new Map(files.map((file) => [file.id, file.format]))
-  const loadable = (assetIds: readonly string[]) =>
-    [...assetIds].sort(
-      (a, b) =>
-        LOAD_PREFERENCE.indexOf(formatOf.get(a) ?? "ttf") -
-        LOAD_PREFERENCE.indexOf(formatOf.get(b) ?? "ttf"),
-    )[0] ?? null
+/**
+ * Which file to show a style in: the fastest loadable format, from a loose file
+ * or from inside a package, on equal terms.
+ */
+export function previewSource(sources: readonly StyleSource[]): PreviewSource | null {
+  const best = sources
+    .filter((source) => source.loadable)
+    .sort((a, b) => LOAD_PREFERENCE.indexOf(a.format) - LOAD_PREFERENCE.indexOf(b.format))[0]
+  return best ? { assetId: best.assetId, entryPath: best.entryPath } : null
+}
 
+export function previewStyles(metadata: FontMetadata, family: DetectedFamily): PreviewStyle[] {
   const detectedByKey = new Map(family.styles.map((style) => [style.key, style]))
   const canonical = metadata.styles ?? []
-  const source =
-    canonical.length > 0
-      ? canonical.map((style) => ({
-          key: style.key,
-          name: style.name,
-          assetId: loadable(detectedByKey.get(style.key)?.assetIds ?? []),
-        }))
-      : family.styles.map((style) => ({
-          key: style.key,
-          name: style.name,
-          assetId: loadable(style.assetIds),
-        }))
-  return source
+  const describe = (key: string, name: string, sources: readonly StyleSource[]) => {
+    const source = previewSource(sources)
+    return { key, name, source, unloadable: source === null && sources.length > 0 }
+  }
+  return canonical.length > 0
+    ? canonical.map((style) =>
+        describe(style.key, style.name, detectedByKey.get(style.key)?.sources ?? []),
+      )
+    : family.styles.map((style) => describe(style.key, style.name, style.sources))
 }
 
 function shortStyleName(styleName: string, familyName: string): string {
@@ -130,13 +155,13 @@ export function LivePreview({
   const selected = useMemo(
     () =>
       styles.find((style) => style.key === styleKey) ??
-      styles.find((style) => style.assetId !== null && /regular|book|normal/i.test(style.name)) ??
-      styles.find((style) => style.assetId !== null) ??
+      styles.find((style) => style.source !== null && /regular|book|normal/i.test(style.name)) ??
+      styles.find((style) => style.source !== null) ??
       styles[0] ??
       null,
     [styles, styleKey],
   )
-  const face = useFontFace(workspaceSlug, selected?.assetId ?? null)
+  const face = useFontFace(workspaceSlug, selected?.source ?? null)
 
   const displayName = name.trim() || "Untitled family"
   const styleCount = metadata.styleCount ?? styles.length
@@ -157,7 +182,9 @@ export function LivePreview({
     face.kind === "none"
       ? styles.length === 0
         ? "No font file yet. Showing Fanwise’s display face until you upload one."
-        : "This style has no loadable file. Showing Fanwise’s display face."
+        : selected?.unloadable
+          ? "This style’s font is inside a package too large to open for preview. Buyers still receive it; upload the font file on its own to see it here."
+          : "This style has no loadable file. Showing Fanwise’s display face."
       : face.kind === "loading"
         ? `Loading ${selected?.name ?? "the font"}…`
         : face.kind === "failed"
@@ -257,7 +284,11 @@ export function LivePreview({
               {styles.map((style) => (
                 <option key={style.key} value={style.key}>
                   {style.name}
-                  {style.assetId === null ? " (no file)" : ""}
+                  {style.source === null
+                    ? style.unloadable
+                      ? " (not previewable)"
+                      : " (no file)"
+                    : ""}
                 </option>
               ))}
             </select>

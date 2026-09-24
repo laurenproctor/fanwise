@@ -132,7 +132,15 @@ listed), or `metadata.archiveProblem` when the ZIP cannot be opened (malformed, 
 split archives, which are refused). The package itself is delivered as uploaded; nothing is
 unpacked into storage. The font workspace detects a family from packaged fonts exactly as
 from loose ones, the readiness blocker `files.present` counts them, and the FactSheet's
-deliverable formats include what the package holds. A ready package with neither key was
+deliverable formats include what the package holds. Since 23 September 2026 every file in a
+package is accounted for on the product: each detected style records its sources
+(`DetectedStyle.sources`, a loose asset or a `{ assetId, entryPath }` inside a package), the
+live preview loads a packaged font through the preview route's `?entry=` form (one entry
+read out of the stored package in the request, bounded at 128 MB per package and 64 MB per
+entry; past that the style is shown as delivered but not previewable), a document inside
+the package whose name reads as a license (`License.pdf`, `EULA.txt`, `Terms.rtf`) satisfies
+the `licensing.eula` rule, and the contents list says what each image or other file means
+for the listing. A ready package with neither key was
 settled by an older worker and is read on request like an unread font. Decodable images get
 `metadata.width` and `height`; product images add `metadata.altText` and
 `metadata.altTextSource` (`creator` or `generated`, ADR 0014), written by the creator from
