@@ -31,7 +31,9 @@ env:
   # asserts both outcomes), no image is transformed through the storage
   # proxy, and there are no edge functions, realtime channels or log
   # pipelines. Each excluded image is one the runner would otherwise pull
-  # cold on every run; together they were more than half of a ~100 s start.
+  # cold on every run. Measured on 24 September 2026: the start went from
+  # 90-100 s to 73-84 s, so most of what remains is Postgres and its health
+  # checks; the exclusion is worth keeping, not worth extending.
   #
   # The names are the ones CLI 2.101.0 (pinned below) accepts, and they are
   # not the ones its `--help` prints: `inbucket` is `mailpit`, `analytics` is
