@@ -43,6 +43,7 @@ step completes, and do not work on more than one step at a time.
 | WooCommerce test store | B8 exit, and A7 if it runs before Etsy's | nothing to file | exists, 9 Sep 2026: `houseofproctor.com`, permalinks on. Fanwise needs a public HTTPS origin to meet it |
 | Behance profile with Stripe connected | B9, and its §13 questions before B9 opens | nothing to file | not yet. A profile and a Stripe account; decision 26 |
 | Gumroad OAuth application and seller account | B10 build and exit | nothing to file: self-serve in account settings | exists: applications registered 16 Sep 2026, and B10's exit passed against the seller account on 17 Sep 2026. The email to Gumroad in decision 27 is still owed |
+| Polar OAuth client and organization | B13 exit | nothing to file: self-serve in user settings, and a sandbox exists | not yet. A client per environment and an organization; decision 32 |
 
 The WooCommerce row is not an application. It is in this table because it is the one thing
 B8's exit waits on, and because it is the cheapest unblock the roadmap has: no developer
@@ -301,6 +302,10 @@ product creation by IP address, so every Fanwise workspace draws on one allowanc
 ten creates a minute. A7 did not have to solve that: B10 added a declared per-adapter pace
 that the runner and the durable queue honour. `docs/channels/gumroad.md` §10.
 
+**Polar would be the fifth**, once B13's exit passes. Its limit is per organization or per
+OAuth client, so it needs no pace; what it adds instead is a clock, an API version that
+expires twice a year. `docs/channels/polar.md` §10.
+
 **WooCommerce is the third channel Publish Everywhere can call**, since B8 landed on `main`
 on 8 September 2026, and it changes A7's blocker rather than its exit. The exit still reads
 two live URLs. What has changed is that the second live channel no longer has to be Etsy: a
@@ -417,6 +422,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B10 | Gumroad: OAuth with PKCE, adapter, presigned multipart file upload, draft then enable, covers and thumbnail, the compensating delete, a platform-wide create pace, idempotency. See `docs/channels/gumroad.md`. Planned 11 September 2026 at the founder's request; **opened 16 September 2026 at the founder's request, ahead of A7's exit; code complete the same day**; **exit passed 17 September 2026**, journey 13, see below |
 | B11 | The companion window: the assisted handoff shown beside the marketplace's own editor, in a pop-out that touches nothing on the marketplace's page. See `docs/companion-window.md` and `docs/decisions/0010`. Planned 12 September 2026. **Opened 13 September 2026 at the founder's request, ahead of its evidence; code complete, exit unrun**, see below |
 | B12 | Import a live listing: an inward read per `api` adapter, listing-URL resolution inside the adapter, a reviewed mapping to a canonical product, fetched images, the `import` snapshot, and the claim that makes a second import a navigation. See `docs/listing-import.md`. **Planned 12 September 2026 at the founder's request, not opened**; opens after Gate A passes, see below |
+| B13 | Polar: OpenID Connect with PKCE and a ten-day token refreshed in place, adapter, presigned multipart upload for files and images, the downloadables benefit, the checkout link, a resumable publish keyed on a metadata stamp, idempotency. See `docs/channels/polar.md`. Assessed and **opened 23 September 2026 at the founder's request, ahead of A7's exit, on the B10 precedent; code complete the same day**, exit unrun, see below |
 
 ### B1, what was built and what is still owed
 
@@ -840,6 +846,66 @@ rather than as the plan changing. `docs/companion-window.md` §12 has the detail
 **What is still owed:** the exit test above, which needs a real creator, a real assisted
 channel, and so A8; the manual browser run in `docs/companion-window.md` §7; and the finding
 itself, which now decides whether the companion stays rather than whether it is built.
+
+### B13, what was built and what is still owed
+
+Assessed, planned and built on 23 September 2026, in one day and one branch, at the
+founder's request, ahead of A7's exit, on the B10 precedent. The assessment is in
+`docs/channel-feasibility.md` under Tier 1; the spec is `docs/channels/polar.md`.
+
+What landed, against the scope list below: `lib/channels/adapters/polar` in full, the
+catalog migration `20260923120000_polar_channel`, the Polar mark (the first not taken from
+simple-icons, which has none; `components/channels/channel-mark.tsx` grew an optional
+`paths` and `fillRule` for a logo drawn as several even-odd shapes), and the two unit test
+files. No shared machinery was added: the token refresh follows Etsy's, the revoke follows
+Gumroad's, the image policy is the shared one, and the stamp-and-search guard lives in the
+adapter because Polar's metadata filter makes it one read.
+
+Three things worth knowing about the build:
+
+- **A publish resumes rather than cleans up.** Polar has no product delete, so a failed
+  attempt is not undone; the next attempt finds the product by the listing id stamped in
+  its metadata and finishes it. Adoption is safe here in a way it is not on Gumroad,
+  because nothing a seller made by hand carries Fanwise's stamp.
+- **The description goes as Markdown, unrendered.** Polar renders Markdown itself, so this
+  is the first channel that takes the canonical text as it is.
+- **The adapter pins `Polar-Version: 2026-04`** and Polar removes each version about nine
+  months after it ships. This is the only channel with a maintenance clock, and the
+  constant in `config.ts` is the whole of it.
+
+What Polar is to the plan, in one sentence: the third billable automatic channel, the first
+that delivers the file itself, and the first that brings no buyers, which is why decision 32
+asks whether a checkout should bill at the marketplace price.
+
+Scope, as built:
+
+- `lib/channels/adapters/polar`: capabilities, OpenID Connect with PKCE and a refresh, the
+  presigned multipart upload for files and images, the benefit, the product in its
+  draft-then-public sequence, the checkout link, the stamp search, an error map for a plain
+  HTTP API, and a merchandising profile for a 64-character title and no tags.
+- A catalog migration: one `channels` row, `integration_type = api`, `billable = true`.
+- `tests/unit/polar-oauth.test.ts` and `tests/unit/polar-adapter.test.ts`; journey 16.
+
+**B13 waited on nothing in code.** It depends on A3's contract, A5's publishing machinery
+and A6's OAuth with PKCE, all done. **Its exit waits on decision 32**: an OAuth client
+registered in a Polar account, and an organization to publish into. The sandbox exists for
+the first pass and takes Stripe's test cards; the production pass needs the organization's
+first payout review only if the buyer's download is to be checked after a real order.
+
+**B13's exit test** is journey 16: connect through OpenID Connect, publish a real product
+with its images and its file, open the checkout link, buy with a test card, download the
+file from Polar, and settle the spec's §13 questions, the first of which is which API
+version is Current. A second click creates nothing, and a publish that failed after the
+product exists finishes it rather than making another.
+
+What B13 changes elsewhere in this file:
+
+- **A7** gains a fifth channel it could call, with no new constraint.
+- **B5** gains a fifth ingestion source, `GET /v1/orders` and the `order.paid` webhook,
+  which need `orders:read` and a reconnect of every Polar connection.
+- **C1 and C2** gain a third billable automatic channel, provisionally. Decision 32 asks
+  whether it stays billable.
+- **Gate A does not widen.** Polar is in Gate B.
 
 ## Gate C: a stranger can pay
 

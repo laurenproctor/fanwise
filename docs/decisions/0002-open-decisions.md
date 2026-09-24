@@ -165,6 +165,42 @@ says otherwise. Still open: the seller account's payout method, and the email.
 so the account has its confirmed email and payout method; B10 is done. What stays open here
 is the email to Gumroad, and the §13 answers the run produced are owed to the spec.
 
+### 32. Register a Polar OAuth client and an organization, and decide whether a checkout bills like a marketplace
+
+B13 was assessed and built on 23 September 2026. Its exit needs two things nobody has to
+apply for: an OAuth2 client, registered in a Polar user's settings under OAuth with the
+redirect URI `<NEXT_PUBLIC_APP_URL>/api/channels/polar/oauth/callback`, the seven scopes in
+`docs/channels/polar.md` §9 and a homepage URL, one per environment; and an organization to
+publish into. Polar's sandbox at `sandbox.polar.sh` has its own accounts and clients and
+takes Stripe's test cards, so the first pass of journey 16 belongs there, with
+`POLAR_ENVIRONMENT=sandbox` on the deployment that runs it. A production pass needs the
+organization's first payout review only if a real order is to be paid out; the download can
+be checked with a free product or a 100% discount code, which is what Polar itself asks.
+
+Twelve questions in the spec's §13 can only be settled against that organization, and the
+first decides code: which API version is Current on the exit day. The adapter pins
+`2026-04`, and Polar removes each version about nine months after it ships.
+
+The other half of this decision is billing. The channel row is seeded `billable = true`
+because Polar is external and not the creator's own store, which is rule 4's line. But
+Polar is a checkout: no discovery, no search, no product page, no buyers of its own. What a
+creator gets for the $6 is automatic publishing, file delivery and tax handling on a
+channel they still have to bring every buyer to.
+
+- **Bills, as seeded.** The marketplace price for an automatic channel, on the ground that
+  the price pays for what Fanwise does, not for what the channel brings. Simplest, and
+  consistent with Gumroad.
+- **Included, like an owned storefront.** Flip the row to `billable = false`, on the ground
+  that a checkout the creator drives all the traffic to is theirs in every way that matters.
+  Puts it beside WooCommerce in decision 23, and makes the third automatic channel free.
+- **A lower automatic price.** Not available: decision 16's tiers are assisted versus
+  automatic, and a third tier for "automatic but brings nobody" is a pricing page nobody
+  can read.
+
+**Recommendation:** register the client and the organization now, run the sandbox pass,
+and leave the row billable until decision 23 is taken, since the two are the same question
+asked of a storefront and of a checkout, and should get one answer.
+
 ---
 
 ## Shopify, before any public launch

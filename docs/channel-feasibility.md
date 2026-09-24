@@ -195,7 +195,8 @@ reason the old section wanted the email sent.
 Assessed 23 September 2026 against Polar's own documentation at `polar.sh/docs` (the
 Products, File Downloads, OAuth 2.0, API overview, API versioning, Fees, Account reviews,
 Webhooks and Sandbox pages, and the `2026-04` OpenAPI reference for files, products and
-benefits) and the Acceptable Use Policy effective 25 March 2026. Not planned as a step.
+benefits) and the Acceptable Use Policy effective 25 March 2026. Opened and built as B13
+the same day; the spec is `docs/channels/polar.md`.
 
 **It fits the adapter contract.** Third-party access is OpenID Connect, authorization code
 only, PKCE for public clients. Tokens are user-scoped, and the seller can limit one to
@@ -558,7 +559,7 @@ belongs in the decision 14 conversation next to MyFonts. Not assessed here.
 | Adobe Stock | Assisted | SFTP + 5,000-row CSV, manual submit | None | **V2, highest leverage** |
 | MyFonts | Assisted | Portal only, exact specs | CSV download | **V2, if fonts are the wedge** |
 | Gumroad | Automatic | Full API since April 2026, file by multipart upload, create limit shared per IP | API + webhooks | **B10**, built 16 Sep 2026, exit passed 17 Sep 2026 |
-| Polar | Automatic | Full API, file create by presigned multipart upload, delivered by Polar | API + webhooks | **Candidate**, assessed 23 Sep 2026, not planned. Checkout only, no marketplace, so billing belongs with decision 23 |
+| Polar | Automatic | Full API, file create by presigned multipart upload, delivered by Polar | API + webhooks | **V2, B13**, assessed and built 23 Sep 2026, exit unrun. Checkout only, no marketplace; billing is decision 32 |
 | Envato | Assisted | No item creation, FTP for audio/video only | **API** | **V2 for analytics only** |
 | Behance | Assisted | Manual, a project plus an asset, no review queue documented | None; the seller's own Stripe | **V2, B9**, built 17 Sep 2026 ahead of A8, exit needs a profile with Stripe |
 | Creative Fabrica | Assisted | Manual, 1 to 2 day review | None | **V3** |

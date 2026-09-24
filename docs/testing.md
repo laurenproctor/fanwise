@@ -15,8 +15,8 @@ the wrong one is how this suite passes while proving nothing.
 handling, the posted grant, product creation, upload, publish, retry, transaction ingestion,
 AI failure.
 
-**E2E** — the fifteen journeys below, plus step exit tests against the mock channels
-rather than against the fifteen:
+**E2E** — the sixteen journeys below, plus step exit tests against the mock channels
+rather than against the sixteen:
 
 - `journey-03-channels.spec.ts` (A3): one product, two independent listings, and no publish
   affordance anywhere on the assisted channel.
@@ -121,7 +121,7 @@ content arrives, so `waitForURL` can return while the loading boundary is still 
 and a locator that counts elements then finds none. Follow it with a wait on real content —
 the product heading, usually.
 
-## The fifteen journeys
+## The sixteen journeys
 
 1. Signup, workspace, product. *(complete at A2)*
 2. Product to AI Shopify listing, approved. *(composition ran live at B1; the review loop
@@ -171,6 +171,11 @@ the product heading, usually.
 15. Import a live listing, then publish the imported product to a second channel.
     *(planned at B12, not built; opens after Gate A passes, and the listing it imports must
     be one Fanwise did not create, see `docs/listing-import.md`)*
+16. Connect Polar, publish a product with its images and its file, open the checkout link,
+    buy with a test card, and download the file from Polar. *(built at B13 on 23 September
+    2026, exit unrun; the adapter is covered by `tests/unit/polar-oauth.test.ts` and
+    `tests/unit/polar-adapter.test.ts`, and the run needs the client and organization in
+    decision 32. Its first pass belongs in Polar's sandbox)*
 
 Journey 9 is never skipped, never quarantined, never marked flaky. If it fails, the product
 is broken in the way that matters most.
@@ -247,7 +252,7 @@ real window in Chromium, copies from inside it and brings it back;
 render and the ADR 0010 constraints. The rest is journey 7 run once with the companion open,
 which waits on A8. A new number would imply a new path, and there is not one.
 
-**Delete draft is not one of the fifteen** either, and for the same reason: removing a draft
+**Delete draft is not one of the sixteen** either, and for the same reason: removing a draft
 that never left Fanwise is not a step toward a live listing. It has one browser test,
 `tests/e2e/delete-product-draft.spec.ts`, because focus returning to the trigger after Escape
 and after Cancel, and the redirect to a populated catalog, are things only a browser can
@@ -263,7 +268,7 @@ action does with each answer, including storage failing after the commit;
 `tests/unit/delete-product-draft-ui.test.ts` is the markup. The unit suite has no DOM, so
 the pending and error renders replace `useActionState` alone.
 
-**Password recovery is not one of the fifteen**, because it is not a step on the path from empty
+**Password recovery is not one of the sixteen**, because it is not a step on the path from empty
 workspace to live listing. It is covered anyway, in two halves that meet at the token:
 `tests/db/password-recovery.test.ts` makes the same calls the confirm route makes, against the
 real auth server, and proves the link is single use; `tests/e2e/password-recovery.spec.ts`

@@ -34,7 +34,9 @@ name.
    storefronts, Shopify and WooCommerce, and both are seeded included. Whether a second
    owned storefront should bill is decision 23 in `docs/decisions/0002`, still open;
    flipping the WooCommerce row is one migration. Gumroad, planned at B10, is seeded billable
-   as a marketplace; decision 23 says why.
+   as a marketplace; decision 23 says why. Polar, built at B13, is seeded billable too, and
+   provisionally: it is external and not the creator's own store, but it is a checkout with
+   no marketplace behind it, and decision 32 asks whether that earns the marketplace price.
 5. Assisted versus automatic pricing is **an open decision**. Charging the same $6 for a
    channel Fanwise cannot publish to is harder to defend. Resolve before the pricing page is
    public. Behance, planned at B9, is the second assisted marketplace and is seeded
