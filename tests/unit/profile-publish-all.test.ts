@@ -20,6 +20,7 @@ function candidate(n: number, overrides: Partial<ProductCandidate> = {}): Produc
     id: pid(n),
     slug: `product-${n}`,
     title: `Product ${n}`,
+    productType: "template",
     typeLabel: "Template",
     imageUrl: null,
     eligibility: { eligible: true },

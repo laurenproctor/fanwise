@@ -1,8 +1,9 @@
-import type { ProfilePresentation, PresentationProduct } from "@/lib/public/profile-presentation"
+import type { ProfilePresentation } from "@/lib/public/profile-presentation"
 import { kindName, type ResolvedLink } from "@/lib/public/profile-links"
-import { formatPrice } from "./product-card"
+import { DEFAULT_BROWSE, browseSearch, type BrowseState } from "@/lib/public/product-browse"
 import { LinkGlyph } from "./link-glyph"
 import { ProfileAvatar } from "./profile-avatar"
+import { ProfileProductBrowser } from "./profile-product-browser"
 
 /**
  * A creator's public profile, drawn from data it is handed.
@@ -24,9 +25,11 @@ import { ProfileAvatar } from "./profile-avatar"
  *   1. Who: the image, the studio's name, where it is, one line on what it
  *      does, and the ways to reach it.
  *   2. The work: the products, as a grid of cards that each go to the
- *      product's own page.
- *   3. About: the longer text, the kinds of product the studio makes, where it
- *      is based, and every link written out in words.
+ *      product's own page, with a search, a filter by kind and a sort once
+ *      there are enough to look through (profile-product-browser.tsx).
+ *   3. About: the longer text, the kinds of product the studio makes (each a
+ *      link to that kind in the grid, on the public page), where it is based,
+ *      and every link written out in words.
  *
  * Each part renders only what the creator filled in. A partial profile is a
  * shorter page, never one with empty labels or a stray comma; the builder's
@@ -83,6 +86,7 @@ export function PublicProfile({
   nameAs: Name = "h1",
   placeholders = false,
   emptyProductsMessage = "No products to show yet.",
+  browse = DEFAULT_BROWSE,
 }: {
   profile: ProfilePresentation
   layout: ProfileLayout
@@ -92,6 +96,8 @@ export function PublicProfile({
   /** Show gentle stand-ins for empty fields. For the builder, never the public page. */
   placeholders?: boolean
   emptyProductsMessage?: string
+  /** The search, kind and sort the page opens on, read from the address by the public route. */
+  browse?: BrowseState
 }) {
   const shape = LAYOUT[layout]
   const hasName = profile.displayName.length > 0
@@ -186,11 +192,15 @@ export function PublicProfile({
           ) : null}
         </div>
         {productCount > 0 ? (
-          <ul className={`grid gap-x-5 gap-y-8 ${shape.grid}`}>
-            {profile.products.map((product) => (
-              <ProductTile key={product.key} product={product} interactive={interactive} />
-            ))}
-          </ul>
+          <ProfileProductBrowser
+            // Remounted when the address asks for a different view, so a
+            // "Makes" link lands on its kind even from an already-open page.
+            key={browseSearch(browse)}
+            products={profile.products}
+            initial={browse}
+            gridClassName={shape.grid}
+            interactive={interactive}
+          />
         ) : (
           <p className="rounded-[14px] border border-dashed border-[var(--color-rule)] px-5 py-10 text-center text-[14px] text-[var(--color-ink-3)]">
             {emptyProductsMessage}
@@ -233,11 +243,19 @@ export function PublicProfile({
                   <dd>
                     <ul className="flex flex-wrap gap-2" aria-label="Kinds of product">
                       {profile.specialties.map((specialty) => (
-                        <li
-                          key={specialty}
-                          className="rounded-[var(--radius-pill)] border border-[var(--color-rule)] px-3 py-1 text-[13px] text-[var(--color-ink-2)]"
-                        >
-                          {specialty}
+                        <li key={specialty.type}>
+                          {interactive && profile.specialties.length > 1 ? (
+                            <a
+                              href={`${browseSearch({ ...DEFAULT_BROWSE, type: specialty.type })}#profile-products`}
+                              className="inline-block rounded-[var(--radius-pill)] border border-[var(--color-rule)] px-3 py-1 text-[13px] text-[var(--color-ink-2)] hover:border-[var(--color-ink-3)] hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                            >
+                              {specialty.label}
+                            </a>
+                          ) : (
+                            <span className="inline-block rounded-[var(--radius-pill)] border border-[var(--color-rule)] px-3 py-1 text-[13px] text-[var(--color-ink-2)]">
+                              {specialty.label}
+                            </span>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -348,97 +366,6 @@ function PinGlyph() {
       <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z" />
       <circle cx="12" cy="10" r="2.5" />
     </svg>
-  )
-}
-
-function ProductTile({
-  product,
-  interactive,
-}: {
-  product: PresentationProduct
-  interactive: boolean
-}) {
-  const linked = interactive && Boolean(product.href)
-  const meta = [
-    product.typeLabel,
-    product.startingPrice ? `From ${formatPrice(product.startingPrice)}` : null,
-  ].filter(Boolean)
-  const body = (
-    <>
-      <div className="aspect-video w-full overflow-hidden rounded-[12px] border border-[var(--color-rule)] bg-[var(--color-paper-2)]">
-        {product.imageUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element -- see PublicImage. */
-          <img
-            src={product.imageUrl}
-            // Inside a link the title follows as text, so the image stays
-            // silent rather than making a screen reader say the name twice.
-            alt={linked ? "" : product.imageAlt}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-          />
-        ) : (
-          // Intentional rather than an empty grey box: "no image yet" should be
-          // distinguishable from "image still loading".
-          <span
-            role={linked ? undefined : "img"}
-            aria-label={linked ? undefined : `${product.title} has no image`}
-            aria-hidden={linked ? true : undefined}
-            data-missing-image
-            className="flex h-full w-full flex-col items-center justify-center gap-2 text-[var(--color-ink-3)]"
-          >
-            <svg
-              aria-hidden
-              viewBox="0 0 24 24"
-              width="28"
-              height="28"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.4"
-            >
-              <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
-              <path d="m3.5 16 5-5 4 4 3-3 5 5" strokeLinejoin="round" />
-              <circle cx="15.5" cy="9" r="1.5" />
-            </svg>
-            <span className="label-mono">{product.typeLabel}</span>
-          </span>
-        )}
-      </div>
-      <div className="flex min-w-0 flex-col gap-1">
-        <span className="font-display text-[15px] break-words text-[var(--color-ink)] group-hover:underline group-hover:underline-offset-4">
-          {product.title}
-        </span>
-        <span className="tabular text-[13px] text-[var(--color-ink-3)]">{meta.join(" · ")}</span>
-        {product.summary ? (
-          <span className="line-clamp-2 text-[14px] text-[var(--color-ink-2)]">
-            {product.summary}
-          </span>
-        ) : null}
-        {product.channelCount && product.channelCount > 0 ? (
-          <span className="text-[13px] text-[var(--color-ink-3)]">
-            Available on {product.channelCount}{" "}
-            {product.channelCount === 1 ? "channel" : "channels"}
-          </span>
-        ) : null}
-      </div>
-    </>
-  )
-
-  // Same box either way, so the final preview and the public page lay out
-  // identically; only the public page makes the tile a link.
-  return (
-    <li className="min-w-0">
-      {linked ? (
-        <a
-          href={product.href!}
-          className="group flex flex-col gap-3 rounded-[12px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-accent)]"
-        >
-          {body}
-        </a>
-      ) : (
-        <div className="flex flex-col gap-3">{body}</div>
-      )}
-    </li>
   )
 }
 

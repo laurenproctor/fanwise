@@ -24,8 +24,9 @@ export function SettingsSection({
 
   return (
     <section
+      id={id}
       aria-labelledby={headingId}
-      className="grid gap-8 border-t border-[var(--color-rule)] pt-12 sm:pt-14 lg:grid-cols-[210px_minmax(0,1fr)] lg:gap-14 lg:pt-16"
+      className="grid scroll-mt-6 gap-8 border-t border-[var(--color-rule)] pt-12 sm:pt-14 lg:grid-cols-[210px_minmax(0,1fr)] lg:gap-14 lg:pt-16"
     >
       <div className="flex flex-col gap-2">
         <h2 id={headingId} className="label-mono text-[var(--color-ink-2)]">

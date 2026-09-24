@@ -563,12 +563,37 @@ describe("the preview mapping", () => {
       handle: "lauren-proctor",
       avatarUrl: null,
       products: [
-        { key: "a", title: "A", typeLabel: "Font", imageUrl: null, imageAlt: "" },
-        { key: "b", title: "B", typeLabel: "Template", imageUrl: null, imageAlt: "" },
-        { key: "c", title: "C", typeLabel: "Font", imageUrl: null, imageAlt: "" },
+        {
+          key: "a",
+          title: "A",
+          productType: "font",
+          typeLabel: "Font",
+          imageUrl: null,
+          imageAlt: "",
+        },
+        {
+          key: "b",
+          title: "B",
+          productType: "template",
+          typeLabel: "Template",
+          imageUrl: null,
+          imageAlt: "",
+        },
+        {
+          key: "c",
+          title: "C",
+          productType: "font",
+          typeLabel: "Font",
+          imageUrl: null,
+          imageAlt: "",
+        },
       ],
     })
-    expect(presentation.specialties).toEqual(["Font", "Template"])
+    // Plural, because "Makes" names kinds of product rather than one product.
+    expect(presentation.specialties).toEqual([
+      { type: "font", label: "Fonts" },
+      { type: "template", label: "Templates" },
+    ])
   })
 
   it("shows a Contact button only for a contact publication would accept", () => {

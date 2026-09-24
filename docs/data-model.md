@@ -835,6 +835,19 @@ reconstruct anybody's browsing. **No grant to `anon` at all** — a route handle
 with the service role after checking the page is genuinely published, so a table that
 accepts anonymous writes never exists.
 
+**public_page_views** — id, workspace_id, public_profile_id, public_product_page_id
+(null for a view of the profile itself), occurred_at, referrer_host, campaign
+
+The sibling of `public_outbound_clicks`, held to the same rules: no visitor identity,
+no grant to `anon`, written only by `/api/public/view` with the service role after an
+`anon` read confirms the page is published, readable by the workspace's members.
+Crawlers (by announced user agent, never stored) and the workspace's own members are
+not counted; a reload in the same tab is filtered in the browser through
+`sessionStorage`, so the server needs no visitor id to dedupe. The Profile page's
+Visitors section reads it through `public_profile_analytics(profile, days)`, security
+invoker, which aggregates in SQL because PostgREST's `max_rows` would silently cap a
+count done in the application. Days are UTC. Migration `20260923120000`.
+
 ### What `anon` may read, and how much of it
 
 Nothing is public until somebody published it. Both tables are born `draft`, and a

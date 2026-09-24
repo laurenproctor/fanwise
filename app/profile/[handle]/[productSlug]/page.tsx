@@ -3,6 +3,7 @@ import { Suspense } from "react"
 import Link from "next/link"
 import { notFound, permanentRedirect } from "next/navigation"
 import { PublicShell } from "@/components/public/public-shell"
+import { PageViewBeacon } from "@/components/public/page-view-beacon"
 import { PublicAvatar } from "@/components/public/public-image"
 import { ProductGallery } from "@/components/public/product-gallery"
 import { ChooseWhereToBuy, DestinationList } from "@/components/public/destination-list"
@@ -138,6 +139,7 @@ export default async function PublicProductPage({ params, searchParams }: Params
 
   return (
     <PublicShell>
+      <PageViewBeacon profileId={profile.id} pageId={product.id} campaign={campaign ?? null} />
       {/*
         Structured data, and only the parts that are true. There is no
         `aggregateRating` and no `review`, because Fanwise holds neither and a

@@ -41,6 +41,8 @@ export interface PublicProductCard {
   coverAssetId: string | null
   coverAlt: string
   featured: boolean
+  /** When the page went live, for "Newest" on the profile. */
+  publishedAt: string | null
   /** Null when nothing reliable is known. Never guessed, never zero-as-unknown. */
   startingPrice: { amount: number; currency: string } | null
   channelCount: number

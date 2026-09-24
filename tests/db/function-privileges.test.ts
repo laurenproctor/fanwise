@@ -100,6 +100,13 @@ const AUTHENTICATED_MAY_EXECUTE = new Set([
     from the outside.
   */
   "publish_all_profile_products(p_public_profile_id uuid, p_product_ids uuid[])",
+  /*
+    The Profile page's Visitors section: views and clicks, counted in SQL so
+    PostgREST's row cap cannot truncate a total. Security invoker and stable,
+    so RLS decides what is counted and another workspace's profile answers
+    zeros. tests/db/page-views.test.ts holds that from the outside.
+  */
+  "public_profile_analytics(p_public_profile_id uuid, p_days integer)",
 ])
 
 /**

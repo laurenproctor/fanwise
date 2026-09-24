@@ -47,6 +47,7 @@ function candidate(n: number, overrides: Partial<ProductCandidate> = {}): Produc
     id: pid(n),
     slug: `product-${n}`,
     title: `Product ${n}`,
+    productType: "template",
     typeLabel: "Template",
     imageUrl: null,
     eligibility: { eligible: true },
@@ -640,13 +641,17 @@ function card(slug: string, title: string, coverAssetId: string | null): PublicP
     coverAssetId,
     coverAlt: title,
     featured: false,
+    publishedAt: null,
     startingPrice: null,
     channelCount: 1,
   }
 }
 
 async function renderPage(handle = "lauren-proctor"): Promise<string> {
-  const element = (await page.default({ params: Promise.resolve({ handle }) })) as ReactElement
+  const element = (await page.default({
+    params: Promise.resolve({ handle }),
+    searchParams: Promise.resolve({}),
+  })) as ReactElement
   return renderToStaticMarkup(element)
 }
 

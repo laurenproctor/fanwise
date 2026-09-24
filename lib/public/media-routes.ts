@@ -13,6 +13,7 @@ export const publicMediaRoutes = {
   asset: (assetId: string) => `/api/public/asset/${assetId}`,
   avatar: (profileId: string) => `/api/public/avatar/${profileId}`,
   outboundClick: () => "/api/public/outbound",
+  pageView: () => "/api/public/view",
   /**
    * The one exception to "the id is not a capability": a download address a
    * storefront hands its buyers, whose token is the capability (ADR 0012).

@@ -32,6 +32,7 @@ function candidate(n: number, overrides: Partial<ProductCandidate> = {}): Produc
     id: id(n),
     slug: `product-${n}`,
     title: `Product ${n}`,
+    productType: "template",
     typeLabel: "Template",
     imageUrl: `/ws/assets/img-${n}/preview`,
     eligibility: { eligible: true },
@@ -112,6 +113,7 @@ describe("eligibility comes from the product lifecycle", () => {
       id: id(1),
       slug: null,
       title: "Editorial Type",
+      productType: "font",
       typeLabel: "FONT",
       imageUrl: "/img/cover-1",
       eligibility: { eligible: true },
@@ -144,7 +146,16 @@ describe("eligibility comes from the product lifecycle", () => {
       { typeLabel: (t) => t, imageUrl: (a) => a },
     )
     expect(Object.keys(only!).sort()).toEqual(
-      ["eligibility", "existingOrder", "id", "imageUrl", "slug", "title", "typeLabel"].sort(),
+      [
+        "eligibility",
+        "existingOrder",
+        "id",
+        "imageUrl",
+        "productType",
+        "slug",
+        "title",
+        "typeLabel",
+      ].sort(),
     )
   })
 })

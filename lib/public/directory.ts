@@ -1,5 +1,6 @@
 import { isCountryCode } from "@/lib/location/countries"
 import { marketingRoutes } from "@/lib/routes"
+import { PRODUCT_TYPE_PLURALS } from "@/lib/products/types"
 import type { ProductType } from "./types"
 
 /**
@@ -28,19 +29,7 @@ export const SORT_LABELS: Record<DirectorySort, string> = {
 }
 
 /** Plural, because a filter asks for a kind of work: "Fonts", not "Font". */
-export const PRODUCT_TYPE_FILTER_LABELS: Record<ProductType, string> = {
-  font: "Fonts",
-  template: "Templates",
-  graphic: "Graphics",
-  photo: "Photos",
-  illustration: "Illustrations",
-  icon: "Icons",
-  mockup: "Mockups",
-  brush: "Brushes",
-  three_d: "3D",
-  theme: "Themes",
-  other: "Other",
-}
+export const PRODUCT_TYPE_FILTER_LABELS: Record<ProductType, string> = PRODUCT_TYPE_PLURALS
 
 const PRODUCT_TYPES = Object.keys(PRODUCT_TYPE_FILTER_LABELS) as ProductType[]
 

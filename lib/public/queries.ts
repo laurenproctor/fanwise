@@ -205,6 +205,7 @@ export async function loadProfileCatalog(profileId: string): Promise<PublicProdu
         coverAssetId: page.cover_asset_id ?? pickCover(assetsByProduct.get(page.product_id) ?? []),
         coverAlt: title,
         featured: page.featured,
+        publishedAt: page.published_at,
         startingPrice: startingPrice(product, productListings),
         channelCount: productListings.length,
       },
