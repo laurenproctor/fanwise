@@ -169,3 +169,43 @@ export const RAIL: readonly (readonly [ShopName, string])[] = [
   ["Adobe Stock", "Assisted"],
   ["MyFonts", "Assisted"],
 ]
+
+/**
+ * Selling channels on the build list that are not connected yet: the
+ * storefronts and marketplaces from the "Build priority" tab of the channel
+ * research workbook (November 2026), in its build order. Payment providers,
+ * licensing, product feeds and print-on-demand suppliers are left out, since a
+ * buyer does not shop there.
+ *
+ * Plain strings, not `ShopName`: none of these has a mark, a spec card or an
+ * adapter, and the page says so. Nothing here is a promise of a date.
+ */
+export type PlannedChannel = {
+  name: string
+  kind: "Storefront" | "Marketplace" | "Wholesale marketplace" | "App store"
+  sells: "Physical products" | "Digital products" | "Physical and digital"
+}
+
+export const BUILD_LIST: PlannedChannel[] = [
+  { name: "eBay", kind: "Marketplace", sells: "Physical products" },
+  { name: "itch.io", kind: "Marketplace", sells: "Digital products" },
+  { name: "BigCommerce", kind: "Storefront", sells: "Physical and digital" },
+  { name: "Wix Stores", kind: "Storefront", sells: "Physical and digital" },
+  { name: "Ecwid by Lightspeed", kind: "Storefront", sells: "Physical and digital" },
+  { name: "Sellfy", kind: "Storefront", sells: "Physical and digital" },
+  { name: "TikTok Shop", kind: "Marketplace", sells: "Physical products" },
+  { name: "Amazon Marketplace", kind: "Marketplace", sells: "Physical products" },
+  { name: "Walmart Marketplace", kind: "Marketplace", sells: "Physical products" },
+  { name: "Whatnot", kind: "Marketplace", sells: "Physical products" },
+  { name: "Faire", kind: "Wholesale marketplace", sells: "Physical products" },
+  { name: "Squarespace", kind: "Storefront", sells: "Physical products" },
+  { name: "Mercado Libre", kind: "Marketplace", sells: "Physical products" },
+  { name: "Kaufland Global Marketplace", kind: "Marketplace", sells: "Physical products" },
+  { name: "Allegro", kind: "Marketplace", sells: "Physical products" },
+  { name: "bol", kind: "Marketplace", sells: "Physical products" },
+  { name: "Bonanza", kind: "Marketplace", sells: "Physical products" },
+  { name: "Reverb", kind: "Marketplace", sells: "Physical products" },
+  { name: "BrickLink", kind: "Marketplace", sells: "Physical products" },
+  { name: "Orderchamp", kind: "Wholesale marketplace", sells: "Physical products" },
+  { name: "Mac App Store", kind: "App store", sells: "Digital products" },
+]

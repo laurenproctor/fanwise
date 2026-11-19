@@ -6,7 +6,7 @@ import { MarketplacePicker } from "./marketplace-picker"
 import { ScrollReveal } from "./scroll-reveal"
 import { FANWISE_DEFINITION } from "./site-footer"
 import { SiteNav } from "./site-nav"
-import { RAIL } from "./channels"
+import { BUILD_LIST, RAIL } from "./channels"
 import { ShopMark } from "./shop-mark"
 import { marketingRoutes } from "@/lib/routes"
 
@@ -578,6 +578,13 @@ export function Landing() {
               Spec values are illustrative. Fanwise tracks the rules for each marketplace. When a
               shop changes a requirement, the affected drafts rebuild and you get a note saying
               which listings moved.
+            </p>
+            <p style={{ marginTop: 18 }}>
+              <Link href={`${marketingRoutes.marketplaces}#build-list`} className="fw-arrow-link">
+                {BUILD_LIST.length} more shops are on the build list, including eBay, Amazon,
+                Walmart, TikTok Shop, itch.io and the Mac App Store{" "}
+                <span aria-hidden="true">&rarr;</span>
+              </Link>
             </p>
           </section>
         </div>
