@@ -1,0 +1,12 @@
+# Netlify build settings. Netlify detects Next.js and supplies its OpenNext
+# adapter on every build, so no plugin is pinned here.
+[build]
+  command = "pnpm build"
+  publish = ".next"
+
+[build.environment]
+  # Matches CI (.github/workflows/ci.yml).
+  NODE_VERSION = "24"
+  # Netlify's Next.js adapter needs hoisted dependencies under pnpm.
+  PNPM_FLAGS = "--shamefully-hoist"
+  NEXT_TELEMETRY_DISABLED = "1"

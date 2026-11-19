@@ -29,12 +29,21 @@ export type Environment = "development" | "preview" | "production" | "local"
  * Vercel sets VERCEL_ENV on every deployment; a preview is a production build
  * on a throwaway URL, so NODE_ENV alone cannot tell the two apart. Off Vercel,
  * `next dev` is development and `next start` is local.
+ *
+ * Netlify names its deploy context in CONTEXT, at build time only: a function
+ * cannot read it at runtime. `next.config.ts` therefore inlines it into the
+ * bundle as FANWISE_NETLIFY_CONTEXT and callers pass it here as
+ * NETLIFY_CONTEXT. Only Netlify's production context is production. Its
+ * previews and branch deploys stay local: the production policy without HSTS,
+ * and without the Vercel toolbar origins a Vercel preview admits.
  */
 export function environmentFrom(env: {
   VERCEL_ENV?: string | undefined
   NODE_ENV?: string | undefined
+  NETLIFY_CONTEXT?: string | undefined
 }): Environment {
   if (env.VERCEL_ENV === "production") return "production"
+  if (env.NETLIFY_CONTEXT === "production") return "production"
   if (env.VERCEL_ENV === "preview") return "preview"
   if (env.VERCEL_ENV === "development" || env.NODE_ENV === "development") return "development"
   return "local"

@@ -118,7 +118,14 @@ export function isPublic(pathname: string): boolean {
 
 export default async function proxy(request: NextRequest) {
   const env = clientEnv()
-  const environment = environmentFrom(process.env)
+  // Named reads, not the whole of process.env: FANWISE_NETLIFY_CONTEXT is
+  // inlined by next.config.ts at build time, and only a literal
+  // `process.env.NAME` is replaced.
+  const environment = environmentFrom({
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    NODE_ENV: process.env.NODE_ENV,
+    NETLIFY_CONTEXT: process.env.FANWISE_NETLIFY_CONTEXT,
+  })
   const policyInput = { environment, supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL }
   const marketing = isStaticMarketingRoute(request.nextUrl.pathname)
   const nonce = marketing ? null : createNonce()

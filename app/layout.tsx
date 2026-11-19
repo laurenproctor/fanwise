@@ -93,9 +93,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           so the nonce policy in lib/security/headers.ts admits it under 'self' with
           no nonce to thread through. Its own Suspense boundary keeps the
           useSearchParams read from opting a page out of prerendering. It only
-          reports from a Vercel deployment; a local build appends nothing.
+          reports from a Vercel deployment; a local build appends nothing. On any
+          other host that script address does not exist, so the component is
+          left out there rather than requesting a 404 on every page.
         */}
-        <Analytics />
+        {process.env.VERCEL ? <Analytics /> : null}
       </body>
     </html>
   )
