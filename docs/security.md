@@ -451,3 +451,13 @@ so a query cannot inject filter syntax. `public_featured_profiles` is writable b
 service role only; the label "Selected by Fanwise" is true because no creator can write
 that table. Analytics events from the directory carry the section and never a query,
 handle or product.
+
+**Analytics is Google Analytics 4, and it is sent as little as possible.** It loads only
+when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is set, and only then does the Content Security Policy
+name Google's hosts. Every address sent is origin plus path: query strings carry search
+words, OAuth codes and sign-in tokens, so `lib/analytics/ga.ts` turns off GA's automatic
+page view and sends its own with the query removed, and cleans the referrer the same way.
+No user ID, email, workspace or handle is ever set. Ad storage, ad user data, ad
+personalization and Google Signals are off. One setting lives in GA and not in the code:
+Enhanced measurement's "Page changes based on browser history events" must be off, or GA
+sends a second page view with the raw address.

@@ -1,3 +1,4 @@
+import { gaMeasurementId } from "@/lib/analytics/ga"
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import { clientEnv } from "@/lib/env"
@@ -126,7 +127,12 @@ export default async function proxy(request: NextRequest) {
     NODE_ENV: process.env.NODE_ENV,
     NETLIFY_CONTEXT: process.env.FANWISE_NETLIFY_CONTEXT,
   })
-  const policyInput = { environment, supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL }
+  const policyInput = {
+    environment,
+    supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL,
+    // Google's hosts are named only when a measurement ID is configured.
+    analytics: gaMeasurementId(process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID) !== null,
+  }
   const marketing = isStaticMarketingRoute(request.nextUrl.pathname)
   const nonce = marketing ? null : createNonce()
   const policy = nonce ? applicationPolicy({ ...policyInput, nonce }) : marketingPolicy(policyInput)

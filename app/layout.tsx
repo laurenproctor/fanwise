@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { Archivo, Instrument_Sans, JetBrains_Mono } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
+import { GoogleAnalytics } from "@/components/analytics/google-analytics"
 import { StrayFileDropGuard } from "@/components/ui/stray-file-drop-guard"
 import { AnimatedFavicon } from "@/components/ui/animated-favicon"
 import "./globals.css"
@@ -89,15 +89,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AnimatedFavicon />
         {children}
         {/*
-          Renders null and appends a same-origin script, /_vercel/insights/script.js,
-          so the nonce policy in lib/security/headers.ts admits it under 'self' with
-          no nonce to thread through. Its own Suspense boundary keeps the
-          useSearchParams read from opting a page out of prerendering. It only
-          reports from a Vercel deployment; a local build appends nothing. On any
-          other host that script address does not exist, so the component is
-          left out there rather than requesting a 404 on every page.
+          Google Analytics 4. Renders nothing without a measurement ID. What it
+          sends, and what it never sends, is in lib/analytics/ga.ts.
         */}
-        {process.env.VERCEL ? <Analytics /> : null}
+        <GoogleAnalytics />
       </body>
     </html>
   )

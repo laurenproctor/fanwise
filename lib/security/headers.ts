@@ -115,7 +115,23 @@ export interface PolicyInput {
   environment: Environment
   /** NEXT_PUBLIC_SUPABASE_URL. The browser talks to it for auth and uploads. */
   supabaseUrl: string
+  /** True when a GA4 measurement ID is configured. Admits Google's hosts. */
+  analytics?: boolean
 }
+
+/**
+ * What the Google Analytics 4 tag needs, per Google's own CSP guidance, with
+ * no advertising or Google Signals hosts. Named only when analytics is on.
+ */
+const GOOGLE_ANALYTICS = {
+  script: ["https://*.googletagmanager.com"],
+  img: ["https://*.google-analytics.com", "https://*.googletagmanager.com"],
+  connect: [
+    "https://*.google-analytics.com",
+    "https://*.analytics.google.com",
+    "https://*.googletagmanager.com",
+  ],
+} as const
 
 /**
  * What Vercel's preview toolbar needs, per Vercel's own CSP guidance. Preview
@@ -137,8 +153,9 @@ function origin(url: string): string {
 }
 
 /** The directives every policy shares: everything except scripts. */
-function sharedDirectives({ environment, supabaseUrl }: PolicyInput): Directives {
+function sharedDirectives({ environment, supabaseUrl, analytics }: PolicyInput): Directives {
   const preview = environment === "preview"
+  const ga = analytics ? GOOGLE_ANALYTICS : null
   const supabase = origin(supabaseUrl)
   const directives: Directives = {
     "base-uri": ["'self'"],
@@ -151,7 +168,14 @@ function sharedDirectives({ environment, supabaseUrl }: PolicyInput): Directives
     "style-src": ["'self'", "'unsafe-inline'", ...(preview ? VERCEL_TOOLBAR.style : [])],
     // Asset previews redirect an <img> to a signed storage URL, so the storage
     // host has to be admitted for images.
-    "img-src": ["'self'", "data:", "blob:", supabase, ...(preview ? VERCEL_TOOLBAR.img : [])],
+    "img-src": [
+      "'self'",
+      "data:",
+      "blob:",
+      supabase,
+      ...(ga ? ga.img : []),
+      ...(preview ? VERCEL_TOOLBAR.img : []),
+    ],
     "font-src": ["'self'", ...(preview ? VERCEL_TOOLBAR.font : [])],
     // Uploads PUT straight to a signed storage URL from the browser, and the
     // auth client talks to the same host. In development the dev server's
@@ -159,6 +183,7 @@ function sharedDirectives({ environment, supabaseUrl }: PolicyInput): Directives
     "connect-src": [
       "'self'",
       supabase,
+      ...(ga ? ga.connect : []),
       ...(environment === "development" ? ["ws:", "wss:"] : []),
       ...(preview ? VERCEL_TOOLBAR.connect : []),
     ],
@@ -187,6 +212,7 @@ function serialize(directives: Directives): string {
 export function applicationPolicy(input: PolicyInput & { nonce: string }): string {
   const { environment, nonce } = input
   const script = ["'self'", `'nonce-${nonce}'`]
+  if (input.analytics) script.push(...GOOGLE_ANALYTICS.script)
   if (environment === "development") script.push("'unsafe-eval'")
   if (environment === "preview") script.push(...VERCEL_TOOLBAR.script)
   return serialize({
@@ -215,7 +241,7 @@ export function marketingReportOnlyPolicy(
 ): string {
   const directives: Directives = {
     "default-src": ["'self'"],
-    "script-src": ["'self'"],
+    "script-src": ["'self'", ...(input.analytics ? GOOGLE_ANALYTICS.script : [])],
     ...sharedDirectives(input),
   }
   if (input.reportUri) directives["report-uri"] = [input.reportUri]
