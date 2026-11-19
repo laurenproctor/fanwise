@@ -22,7 +22,7 @@ const PHASES = [
   {
     num: "01",
     title: "Make publishing easy",
-    body: "One product becomes six correct listings in minutes instead of a day.",
+    body: "One product becomes a storefront page and six correct listings in minutes instead of a day.",
   },
   {
     num: "02",
@@ -37,7 +37,7 @@ const PHASES = [
   {
     num: "04",
     title: "Help decisions",
-    body: "What to make next, where to sell it, and what to charge — grounded in your own numbers.",
+    body: "What to make next, where to sell it, and what to charge, grounded in your own numbers.",
   },
 ]
 
@@ -46,9 +46,9 @@ const PHASES = [
  * invariants CLAUDE.md states, said to a reader rather than to a developer.
  */
 const NOTS = [
-  "A form-filling bot. Fanwise understands each shop's rules; it does not paste into their forms and hope.",
+  "A form-filling bot. Fanwise understands each shop's rules. It does not paste into their forms and hope.",
   "Organized around any one marketplace. Every shop is a peer destination, including the biggest one.",
-  "A tool that treats marketplace records as the truth. The truth is yours; the listings are copies.",
+  "A tool that treats marketplace records as the truth. The truth is yours. The listings are copies.",
 ]
 
 export default function AboutPage() {
@@ -58,29 +58,30 @@ export default function AboutPage() {
         <span className="fw-eyebrow">About</span>
         <h1 className="fw-h1">The product record belongs to the person who made the product.</h1>
         <p className="fw-lede">
-          Designers who sell in six shops keep six copies of the truth — one per marketplace, each
-          drifting from the others. Fanwise exists to put the record back in one place, owned by its
-          maker, and to treat every marketplace as what it is: a destination.
+          Type designers, makers and Mac developers who sell in six shops keep six copies of the
+          truth, one per marketplace, each drifting from the others. Fanwise exists to put the
+          record back in one place, owned by its maker, and to treat every marketplace as what it
+          is: a destination.
         </p>
       </header>
 
       <section style={{ padding: "88px 0", maxWidth: 820 }}>
         <span className="fw-eyebrow fw-eyebrow--tight">The one rule</span>
         <div className="fw-about__rule-card">
-          <span className="fw-about__term">Canonical product</span>
+          <span className="fw-about__term">Your product record</span>
           <span aria-hidden="true" className="fw-about__arrow">
             &rarr;
           </span>
-          <span className="fw-about__term">Channel adapter</span>
+          <span className="fw-about__term">Each shop&apos;s rules</span>
           <span aria-hidden="true" className="fw-about__arrow">
             &rarr;
           </span>
           <span className="fw-about__term fw-about__term--out">Listing</span>
         </div>
         <p className="fw-about__after">
-          Never the reverse. Your product record is authoritative; each shop receives a translation
-          of it. No marketplace&apos;s quirks leak back into your catalog, so every channel added
-          makes the system more useful instead of the record messier.
+          Never the reverse. Your product record is the authority, and each shop receives a
+          translation of it. No marketplace&apos;s quirks leak back into your catalog, so every
+          channel you add makes Fanwise more useful instead of your records messier.
         </p>
       </section>
 

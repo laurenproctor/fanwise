@@ -6,7 +6,7 @@ import { marketingRoutes } from "@/lib/routes"
 export const metadata: Metadata = {
   title: "How Fanwise works",
   description:
-    "From your canonical product, through a channel adapter, to a listing. One master listing in, six correct listings out.",
+    "One master listing for a typeface, a physical product, or a Mac app. Fanwise sells it from your storefront and publishes six correct listings to other shops.",
 }
 
 const FOOTER = [
@@ -42,8 +42,8 @@ const STEPS: {
   {
     num: "01",
     title: "Build the master listing",
-    body: "Upload the product files, one set of full-size previews, a description, a license and a price. This is the canonical record — the only version of the product you ever write.",
-    note: "This happens once per product. Everything after it is derived, so there is nothing to keep in sync by hand.",
+    body: "Add a typeface, a physical product, or a Mac app: the files or the item details, full-size previews, a description, and a price. This is the only version of the product you ever write.",
+    note: "You do this once per product. Fanwise builds everything after it, so you have nothing to keep in sync by hand.",
     panelHead: "Master · Aster Grotesk",
     rows: [
       { k: "Files", v: "4 · 68 MB", tone: "fact" },
@@ -55,10 +55,23 @@ const STEPS: {
   },
   {
     num: "02",
+    title: "Open your storefront",
+    body: "Turn on checkout and your product page starts selling. Buyers pay you. Fanwise delivers the files, or hands you the order to ship.",
+    note: "Your storefront comes with the $9 base. You can sell from it before you connect another shop.",
+    panelHead: "Storefront",
+    rows: [
+      { k: "Address", v: "fanwise.com/@you", tone: "fact" },
+      { k: "Product page", v: "From the master", tone: "fact" },
+      { k: "Checkout", v: "On", tone: "live" },
+      { k: "Delivery", v: "Download or shipped", tone: "fact" },
+    ],
+  },
+  {
+    num: "03",
     title: "Pick the shops",
-    body: "Toggle the marketplaces this product belongs on. Each one gets its own derived draft: previews cropped to that shop's spec, copy trimmed to its limits, tags mapped onto its taxonomy, your license matched to its menu.",
-    note: "Drafts are built by the channel adapters — one per marketplace, each fluent in that shop's rulebook.",
-    panelHead: "Derived drafts",
+    body: "Choose the marketplaces this product belongs on. You get a finished draft for each one: previews cropped to that shop's spec, copy trimmed to its limits, tags mapped to its categories, and your license matched to its menu.",
+    note: "Fanwise knows each shop's rulebook, so you don't have to.",
+    panelHead: "Drafts for each shop",
     rows: [
       { k: "Etsy", v: "4:3 crop · 13 tags · plain text", tone: "fact" },
       { k: "Creative Market", v: "1160 × 772 · markdown", tone: "fact" },
@@ -69,10 +82,10 @@ const STEPS: {
     ],
   },
   {
-    num: "03",
+    num: "04",
     title: "Review and publish",
-    body: "Check the drafts side by side, adjust anything a shop will care about, and publish. Fanwise submits each draft, tracks approvals and moderation queues, and flags the rejections that need a human.",
-    note: "Nothing goes out unseen — Fanwise builds the drafts, a person signs them off.",
+    body: "Check the drafts side by side, adjust anything a shop will care about, and publish. Fanwise submits each draft, tracks approvals and moderation queues, and flags the rejections that need you.",
+    note: "Nothing goes out unseen. Fanwise builds the drafts and you sign them off.",
     panelHead: "Status",
     rows: [
       { k: "Etsy", v: "Live", tone: "live" },
@@ -85,18 +98,34 @@ const STEPS: {
   },
 ]
 
+/** What the master listing holds for each product type the site opens with. */
+const TYPES = [
+  {
+    title: "Typefaces",
+    body: "Enter the family once. Fanwise reads the styles and language coverage from the font files and builds the specimens.",
+  },
+  {
+    title: "Physical products",
+    body: "Enter the variants, the stock for each one, the weight and size, and the shipping rules. Every order tells you what to ship.",
+  },
+  {
+    title: "Mac apps",
+    body: "Upload the build with its version, release notes, macOS requirement, and screenshots. Buyers get the download when they pay.",
+  },
+]
+
 const AFTER = [
   {
     title: "Edits fan out too",
-    body: "Change the price, a preview or the description on the master, and every derived listing updates on its own schedule.",
+    body: "Change the price, a preview, or the description once, and every listing updates on its own schedule.",
   },
   {
     title: "Rejections come with fixes",
-    body: "When a shop bounces a draft, Fanwise shows the shop's reason and a suggested fix. Accepting it rebuilds and resubmits that one draft.",
+    body: "When a shop rejects a draft, Fanwise shows the shop's reason and a suggested fix. Accept it and that one draft rebuilds and resubmits.",
   },
   {
     title: "Rules stay current",
-    body: "Marketplace specs are versioned. When a shop changes a rule, affected drafts rebuild and you get a note saying which listings moved.",
+    body: "Fanwise tracks each marketplace's rules. When a shop changes one, the affected drafts rebuild and you get a note saying which listings moved.",
   },
   {
     title: "Sales flow back",
@@ -109,10 +138,10 @@ export default function HowItWorksPage() {
     <MarketingPage nav={{ current: "how-it-works" }} footer={FOOTER}>
       <header className="fw-page__header fw-page__header--tight">
         <span className="fw-eyebrow">How it works</span>
-        <h1 className="fw-h1">One master listing in. Six correct listings out.</h1>
+        <h1 className="fw-h1">One master listing in. A storefront and six listings out.</h1>
         <p className="fw-lede">
-          Everything in Fanwise flows in one direction: from your canonical product, through a
-          channel adapter, to a listing. Here is the whole path.
+          Write a product up once. Fanwise sells it from your storefront and builds the listing for
+          every shop. Here is the whole path.
         </p>
       </header>
 
@@ -144,6 +173,24 @@ export default function HowItWorksPage() {
         </p>
       </section>
 
+      <section style={{ padding: "48px 0 0" }}>
+        <div className="fw-intro">
+          <span className="fw-eyebrow fw-eyebrow--tight">Product types</span>
+          <h2 className="fw-h2">One path for every product type.</h2>
+          <p className="fw-intro__body">
+            The steps are the same for all three. Only the details you enter change.
+          </p>
+        </div>
+        <div className="fw-cards">
+          {TYPES.map((item) => (
+            <div key={item.title} className="fw-card">
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section style={{ padding: "48px 0 92px" }}>
         <div className="fw-intro">
           <span className="fw-eyebrow fw-eyebrow--tight">After publish</span>
@@ -161,7 +208,7 @@ export default function HowItWorksPage() {
 
       <CtaPanel
         title="Try it with one product."
-        body="Upload it once, pick your shops, and review the drafts side by side."
+        body="Add it once, open your storefront, and review the drafts side by side."
         action={{ label: "Get started", href: marketingRoutes.signUp }}
       />
     </MarketingPage>

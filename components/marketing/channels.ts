@@ -123,7 +123,7 @@ export const SHOPS: Shop[] = [
     badge: "Marketplace · $6/mo",
     kind: "marketplace",
     blurb:
-      "Templates and assets discovered almost entirely through keywords. No prose, no tags — just 49 chances to be found.",
+      "Templates and assets discovered almost entirely through keywords. No prose and no tags: 49 chances to be found.",
     preview: "Rendered template preview",
     title: "200 chars",
     tags: "Up to 49 keywords",

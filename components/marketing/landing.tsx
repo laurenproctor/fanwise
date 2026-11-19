@@ -54,6 +54,13 @@ const DERIVED: {
   last?: boolean
 }[] = [
   {
+    name: "Fanwise",
+    spec: "Your storefront · checkout · delivery",
+    status: "live",
+    label: "Selling",
+    when: "2m ago",
+  },
+  {
     name: "Etsy",
     spec: "2000 px 4:3 · 13 tags · 140 char title",
     status: "live",
@@ -99,21 +106,44 @@ const TALLY = [
   ["Fill forms, upload, wait, fix rejections", "2h 20m"],
 ] as const
 
+/**
+ * What Fanwise sells today. Typefaces, physical products and Mac apps are the
+ * product types the site opens with; the third card names the rest without
+ * promising a date.
+ */
+const SELL = [
+  {
+    num: "AVAILABLE NOW",
+    title: "Typefaces",
+    body: "Upload the family once and skip the specimen grind. Fanwise reads every style, checks language coverage, and builds the specimens each shop asks for.",
+  },
+  {
+    num: "AVAILABLE NOW",
+    title: "Physical products",
+    body: "Set your variants, stock, and shipping rules once. Fanwise takes the order and tells you what to ship.",
+  },
+  {
+    num: "AVAILABLE NOW",
+    title: "Mac apps",
+    body: "Ship a new build without rewriting a listing. Upload it with its release notes. Fanwise takes the payment and delivers the download.",
+  },
+]
+
 const HOW = [
   {
     num: "STEP 01",
     title: "Build the master listing",
-    body: "Upload the files, one set of full-size previews, a description, a license and a price. This is the single source every shop derives from.",
+    body: "Add the files or the item details, full-size previews, a description, and a price. You never write this product up again.",
   },
   {
     num: "STEP 02",
-    title: "Pick the shops",
-    body: "Toggle the marketplaces this product belongs on. Each gets its own draft: previews cropped to spec, copy trimmed to the limit, tags mapped to that shop's taxonomy.",
+    title: "Open your storefront",
+    body: "Turn on checkout and your product page starts selling. Buyers pay you. Fanwise delivers the files, or hands you the order to ship.",
   },
   {
     num: "STEP 03",
-    title: "Review and publish",
-    body: "Check the drafts side by side, adjust anything a shop will care about, publish. Fanwise tracks approvals and flags the rejections that need a human.",
+    title: "Publish everywhere",
+    body: "Pick the other shops and get a finished draft for each: previews cropped to spec, copy trimmed to the limit, tags mapped to that shop's categories. Fanwise tracks approvals and flags the rejections that need you.",
   },
 ]
 
@@ -179,14 +209,15 @@ const SPEC_COLUMNS = [
 
 const PLAN_FEATURES = [
   "Unlimited products, no per-product charge",
-  "One owned storefront included",
-  "Full preview, copy and tag mapping",
-  "Status tracking and rejection fixes",
+  "Your own storefront, with checkout and delivery",
+  "One Shopify or WooCommerce store included",
+  "Previews, copy, and tags built for every shop",
+  "Every listing status in one view, with fixes for rejections",
   "Add or drop a marketplace any month",
 ]
 
 const STUDIO_FEATURES = [
-  "For foundries and creative teams",
+  "For foundries, app studios, brands, and creative teams",
   "Multiple seats and client workspaces",
   "Multiple accounts per marketplace",
   "Bulk publishing and updates",
@@ -207,7 +238,7 @@ export function Landing() {
 
             <div style={{ paddingTop: 56 }}>
               <span className="fw-chip">
-                <i className="fw-chip__dot fw-pulse" /> Six marketplaces connected
+                <i className="fw-chip__dot fw-pulse" /> Typefaces, physical products, Mac apps
               </span>
               <h1 className="fw-hero__title">
                 Create once.
@@ -218,8 +249,8 @@ export function Landing() {
 
             <div className="fw-hero__foot">
               <p>
-                One canonical product, translated into a listing for every shop that sells it —
-                previews, copy, tags and license, each to that shop&apos;s rules.
+                Add a typeface, a physical product, or a Mac app once. Sell it from your own
+                storefront and in every shop that carries it, without rebuilding a single listing.
               </p>
               <div className="fw-hero__buttons">
                 <a href="#start" className="fw-btn fw-btn--sm fw-btn--bright">
@@ -236,29 +267,52 @@ export function Landing() {
         <div className="fw-slab">
           <div className="fw-wrap--wide fw-statement">
             <h2>
-              Fanwise holds one record of your product and hands every marketplace a listing{" "}
-              <span>in the exact shape it demands.</span>
+              Write one listing. Fanwise sells it from your storefront and rebuilds it for every
+              marketplace, <span>so you never fill in the same form twice.</span>
             </h2>
             <div className="fw-statement__side">
               <p>
-                Fonts, templates, presets, icons, mockups, UI kits. If it ships as a file and sells
-                as a listing, Fanwise fans it out.
+                Start with typefaces, physical products, and Mac apps. Templates, images, icons, and
+                presets follow.
               </p>
-              <a href="#product" className="fw-arrow-link">
-                Look inside the workspace <span aria-hidden="true">&rarr;</span>
+              <a href="#sell" className="fw-arrow-link">
+                See what you can sell <span aria-hidden="true">&rarr;</span>
               </a>
             </div>
           </div>
+
+          <section id="sell" className="fw-wrap--wide" style={{ paddingBottom: 92 }}>
+            <div className="fw-slab-head">
+              <div>
+                <span className="fw-slab-eyebrow">What you can sell</span>
+                <h2>Typefaces, physical products, and Mac apps</h2>
+              </div>
+              <p>
+                Each product type gets a record that already knows what buyers and shops ask for.
+                You fill it in once.
+              </p>
+            </div>
+            <div className="fw-slab-cards">
+              {SELL.map((item) => (
+                <div key={item.title} className="fw-slab-card">
+                  <div className="fw-slab-card__num">{item.num}</div>
+                  <h3>{item.title}</h3>
+                  <p>{item.body}</p>
+                </div>
+              ))}
+            </div>
+          </section>
 
           <section id="product" className="fw-wrap--wide" style={{ paddingBottom: 96 }}>
             <div className="fw-slab-head fw-slab-head--tight">
               <div>
                 <span className="fw-slab-eyebrow">The workspace</span>
-                <h2>One master, six drafts</h2>
+                <h2>One listing, 7 places to buy</h2>
               </div>
               <p>
-                The master listing on the left is the only thing you write. Each shop&apos;s derived
-                draft carries its own preview crop, copy length, tags and live status.
+                The master listing on the left is the only thing you write. Your storefront sells it
+                right away. Each shop gets its own draft with the right preview crop, copy length,
+                and tags, and you see every status in one view.
               </p>
             </div>
 
@@ -299,8 +353,8 @@ export function Landing() {
 
                 <div className="fw-mock__derived">
                   <div className="fw-derived-row fw-derived-row--head">
-                    <div>Marketplace</div>
-                    <div>Derived draft</div>
+                    <div>Shop</div>
+                    <div>Draft</div>
                     <div>Status</div>
                     <div style={{ textAlign: "right" }}>Updated</div>
                   </div>
@@ -355,7 +409,8 @@ export function Landing() {
 
               <div className="fw-mock__foot">
                 <div>
-                  6 drafts &middot; 3 live &middot; 2 pending &middot; <b>1 needs attention</b>
+                  Storefront selling &middot; 6 drafts &middot; 3 live &middot; 2 pending &middot;{" "}
+                  <b>1 needs attention</b>
                 </div>
                 <div>Next sync in 4m</div>
               </div>
@@ -363,9 +418,10 @@ export function Landing() {
 
             <div className="fw-mock__caption">
               <p className="fw-footnote">
-                Interface shown with a sample workspace; the product, figures and statuses are
-                illustrative. A rejection comes back with the shop&apos;s reason and a suggested
-                fix; accepting it rebuilds and resubmits that one draft.
+                Interface shown with a sample typeface workspace. The product, figures, and statuses
+                are illustrative. Physical products and Mac apps use the same layout. When a shop
+                rejects a draft, Fanwise shows the reason and a suggested fix. Accept it and that
+                one draft rebuilds and resubmits.
               </p>
               <a href="#start" className="fw-arrow-link">
                 Fan out a product <span aria-hidden="true">&rarr;</span>
@@ -397,7 +453,7 @@ export function Landing() {
           <section id="cost" className="fw-wrap--wide" style={{ padding: "92px 0" }}>
             <div className="fw-slab-head">
               <div>
-                <span className="fw-slab-eyebrow">The arithmetic</span>
+                <span className="fw-slab-eyebrow">The time you get back</span>
                 <h2>
                   Making it takes a week.
                   <br />
@@ -405,13 +461,13 @@ export function Landing() {
                 </h2>
               </div>
               <p>
-                Every shop wants the same product in a slightly different shape. Six times over, by
-                hand, for every release.
+                Every shop wants the same product in a slightly different shape. By hand, that is
+                the same job 6 times for every release. On Fanwise, you review and approve.
               </p>
             </div>
             <div className="fw-arith">
               <div
-                aria-label="Illustrative time spent listing one font family by hand"
+                aria-label="Illustrative time spent listing one product by hand"
                 className="fw-tally"
               >
                 {TALLY.map(([task, time]) => (
@@ -421,7 +477,7 @@ export function Landing() {
                   </div>
                 ))}
                 <div className="fw-tally__row fw-tally__row--total">
-                  <span>One font family, listed by hand</span>
+                  <span>One product, listed by hand</span>
                   <span className="fw-tally__time">6h 40m</span>
                 </div>
               </div>
@@ -450,9 +506,9 @@ export function Landing() {
                   </div>
                 </div>
                 <p className="fw-footnote" style={{ marginTop: 18 }}>
-                  Illustrative timings for one font family across six shops, not a measured
-                  benchmark. The minutes on Fanwise are review and approval: Fanwise builds the
-                  drafts, a person signs them off.
+                  Illustrative timings for one product across six shops, not a measured benchmark.
+                  The minutes on Fanwise are review and approval: Fanwise builds the drafts and you
+                  sign them off.
                 </p>
               </div>
             </div>
@@ -461,12 +517,12 @@ export function Landing() {
           <section id="work" className="fw-wrap--wide" style={{ padding: "0 0 92px" }}>
             <div className="fw-slab-head">
               <div>
-                <span className="fw-slab-eyebrow">Three steps</span>
+                <span className="fw-slab-eyebrow">3 steps</span>
                 <h2>How it works</h2>
               </div>
               <p>
-                The first step is the only one that takes real time, and it happens once per
-                product.
+                The first step takes real time. It happens once per product, and everything after it
+                is review.
               </p>
             </div>
             <div className="fw-slab-cards">
@@ -484,11 +540,11 @@ export function Landing() {
             <div className="fw-slab-head">
               <div>
                 <span className="fw-slab-eyebrow">Reference</span>
-                <h2>The spec sheet</h2>
+                <h2>6 rulebooks you no longer keep</h2>
               </div>
               <p>
-                This is the work. Six sets of rules, none of them in agreement. Fanwise keeps them
-                so you never have to.
+                This is the work Fanwise takes off your desk: 6 sets of rules, none of them in
+                agreement, all kept current for you.
               </p>
             </div>
             <div
@@ -519,9 +575,9 @@ export function Landing() {
               </table>
             </div>
             <p className="fw-footnote" style={{ marginTop: 18 }}>
-              Spec values are illustrative. Rules are maintained per marketplace and versioned; when
-              a shop changes a requirement, affected drafts rebuild and you get a note saying which
-              listings moved.
+              Spec values are illustrative. Fanwise tracks the rules for each marketplace. When a
+              shop changes a requirement, the affected drafts rebuild and you get a note saying
+              which listings moved.
             </p>
           </section>
         </div>
@@ -532,11 +588,11 @@ export function Landing() {
             <div className="fw-band-head">
               <div>
                 <span className="fw-band-eyebrow">Pricing</span>
-                <h2>One price, plus the shops</h2>
+                <h2>A flat price. Your sales stay yours.</h2>
               </div>
               <p>
-                $9 a month, then $6 for each marketplace you connect. One owned storefront is
-                included, the catalog is unlimited, and Fanwise never takes a percentage of sales.
+                $9 a month covers your storefront and an unlimited catalog. Add $6 for each
+                marketplace you connect. Fanwise never takes a percentage of sales.
               </p>
             </div>
             <div className="fw-tiers">
@@ -590,15 +646,15 @@ export function Landing() {
               <h2>
                 Bring one product.
                 <br />
-                <b>Leave with six listings.</b>
+                <b>Leave with a storefront.</b>
               </h2>
               <p className="fw-band--start__lede">
-                Connect a shop, upload a product, and watch the drafts build. $9 a month, plus $6
-                for each marketplace connected.
+                Add one product and start selling from your own storefront. Connect the other shops
+                when you&apos;re ready. $9 a month, plus $6 for each marketplace.
               </p>
               <div className="fw-assurances">
                 <span>
-                  <i /> Six shops connected
+                  <i /> Your own storefront
                 </span>
                 <span>
                   <i /> $9 plus $6 a marketplace
@@ -616,7 +672,7 @@ export function Landing() {
             */}
             <div className="fw-signup-card">
               <h3>Create a workspace</h3>
-              <p>An email and a password is all it takes. Connect your first shop from inside.</p>
+              <p>All it takes is an email and a password. Add your first product from inside.</p>
               <Link href={marketingRoutes.signUp} className="fw-btn fw-btn--bright">
                 Get started
               </Link>

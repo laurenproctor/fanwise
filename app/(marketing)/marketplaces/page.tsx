@@ -36,8 +36,9 @@ export default function MarketplacesPage() {
         <span className="fw-eyebrow">Marketplaces</span>
         <h1 className="fw-h1">Seven shops. Seven rulebooks. One of yours.</h1>
         <p className="fw-lede">
-          Every marketplace below is a first-class destination in Fanwise. Connect the ones you sell
-          on for $6 each a month; one owned storefront, Shopify or WooCommerce, is included.
+          Connect the shops you sell on for $6 each a month and stop learning their rules. One store
+          of your own, Shopify or WooCommerce, is included. Fanwise offers each product only the
+          shops that carry its type.
         </p>
       </header>
 
@@ -86,7 +87,7 @@ export default function MarketplacesPage() {
           <span className="fw-eyebrow fw-eyebrow--tight">Reference</span>
           <h2 className="fw-h2">The spec sheet, side by side.</h2>
           <p className="fw-intro__body">
-            Rules are maintained per marketplace and versioned. When a shop changes a requirement,
+            Fanwise tracks each marketplace&apos;s rules. When a shop changes a requirement, the
             affected drafts rebuild and you get a note saying which listings moved.
           </p>
         </div>
