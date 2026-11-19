@@ -11,7 +11,7 @@ import { marketingRoutes } from "@/lib/routes"
 export const metadata: Metadata = {
   title: "Fanwise Pricing",
   description:
-    "$9 a month, then $6 for each marketplace you connect. One owned storefront included, unlimited catalog, no percentage of sales.",
+    "$9 a month covers your Fanwise storefront and an unlimited catalog, then $6 for each marketplace you connect. No percentage of sales.",
 }
 
 const FOOTER = [
@@ -26,30 +26,38 @@ const FOOTER = [
 const MODEL = [
   {
     title: "Unlimited catalog",
-    body: "Put your entire library into Fanwise without watching a product cap.",
+    body: "Put your entire library into Fanwise. No product cap to watch.",
   },
   {
     title: "No revenue share",
-    body: "A $20 template and a $20,000 license cost the same to publish.",
+    body: "A $20 template and a $20,000 license cost the same to publish. Fanwise takes no cut of either.",
   },
   {
     title: "Channels when you need them",
-    body: "Expand distribution without upgrading to an arbitrary plan tier.",
+    body: "Add a marketplace for $6 when you want the reach. Drop it when you don't.",
   },
 ]
 
 const FAQ = [
   {
+    q: "Do I need another shop to sell?",
+    a: "No. Your Fanwise storefront comes with the $9 base and sells on its own. Connect other shops when you want more reach.",
+  },
+  {
+    q: "What can I sell?",
+    a: "Typefaces, physical products, and Mac apps today. Templates, images, icons, presets and mockups follow.",
+  },
+  {
     q: "Do I pay per product?",
-    a: "No. Fanwise is built to hold your entire digital-product catalog, and the subscription does not increase as it grows.",
+    a: "No. Add your entire catalog. The subscription does not go up as it grows.",
   },
   {
     q: "What counts as a marketplace?",
-    a: "An external sales destination connected to Fanwise — Etsy, Creative Market, Envato, Gumroad, Adobe Stock or MyFonts.",
+    a: "An external sales destination connected to Fanwise: Etsy, Creative Market, Envato, Gumroad, Adobe Stock or MyFonts.",
   },
   {
     q: "Does my own store count as a marketplace?",
-    a: "One owned storefront, Shopify or WooCommerce, is included with Fanwise. External marketplaces are $6 each.",
+    a: "No. Your Fanwise storefront and one store of your own, Shopify or WooCommerce, are included. External marketplaces are $6 each.",
   },
   {
     q: "What if I stop selling on a marketplace?",
@@ -69,7 +77,7 @@ const FAQ = [
   },
   {
     q: "Can I cancel?",
-    a: "Any time. You can also export your catalog and leave — Fanwise holds your products, not your business.",
+    a: "Any time. You can also export your catalog and leave. Fanwise holds your products, not your business.",
   },
 ]
 
@@ -92,8 +100,8 @@ export default function PricingPage() {
         </header>
         <div style={{ paddingTop: 0, paddingBottom: 12 }}>
           <p className="fw-price-lede">
-            Fanwise is $9 a month, then $6 for each marketplace you connect. Your catalog can grow
-            without your bill moving.
+            Fanwise is $9 a month for your storefront and your whole catalog, then $6 for each
+            marketplace you connect. Your catalog can grow without your bill moving.
           </p>
           <div className="fw-price-actions">
             <Link href={marketingRoutes.signUp} className="fw-btn fw-btn--accent">
@@ -126,12 +134,11 @@ export default function PricingPage() {
               <span className="fw-eyebrow fw-eyebrow--tight">Owned versus rented</span>
               <h2 className="fw-h2">Your own store should be the center.</h2>
               <p style={{ color: "var(--fw-ink-2)", marginTop: 18, maxWidth: "44ch" }}>
-                Fanwise helps you distribute widely without losing sight of the channel you own.
-                Connect one direct storefront at no channel charge, then add external marketplaces
-                for $6 each.
+                Sell widely without giving up the channel you own. Your Fanwise storefront and one
+                store of your own cost nothing extra. Each external marketplace is $6.
               </p>
               <div className="fw-channels__claim">
-                <b>1 owned storefront included.</b>
+                <b>Your Fanwise storefront and 1 store of your own included.</b>
                 <span>Every external marketplace after that is $6 a month.</span>
               </div>
             </div>
@@ -139,6 +146,12 @@ export default function PricingPage() {
               <div>
                 <h4>Direct storefront</h4>
                 <div className="fw-channels__list">
+                  <div className="fw-channels__row">
+                    Fanwise storefront
+                    <span className="fw-channels__state fw-channels__state--included">
+                      Included
+                    </span>
+                  </div>
                   <div className="fw-channels__row">
                     Shopify
                     <span className="fw-channels__state fw-channels__state--included">
@@ -177,8 +190,8 @@ export default function PricingPage() {
             <span className="fw-eyebrow fw-eyebrow--tight">The model</span>
             <h2 className="fw-h2">Pricing that grows with your operation, not your success.</h2>
             <p className="fw-intro__body">
-              Fanwise does not charge more because you made more products or had a great month. You
-              pay for the channels it operates.
+              A great month does not raise your bill, and neither does a bigger catalog. You pay for
+              the channels Fanwise runs for you.
             </p>
           </div>
           <div className="fw-cards">
@@ -196,8 +209,8 @@ export default function PricingPage() {
             <div className="fw-studio__text">
               <h3>Running a larger catalog or team?</h3>
               <p>
-                Fanwise Studio is for high-volume creators, foundries and creative teams that need
-                bulk publishing, multiple users, and more automation.
+                Fanwise Studio gives high-volume creators, foundries, app studios, brands, and
+                creative teams bulk publishing, multiple users, and more automation.
               </p>
               <p className="fw-studio__list">
                 Team members &middot; Multiple accounts per marketplace &middot; Bulk publishing
@@ -231,7 +244,7 @@ export default function PricingPage() {
         <CtaPanel
           size="large"
           title="One catalog. Every channel."
-          body="Create your product once. Fanwise prepares, publishes and manages it everywhere you sell."
+          body="Create your product once. Sell it from your storefront and everywhere else you sell."
           action={{ label: "Start free", href: marketingRoutes.signUp }}
           fine="$9 a month when you are ready. Add marketplaces for $6 each."
         />

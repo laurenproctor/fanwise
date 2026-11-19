@@ -43,7 +43,7 @@ export const dynamic = "force-dynamic"
 
 const TITLE = "Discover independent creators · Fanwise"
 const DESCRIPTION =
-  "Discover designers, creators, and studios making typefaces, templates, brand systems, UI kits, and other creative products on Fanwise."
+  "Discover designers, creators, and studios making typefaces, physical products, Mac apps, templates, brand systems, UI kits, and other creative products on Fanwise."
 
 const FOOTER = [
   { label: "Product", href: marketingRoutes.landing },
