@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { SHOPS } from "@/components/marketing/channels"
+import { SHOPS, BUILD_LIST } from "@/components/marketing/channels"
 import { CtaPanel } from "@/components/marketing/cta-panel"
 import { MarketingPage } from "@/components/marketing/page-shell"
 import { ShopMark } from "@/components/marketing/shop-mark"
@@ -120,6 +120,44 @@ export default function MarketplacesPage() {
                   <td>{shop.tags}</td>
                   <td>{shop.copy}</td>
                   <td>{shop.review}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="build-list" style={{ padding: "0 0 92px" }}>
+        <div className="fw-intro">
+          <span className="fw-eyebrow fw-eyebrow--tight">Coming next</span>
+          <h2 className="fw-h2">{BUILD_LIST.length} more places to sell.</h2>
+          <p className="fw-intro__body">
+            These storefronts and marketplaces are on the build list, in the order Fanwise plans to
+            build them. None is connected yet. Tell us which one you sell on and it moves up.
+          </p>
+        </div>
+        <div
+          className="fw-table-scroll"
+          role="region"
+          aria-label="Shops on the build list"
+          tabIndex={0}
+        >
+          <table className="fw-table">
+            <thead>
+              <tr>
+                <th scope="col">Shop</th>
+                <th scope="col">Type</th>
+                <th scope="col">Sells</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {BUILD_LIST.map((channel) => (
+                <tr key={channel.name}>
+                  <td>{channel.name}</td>
+                  <td>{channel.kind}</td>
+                  <td>{channel.sells}</td>
+                  <td>On the build list</td>
                 </tr>
               ))}
             </tbody>
