@@ -59,6 +59,10 @@ describe("the environment is read from Vercel first", () => {
     [{ VERCEL_ENV: "development", NODE_ENV: "development" }, "development"],
     [{ NODE_ENV: "development" }, "development"],
     [{ NODE_ENV: "production" }, "local"],
+    [{ NETLIFY_CONTEXT: "production", NODE_ENV: "production" }, "production"],
+    [{ NETLIFY_CONTEXT: "deploy-preview", NODE_ENV: "production" }, "local"],
+    [{ NETLIFY_CONTEXT: "branch-deploy", NODE_ENV: "production" }, "local"],
+    [{ NETLIFY_CONTEXT: "", NODE_ENV: "production" }, "local"],
     [{ NODE_ENV: "test" }, "local"],
     [{}, "local"],
   ])("%o is %s", (env, expected) => {

@@ -26,13 +26,32 @@ function tunnelHost(): string[] {
   }
 }
 
+/**
+ * Netlify's deploy context, read at build time. Empty anywhere else. See
+ * `environmentFrom` in lib/security/headers.ts for why it is inlined.
+ */
+const netlifyContext = process.env.NETLIFY === "true" ? (process.env.CONTEXT ?? "") : ""
+
 const config: NextConfig = {
   reactStrictMode: true,
+  // Inlined into every bundle at build time, the proxy's included.
+  env: { FANWISE_NETLIFY_CONTEXT: netlifyContext },
   // The headers every response carries, static assets included. The
   // Content-Security-Policy is not here: it carries a per-request nonce on the
   // dynamic routes, so the proxy sets it. lib/security/headers.ts owns both.
   async headers() {
-    return [{ source: "/(.*)", headers: baselineHeaders(environmentFrom(process.env)) }]
+    return [
+      {
+        source: "/(.*)",
+        headers: baselineHeaders(
+          environmentFrom({
+            VERCEL_ENV: process.env.VERCEL_ENV,
+            NODE_ENV: process.env.NODE_ENV,
+            NETLIFY_CONTEXT: netlifyContext,
+          }),
+        ),
+      },
+    ]
   },
   /**
    * The profile's management pages moved out of Settings on 13 September 2026,
