@@ -13,7 +13,7 @@ files, and Trigger.dev still runs background jobs. Netlify only runs the Next.js
   `lib/security/headers.ts` treats Netlify's production context as production, so HSTS and
   upgraded requests still apply. Deploy previews and branch deploys get the production
   policy without HSTS.
-- `app/layout.tsx` renders Vercel Web Analytics only on Vercel.
+- Analytics is Google Analytics 4 (`lib/analytics/ga.ts`), which does not depend on the host.
 
 ## What a person does in Netlify
 
@@ -38,6 +38,3 @@ Unless a custom domain sits in front, the address moves off `fanwise.vercel.app`
   brings the usable size to about 4.5 MB. Profile avatars allow 5 MiB, so the largest
   avatars will be refused, as they already were on Vercel.
 - Synchronous requests stop at 60 seconds.
-- The Privacy page says page views are counted with Vercel Web Analytics. Off Vercel nothing
-  counts page views. That sentence needs the founder's decision: replace the analytics or
-  change the sentence.

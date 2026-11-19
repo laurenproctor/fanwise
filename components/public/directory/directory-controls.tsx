@@ -1,6 +1,6 @@
 "use client"
 
-import { track } from "@vercel/analytics"
+import { track } from "@/lib/analytics/ga"
 import { useRouter } from "next/navigation"
 import { useEffect, useId, useRef, useState, useTransition } from "react"
 import {
