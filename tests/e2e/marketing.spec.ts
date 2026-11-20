@@ -9,9 +9,9 @@ import { expect, test } from "@playwright/test"
 const PAGES = [
   ["/", "Create once."],
   ["/marketplaces", "Seven shops. Seven rulebooks. One of yours."],
-  ["/how-it-works", "One master listing in. A storefront and six listings out."],
+  ["/how-it-works", "One product listing in. Your storefront and six shops out."],
   ["/pricing", "Simple pricing for wherever you sell."],
-  ["/about", "The product record belongs to the person who made the product."],
+  ["/about", "The product listing belongs to the person who made the product."],
   ["/terms", "Terms of Service"],
   ["/privacy", "Privacy Policy"],
 ] as const

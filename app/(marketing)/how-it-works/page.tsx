@@ -6,7 +6,7 @@ import { marketingRoutes } from "@/lib/routes"
 export const metadata: Metadata = {
   title: "How Fanwise works",
   description:
-    "One master listing for a typeface, a physical product, or a Mac app. Fanwise sells it from your storefront and publishes six correct listings to other shops.",
+    "Create one product listing for a typeface, a physical product, or a Mac app. Fanwise syndicates it to your storefront and six shops at once.",
 }
 
 const FOOTER = [
@@ -41,10 +41,10 @@ const STEPS: {
 }[] = [
   {
     num: "01",
-    title: "Build the master listing",
-    body: "Add a typeface, a physical product, or a Mac app: the files or the item details, full-size previews, a description, and a price. This is the only version of the product you ever write.",
+    title: "Create your product listing",
+    body: "Add a typeface, a physical product, or a Mac app: the files or the item details, full-size previews, a description, and a price. This is the only product listing you ever write.",
     note: "You do this once per product. Fanwise builds everything after it, so you have nothing to keep in sync by hand.",
-    panelHead: "Master · Aster Grotesk",
+    panelHead: "Product listing · Aster Grotesk",
     rows: [
       { k: "Files", v: "4 · 68 MB", tone: "fact" },
       { k: "Previews", v: "9 at full size", tone: "fact" },
@@ -61,7 +61,7 @@ const STEPS: {
     panelHead: "Storefront",
     rows: [
       { k: "Address", v: "fanwise.com/@you", tone: "fact" },
-      { k: "Product page", v: "From the master", tone: "fact" },
+      { k: "Product page", v: "From your listing", tone: "fact" },
       { k: "Checkout", v: "On", tone: "live" },
       { k: "Delivery", v: "Download or shipped", tone: "fact" },
     ],
@@ -117,7 +117,7 @@ const TYPES = [
 const AFTER = [
   {
     title: "Edits fan out too",
-    body: "Change the price, a preview, or the description once, and every listing updates on its own schedule.",
+    body: "Change the price, a preview, or the description on your product listing, and every shop updates on its own schedule.",
   },
   {
     title: "Rejections come with fixes",
@@ -128,8 +128,8 @@ const AFTER = [
     body: "Fanwise tracks each marketplace's rules. When a shop changes one, the affected drafts rebuild and you get a note saying which listings moved.",
   },
   {
-    title: "Sales flow back",
-    body: "Revenue from every channel lands in one ledger, so you can see which shops earn their $6.",
+    title: "See how it sells",
+    body: "Sales from every shop land in one place. See how each product and your whole brand perform, and which shops earn their $6.",
   },
 ]
 
@@ -138,10 +138,10 @@ export default function HowItWorksPage() {
     <MarketingPage nav={{ current: "how-it-works" }} footer={FOOTER}>
       <header className="fw-page__header fw-page__header--tight">
         <span className="fw-eyebrow">How it works</span>
-        <h1 className="fw-h1">One master listing in. A storefront and six listings out.</h1>
+        <h1 className="fw-h1">One product listing in. Your storefront and six shops out.</h1>
         <p className="fw-lede">
-          Write a product up once. Fanwise sells it from your storefront and builds the listing for
-          every shop. Here is the whole path.
+          Create a product listing once. Fanwise syndicates it to your storefront and every shop at
+          once, and you manage it all from one place. Here is the whole path.
         </p>
       </header>
 

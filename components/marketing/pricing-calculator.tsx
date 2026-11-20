@@ -23,7 +23,7 @@ const MAX_CHANNELS = 8
 
 const FEATURES = [
   "Unlimited products",
-  "One canonical product catalog",
+  "One product catalog",
   "Marketplace-ready listing drafts",
   "Publish Everywhere",
   "Product files and previews",

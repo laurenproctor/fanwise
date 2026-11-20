@@ -53,14 +53,14 @@ export const SHOPS: Shop[] = [
     badge: "Storefront · Included",
     kind: "storefront",
     blurb:
-      "Your owned store is the center of the system. Fanwise publishes the canonical listing here first, at full fidelity.",
+      "Your owned store is the center of the system. Fanwise publishes your product listing here first, at full fidelity.",
     preview: "Your theme's image sizes",
     title: "255 chars",
     tags: "Unlimited product tags",
     copy: "Full rich text",
     review: "Instant",
     handles:
-      "Fanwise keeps your storefront and every marketplace copy in step: change the master, and the store updates with the drafts.",
+      "Fanwise keeps your storefront and every marketplace copy in step: change your product listing, and the store updates with the drafts.",
   },
   {
     name: "WooCommerce",
@@ -74,7 +74,7 @@ export const SHOPS: Shop[] = [
     copy: "Full rich text",
     review: "Instant",
     handles:
-      "Fanwise connects with your store's own approval screen, no plugin and no app to install, and keeps the shop in step with the master listing.",
+      "Fanwise connects with your store's own approval screen, no plugin and no app to install, and keeps the shop in step with your product listing.",
   },
   {
     name: "Etsy",

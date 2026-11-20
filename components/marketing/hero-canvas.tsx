@@ -152,7 +152,7 @@ export function HeroCanvas() {
         ctx.textAlign = "center"
         ctx.textBaseline = "top"
         ctx.letterSpacing = "2px"
-        ctx.fillText("ONE MASTER LISTING", px, py + 30)
+        ctx.fillText("ONE PRODUCT LISTING", px, py + 30)
         ctx.beginPath()
         ctx.moveTo(px, py + 14)
         ctx.lineTo(px, py + 24)

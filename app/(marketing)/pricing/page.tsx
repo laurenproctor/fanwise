@@ -244,7 +244,7 @@ export default function PricingPage() {
         <CtaPanel
           size="large"
           title="One catalog. Every channel."
-          body="Create your product once. Sell it from your storefront and everywhere else you sell."
+          body="Create your product listing once. Syndicate it to your storefront and everywhere else you sell."
           action={{ label: "Start free", href: marketingRoutes.signUp }}
           fine="$9 a month when you are ready. Add marketplaces for $6 each."
         />
