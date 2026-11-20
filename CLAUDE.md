@@ -2,16 +2,44 @@
 
 ## What Fanwise is
 
-Fanwise is a canonical digital-product operating system for creators who sell the same
-product across multiple storefronts and marketplaces.
+Fanwise is a canonical product operating system for creators who sell the same product
+across their own storefront and multiple marketplaces. A creator makes one product, Fanwise
+syndicates it to a Fanwise storefront and to every shop that carries it, and the creator
+manages every listing and reads every sale from one place.
+
+The founder set this direction on 20 November 2026. It widens the product in two ways:
+
+- **Product types.** Typefaces, physical products and Mac apps come first. Templates,
+  images, icons and presets follow. Fanwise is no longer digital-only.
+- **Both sides of selling.** Fanwise is a storefront for direct sales as well as a publisher
+  to other shops.
 
 Marketplace integrations are adapters around the Fanwise domain model. Never redesign the
 core product model around an external marketplace. Shopify, Etsy and WooCommerce are
 initial destinations, not architectural authorities.
 
-Publishing is the initial wedge. Do not implement marketplace intelligence, automated
-optimization, browser automation, physical commerce, or unrelated SaaS features unless
-explicitly requested.
+Publishing is the initial wedge. Physical products, Mac apps, storefront checkout, search
+and AI discoverability, and keyword recommendations are in the product direction, and each
+is built only as a step the founder opens. Do not implement marketplace intelligence
+beyond that, browser automation, or unrelated SaaS features unless explicitly requested.
+
+### What the public site says, and what the app does
+
+The marketing site under `app/(marketing)/` was rewritten to the new direction between 18
+and 20 November 2026. It runs ahead of the app. When a task touches one of these, check the
+code before trusting the copy, and never describe one as built until it is:
+
+| The site says | In the app today |
+|---|---|
+| A Fanwise storefront with checkout and delivery | Public pages at `/@handle` exist. Checkout and delivery do not |
+| Physical products: variants, stock, shipping, orders | Not built |
+| Mac apps: builds, release notes, download delivery | Not built |
+| Listings tuned for each shop's search | Built, in the merchandising step, under the factuality rule |
+| Structured data that AI assistants can read | Built, on public product pages |
+| Products prepared for AI shopping results | Not built |
+| Keyword recommendations from keywords the seller enters | Not built |
+| Sales from every shop in one place, brand performance | Check the schema (`pnpm db:types`) before relying on it |
+| 21 more shops on the build list | Planned only. `BUILD_LIST` in `components/marketing/channels.ts` |
 
 ## Current step
 
@@ -39,6 +67,11 @@ unrun, waiting on the profile in decision 26. B1, B2 and B8
 are on `main`; B8's exit passed on 16 September 2026. Gate A is
 not passed; A8 waits on a Creative Market seller login and the questions in that spec's
 §13.** See `docs/roadmap.md`. Implement the current step only. Do not build ahead.
+
+One more thing shipped outside the step order, between 18 and 20 November 2026, at the
+founder's request: the marketing site's new direction (copy and mockups), the move to
+Netlify (`docs/hosting-netlify.md`), and GA4 analytics (`docs/security.md`). No migration,
+and no change to RLS, idempotency or the factuality validator. It opens no step.
 
 ## Architecture invariants
 
@@ -115,9 +148,12 @@ Use these words in code, UI and docs, consistently.
 | Public page | The public showcase for one product, at `/@handle/<slug>`. Inherits from the canonical product; its own columns are deliberate overrides, never a copy |
 | Run | One Publish Everywhere action and the per-channel outcomes it produced |
 | Skipped | A connected channel a run did not attempt, always with a reason |
+| Product listing | Marketing copy only: the public word for the Product, the one thing a creator writes. In code, UI and docs the record is still a Product and a Listing is still channel-specific |
+| Syndicate | Marketing copy only: the public word for Publish Everywhere sending one product to many channels |
 
 In the UI say **Publish**, not Submit. Say **Channels**, not Marketplaces. Say **Product**,
-not Item. The central action is **Publish Everywhere**.
+not Item. The central action is **Publish Everywhere**. On the marketing site say
+**typefaces**, not fonts, and write copy that leads with what the creator gains.
 
 A product is never described as published, partially published or unpublished. Listings are.
 A run says what it did per channel and counts the results; "partially published" is banned
@@ -213,7 +249,8 @@ Do not continue into the next step automatically.
 ## Design
 
 `design/marketing/` holds the published landing and pricing mockups as static HTML. They are
-the source of truth for the visual system and are never imported by `app/`.
+the source of truth for the visual system and are never imported by `app/`. They were
+brought in line with the built site on 20 November 2026; change the two together.
 
 The workspace window inside `design/marketing/landing.html` is the closest thing to a spec
 for the publish screen: master listing on the left, derived channel listings on the right
@@ -221,6 +258,12 @@ with per-channel statuses and an inline rejection fix. Read it before building A
 
 Every figure in the mockups is placeholder except the channel modes and the pricing, which
 are accurate. Do not carry invented usage statistics into anything real.
+
+## Hosting
+
+Netlify, from `main`, configured in `netlify.toml`. Vercel is retired. See
+`docs/hosting-netlify.md`. Secrets live in Netlify's environment settings and the founder
+enters them; an agent never types one.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

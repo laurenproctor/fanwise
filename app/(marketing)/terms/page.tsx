@@ -22,11 +22,13 @@ export default function TermsPage() {
       <header className="fw-legal__header">
         <span className="fw-eyebrow">Legal</span>
         <h1 className="fw-legal__h1">Terms of Service</h1>
-        <p className="fw-legal__date">Effective September 6, 2026</p>
+        <p className="fw-legal__date">
+          Effective September 6, 2026. Last updated November 20, 2026.
+        </p>
         <p className="fw-legal__summary">
-          The short version: you own your products, Fanwise publishes them where you tell it to, you
-          pay a flat subscription, and you can export everything and leave whenever you like. The
-          longer version follows.
+          The short version: you own your products, Fanwise sells and publishes them where you tell
+          it to, you pay a flat subscription, and you can export everything and leave whenever you
+          like. The longer version follows.
         </p>
       </header>
 
@@ -35,19 +37,25 @@ export default function TermsPage() {
           <h2>1. The agreement</h2>
           <p>
             These terms are a contract between you and Fanwise covering your use of the Fanwise
-            service — the workspace, the publishing tools, and everything reachable from your
-            account. By creating a workspace you accept them. If you use Fanwise for a company or
-            studio, you accept them on its behalf.
+            service: the workspace, your storefront, the publishing tools, and everything reachable
+            from your account. By creating a workspace you accept them. If you use Fanwise for a
+            company or studio, you accept them on its behalf.
           </p>
         </section>
         <section>
           <h2>2. The service</h2>
           <p>
-            Fanwise holds a canonical record of each of your digital products and derives
-            marketplace-specific listings from it — previews, copy, tags, pricing and license
-            mappings — then publishes and maintains those listings on the channels you connect. We
-            may change or improve features over time; we will not remove your ability to export your
-            catalog.
+            Fanwise holds one product listing for each product you sell, including typefaces,
+            physical products, Mac apps and other digital products. It shows that listing on your
+            Fanwise storefront and derives a version for each marketplace from it (previews, copy,
+            tags, pricing and license mappings), then publishes and maintains those listings on the
+            channels you connect. We may change or improve features over time. We will not remove
+            your ability to export your catalog.
+          </p>
+          <p>
+            For physical products, you hold the stock and you ship the order. Fanwise passes you the
+            order details and does not store, pack, ship or insure goods. Shipping, returns, refunds
+            and any taxes or duties on a sale are between you and your buyer.
           </p>
         </section>
         <section>
@@ -61,11 +69,11 @@ export default function TermsPage() {
         <section>
           <h2>4. Your content and ownership</h2>
           <p>
-            Everything you upload — product files, previews, descriptions, metadata — remains yours.
-            You grant Fanwise a limited license to store, process, transform and transmit that
-            content solely to operate the service: generating derived listings, submitting them to
-            the marketplaces you choose, and keeping them in sync. We do not sell your content,
-            claim rights in it, or use it to build products that compete with yours.
+            Everything you upload remains yours: product files, app builds, previews, descriptions
+            and metadata. You grant Fanwise a limited license to store, process, transform and
+            transmit that content solely to operate the service: generating derived listings,
+            submitting them to the marketplaces you choose, and keeping them in sync. We do not sell
+            your content, claim rights in it, or use it to build products that compete with yours.
           </p>
         </section>
         <section>
@@ -92,18 +100,19 @@ export default function TermsPage() {
         <section>
           <h2>7. Acceptable use</h2>
           <p>
-            Sell only work you have the rights to sell. Do not use Fanwise to distribute malware,
-            infringe intellectual property, evade a marketplace ban, or interfere with the service
-            or other workspaces. We may suspend workspaces that do.
+            Sell only work you have the rights to sell, and only goods that are legal to sell and
+            ship where you offer them. Do not use Fanwise to distribute malware, infringe
+            intellectual property, evade a marketplace ban, or interfere with the service or other
+            workspaces. We may suspend workspaces that do.
           </p>
         </section>
         <section>
           <h2>8. Cancellation and export</h2>
           <p>
             You can cancel at any time from your workspace; service continues to the end of the paid
-            period. You can export your full catalog — files, listings, metadata and history — at
-            any time, including after cancellation for 90 days. Fanwise holds your products, not
-            your business.
+            period. You can export your full catalog (files, listings, metadata and history) at any
+            time, including after cancellation for 90 days. Fanwise holds your products, not your
+            business.
           </p>
         </section>
         <section>
