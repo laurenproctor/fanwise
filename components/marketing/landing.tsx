@@ -132,7 +132,7 @@ const SELL = [
 const HOW = [
   {
     num: "STEP 01",
-    title: "Build the master listing",
+    title: "Create your product listing",
     body: "Add the files or the item details, full-size previews, a description, and a price. You never write this product up again.",
   },
   {
@@ -142,8 +142,8 @@ const HOW = [
   },
   {
     num: "STEP 03",
-    title: "Publish everywhere",
-    body: "Pick the other shops and get a finished draft for each: previews cropped to spec, copy trimmed to the limit, tags mapped to that shop's categories. Fanwise tracks approvals and flags the rejections that need you.",
+    title: "Syndicate it everywhere",
+    body: "Pick the other shops and Fanwise sends your listing to all of them at once: previews cropped to spec, copy trimmed to the limit, tags mapped to that shop's categories. Then manage every shop, and see every sale, from one place.",
   },
 ]
 
@@ -211,8 +211,8 @@ const PLAN_FEATURES = [
   "Unlimited products, no per-product charge",
   "Your own storefront, with checkout and delivery",
   "One Shopify or WooCommerce store included",
-  "Previews, copy, and tags built for every shop",
-  "Every listing status in one view, with fixes for rejections",
+  "One product listing, syndicated to every shop",
+  "Every shop managed from one place, with fixes for rejections",
   "Add or drop a marketplace any month",
 ]
 
@@ -249,8 +249,8 @@ export function Landing() {
 
             <div className="fw-hero__foot">
               <p>
-                Add a typeface, a physical product, or a Mac app once. Sell it from your own
-                storefront and in every shop that carries it, without rebuilding a single listing.
+                Create one product listing. Fanwise syndicates it to your own storefront and every
+                shop that carries it, all at once. Manage it and see how it sells from one place.
               </p>
               <div className="fw-hero__buttons">
                 <a href="#start" className="fw-btn fw-btn--sm fw-btn--bright">
@@ -267,8 +267,8 @@ export function Landing() {
         <div className="fw-slab">
           <div className="fw-wrap--wide fw-statement">
             <h2>
-              Write one listing. Fanwise sells it from your storefront and rebuilds it for every
-              marketplace, <span>so you never fill in the same form twice.</span>
+              Create one product listing. Fanwise syndicates it to your storefront and every
+              marketplace at once, <span>so you never fill in the same form twice.</span>
             </h2>
             <div className="fw-statement__side">
               <p>
@@ -288,8 +288,8 @@ export function Landing() {
                 <h2>Typefaces, physical products, and Mac apps</h2>
               </div>
               <p>
-                Each product type gets a record that already knows what buyers and shops ask for.
-                You fill it in once.
+                Each product type gets a product listing that already knows what buyers and shops
+                ask for. You fill it in once.
               </p>
             </div>
             <div className="fw-slab-cards">
@@ -310,9 +310,10 @@ export function Landing() {
                 <h2>One listing, 7 places to buy</h2>
               </div>
               <p>
-                The master listing on the left is the only thing you write. Your storefront sells it
-                right away. Each shop gets its own draft with the right preview crop, copy length,
-                and tags, and you see every status in one view.
+                Your product listing on the left is the only thing you write. Your storefront sells
+                it right away. Each shop gets its own version with the right preview crop, copy
+                length, and tags. You see every status and every sale in one place, so you know how
+                the whole brand is performing.
               </p>
             </div>
 

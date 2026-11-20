@@ -6,7 +6,7 @@ import { marketingRoutes } from "@/lib/routes"
 export const metadata: Metadata = {
   title: "About Fanwise",
   description:
-    "The product record belongs to the person who made the product. Why Fanwise treats every marketplace as a destination, not an authority.",
+    "The product listing belongs to the person who made the product. Why Fanwise treats every marketplace as a destination, not an authority.",
 }
 
 const FOOTER = [
@@ -32,7 +32,7 @@ const PHASES = [
   {
     num: "03",
     title: "Bring the money back",
-    body: "Sales and performance from every channel, reconciled in one ledger.",
+    body: "Sales from every shop in one place, so you can see how each product and your whole brand perform.",
   },
   {
     num: "04",
@@ -56,19 +56,19 @@ export default function AboutPage() {
     <MarketingPage nav={{ current: "about" }} footer={FOOTER}>
       <header className="fw-page__header">
         <span className="fw-eyebrow">About</span>
-        <h1 className="fw-h1">The product record belongs to the person who made the product.</h1>
+        <h1 className="fw-h1">The product listing belongs to the person who made the product.</h1>
         <p className="fw-lede">
           Type designers, makers and Mac developers who sell in six shops keep six copies of the
           truth, one per marketplace, each drifting from the others. Fanwise exists to put the
-          record back in one place, owned by its maker, and to treat every marketplace as what it
-          is: a destination.
+          product listing back in one place, owned by its maker, and to treat every marketplace as
+          what it is: a destination.
         </p>
       </header>
 
       <section style={{ padding: "88px 0", maxWidth: 820 }}>
         <span className="fw-eyebrow fw-eyebrow--tight">The one rule</span>
         <div className="fw-about__rule-card">
-          <span className="fw-about__term">Your product record</span>
+          <span className="fw-about__term">Your product listing</span>
           <span aria-hidden="true" className="fw-about__arrow">
             &rarr;
           </span>
@@ -76,12 +76,12 @@ export default function AboutPage() {
           <span aria-hidden="true" className="fw-about__arrow">
             &rarr;
           </span>
-          <span className="fw-about__term fw-about__term--out">Listing</span>
+          <span className="fw-about__term fw-about__term--out">Every shop</span>
         </div>
         <p className="fw-about__after">
-          Never the reverse. Your product record is the authority, and each shop receives a
+          Never the reverse. Your product listing is the authority, and each shop receives a
           translation of it. No marketplace&apos;s quirks leak back into your catalog, so every
-          channel you add makes Fanwise more useful instead of your records messier.
+          channel you add makes Fanwise more useful instead of your listings messier.
         </p>
       </section>
 
