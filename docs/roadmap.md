@@ -910,8 +910,12 @@ three.
 ## Deliberately out of scope for V1
 
 Product versions table, viewer and editor roles, Framer, metric snapshots, multi-currency,
-browser automation, physical commerce, and everything in the strategy document marked V2 or
-V3.
+browser automation, and everything in the strategy document marked V2 or V3.
+
+Physical commerce left this list on 20 November 2026, when the founder widened Fanwise to
+typefaces, physical products and Mac apps with a storefront of its own. It is in the
+direction and not in any step yet: nothing here schedules it, and `CLAUDE.md` lists what the
+public site says against what the app does.
 
 Browser automation means anything that works on a marketplace's page: filling fields,
 attaching files, clicking, or reading the page back, whether a script or a browser
