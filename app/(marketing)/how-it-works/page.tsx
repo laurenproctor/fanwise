@@ -124,6 +124,10 @@ const AFTER = [
     body: "When a shop rejects a draft, Fanwise shows the shop's reason and a suggested fix. Accept it and that one draft rebuilds and resubmits.",
   },
   {
+    title: "Listings get found",
+    body: "Fanwise optimizes every listing for search and for AI. Enter the keywords you want to be found for, and it recommends changes so buyers discover you more often.",
+  },
+  {
     title: "Rules stay current",
     body: "Fanwise tracks each marketplace's rules. When a shop changes one, the affected drafts rebuild and you get a note saying which listings moved.",
   },

@@ -207,11 +207,37 @@ const SPEC_COLUMNS = [
   "Review",
 ] as const
 
+/**
+ * How Fanwise gets a listing found. The first card describes what the
+ * merchandising step already does, under the factuality rule
+ * (docs/ai-merchandising.md), and the product pages already carry structured
+ * data. AI shopping feeds and keyword recommendations describe the direction
+ * the founder set on 20 November 2026 and are not built yet.
+ */
+const FOUND = [
+  {
+    num: "SEARCH",
+    title: "Rank where buyers search",
+    body: "Fanwise writes each shop's title, tags, and description in the words that shop's buyers search for. The facts stay yours: it never invents a claim about your product.",
+  },
+  {
+    num: "AI",
+    title: "Get recommended by AI",
+    body: "Your product pages carry structured data that AI assistants can read and cite. Fanwise also prepares your products for AI shopping results.",
+  },
+  {
+    num: "KEYWORDS",
+    title: "Pick the keywords you want to own",
+    body: "Enter the keywords you want to be found for. Fanwise recommends changes to each listing so buyers discover you more often.",
+  },
+]
+
 const PLAN_FEATURES = [
   "Unlimited products, no per-product charge",
   "Your own storefront, with checkout and delivery",
   "One Shopify or WooCommerce store included",
   "One product listing, syndicated to every shop",
+  "Every listing optimized for search and AI",
   "Every shop managed from one place, with fixes for rejections",
   "Add or drop a marketplace any month",
 ]
@@ -532,6 +558,28 @@ export function Landing() {
                   <div className="fw-slab-card__num">{step.num}</div>
                   <h3>{step.title}</h3>
                   <p>{step.body}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section id="found" className="fw-wrap--wide" style={{ padding: "0 0 92px" }}>
+            <div className="fw-slab-head">
+              <div>
+                <span className="fw-slab-eyebrow">Get found</span>
+                <h2>Search and AI discovery</h2>
+              </div>
+              <p>
+                A product listing only sells if buyers find it. Fanwise optimizes every listing for
+                search and for AI, in every shop.
+              </p>
+            </div>
+            <div className="fw-slab-cards">
+              {FOUND.map((item) => (
+                <div key={item.num} className="fw-slab-card">
+                  <div className="fw-slab-card__num">{item.num}</div>
+                  <h3>{item.title}</h3>
+                  <p>{item.body}</p>
                 </div>
               ))}
             </div>
