@@ -16,8 +16,8 @@ Both are self-contained: open either directly in a browser, no build step.
 tokens; these files are where those tokens came from and where the intent lives.
 
 **The landing page contains a working mockup of the product UI.** The workspace window in
-the middle of `landing.html` shows one master listing on the left and six derived channel
-listings on the right, with per-channel derived-draft summaries, live and pending and
+the middle of `landing.html` shows one product listing on the left and, on the right, the
+Fanwise storefront plus six derived channel listings, with per-channel draft summaries, live and pending and
 needs-a-fix statuses, and an inline rejection with a suggested fix. That section is the
 closest thing to a product spec for the publish screen, and it should be read as one when
 step A4 and A7 arrive.
@@ -29,11 +29,13 @@ should be a separate deployment, and when app screens are built they should deri
 
 ## What is real and what is placeholder
 
-The mockups deliberately show a working product. Every number in them is invented.
+The mockups deliberately show a working product. Every number in them is invented. The
+invented usage statistics the landing mockup once opened with came out on 20 November 2026,
+when both files were brought in line with the built site.
 
 | In the mockups | Status |
 |---|---|
-| Usage stats (41,280 listings, 2,406 designers, 99.4%) | Placeholder |
+| Listing-time figures (6h 40m by hand, under 10m on Fanwise) | Illustrative, and labeled so on the page |
 | The Aster Grotesk sample workspace | Placeholder |
 | Channel spec sheet values | Illustrative. `docs/channels/creative-market.md` has verified ones |
 | Channel modes (Storefront, Automatic, Assisted) | **Accurate**, per `docs/channel-feasibility.md` |
@@ -46,6 +48,15 @@ The built marketing site under `app/(marketing)/` takes the second option: the w
 mock, the listing-time table and every channel spec value carry a note saying so. That is a
 disclosure, not a substitute for real figures — when verified numbers exist, they should
 replace these and the notes should go.
+
+## In step with the built site
+
+On 20 November 2026 both files were rewritten to say what `app/(marketing)/` says: one
+product listing syndicated to a Fanwise storefront and every shop, typefaces, physical
+products and Mac apps as the product types, and the search and AI discovery section. The
+pricing mockup lost its free-plan and comparison sections, which the built page never had.
+Change the built page and the mockup together. `tests/unit/marketing.test.ts` holds the
+channel rail to that; the rest is by hand.
 
 ## Editing
 

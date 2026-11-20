@@ -96,12 +96,6 @@
   .slab { position: relative; z-index: 2; background: var(--paper); border-radius: 30px 30px 0 0; margin-top: -30px; }
   .slab.flat { border-radius: 0; margin-top: 0; }
 
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); padding: 58px 0 54px; }
-  .stat { padding-right: 28px; border-right: 1px solid var(--rule-l); display: flex; flex-direction: column; }
-  .stat:last-child { border-right: 0; }
-  .stat .n { font-family: var(--display); font-weight: 300; font-size: clamp(36px, 4.4vw, 58px); line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
-  .stat .n s { text-decoration: none; color: var(--ink-3); }
-  .stat .sub { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin-top: 12px; }
 
   .statement { padding: 12px 0 88px; display: grid; grid-template-columns: 1fr 1.55fr; gap: 40px; }
   .statement h2 { font-size: clamp(27px, 3.1vw, 42px); line-height: 1.18; font-weight: 300; }
@@ -287,8 +281,6 @@
     .wrap { width: calc(100% - 44px); }
     .nav-mid, .nav-right .signin { display: none; }
     .hero-foot, .statement, .ledger-grid, .sec-head, .wl { grid-template-columns: 1fr; }
-    .stats { grid-template-columns: 1fr 1fr; gap: 28px 0; }
-    .stat:nth-child(2) { border-right: 0; }
     .rail-in { grid-template-columns: repeat(2, 1fr); }
     .rail-in div:nth-child(2n) { border-right: 0; }
     .steps, .tiers { grid-template-columns: 1fr; }
@@ -305,7 +297,7 @@
 <div class="frame">
   <!-- HERO -->
   <header class="hero" id="top">
-    <canvas id="beam" aria-label="A single point of light fanning out into six beams, one for each marketplace"></canvas>
+    <canvas id="beam" aria-label="One product listing fanning out into beams, one for each place it sells"></canvas>
     <div class="wrap hero-inner">
       <nav class="nav">
         <a class="brand" href="#top">
@@ -315,7 +307,7 @@
         <div class="nav-mid">
           <a href="#product">Product</a>
           <a href="#shops">Marketplaces</a>
-          <a href="#specs">Spec sheet</a>
+          <a href="#work">How it works</a>
           <a href="#pricing">Pricing</a>
         </div>
         <div class="nav-right">
@@ -325,12 +317,12 @@
       </nav>
 
       <div style="padding-top:56px">
-        <span class="tag"><i></i> All six marketplaces operational</span>
-        <h1 class="giant">Upload once.<br><b>Everywhere.</b></h1>
+        <span class="tag"><i></i> Typefaces, physical products, Mac apps</span>
+        <h1 class="giant">Create once.<br><b>Sell everywhere.</b></h1>
       </div>
 
       <div class="hero-foot">
-        <p>One master listing, fanned out to every shop that sells it, resized and retagged to each one's rules.</p>
+        <p>Create one product listing. Fanwise syndicates it to your own storefront and every shop that carries it, all at once. Manage it and see how it sells from one place.</p>
         <div class="hero-cta">
           <a class="pill solid" href="#start">Get started</a>
           <a class="pill" href="#product">See it working</a>
@@ -341,41 +333,50 @@
 
   <!-- STATS -->
   <div class="slab">
-    <div class="wrap stats">
-      <div class="stat">
-        <div class="n">41,280</div>
-        <div class="sub">listings fanned out</div>
-      </div>
-      <div class="stat">
-        <div class="n">2,406</div>
-        <div class="sub">designers on Fanwise</div>
-      </div>
-      <div class="stat">
-        <div class="n">9<s>m</s> 40<s>s</s></div>
-        <div class="sub">median product to six shops</div>
-      </div>
-      <div class="stat">
-        <div class="n">99.4<s>%</s></div>
-        <div class="sub">drafts accepted first pass</div>
+    <div class="wrap statement">
+      <h2>Create one product listing. Fanwise syndicates it to your storefront and every marketplace at once, <span>so you never fill in the same form twice.</span></h2>
+      <div class="aside">
+        <p>Start with typefaces, physical products, and Mac apps. Templates, images, icons, and presets follow.</p>
+        <a class="link-arrow" href="#sell">See what you can sell <span aria-hidden="true">&rarr;</span></a>
       </div>
     </div>
 
-    <div class="wrap statement">
-      <h2>Fanwise takes one product and gives it to every shop that sells it, <span>in the exact shape each one demands.</span></h2>
-      <div class="aside">
-        <p>Fonts, templates, presets, icons, mockups, UI kits. If it ships as a file and sells as a listing, it fans out.</p>
-        <a class="link-arrow" href="#product">Look inside the workspace <span aria-hidden="true">&rarr;</span></a>
+    <!-- WHAT YOU CAN SELL -->
+    <section class="wrap sec" id="sell" style="padding-top:0">
+      <div class="sec-head">
+        <div>
+          <span class="mono kicker">What you can sell</span>
+          <h2>Typefaces, physical products, and Mac apps</h2>
+        </div>
+        <p>Each product type gets a product listing that already knows what buyers and shops ask for. You fill it in once.</p>
       </div>
-    </div>
+      <div class="steps">
+        <div class="step">
+          <div class="n">AVAILABLE NOW</div>
+          <h3>Typefaces</h3>
+          <p>Upload the family once and skip the specimen grind. Fanwise reads every style, checks language coverage, and builds the specimens each shop asks for.</p>
+        </div>
+        <div class="step">
+          <div class="n">AVAILABLE NOW</div>
+          <h3>Physical products</h3>
+          <p>Set your variants, stock, and shipping rules once. Fanwise takes the order and tells you what to ship.</p>
+        </div>
+        <div class="step">
+          <div class="n">AVAILABLE NOW</div>
+          <h3>Mac apps</h3>
+          <p>Ship a new build without rewriting a listing. Upload it with its release notes. Fanwise takes the payment and delivers the download.</p>
+        </div>
+      </div>
+    </section>
 
     <!-- PRODUCT -->
     <section class="wrap app-sec" id="product">
       <div class="sec-head" style="margin-bottom:34px">
         <div>
           <span class="mono kicker">The workspace</span>
-          <h2>Six drafts, built in 41 seconds</h2>
+          <h2>One listing, 7 places to buy</h2>
         </div>
-        <p>One master listing on the left. Every shop's derived draft on the right, with its own preview crop, copy length, tags and live status.</p>
+        <p>Your product listing on the left is the only thing you write. Your storefront sells it right away. Each shop gets its own version with the right preview crop, copy length, and tags. You see every status and every sale in one place, so you know how the whole brand is performing.</p>
       </div>
 
       <div class="app">
@@ -402,7 +403,14 @@
 
           <div class="drafts">
             <div class="drafts-head">
-              <div>Marketplace</div><div>Derived draft</div><div>Status</div><div style="text-align:right">Updated</div>
+              <div>Shop</div><div>Draft</div><div>Status</div><div style="text-align:right">Updated</div>
+            </div>
+
+            <div class="draft">
+              <div class="shop">Fanwise</div>
+              <div class="derived">Your storefront &middot; checkout &middot; delivery</div>
+              <div><span class="status ok"><i></i> Selling</span></div>
+              <div class="when">2m ago</div>
             </div>
 
             <div class="draft">
@@ -456,13 +464,13 @@
         </div>
 
         <div class="app-foot">
-          <div>6 drafts built in <b>41s</b> &middot; 3 live &middot; 2 pending &middot; <b>1 needs attention</b></div>
+          <div>Storefront selling &middot; 6 drafts &middot; 3 live &middot; 2 pending &middot; <b>1 needs attention</b></div>
           <div>Next sync in 4m</div>
         </div>
       </div>
 
       <div class="app-cap">
-        <p class="note" style="margin-top:0">Interface shown with a sample workspace. Rejections come back with the shop's reason and a suggested fix; accepting one rebuilds and resubmits that draft alone.</p>
+        <p class="note" style="margin-top:0">Interface shown with a sample typeface workspace. The product, figures, and statuses are illustrative. Physical products and Mac apps use the same layout. When a shop rejects a draft, Fanwise shows the reason and a suggested fix. Accept it and that one draft rebuilds and resubmits.</p>
         <a class="link-arrow" href="#start" style="align-self:end">Fan out a product <span aria-hidden="true">&rarr;</span></a>
       </div>
     </section>
@@ -486,19 +494,19 @@
     <section class="wrap sec" id="cost">
       <div class="sec-head">
         <div>
-          <span class="mono kicker">The arithmetic</span>
+          <span class="mono kicker">The time you get back</span>
           <h2>Making it takes a week.<br>Listing it used to take another.</h2>
         </div>
-        <p>Every shop wants the same product in a slightly different shape. Six times over, by hand, for one release.</p>
+        <p>Every shop wants the same product in a slightly different shape. By hand, that is the same job 6 times for every release. On Fanwise, you review and approve.</p>
       </div>
       <div class="ledger-grid">
-        <div class="ledger" aria-label="Time spent listing one font family by hand">
+        <div class="ledger" aria-label="Illustrative time spent listing one product by hand">
           <div class="row"><span>Re-export previews for six image specs</span><span>1h 40m</span></div>
           <div class="row"><span>Rewrite the description to six length limits</span><span>55m</span></div>
-          <div class="row"><span>Research and enter tags, six taxonomies</span><span>1h 10m</span></div>
+          <div class="row"><span>Research and enter tags in six taxonomies</span><span>1h 10m</span></div>
           <div class="row"><span>Map one license to six license menus</span><span>35m</span></div>
           <div class="row"><span>Fill forms, upload, wait, fix rejections</span><span>2h 20m</span></div>
-          <div class="row total"><span>One font family, listed by hand</span><span>6h 40m</span></div>
+          <div class="row total"><span>One product, listed by hand</span><span>6h 40m</span></div>
         </div>
         <div>
           <div class="versus">
@@ -507,11 +515,11 @@
               <div class="track"><div class="fill hand"></div></div>
             </div>
             <div class="bar">
-              <div class="cap"><span>On Fanwise, median</span><b>9m 40s</b></div>
+              <div class="cap"><span>On Fanwise</span><b>under 10m</b></div>
               <div class="track"><div class="fill fw"></div></div>
             </div>
           </div>
-          <p class="note">Hand timings are the average designers reported for one font family across these six shops. The nine minutes are review and approval: Fanwise builds the drafts, a person signs them off.</p>
+          <p class="note">Illustrative timings for one product across six shops, not a measured benchmark. The minutes on Fanwise are review and approval: Fanwise builds the drafts and you sign them off.</p>
         </div>
       </div>
     </section>
@@ -520,26 +528,54 @@
     <section class="wrap sec" id="work" style="padding-top:0">
       <div class="sec-head">
         <div>
-          <span class="mono kicker">Three steps</span>
+          <span class="mono kicker">3 steps</span>
           <h2>How it works</h2>
         </div>
-        <p>The first step is the only one that takes any real time, and it happens once per product.</p>
+        <p>The first step takes real time. It happens once per product, and everything after it is review.</p>
       </div>
       <div class="steps">
         <div class="step">
           <div class="n">STEP 01</div>
-          <h3>Build the master listing</h3>
-          <p>Upload the files, one set of previews at full size, a description, a license and a price. This is the single source every shop is derived from.</p>
+          <h3>Create your product listing</h3>
+          <p>Add the files or the item details, full-size previews, a description, and a price. You never write this product up again.</p>
         </div>
         <div class="step">
           <div class="n">STEP 02</div>
-          <h3>Pick the shops</h3>
-          <p>Toggle the marketplaces the product belongs on. Each gets its own draft: previews cropped to spec, copy trimmed to the limit, tags mapped to that shop's taxonomy.</p>
+          <h3>Open your storefront</h3>
+          <p>Turn on checkout and your product page starts selling. Buyers pay you. Fanwise delivers the files, or hands you the order to ship.</p>
         </div>
         <div class="step">
           <div class="n">STEP 03</div>
-          <h3>Review and send</h3>
-          <p>Check the drafts side by side, adjust anything a shop will care about, submit. Fanwise tracks approvals and flags the rejections that need a human.</p>
+          <h3>Syndicate it everywhere</h3>
+          <p>Pick the other shops and Fanwise sends your listing to all of them at once: previews cropped to spec, copy trimmed to the limit, tags mapped to that shop's categories. Then manage every shop, and see every sale, from one place.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- GET FOUND -->
+    <section class="wrap sec" id="found" style="padding-top:0">
+      <div class="sec-head">
+        <div>
+          <span class="mono kicker">Get found</span>
+          <h2>Search and AI discovery</h2>
+        </div>
+        <p>A product listing only sells if buyers find it. Fanwise optimizes every listing for search and for AI, in every shop.</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="n">SEARCH</div>
+          <h3>Rank where buyers search</h3>
+          <p>Fanwise writes each shop's title, tags, and description in the words that shop's buyers search for. The facts stay yours: it never invents a claim about your product.</p>
+        </div>
+        <div class="step">
+          <div class="n">AI</div>
+          <h3>Get recommended by AI</h3>
+          <p>Your product pages carry structured data that AI assistants can read and cite. Fanwise also prepares your products for AI shopping results.</p>
+        </div>
+        <div class="step">
+          <div class="n">KEYWORDS</div>
+          <h3>Pick the keywords you want to own</h3>
+          <p>Enter the keywords you want to be found for. Fanwise recommends changes to each listing so buyers discover you more often.</p>
         </div>
       </div>
     </section>
@@ -549,9 +585,9 @@
       <div class="sec-head">
         <div>
           <span class="mono kicker">Reference</span>
-          <h2>The spec sheet</h2>
+          <h2>6 rulebooks you no longer keep</h2>
         </div>
-        <p>This is the work. Six sets of rules, none of them in agreement. Fanwise keeps them so a designer never has to.</p>
+        <p>This is the work Fanwise takes off your desk: 6 sets of rules, none of them in agreement, all kept current for you.</p>
       </div>
       <div class="table-scroll">
         <table>
@@ -568,7 +604,8 @@
           </tbody>
         </table>
       </div>
-      <p class="note">Rules are maintained per marketplace and versioned. When a shop changes a requirement, affected drafts rebuild and the owner gets a note saying which listings moved.</p>
+      <p class="note">Spec values are illustrative. Fanwise tracks the rules for each marketplace. When a shop changes a requirement, the affected drafts rebuild and you get a note saying which listings moved.</p>
+      <p style="margin-top:18px"><a class="link-arrow" href="#shops">21 more shops are on the build list, including eBay, Amazon, Walmart, TikTok Shop, itch.io and the Mac App Store <span aria-hidden="true">&rarr;</span></a></p>
     </section>
   </div>
 
@@ -579,9 +616,9 @@
       <div class="sec-head">
         <div>
           <span class="mono kicker on-dark">Pricing</span>
-          <h2>One price, plus the shops</h2>
+          <h2>A flat price. Your sales stay yours.</h2>
         </div>
-        <p>$9 a month, then $6 for each marketplace connected. One owned storefront is included, the catalog is unlimited, and Fanwise never takes a percentage of sales.</p>
+        <p>$9 a month covers your storefront and an unlimited catalog. Add $6 for each marketplace you connect. Fanwise never takes a percentage of sales.</p>
       </div>
       <div class="tiers">
         <div class="tier lead" style="grid-column: span 2">
@@ -599,9 +636,11 @@
           <p class="calc" id="calc" aria-live="polite"></p>
           <ul>
             <li>Unlimited products, no per-product charge</li>
-            <li>One owned storefront included</li>
-            <li>Full preview, copy and tag mapping</li>
-            <li>Status tracking and rejection fixes</li>
+            <li>Your own storefront, with checkout and delivery</li>
+            <li>One Shopify or WooCommerce store included</li>
+            <li>One product listing, syndicated to every shop</li>
+            <li>Every listing optimized for search and AI</li>
+            <li>Every shop managed from one place, with fixes for rejections</li>
             <li>Add or drop a marketplace any month</li>
           </ul>
           <a class="pill solid" href="#start">Get started</a>
@@ -610,7 +649,7 @@
           <h3>Studio</h3>
           <div class="price">$59<small>per month</small></div>
           <ul>
-            <li>For foundries and creative teams</li>
+            <li>For foundries, app studios, brands, and creative teams</li>
             <li>Multiple seats and client workspaces</li>
             <li>Multiple accounts per marketplace</li>
             <li>Bulk publishing and updates</li>
@@ -629,46 +668,19 @@
     <div class="wrap wl">
       <div>
         <span class="mono kicker on-dark">Get started</span>
-        <h2>Bring one product.<br><b>Leave with six listings.</b></h2>
-        <p>Connect a shop, upload a product, and watch the drafts build. $9 a month, plus $6 for each marketplace connected.</p>
+        <h2>Bring one product.<br><b>Leave with a storefront.</b></h2>
+        <p>Add one product and start selling from your own storefront. Connect the other shops when you're ready. $9 a month, plus $6 for each marketplace.</p>
         <div class="ticks">
-          <span><i></i> Six shops connected</span>
+          <span><i></i> Your own storefront</span>
           <span><i></i> $9 plus $6 a marketplace</span>
           <span><i></i> Export and leave anytime</span>
         </div>
       </div>
       <div>
-        <form id="wl-form" novalidate>
-          <div class="field">
-            <label for="name">Name</label>
-            <input id="name" name="name" type="text" autocomplete="name" placeholder="Full name">
-          </div>
-          <div class="field">
-            <label for="email">Work email</label>
-            <input id="email" name="email" type="email" autocomplete="email" placeholder="name@studio.com">
-          </div>
-          <div class="form-row">
-            <div class="field">
-              <label for="sells">Mostly sells</label>
-              <select id="sells" name="sells">
-                <option>Fonts</option><option>Templates</option><option>Presets and actions</option>
-                <option>Icons and illustration</option><option>Mockups</option><option>UI kits</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="shop">First shop to connect</label>
-              <select id="shop" name="shop">
-                <option>Etsy</option><option>Creative Market</option><option>Envato</option>
-                <option>Gumroad</option><option>Adobe Stock</option><option>MyFonts</option>
-              </select>
-            </div>
-          </div>
-          <p class="err" id="err"></p>
-          <button class="submit" type="submit">Create a workspace</button>
-        </form>
-        <div class="confirm" id="confirm">
-          <h3>Workspace ready.</h3>
-          <p id="confirm-detail"></p>
+        <div class="confirm show">
+          <h3>Create a workspace</h3>
+          <p>All it takes is an email and a password. Add your first product from inside.</p>
+          <a class="pill solid" href="#start" style="margin-top:20px;display:inline-flex">Get started</a>
         </div>
       </div>
     </div>
@@ -684,7 +696,7 @@
         <span class="status-line"><i></i> All systems operational</span>
       </div>
       <div class="foot-links">
-        <a href="#product">Product</a><a href="#specs">Spec sheet</a><a href="#pricing">Pricing</a><a href="#start">Sign in</a>
+        <a href="#product">Product</a><a href="#shops">Marketplaces</a><a href="#work">How it works</a><a href="#pricing">Pricing</a><a href="#start">Sign in</a>
       </div>
       <p class="def">fanwise, adv. In the manner of a fan; spreading out from a single fixed point.</p>
     </div>
@@ -809,7 +821,7 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       ctx.letterSpacing = '2px';
-      ctx.fillText('ONE MASTER LISTING', px, py + 30);
+      ctx.fillText('ONE PRODUCT LISTING', px, py + 30);
       ctx.beginPath();
       ctx.moveTo(px, py + 14);
       ctx.lineTo(px, py + 24);
@@ -831,20 +843,6 @@
   if (!reduce) requestAnimationFrame(frame);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
 
-  // sign-up, display only
-  var form = document.getElementById('wl-form'), err = document.getElementById('err');
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    var name = form.name.value.trim(), email = form.email.value.trim();
-    if (!name) { err.style.display = 'block'; err.textContent = 'Add a name so we know what to call the workspace.'; return; }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { err.style.display = 'block'; err.textContent = 'That email looks incomplete. Check it and try again.'; return; }
-    err.style.display = 'none';
-    form.classList.add('hide');
-    document.getElementById('confirm-detail').textContent =
-      'Welcome, ' + name + '. Your workspace is set up for ' + form.sells.value.toLowerCase() + ', with ' + form.shop.value + ' first in line to connect at $6 a month. Check your inbox to confirm the address.';
-    document.getElementById('confirm').classList.add('show');
-  });
-
   // per-marketplace price picker
   var picker = document.getElementById('picker'), calc = document.getElementById('calc');
   function priceOut() {
@@ -864,12 +862,12 @@
   // sample fix action
   var fixBtn = document.querySelector('.fix button');
   if (fixBtn) fixBtn.addEventListener('click', function () {
-    var row = document.querySelectorAll('.draft')[4];
+    var row = document.querySelectorAll('.draft')[5];
     row.querySelector('.status').outerHTML = '<span class="status warn"><i></i> Resubmitted</span>';
     row.querySelector('.when').textContent = 'just now';
     document.querySelector('.fixrow').remove();
     var foot = document.querySelector('.app-foot div');
-    foot.innerHTML = '6 drafts built in <b>41s</b> &middot; 3 live &middot; <b>3 pending</b> &middot; 0 need attention';
+    foot.innerHTML = 'Storefront selling &middot; 6 drafts &middot; 3 live &middot; <b>3 pending</b> &middot; 0 need attention';
   });
 })();
 </script>
