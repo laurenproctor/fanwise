@@ -417,6 +417,7 @@ same portfolio problem A's exit has. Reordering buys time for B1; it does not bu
 | B10 | Gumroad: OAuth with PKCE, adapter, presigned multipart file upload, draft then enable, covers and thumbnail, the compensating delete, a platform-wide create pace, idempotency. See `docs/channels/gumroad.md`. Planned 11 September 2026 at the founder's request; **opened 16 September 2026 at the founder's request, ahead of A7's exit; code complete the same day**; **exit passed 17 September 2026**, journey 13, see below |
 | B11 | The companion window: the assisted handoff shown beside the marketplace's own editor, in a pop-out that touches nothing on the marketplace's page. See `docs/companion-window.md` and `docs/decisions/0010`. Planned 12 September 2026. **Opened 13 September 2026 at the founder's request, ahead of its evidence; code complete, exit unrun**, see below |
 | B12 | Import a live listing: an inward read per `api` adapter, listing-URL resolution inside the adapter, a reviewed mapping to a canonical product, fetched images, the `import` snapshot, and the claim that makes a second import a navigation. See `docs/listing-import.md`. **Planned 12 September 2026 at the founder's request, not opened**; opens after Gate A passes, see below |
+| B13 | Storefront checkout: a Buy button on the public product page, payment into the creator's own Stripe account, file delivery by email and on the page, an Orders list. **Proposed 25 November 2026, not opened.** Waits on ADR 0016. See `docs/storefront-checkout.md` |
 
 ### B1, what was built and what is still owed
 
