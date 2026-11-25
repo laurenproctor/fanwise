@@ -544,7 +544,16 @@ Note the interaction: the storage bucket already caps a single object at 4 GiB, 
 deliverables would exhaust a 25 GB workspace. Pick this number against real font and template
 bundle sizes rather than in the abstract.
 
+### 31. How a buyer pays on a Fanwise storefront
+
+Proposed 25 November 2026 and waiting on the founder: five questions, each with a
+recommended answer, in `docs/decisions/0016`. B13 does not open until they are answered.
+
 ### 18. Free tier or trial
+
+*Note, 25 November 2026: the free plan described below came out of the pricing mockup on 20
+November 2026, when the mockups were brought in line with the built site. The question is
+still open; the mockup no longer argues one side of it.*
 
 `docs/billing.md` describes neither. The roadmap's C1 says "trial". The published pricing
 mockup ships a **free plan**: $0, one product, one assisted channel, limited generations, no
